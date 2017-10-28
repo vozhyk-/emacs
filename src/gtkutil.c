@@ -19,7 +19,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 
 #include <config.h>
 
-#ifdef USE_GTK
+#if defined(USE_GTK) && !defined(HAVE_GTK3WL)
 #include <float.h>
 #include <stdio.h>
 

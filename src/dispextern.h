@@ -80,6 +80,14 @@ typedef Pixmap XImagePtr;
 typedef XImagePtr XImagePtr_or_DC;
 #endif
 
+#ifdef HAVE_GTK3WL
+#include "gtk3wlgui.h"
+/* Following typedef needed to accommodate the MSDOS port, believe it or not.  */
+typedef struct gtk3wl_display_info Display_Info;
+typedef Pixmap XImagePtr;
+typedef XImagePtr XImagePtr_or_DC;
+#endif
+
 #ifdef HAVE_WINDOW_SYSTEM
 # include <time.h>
 # include "fontset.h"
@@ -3375,7 +3383,7 @@ bool valid_image_p (Lisp_Object);
 void prepare_image_for_display (struct frame *, struct image *);
 ptrdiff_t lookup_image (struct frame *, Lisp_Object);
 
-#if defined (HAVE_X_WINDOWS) ||  defined (HAVE_NS)
+#if defined (HAVE_X_WINDOWS) ||  defined (HAVE_NS) || defined(HAVE_GTK3WL)
 #define RGB_PIXEL_COLOR unsigned long
 #endif
 

@@ -95,7 +95,7 @@ static bool valgrind_p;
 #include <unistd.h>
 #include <fcntl.h>
 
-#ifdef USE_GTK
+#if defined(USE_GTK) && !defined(HAVE_GTK3WL)
 # include "gtkutil.h"
 #endif
 #ifdef WINDOWSNT

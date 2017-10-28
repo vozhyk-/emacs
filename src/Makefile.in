@@ -284,6 +284,9 @@ W32_OBJ=@W32_OBJ@
 ## --lwinspool if HAVE_W32, else empty.
 W32_LIBS=@W32_LIBS@
 
+GTK3WL_OBJ=@GTK3WL_OBJ@
+GTK3WL_LIBS=@GTK3WL_LIBS@
+
 ## emacs.res if HAVE_W32
 EMACSRES = @EMACSRES@
 ## If HAVE_W32, compiler arguments for including
@@ -396,7 +399,7 @@ base_obj = dispnew.o frame.o scroll.o xdisp.o menu.o $(XMENU_OBJ) window.o \
 	profiler.o decompress.o \
 	thread.o systhread.o \
 	$(if $(HYBRID_MALLOC),sheap.o) \
-	$(MSDOS_OBJ) $(MSDOS_X_OBJ) $(NS_OBJ) $(CYGWIN_OBJ) $(FONT_OBJ) \
+	$(MSDOS_OBJ) $(MSDOS_X_OBJ) $(NS_OBJ) $(GTK3WL_OBJ) $(CYGWIN_OBJ) $(FONT_OBJ) \
 	$(W32_OBJ) $(WINDOW_SYSTEM_OBJ) $(XGSELOBJ)
 obj = $(base_obj) $(NS_OBJC_OBJ)
 

@@ -1791,6 +1791,8 @@ window_system=none
 AC_PATH_X
 if test "$no_x" != yes; then
   window_system=x11
+else
+  window_system=gtk3wl
 fi
 
 LD_SWITCH_X_SITE_RPATH=
@@ -2159,6 +2161,11 @@ dnl use the toolkit if we have gtk, or X11R5 or newer.
   ;;
   w32 )
     term_header=w32term.h
+  ;;
+  gtk3wl )
+    term_header=gtk3wlterm.h
+    with_gtk3=yes
+    USE_X_TOOLKIT=none
   ;;
 esac
 
@@ -2641,7 +2648,9 @@ if test x"$pkg_check_gtk" = xyes; then
     HAVE_GTK=yes
     AC_DEFINE(USE_GTK, 1, [Define to 1 if using GTK.])
     GTK_OBJ="gtkutil.o $GTK_OBJ"
-    term_header=$gtk_term_header
+    if test $window_system != gtk3wl; then
+      term_header=$gtk_term_header
+    fi
     USE_X_TOOLKIT=none
     AC_MSG_WARN([[Your version of Gtk+ will have problems with
        closing open displays.  This is no problem if you just use
@@ -2699,7 +2708,9 @@ if test "${HAVE_GTK}" = "yes"; then
                  gtk_orientable_set_orientation \
 		 gtk_window_set_has_resize_grip)
 
- term_header=gtkutil.h
+ if $window_system != gtk3wl; then
+   term_header=gtkutil.h
+ fi
 fi
 
 
@@ -2724,6 +2735,16 @@ AC_SUBST(XWIDGETS_OBJ)
 
 CFLAGS=$OLD_CFLAGS
 LIBS=$OLD_LIBS
+
+GTK3WL_OBJ=
+GTK3WL_LIBS=
+if test "$window_system" = "gtk3wl"; then
+  GTK3WL_OBJ="gtk3wlfns.o"
+  GTK3WL_LIBS="$GTK_LIBS"
+  AC_DEFINE([HAVE_GTK3WL], 1, [Define to 1 if you have Gtk+-3 with wayland.])
+fi
+AC_SUBST(GTK3WL_OBJ)
+AC_SUBST(GTK3WL_LIBS)
 
 dnl D-Bus has been tested under GNU/Linux only.  Must be adapted for
 dnl other platforms.

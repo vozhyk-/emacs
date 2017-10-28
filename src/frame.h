@@ -509,6 +509,7 @@ struct frame
     struct x_output *x;         /* From xterm.h.  */
     struct w32_output *w32;     /* From w32term.h.  */
     struct ns_output *ns;       /* From nsterm.h.  */
+    struct gtk3wl_output *gtk3wl; /* From gtk3wlterm.h. */
     intptr_t nothing;
   }
   output_data;
@@ -750,6 +751,11 @@ default_pixels_per_inch_y (void)
 #else
 #define FRAME_NS_P(f) ((f)->output_method == output_ns)
 #endif
+#ifndef HAVE_GTK3WL
+#define FRAME_GTK3WL_P(f) false
+#else
+#define FRAME_GTK3WL_P(f) ((f)->output_method == output_gtk3wl)
+#endif
 
 /* FRAME_WINDOW_P tests whether the frame is a window, and is
    defined to be the predicate for the window system being used.  */
@@ -762,6 +768,9 @@ default_pixels_per_inch_y (void)
 #endif
 #ifdef HAVE_NS
 #define FRAME_WINDOW_P(f) FRAME_NS_P(f)
+#endif
+#ifdef HAVE_GTK3WL
+#define FRAME_WINDOW_P(f) FRAME_GTK3WL_P(f)
 #endif
 #ifndef FRAME_WINDOW_P
 #define FRAME_WINDOW_P(f) ((void) (f), false)
