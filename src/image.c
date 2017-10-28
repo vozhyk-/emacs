@@ -103,8 +103,24 @@ typedef struct ns_bitmap_record Bitmap_Record;
   ns_defined_color (f, name, color_def, alloc, 0)
 #endif /* HAVE_NS */
 
+#ifdef HAVE_GTK3WL
+typedef struct gtk3wl_bitmap_record Bitmap_Record;
+
+#define GET_PIXEL(ximg, x, y) 0
+ // XGetPixel (ximg, x, y)
+#define NO_PIXMAP 0
+
+#define PIX_MASK_RETAIN	0
+
+#define PIX_MASK_RETAIN	0
+#define PIX_MASK_DRAW	1
+
+#define x_defined_color(f, name, color_def, alloc) \
+  gtk3wl_defined_color (f, name, color_def, alloc, 0)
+#endif /* HAVE_GTK3WL */
+
 #if (defined HAVE_X_WINDOWS \
-     && ! (defined HAVE_NTGUI || defined USE_CAIRO || defined HAVE_NS))
+     && ! (defined HAVE_NTGUI || defined USE_CAIRO || defined HAVE_NS || defined HAVE_GTK3WL))
 /* W32_TODO : Color tables on W32.  */
 # define COLOR_TABLE_SUPPORT 1
 #endif
@@ -298,6 +314,10 @@ x_create_bitmap_from_file (struct frame *f, Lisp_Object file)
   dpyinfo->bitmaps[id - 1].height = ns_image_width (bitmap);
   dpyinfo->bitmaps[id - 1].width = ns_image_height (bitmap);
   return id;
+#endif
+
+#ifdef HAVE_GTK3WL
+  return -1;
 #endif
 
 #ifdef HAVE_X_WINDOWS
@@ -1195,6 +1215,11 @@ four_corners_best (XImagePtr_or_DC ximg, int *corners,
 
 #define Free_Pixmap(display, pixmap) \
   ns_release_object (pixmap)
+
+#elif defined (HAVE_GTK3WL)
+
+#define Free_Pixmap(display, pixmap) ((void) 0)
+//  ns_release_object (pixmap)
 
 #else
 
@@ -2096,6 +2121,24 @@ x_create_x_image_and_pixmap (struct frame *f, int width, int height, int depth,
   *ximg = *pixmap;
   return 1;
 #endif
+
+#ifdef HAVE_GTK3WL
+#if 0
+  *pixmap = ns_image_for_XPM (width, height, depth);
+  if (*pixmap == 0)
+    {
+      *ximg = NULL;
+      image_error ("Unable to allocate NSImage for XPM pixmap");
+      return 0;
+    }
+  *ximg = *pixmap;
+  return 1;
+#else
+  *pixmap = 0;
+  *ximg = NULL;
+  return 0;
+#endif
+#endif
 }
 
 
@@ -2119,6 +2162,9 @@ x_destroy_x_image (XImagePtr ximg)
 #endif /* HAVE_NTGUI */
 #ifdef HAVE_NS
       ns_release_object (ximg);
+#endif /* HAVE_NS */
+#ifdef HAVE_GTK3WL
+      // ns_release_object (ximg);
 #endif /* HAVE_NS */
     }
 }
@@ -2150,6 +2196,11 @@ x_put_x_image (struct frame *f, XImagePtr ximg, Pixmap pixmap, int width, int he
 #ifdef HAVE_NS
   eassert (ximg == pixmap);
   ns_retain_object (ximg);
+#endif
+
+#ifdef HAVE_GTK3WL
+  eassert (ximg == pixmap);
+  // ns_retain_object (ximg);
 #endif
 }
 
@@ -2261,6 +2312,11 @@ image_get_x_image (struct frame *f, struct image *img, bool mask_p)
   XImagePtr pixmap = !mask_p ? img->pixmap : img->mask;
 
   ns_retain_object (pixmap);
+  return pixmap;
+#elif defined (HAVE_GTK3WL)
+  XImagePtr pixmap = !mask_p ? img->pixmap : img->mask;
+
+  // ns_retain_object (pixmap);
   return pixmap;
 #endif
 }
@@ -2751,6 +2807,9 @@ Create_Pixmap_From_Bitmap_Data (struct frame *f, struct image *img, char *data,
 
 #elif defined (HAVE_NS)
   img->pixmap = ns_image_from_XBM (data, img->width, img->height, fg, bg);
+
+#elif defined (HAVE_GTK3WL)
+  img->pixmap = 0;
 
 #else
   img->pixmap =
@@ -4983,6 +5042,7 @@ x_disable_image (struct frame *f, struct image *img)
   if (n_planes < 2 || cross_disabled_images)
     {
 #ifndef HAVE_NTGUI
+#ifndef HAVE_GTK3WL
 #ifndef HAVE_NS  /* TODO: NS support, however this not needed for toolbars */
 
 #define MaskForeground(f)  WHITE_PIX_DEFAULT (f)
@@ -5010,6 +5070,7 @@ x_disable_image (struct frame *f, struct image *img)
 	  XFreeGC (dpy, gc);
 	}
 #endif /* !HAVE_NS */
+#endif
 #else
       HDC hdc, bmpdc;
       HGDIOBJ prev;
@@ -5120,8 +5181,12 @@ x_build_heuristic_mask (struct frame *f, struct image *img, Lisp_Object how)
   for (y = 0; y < img->height; ++y)
     for (x = 0; x < img->width; ++x)
 #ifndef HAVE_NS
+#ifdef HAVE_GTK3WL
+      XPutPixel (mask_img, x, y, PIX_MASK_DRAW);
+#else
       XPutPixel (mask_img, x, y, (XGetPixel (ximg, x, y) != bg
 				  ? PIX_MASK_DRAW : PIX_MASK_RETAIN));
+#endif
 #else
       if (XGetPixel (ximg, x, y) == bg)
         ns_set_alpha (ximg, x, y, 0);
