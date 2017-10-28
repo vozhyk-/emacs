@@ -29,6 +29,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include <time.h>
 #include <signal.h>
 #include <unistd.h>
+#include <errno.h>
 
 #include <c-ctype.h>
 #include <c-strcase.h>
@@ -9216,7 +9217,12 @@ baseline level.  The default value is nil.  */);
 
 #endif
 
+/* ==== ==== ==== ==== ==== ==== ==== ==== ==== ==== ==== ==== ==== ==== ==== ==== */
+
 struct gtk3wl_display_info *x_display_list; /* Chain of existing displays */
+static int selfds[2] = { -1, -1 };
+static pthread_mutex_t select_mutex;
+static fd_set select_readfds, select_writefds;
 
 char *
 x_get_keysym_name (int keysym)
@@ -9704,30 +9710,137 @@ x_set_z_group (struct frame *f, Lisp_Object new_value, Lisp_Object old_value)
 #endif
 }
 
+static void
+gtk3wl_initialize_display_info (struct gtk3wl_display_info *dpyinfo)
+/* --------------------------------------------------------------------------
+      Initialize global info and storage for display.
+   -------------------------------------------------------------------------- */
+{
+    dpyinfo->resx = 72.27; /* used 75.0, but this makes pt == pixel, expected */
+    dpyinfo->resy = 72.27;
+    dpyinfo->color_p = 1;
+    dpyinfo->n_planes = 32;
+    dpyinfo->color_table = xmalloc (sizeof *dpyinfo->color_table);
+    // dpyinfo->color_table->colors = NULL;
+    dpyinfo->root_window = 42; /* a placeholder.. */
+    dpyinfo->x_highlight_frame = dpyinfo->x_focus_frame = NULL;
+    dpyinfo->n_fonts = 0;
+    dpyinfo->smallest_font_height = 1;
+    dpyinfo->smallest_char_width = 1;
+
+    reset_mouse_highlight (&dpyinfo->mouse_highlight);
+}
+
+extern frame_parm_handler gtk3wl_frame_parm_handlers[];
+
+static struct redisplay_interface gtk3wl_redisplay_interface =
+{
+  gtk3wl_frame_parm_handlers,
+  x_produce_glyphs,
+  x_write_glyphs,
+  x_insert_glyphs,
+  x_clear_end_of_line,
+  NULL, // gtk3wl_scroll_run,
+  NULL, // gtk3wl_after_update_window_line,
+  NULL, // gtk3wl_update_window_begin,
+  NULL, // gtk3wl_update_window_end,
+  0, /* flush_display */
+  x_clear_window_mouse_face,
+  x_get_glyph_overhangs,
+  x_fix_overlapping_area,
+  NULL, // gtk3wl_draw_fringe_bitmap,
+  0, /* define_fringe_bitmap */ /* FIXME: simplify gtk3wl_draw_fringe_bitmap */
+  0, /* destroy_fringe_bitmap */
+  NULL, // gtk3wl_compute_glyph_string_overhangs,
+  NULL, // gtk3wl_draw_glyph_string,
+  NULL, // gtk3wl_define_frame_cursor,
+  NULL, // gtk3wl_clear_frame_area,
+  NULL, // gtk3wl_draw_window_cursor,
+  NULL, // gtk3wl_draw_vertical_window_border,
+  NULL, // gtk3wl_draw_window_divider,
+  NULL, // gtk3wl_shift_glyphs_for_insert,
+  NULL, // gtk3wl_show_hourglass,
+  NULL, // gtk3wl_hide_hourglass
+};
+
+static void
+gtk3wl_redraw_scroll_bars (struct frame *f)
+{
+}
+
+void
+gtk3wl_clear_frame (struct frame *f)
+/* --------------------------------------------------------------------------
+      External (hook): Erase the entire frame
+   -------------------------------------------------------------------------- */
+{
+ /* comes on initial frame because we have
+    after-make-frame-functions = select-frame */
+  if (!FRAME_DEFAULT_FACE (f))
+    return;
+
+  // mark_window_cursors_off (XWINDOW (FRAME_ROOT_WINDOW (f)));
+
+  block_input ();
+
+  /* as of 2006/11 or so this is now needed */
+  gtk3wl_redraw_scroll_bars (f);
+  unblock_input ();
+}
+
+static struct terminal *
+gtk3wl_create_terminal (struct gtk3wl_display_info *dpyinfo)
+/* --------------------------------------------------------------------------
+      Set up use of NS before we make the first connection.
+   -------------------------------------------------------------------------- */
+{
+  struct terminal *terminal;
+
+  terminal = create_terminal (output_gtk3wl, &gtk3wl_redisplay_interface);
+
+  terminal->display_info.gtk3wl = dpyinfo;
+  dpyinfo->terminal = terminal;
+
+  terminal->clear_frame_hook = gtk3wl_clear_frame;
+  // terminal->ring_bell_hook = gtk3wl_ring_bell;
+  // terminal->update_begin_hook = gtk3wl_update_begin;
+  // terminal->update_end_hook = gtk3wl_update_end;
+  // terminal->read_socket_hook = gtk3wl_read_socket;
+  // terminal->frame_up_to_date_hook = gtk3wl_frame_up_to_date;
+  // terminal->mouse_position_hook = gtk3wl_mouse_position;
+  // terminal->frame_rehighlight_hook = gtk3wl_frame_rehighlight;
+  // terminal->frame_raise_lower_hook = gtk3wl_frame_raise_lower;
+  // terminal->fullscreen_hook = gtk3wl_fullscreen_hook;
+  // terminal->menu_show_hook = gtk3wl_menu_show;
+  // terminal->popup_dialog_hook = gtk3wl_popup_dialog;
+  // terminal->set_vertical_scroll_bar_hook = gtk3wl_set_vertical_scroll_bar;
+  // terminal->set_horizontal_scroll_bar_hook = gtk3wl_set_horizontal_scroll_bar;
+  // terminal->condemn_scroll_bars_hook = gtk3wl_condemn_scroll_bars;
+  // terminal->redeem_scroll_bar_hook = gtk3wl_redeem_scroll_bar;
+  // terminal->judge_scroll_bars_hook = gtk3wl_judge_scroll_bars;
+  // terminal->delete_frame_hook = x_destroy_window;
+  // terminal->delete_terminal_hook = gtk3wl_delete_terminal;
+  /* Other hooks are NULL by default.  */
+
+  return terminal;
+}
+
 struct gtk3wl_display_info *
 gtk3wl_term_init (Lisp_Object display_name)
 /* --------------------------------------------------------------------------
      Start the Application and get things rolling.
    -------------------------------------------------------------------------- */
 {
-#if 0
   struct terminal *terminal;
-  struct ns_display_info *dpyinfo;
-  static int ns_initialized = 0;
+  struct gtk3wl_display_info *dpyinfo;
+  static int gtk3wl_initialized = 0;
   Lisp_Object tmp;
 
-  if (ns_initialized) return x_display_list;
-  ns_initialized = 1;
+  if (gtk3wl_initialized) return x_display_list;
+  gtk3wl_initialized = 1;
 
   block_input ();
 
-  NSTRACE ("ns_term_init");
-
-  [outerpool release];
-  outerpool = [[NSAutoreleasePool alloc] init];
-
-  /* count object allocs (About, click icon); on macOS use ObjectAlloc tool */
-  /*GSDebugAllocationActive (YES); */
   block_input ();
 
   baud_rate = 38400;
@@ -9748,32 +9861,11 @@ gtk3wl_term_init (Lisp_Object display_name)
       pthread_mutex_init (&select_mutex, NULL);
     }
 
-  ns_pending_files = [[NSMutableArray alloc] init];
-  ns_pending_service_names = [[NSMutableArray alloc] init];
-  ns_pending_service_args = [[NSMutableArray alloc] init];
-
-/* Start app and create the main menu, window, view.
-     Needs to be here because ns_initialize_display_info () uses AppKit classes.
-     The view will then ask the NSApp to stop and return to Emacs. */
-  [EmacsApp sharedApplication];
-  if (NSApp == nil)
-    return NULL;
-  [NSApp setDelegate: NSApp];
-
-  /* Start the select thread.  */
-  [NSThread detachNewThreadSelector:@selector (fd_handler:)
-                           toTarget:NSApp
-                         withObject:nil];
-
-  /* debugging: log all notifications */
-  /*   [[NSNotificationCenter defaultCenter] addObserver: NSApp
-                                         selector: @selector (logNotification:)
-                                             name: nil object: nil]; */
-
   dpyinfo = xzalloc (sizeof *dpyinfo);
 
-  ns_initialize_display_info (dpyinfo);
-  terminal = ns_create_terminal (dpyinfo);
+  gtk3wl_initialize_display_info (dpyinfo);
+  terminal = gtk3wl_create_terminal (dpyinfo);
+
 
   terminal->kboard = allocate_kboard (Qgtk3wl);
   /* Don't let the initial kboard remain current longer than necessary.
@@ -9794,6 +9886,7 @@ gtk3wl_term_init (Lisp_Object display_name)
 
   if (!inhibit_x_resources)
     {
+#if 0
       ns_default ("GSFontAntiAlias", &ns_antialias_text,
                  Qt, Qnil, NO, NO);
       tmp = Qnil;
@@ -9801,170 +9894,14 @@ gtk3wl_term_init (Lisp_Object display_name)
       ns_default ("AppleAntiAliasingThreshold", &tmp,
                  make_float (10.0), make_float (6.0), YES, NO);
       ns_antialias_threshold = NILP (tmp) ? 10.0 : extract_float (tmp);
+#endif
     }
 
-  NSTRACE_MSG ("Colors");
-
-  {
-    NSColorList *cl = [NSColorList colorListNamed: @"Emacs"];
-
-    if ( cl == nil )
-      {
-        Lisp_Object color_file, color_map, color;
-        unsigned long c;
-        char *name;
-
-        color_file = Fexpand_file_name (build_string ("rgb.txt"),
-                         Fsymbol_value (intern ("data-directory")));
-
-        color_map = Fx_load_color_file (color_file);
-        if (NILP (color_map))
-          fatal ("Could not read %s.\n", SDATA (color_file));
-
-        cl = [[NSColorList alloc] initWithName: @"Emacs"];
-        for ( ; CONSP (color_map); color_map = XCDR (color_map))
-          {
-            color = XCAR (color_map);
-            name = SSDATA (XCAR (color));
-            c = XINT (XCDR (color));
-            [cl setColor:
-                  [NSColor colorForEmacsRed: RED_FROM_ULONG (c) / 255.0
-                                      green: GREEN_FROM_ULONG (c) / 255.0
-                                       blue: BLUE_FROM_ULONG (c) / 255.0
-                                      alpha: 1.0]
-                  forKey: [NSString stringWithUTF8String: name]];
-          }
-        [cl writeToFile: nil];
-      }
-  }
-
-  NSTRACE_MSG ("Versions");
-
-  {
-#ifdef NS_IMPL_GNUSTEP
-    Vwindow_system_version = build_string (gnustep_base_version);
-#else
-    /*PSnextrelease (128, c); */
-    char c[DBL_BUFSIZE_BOUND];
-    int len = dtoastr (c, sizeof c, 0, 0, NSAppKitVersionNumber);
-    Vwindow_system_version = make_unibyte_string (c, len);
-#endif
-  }
-
   delete_keyboard_wait_descriptor (0);
-
-  ns_app_name = [[NSProcessInfo processInfo] processName];
-
-  /* Set up macOS app menu */
-
-  NSTRACE_MSG ("Menu init");
-
-#ifdef NS_IMPL_COCOA
-  {
-    NSMenu *appMenu;
-    NSMenuItem *item;
-    /* set up the application menu */
-    svcsMenu = [[EmacsMenu alloc] initWithTitle: @"Services"];
-    [svcsMenu setAutoenablesItems: NO];
-    appMenu = [[EmacsMenu alloc] initWithTitle: @"Emacs"];
-    [appMenu setAutoenablesItems: NO];
-    mainMenu = [[EmacsMenu alloc] initWithTitle: @""];
-    dockMenu = [[EmacsMenu alloc] initWithTitle: @""];
-
-    [appMenu insertItemWithTitle: @"About Emacs"
-                          action: @selector (orderFrontStandardAboutPanel:)
-                   keyEquivalent: @""
-                         atIndex: 0];
-    [appMenu insertItem: [NSMenuItem separatorItem] atIndex: 1];
-    [appMenu insertItemWithTitle: @"Preferences..."
-                          action: @selector (showPreferencesWindow:)
-                   keyEquivalent: @","
-                         atIndex: 2];
-    [appMenu insertItem: [NSMenuItem separatorItem] atIndex: 3];
-    item = [appMenu insertItemWithTitle: @"Services"
-                                 action: @selector (menuDown:)
-                          keyEquivalent: @""
-                                atIndex: 4];
-    [appMenu setSubmenu: svcsMenu forItem: item];
-    [appMenu insertItem: [NSMenuItem separatorItem] atIndex: 5];
-    [appMenu insertItemWithTitle: @"Hide Emacs"
-                          action: @selector (hide:)
-                   keyEquivalent: @"h"
-                         atIndex: 6];
-    item =  [appMenu insertItemWithTitle: @"Hide Others"
-                          action: @selector (hideOtherApplications:)
-                   keyEquivalent: @"h"
-                         atIndex: 7];
-    [item setKeyEquivalentModifierMask: NSEventModifierFlagCommand | NSEventModifierFlagOption];
-    [appMenu insertItem: [NSMenuItem separatorItem] atIndex: 8];
-    [appMenu insertItemWithTitle: @"Quit Emacs"
-                          action: @selector (terminate:)
-                   keyEquivalent: @"q"
-                         atIndex: 9];
-
-    item = [mainMenu insertItemWithTitle: ns_app_name
-                                  action: @selector (menuDown:)
-                           keyEquivalent: @""
-                                 atIndex: 0];
-    [mainMenu setSubmenu: appMenu forItem: item];
-    [dockMenu insertItemWithTitle: @"New Frame"
-			   action: @selector (newFrame:)
-		    keyEquivalent: @""
-			  atIndex: 0];
-
-    [NSApp setMainMenu: mainMenu];
-    [NSApp setAppleMenu: appMenu];
-    [NSApp setServicesMenu: svcsMenu];
-    /* Needed at least on Cocoa, to get dock menu to show windows */
-    [NSApp setWindowsMenu: [[NSMenu alloc] init]];
-
-    [[NSNotificationCenter defaultCenter]
-      addObserver: mainMenu
-         selector: @selector (trackingNotification:)
-             name: NSMenuDidBeginTrackingNotification object: mainMenu];
-    [[NSNotificationCenter defaultCenter]
-      addObserver: mainMenu
-         selector: @selector (trackingNotification:)
-             name: NSMenuDidEndTrackingNotification object: mainMenu];
-  }
-#endif /* macOS menu setup */
-
-  /* Register our external input/output types, used for determining
-     applicable services and also drag/drop eligibility. */
-
-  NSTRACE_MSG ("Input/output types");
-
-  ns_send_types = [[NSArray arrayWithObjects: NSStringPboardType, nil] retain];
-  ns_return_types = [[NSArray arrayWithObjects: NSStringPboardType, nil]
-                      retain];
-  ns_drag_types = [[NSArray arrayWithObjects:
-                            NSStringPboardType,
-                            NSTabularTextPboardType,
-                            NSFilenamesPboardType,
-                            NSURLPboardType, nil] retain];
-
-  /* If fullscreen is in init/default-frame-alist, focus isn't set
-     right for fullscreen windows, so set this.  */
-  [NSApp activateIgnoringOtherApps:YES];
-
-  NSTRACE_MSG ("Call NSApp run");
-
-  [NSApp run];
-  ns_do_open_file = YES;
-
-#ifdef NS_IMPL_GNUSTEP
-  /* GNUstep steals SIGCHLD for use in NSTask, but we don't use NSTask.
-     We must re-catch it so subprocess works.  */
-  catch_child_signal ();
-#endif
-
-  NSTRACE_MSG ("ns_term_init done");
 
   unblock_input ();
 
   return dpyinfo;
-#endif
-  return NULL;
 }
 
 const char *
