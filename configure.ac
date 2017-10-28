@@ -2648,9 +2648,7 @@ if test x"$pkg_check_gtk" = xyes; then
     HAVE_GTK=yes
     AC_DEFINE(USE_GTK, 1, [Define to 1 if using GTK.])
     GTK_OBJ="gtkutil.o $GTK_OBJ"
-    if test $window_system != gtk3wl; then
-      term_header=$gtk_term_header
-    fi
+    term_header=$gtk_term_header
     USE_X_TOOLKIT=none
     AC_MSG_WARN([[Your version of Gtk+ will have problems with
        closing open displays.  This is no problem if you just use
@@ -2708,9 +2706,7 @@ if test "${HAVE_GTK}" = "yes"; then
                  gtk_orientable_set_orientation \
 		 gtk_window_set_has_resize_grip)
 
- if $window_system != gtk3wl; then
-   term_header=gtkutil.h
- fi
+ term_header=gtkutil.h
 fi
 
 

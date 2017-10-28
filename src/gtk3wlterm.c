@@ -10049,3 +10049,59 @@ gtk3wl_defined_color (struct frame *f,
 #endif
   return 0;
 }
+
+/* On frame F, translate the color name to RGB values.  Use cached
+   information, if possible.
+
+   Note that there is currently no way to clean old entries out of the
+   cache.  However, it is limited to names in the server's database,
+   and names we've actually looked up; list-colors-display is probably
+   the most color-intensive case we're likely to hit.  */
+
+int gtk3wl_parse_color (struct frame *f, const char *color_name,
+		        XColor *color)
+{
+  if (color_name[0] == '#')
+    {
+      if (strlen(color_name + 1) == 6) {
+	unsigned int r, g, b;
+	if (sscanf(color_name, "%02x%02x%02x", &r, &g, &b) != 3)
+	  return 0;
+	color->pixel = r << 16 | g << 8 | b;
+	color->red = r << 8 | r;
+	color->green = g << 8 | g;
+	color->blue = b << 8 | b;
+	return 1;
+      }
+      if (strlen(color_name + 1) == 3) {
+	unsigned int r, g, b;
+	if (sscanf(color_name, "%1x%1x%1x", &r, &g, &b) != 3)
+	  return 0;
+	color->pixel = r << 20 | r << 16 | g << 12 | g << 8 | b << 4 | b;
+	color->red = r << 12 | r << 8 | r << 4 | r;
+	color->green = g << 12 | g << 8 | g << 4 | g;
+	color->blue = b << 12 | b << 8 | b << 4 | b;
+	return 1;
+      }
+
+      return 0;
+    }
+
+  if (strncmp(color_name, "rgb:", 4) == 0)
+    {
+      if (strlen(color_name + 4) == 14) {
+	unsigned int r, g, b;
+	if (sscanf(color_name, "%04x/%04x/%04x", &r, &g, &b) != 3)
+	  return 0;
+	color->pixel = r >> 8 << 16 | g >> 8 << 8 | b >> 8;
+	color->red = r;
+	color->green = g;
+	color->blue = b;
+	return 1;
+      }
+
+      return 0;
+    }
+
+  return 0;
+}

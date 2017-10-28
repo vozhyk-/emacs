@@ -25,7 +25,15 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 
 #include <gtk/gtk.h>
 #include "../lwlib/lwlib-widget.h"
+#ifdef HAVE_GTK3WL
+#include "gtk3wlterm.h"
+#define EVENT GdkEvent
+#define wx gtk3wl
+#else
 #include "xterm.h"
+#define EVENT XEvent
+#define wx x
+#endif
 
 /* Minimum and maximum values used for GTK scroll bars  */
 
@@ -105,7 +113,7 @@ extern void xg_modify_menubar_widgets (GtkWidget *menubar,
 
 extern void xg_update_frame_menubar (struct frame *f);
 
-extern bool xg_event_is_for_menubar (struct frame *, const XEvent *);
+extern bool xg_event_is_for_menubar (struct frame *, const EVENT *);
 
 extern ptrdiff_t xg_get_scroll_id_for_window (Display *dpy, Window wid);
 
@@ -142,7 +150,7 @@ extern void xg_set_toolkit_horizontal_scroll_bar_thumb (struct scroll_bar *bar,
 							int portion,
 							int position,
 							int whole);
-extern bool xg_event_is_for_scrollbar (struct frame *, const XEvent *);
+extern bool xg_event_is_for_scrollbar (struct frame *, const EVENT *);
 extern int xg_get_default_scrollbar_width (struct frame *f);
 extern int xg_get_default_scrollbar_height (struct frame *f);
 

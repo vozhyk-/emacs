@@ -62,6 +62,59 @@ struct gtk3wl_color_table
 #define GREEN16_FROM_ULONG(color) (GREEN_FROM_ULONG(color) * 0x101)
 #define BLUE16_FROM_ULONG(color) (BLUE_FROM_ULONG(color) * 0x101)
 
+struct scroll_bar
+{
+  /* These fields are shared by all vectors.  */
+  struct vectorlike_header header;
+
+  /* The window we're a scroll bar for.  */
+  Lisp_Object window;
+
+  /* The next and previous in the chain of scroll bars in this frame.  */
+  Lisp_Object next, prev;
+
+  /* Fields from `x_window' down will not be traced by the GC.  */
+
+  /* The X window representing this scroll bar.  */
+  Window x_window;
+
+  /* The position and size of the scroll bar in pixels, relative to the
+     frame.  */
+  int top, left, width, height;
+
+  /* The starting and ending positions of the handle, relative to the
+     handle area (i.e. zero is the top position, not
+     SCROLL_BAR_TOP_BORDER).  If they're equal, that means the handle
+     hasn't been drawn yet.
+
+     These are not actually the locations where the beginning and end
+     are drawn; in order to keep handles from becoming invisible when
+     editing large files, we establish a minimum height by always
+     drawing handle bottoms VERTICAL_SCROLL_BAR_MIN_HANDLE pixels below
+     where they would be normally; the bottom and top are in a
+     different co-ordinate system.  */
+  int start, end;
+
+  /* If the scroll bar handle is currently being dragged by the user,
+     this is the number of pixels from the top of the handle to the
+     place where the user grabbed it.  If the handle isn't currently
+     being dragged, this is -1.  */
+  int dragging;
+
+#if defined (USE_TOOLKIT_SCROLL_BARS) && defined (USE_LUCID)
+  /* Last scroll bar part seen in xaw_jump_callback and xaw_scroll_callback.  */
+  enum scroll_bar_part last_seen_part;
+#endif
+
+#if defined (USE_TOOLKIT_SCROLL_BARS) && !defined (USE_GTK)
+  /* Last value of whole for horizontal scrollbars.  */
+  int whole;
+#endif
+
+  /* True if the scroll bar is horizontal.  */
+  bool horizontal;
+};
+
 /* this extends font backend font */
 struct gtk3wlfont_info
 {
@@ -162,6 +215,9 @@ struct gtk3wl_display_info
 
   /* The scroll bar in which the last motion event occurred.  */
   void *last_mouse_scroll_bar;
+
+  /* The GDK cursor for scroll bars and popup menus.  */
+  GdkCursor *xg_cursor;
 };
 
 /* This is a chain of structures for all the GTK3WL displays currently in use.  */
@@ -232,6 +288,43 @@ struct gtk3wl_output
   /* The last size hints set.  */
   GdkGeometry size_hints;
   long hint_flags;
+
+  /* The widget of this screen.  This is the window of a top widget.  */
+  GtkWidget *widget;
+  /* The widget of the edit portion of this screen; the window in
+     "window_desc" is inside of this.  */
+  GtkWidget *edit_widget;
+  /* The widget used for laying out widgets vertically.  */
+  GtkWidget *vbox_widget;
+  /* The widget used for laying out widgets horizontally.  */
+  GtkWidget *hbox_widget;
+  /* The menubar in this frame.  */
+  GtkWidget *menubar_widget;
+  /* The tool bar in this frame  */
+  GtkWidget *toolbar_widget;
+  /* True if tool bar is packed into the hbox widget (i.e. vertical).  */
+  bool_bf toolbar_in_hbox : 1;
+  bool_bf toolbar_is_packed : 1;
+
+#ifdef USE_GTK_TOOLTIP
+  GtkTooltip *ttip_widget;
+  GtkWidget *ttip_lbl;
+  GtkWindow *ttip_window;
+#endif /* USE_GTK_TOOLTIP */
+
+  /* Height of menu bar widget, in pixels.  This value
+     is not meaningful if the menubar is turned off.  */
+  int menubar_height;
+
+  /* Height of tool bar widget, in pixels.  top_height is used if tool bar
+     at top, bottom_height if tool bar is at the bottom.
+     Zero if not using an external tool bar or if tool bar is vertical.  */
+  int toolbar_top_height, toolbar_bottom_height;
+
+  /* Width of tool bar widget, in pixels.  left_width is used if tool bar
+     at left, right_width if tool bar is at the right.
+     Zero if not using an external tool bar or if tool bar is horizontal.  */
+  int toolbar_left_width, toolbar_right_width;
 };
 
 /* this dummy decl needed to support TTYs */
@@ -252,6 +345,22 @@ struct x_output
 #define FRAME_X_DISPLAY(f) (0)
 #define FRAME_X_SCREEN(f) (0)
 #define FRAME_X_VISUAL(f) FRAME_DISPLAY_INFO(f)->visual
+
+#define DEFAULT_GDK_DISPLAY() gdk_display_get_default()
+
+#define GDK_DISPLAY_XDISPLAY(gdpy) 0
+
+/* Turning a lisp vector value into a pointer to a struct scroll_bar.  */
+#define XSCROLL_BAR(vec) ((struct scroll_bar *) XVECTOR (vec))
+
+// `wx` defined in gtkutil.h
+#define FRAME_GTK_OUTER_WIDGET(f) ((f)->output_data.wx->widget)
+#define FRAME_GTK_WIDGET(f) ((f)->output_data.wx->edit_widget)
+#define FRAME_OUTER_WINDOW(f)                                   \
+       (FRAME_GTK_OUTER_WIDGET (f) ?                            \
+        GTK_WIDGET_TO_X_WIN (FRAME_GTK_OUTER_WIDGET (f)) :      \
+         FRAME_X_WINDOW (f))
+#define GTK_WIDGET_TO_X_WIN(w) 0
 
 #define FRAME_FOREGROUND_COLOR(f) ((f)->output_data.gtk3wl->foreground_color)
 #define FRAME_BACKGROUND_COLOR(f) ((f)->output_data.gtk3wl->background_color)
@@ -279,7 +388,8 @@ struct x_output
                        styleMask:[[FRAME_GTK3WL_VIEW (f) window] styleMask]])))
 
 /* Compute pixel height of the toolbar. */
-#define FRAME_TOOLBAR_HEIGHT(f)                                         \
+#define FRAME_TOOLBAR_HEIGHT(f)                                         0
+#if 0
   (([[FRAME_GTK3WL_VIEW (f) window] toolbar] == nil                         \
     || ! [[FRAME_GTK3WL_VIEW (f) window] toolbar].isVisible) ?		\
    0                                                                    \
@@ -287,22 +397,27 @@ struct x_output
                      [[FRAME_GTK3WL_VIEW (f) window] frame]                 \
                      styleMask:[[FRAME_GTK3WL_VIEW (f) window] styleMask]]) \
            - GTK3WLHeight([[[FRAME_GTK3WL_VIEW (f) window] contentView] frame])))
+#endif
 
 /* Compute pixel size for vertical scroll bars */
-#define GTK3WL_SCROLL_BAR_WIDTH(f)						\
+#define GTK3WL_SCROLL_BAR_WIDTH(f)					0
+#if 0
   (FRAME_HAS_VERTICAL_SCROLL_BARS (f)					\
    ? rint (FRAME_CONFIG_SCROLL_BAR_WIDTH (f) > 0			\
 	   ? FRAME_CONFIG_SCROLL_BAR_WIDTH (f)				\
 	   : (FRAME_SCROLL_BAR_COLS (f) * FRAME_COLUMN_WIDTH (f)))	\
    : 0)
+#endif
 
 /* Compute pixel size for horizontal scroll bars */
-#define GTK3WL_SCROLL_BAR_HEIGHT(f)						\
+#define GTK3WL_SCROLL_BAR_HEIGHT(f)					0
+#if 0
   (FRAME_HAS_HORIZONTAL_SCROLL_BARS (f)					\
    ? rint (FRAME_CONFIG_SCROLL_BAR_HEIGHT (f) > 0			\
 	   ? FRAME_CONFIG_SCROLL_BAR_HEIGHT (f)				\
 	   : (FRAME_SCROLL_BAR_LINES (f) * FRAME_LINE_HEIGHT (f)))	\
    : 0)
+#endif
 
 /* Difference btwn char-column-calculated and actual SB widths.
    This is only a concern for rendering when SB on left. */
@@ -318,6 +433,8 @@ struct x_output
    (FRAME_SCROLL_BAR_LINES (f) * FRAME_LINE_HEIGHT (f)	\
     - GTK3WL_SCROLL_BAR_HEIGHT (f)) : 0)
 
+#define FRAME_MENUBAR_HEIGHT(f) ((f)->output_data.wx->menubar_height)
+
 /* Calculate system coordinates of the left and top of the parent
    window or, if there is no parent window, the screen. */
 #define GTK3WL_PARENT_WINDOW_LEFT_POS(f)                                    \
@@ -331,6 +448,14 @@ struct x_output
    : [[[GTK3WLScreen screegtk3wl] objectAtIndex: 0] frame].size.height)
 
 #define FRAME_GTK3WL_FONT_TABLE(f) (FRAME_DISPLAY_INFO (f)->font_table)
+
+#define FRAME_TOOLBAR_TOP_HEIGHT(f) ((f)->output_data.wx->toolbar_top_height)
+#define FRAME_TOOLBAR_BOTTOM_HEIGHT(f) \
+  ((f)->output_data.wx->toolbar_bottom_height)
+#define FRAME_TOOLBAR_LEFT_WIDTH(f) ((f)->output_data.wx->toolbar_left_width)
+#define FRAME_TOOLBAR_RIGHT_WIDTH(f) ((f)->output_data.wx->toolbar_right_width)
+#define FRAME_TOOLBAR_WIDTH(f) \
+  (FRAME_TOOLBAR_LEFT_WIDTH (f) + FRAME_TOOLBAR_RIGHT_WIDTH (f))
 
 #define FRAME_FONTSET(f) ((f)->output_data.gtk3wl->fontset)
 
@@ -388,6 +513,9 @@ gtk3wl_defined_color (struct frame *f,
 extern void
 gtk3wl_query_color (void *col, XColor *color_def, int setPixel);
 
+int gtk3wl_parse_color (struct frame *f, const char *color_name,
+			XColor *color);
+
 #ifdef __OBJC__
 extern int gtk3wl_lisp_to_color (Lisp_Object color, GTK3WLColor **col);
 extern GTK3WLColor *gtk3wl_lookup_indexed_color (unsigned long idx, struct frame *f);
@@ -407,8 +535,10 @@ extern void gtk3wl_init_locale (void);
 
 
 /* in gtk3wlmenu */
+#if 0
 extern void update_frame_tool_bar (struct frame *f);
 extern void free_frame_tool_bar (struct frame *f);
+#endif
 extern Lisp_Object find_and_return_menu_selection (struct frame *f,
                                                    bool keymaps,
                                                    void *client_data);
