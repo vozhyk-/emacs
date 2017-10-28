@@ -11482,7 +11482,7 @@ clear_garbaged_frames (void)
 	      else
 		clear_current_matrices (f);
 
-#if defined (HAVE_WINDOW_SYSTEM) && !defined (HAVE_NS)
+#if defined (HAVE_WINDOW_SYSTEM) && !defined (HAVE_NS) && !defined(HAVE_GTK3WL)
 	      x_clear_under_internal_border (f);
 #endif /* HAVE_WINDOW_SYSTEM && !HAVE_NS */
 
@@ -11551,7 +11551,7 @@ echo_area_display (bool update_frame_p)
 	    {
 	      n = redisplay_mode_lines (FRAME_ROOT_WINDOW (f), false);
 
-#if defined (HAVE_WINDOW_SYSTEM) && !defined (HAVE_NS)
+#if defined (HAVE_WINDOW_SYSTEM) && !defined (HAVE_NS) && !defined(HAVE_GTK3WL)
 	      x_clear_under_internal_border (f);
 #endif /* HAVE_WINDOW_SYSTEM && !HAVE_NS */
 
@@ -12151,7 +12151,7 @@ update_menu_bar (struct frame *f, bool save_match_data, bool hooks_run)
 
 	  /* Redisplay the menu bar in case we changed it.  */
 #if defined (USE_X_TOOLKIT) || defined (HAVE_NTGUI) \
-    || defined (HAVE_NS) || defined (USE_GTK)
+    || defined (HAVE_NS) || (defined (USE_GTK) && !defined(HAVE_GTK3WL))
 	  if (FRAME_WINDOW_P (f))
             {
 #if defined (HAVE_NS)
@@ -12664,8 +12664,10 @@ redisplay_tool_bar (struct frame *f)
   f->tool_bar_redisplayed = true;
 #if defined (USE_GTK) || defined (HAVE_NS)
 
+#if 0
   if (FRAME_EXTERNAL_TOOL_BAR (f))
     update_frame_tool_bar (f);
+#endif
   return false;
 
 #else /* !USE_GTK && !HAVE_NS */
@@ -13807,7 +13809,7 @@ redisplay_internal (void)
   if (!fr->glyphs_initialized_p)
     return;
 
-#if defined (USE_X_TOOLKIT) || defined (USE_GTK) || defined (HAVE_NS)
+#if defined (USE_X_TOOLKIT) || (defined (USE_GTK) && !defined(HAVE_GTK3WL)) || defined (HAVE_NS)
   if (popup_activated ())
     return;
 #endif
@@ -14332,7 +14334,7 @@ redisplay_internal (void)
 		      && garbaged_frame_retries++ < MAX_GARBAGED_FRAME_RETRIES)
                     goto retry;
 
-#if defined (HAVE_WINDOW_SYSTEM) && !defined (HAVE_NS)
+#if defined (HAVE_WINDOW_SYSTEM) && !defined (HAVE_NS) && !defined(HAVE_GTK3WL)
 		  x_clear_under_internal_border (f);
 #endif /* HAVE_WINDOW_SYSTEM && !HAVE_NS */
 
@@ -30980,7 +30982,7 @@ note_mouse_highlight (struct frame *f, int x, int y)
   struct buffer *b;
 
   /* When a menu is active, don't highlight because this looks odd.  */
-#if defined (USE_X_TOOLKIT) || defined (USE_GTK) || defined (HAVE_NS) || defined (MSDOS)
+#if defined (USE_X_TOOLKIT) || (defined (USE_GTK) && !defined(HAVE_GTK3WL)) || defined (HAVE_NS) || defined (MSDOS)
   if (popup_activated ())
     return;
 #endif
