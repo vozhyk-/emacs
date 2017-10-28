@@ -1581,6 +1581,10 @@ Using an Emacs configured with --with-x-toolkit=lucid does not have this problem
       syms_of_nsselect ();
       syms_of_fontset ();
 #endif /* HAVE_NS */
+#ifdef HAVE_GTK3WL
+      syms_of_gtk3wlterm();
+      syms_of_gtk3wlfns();
+#endif
 
       syms_of_gnutls ();
 
@@ -1642,8 +1646,10 @@ Using an Emacs configured with --with-x-toolkit=lucid does not have this problem
 #ifdef HAVE_DBUS
   init_dbusbind ();
 #endif
-#if defined(USE_GTK) && !defined(HAVE_GTK3WL)
+#if defined(USE_GTK)
+#ifndef HAVE_GTK3WL
   init_xterm ();
+#endif
 #endif
 
   /* This can create a thread that may call getenv, so it must follow

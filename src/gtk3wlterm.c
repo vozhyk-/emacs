@@ -9015,8 +9015,6 @@ ns_xlfd_to_fontname (const char *xlfd)
 void
 syms_of_nsterm (void)
 {
-  NSTRACE ("syms_of_nsterm");
-
   ns_antialias_threshold = 10.0;
 
   /* from 23+ we need to tell emacs what modifiers there are.. */
@@ -9777,7 +9775,7 @@ gtk3wl_term_init (Lisp_Object display_name)
   ns_initialize_display_info (dpyinfo);
   terminal = ns_create_terminal (dpyinfo);
 
-  terminal->kboard = allocate_kboard (Qns);
+  terminal->kboard = allocate_kboard (Qgtk3wl);
   /* Don't let the initial kboard remain current longer than necessary.
      That would cause problems if a file loaded on startup tries to
      prompt in the mini-buffer.  */
@@ -10104,4 +10102,55 @@ int gtk3wl_parse_color (struct frame *f, const char *color_name,
     }
 
   return 0;
+}
+
+void
+syms_of_gtk3wlterm (void)
+{
+  /* from 23+ we need to tell emacs what modifiers there are.. */
+  DEFSYM (Qmodifier_value, "modifier-value");
+  DEFSYM (Qalt, "alt");
+  DEFSYM (Qhyper, "hyper");
+  DEFSYM (Qmeta, "meta");
+  DEFSYM (Qsuper, "super");
+  DEFSYM (Qcontrol, "control");
+  DEFSYM (QUTF8_STRING, "UTF8_STRING");
+
+  DEFSYM (Qfile, "file");
+  DEFSYM (Qurl, "url");
+
+  Fput (Qalt, Qmodifier_value, make_number (alt_modifier));
+  Fput (Qhyper, Qmodifier_value, make_number (hyper_modifier));
+  Fput (Qmeta, Qmodifier_value, make_number (meta_modifier));
+  Fput (Qsuper, Qmodifier_value, make_number (super_modifier));
+  Fput (Qcontrol, Qmodifier_value, make_number (ctrl_modifier));
+
+  /* TODO: move to common code */
+  DEFVAR_LISP ("x-toolkit-scroll-bars", Vx_toolkit_scroll_bars,
+	       doc: /* Which toolkit scroll bars Emacs uses, if any.
+A value of nil means Emacs doesn't use toolkit scroll bars.
+With the X Window system, the value is a symbol describing the
+X toolkit.  Possible values are: gtk, motif, xaw, or xaw3d.
+With MS Windows or Nextstep, the value is t.  */);
+  Vx_toolkit_scroll_bars = Qt;
+
+  DEFVAR_BOOL ("x-use-underline-position-properties",
+	       x_use_underline_position_properties,
+     doc: /*Non-nil means make use of UNDERLINE_POSITION font properties.
+A value of nil means ignore them.  If you encounter fonts with bogus
+UNDERLINE_POSITION font properties, for example 7x13 on XFree prior
+to 4.1, set this to nil. */);
+  x_use_underline_position_properties = 0;
+
+  DEFVAR_BOOL ("x-underline-at-descent-line",
+	       x_underline_at_descent_line,
+     doc: /* Non-nil means to draw the underline at the same place as the descent line.
+A value of nil means to draw the underline according to the value of the
+variable `x-use-underline-position-properties', which is usually at the
+baseline level.  The default value is nil.  */);
+  x_underline_at_descent_line = 0;
+
+  /* Tell Emacs about this window system.  */
+  Fprovide (Qgtk3wl, Qnil);
+
 }
