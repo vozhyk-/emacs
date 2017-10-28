@@ -117,6 +117,7 @@ gtk3wl_get_window (Lisp_Object maybeFrame)
   return window;
 }
 
+#endif
 
 /* Return the X display structure for the display named NAME.
    Open a new connection if necessary.  */
@@ -141,6 +142,8 @@ gtk3wl_display_info_for_name (Lisp_Object name)
 
   return dpyinfo;
 }
+
+#if 0
 
 static NSString *
 gtk3wl_filename_from_panel (NSSavePanel *panel)
@@ -2050,7 +2053,7 @@ terminate Emacs if we can't open the connection.
 
   CHECK_STRING (display);
 
-  nxatoms_of_gtk3wlselect ();
+  // nxatoms_of_gtk3wlselect ();
   dpyinfo = gtk3wl_term_init (display);
   if (dpyinfo == 0)
     {

@@ -1583,7 +1583,7 @@ extern void x_sync (struct frame *);
 extern void x_query_colors (struct frame *f, XColor *, int);
 extern void x_focus_frame (struct frame *, bool);
 
-#ifndef HAVE_NS
+#if !defined(HAVE_NS) && !defined(HAVE_GTK3WL)
 
 extern bool x_bitmap_icon (struct frame *, Lisp_Object);
 

@@ -6008,7 +6008,7 @@ garbage_collect_1 (void *end)
   mark_kboards ();
   mark_threads ();
 
-#ifdef USE_GTK
+#if defined(USE_GTK) && !defined(HAVE_GTK3WL)
   xg_mark_data ();
 #endif
 

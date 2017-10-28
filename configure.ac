@@ -2739,7 +2739,7 @@ LIBS=$OLD_LIBS
 GTK3WL_OBJ=
 GTK3WL_LIBS=
 if test "$window_system" = "gtk3wl"; then
-  GTK3WL_OBJ="gtk3wlfns.o"
+  GTK3WL_OBJ="gtk3wlfns.o gtk3wlterm.o"
   GTK3WL_LIBS="$GTK_LIBS"
   AC_DEFINE([HAVE_GTK3WL], 1, [Define to 1 if you have Gtk+-3 with wayland.])
 fi
