@@ -1411,6 +1411,7 @@ This function is an internal primitive--use `make-frame' instead.  */)
   // f->output_data.gtk3wl->in_animation = NO;
 
   // [[EmacsView alloc] initFrameFromEmacs: f];
+  xg_create_frame_widgets(f);
 
   x_icon (f, parms);
 

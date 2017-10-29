@@ -9788,6 +9788,99 @@ gtk3wl_clear_frame (struct frame *f)
   unblock_input ();
 }
 
+/* Read events coming from the X server.
+   Return as soon as there are no more events to be read.
+
+   Return the number of characters stored into the buffer,
+   thus pretending to be `read' (except the characters we store
+   in the keyboard buffer can be multibyte, so are not necessarily
+   C chars).  */
+
+static int
+gtk3wl_read_socket (struct terminal *terminal, struct input_event *hold_quit)
+{
+  int count = 0;
+  bool event_found = false;
+  struct x_display_info *dpyinfo = terminal->display_info.x;
+
+  block_input ();
+
+#if 0
+  /* For debugging, this gives a way to fake an I/O error.  */
+  if (dpyinfo == XTread_socket_fake_io_error)
+    {
+      XTread_socket_fake_io_error = 0;
+      x_io_error_quitter (dpyinfo->display);
+    }
+#endif
+
+  /* For GTK we must use the GTK event loop.  But XEvents gets passed
+     to our filter function above, and then to the big event switch.
+     We use a bunch of globals to communicate with our filter function,
+     that is kind of ugly, but it works.
+
+     There is no way to do one display at the time, GTK just does events
+     from all displays.  */
+
+  fprintf(stderr, "gtk main...\n");
+  while (gtk_events_pending ())
+    {
+#if 0
+      current_count = count;
+      current_hold_quit = hold_quit;
+#endif
+
+      gtk_main_iteration ();
+
+#if 0
+      count = current_count;
+      current_count = -1;
+      current_hold_quit = 0;
+
+      if (current_finish == X_EVENT_GOTO_OUT)
+        break;
+#endif
+    }
+
+#if 0
+  /* On some systems, an X bug causes Emacs to get no more events
+     when the window is destroyed.  Detect that.  (1994.)  */
+  if (! event_found)
+    {
+      /* Emacs and the X Server eats up CPU time if XNoOp is done every time.
+	 One XNOOP in 100 loops will make Emacs terminate.
+	 B. Bretthauer, 1994 */
+      x_noop_count++;
+      if (x_noop_count >= 100)
+	{
+	  x_noop_count=0;
+
+	  if (next_noop_dpyinfo == 0)
+	    next_noop_dpyinfo = x_display_list;
+
+	  XNoOp (next_noop_dpyinfo->display);
+
+	  /* Each time we get here, cycle through the displays now open.  */
+	  next_noop_dpyinfo = next_noop_dpyinfo->next;
+	}
+    }
+#endif
+
+#if 0
+  /* If the focus was just given to an auto-raising frame,
+     raise it now.  FIXME: handle more than one such frame.  */
+  if (dpyinfo->x_pending_autoraise_frame)
+    {
+      x_raise_frame (dpyinfo->x_pending_autoraise_frame);
+      dpyinfo->x_pending_autoraise_frame = NULL;
+    }
+#endif
+
+  unblock_input ();
+
+  return count;
+}
+
 static struct terminal *
 gtk3wl_create_terminal (struct gtk3wl_display_info *dpyinfo)
 /* --------------------------------------------------------------------------
@@ -9805,7 +9898,7 @@ gtk3wl_create_terminal (struct gtk3wl_display_info *dpyinfo)
   // terminal->ring_bell_hook = gtk3wl_ring_bell;
   // terminal->update_begin_hook = gtk3wl_update_begin;
   // terminal->update_end_hook = gtk3wl_update_end;
-  // terminal->read_socket_hook = gtk3wl_read_socket;
+  terminal->read_socket_hook = gtk3wl_read_socket;
   // terminal->frame_up_to_date_hook = gtk3wl_frame_up_to_date;
   // terminal->mouse_position_hook = gtk3wl_mouse_position;
   // terminal->frame_rehighlight_hook = gtk3wl_frame_rehighlight;
@@ -9825,6 +9918,14 @@ gtk3wl_create_terminal (struct gtk3wl_display_info *dpyinfo)
   return terminal;
 }
 
+static void
+my_log_handler (const gchar *log_domain, GLogLevelFlags log_level,
+		const gchar *msg, gpointer user_data)
+{
+  if (!strstr (msg, "g_set_prgname"))
+      fprintf (stderr, "%s-WARNING **: %s\n", log_domain, msg);
+}
+
 struct gtk3wl_display_info *
 gtk3wl_term_init (Lisp_Object display_name)
 /* --------------------------------------------------------------------------
@@ -9838,6 +9939,65 @@ gtk3wl_term_init (Lisp_Object display_name)
 
   if (gtk3wl_initialized) return x_display_list;
   gtk3wl_initialized = 1;
+
+  {
+#define NUM_ARGV 10
+    int argc;
+    char *argv[NUM_ARGV];
+    char **argv2 = argv;
+    guint id;
+    static int initialized = 0;
+    Display *dpy;
+
+    if (initialized++ > 1)
+      {
+        xg_display_open (SSDATA (display_name), &dpy);
+      }
+    else
+      {
+        static char display_opt[] = "--display";
+        static char name_opt[] = "--name";
+
+        for (argc = 0; argc < NUM_ARGV; ++argc)
+          argv[argc] = 0;
+
+        argc = 0;
+        argv[argc++] = initial_argv[0];
+
+#if 0
+        if (! NILP (display_name))
+          {
+            argv[argc++] = display_opt;
+            argv[argc++] = SSDATA (display_name);
+          }
+#endif
+
+        argv[argc++] = name_opt;
+        argv[argc++] = "Emacs"; // resource_name;
+
+        /* Work around GLib bug that outputs a faulty warning. See
+           https://bugzilla.gnome.org/show_bug.cgi?id=563627.  */
+        id = g_log_set_handler ("GLib", G_LOG_LEVEL_WARNING | G_LOG_FLAG_FATAL
+                                  | G_LOG_FLAG_RECURSION, my_log_handler, NULL);
+
+        /* NULL window -> events for all windows go to our function.
+           Call before gtk_init so Gtk+ event filters comes after our.  */
+        // gdk_window_add_filter (NULL, event_handler_gdk, NULL);
+
+        /* gtk_init does set_locale.  Fix locale before and after.  */
+        // fixup_locale ();
+        // unrequest_sigio (); /* See comment in x_display_ok.  */
+        gtk_init (&argc, &argv2);
+        // request_sigio ();
+        // fixup_locale ();
+
+        g_log_remove_handler ("GLib", id);
+
+        xg_initialize ();
+
+        dpy = DEFAULT_GDK_DISPLAY ();
+      }
+  }
 
   block_input ();
 

@@ -1202,6 +1202,7 @@ xg_create_frame_widgets (struct frame *f)
 #endif
   char *title = 0;
 
+  fprintf(stderr, "xg_create_frame_widgets.\n");
   block_input ();
 
 #ifndef HAVE_GTK3WL  // gtk_plug not found.
@@ -1324,6 +1325,9 @@ xg_create_frame_widgets (struct frame *f)
   /* Must realize the windows so the X window gets created.  It is used
      by callers of this function.  */
   gtk_widget_realize (wfixed);
+#ifdef HAVE_GTK3WL
+  gtk_widget_show_all(wtop);
+#endif
   FRAME_X_WINDOW (f) = GTK_WIDGET_TO_X_WIN (wfixed);
 #ifndef HAVE_GTK3WL
   initial_set_up_x_back_buffer (f);
