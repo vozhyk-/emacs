@@ -10281,11 +10281,10 @@ gtk3wl_begin_cr_clip (struct frame *f, XGCValues *gc)
       if (! FRAME_CR_SURFACE (f))
         {
           cairo_surface_t *surface;
-	  surface = gdk_window_create_similar_image_surface(gtk_widget_get_window (FRAME_GTK_WIDGET (f)),
-							    CAIRO_FORMAT_ARGB32,
-							    FRAME_PIXEL_WIDTH (f),
-							    FRAME_PIXEL_HEIGHT (f),
-							    1.0);
+	  surface = gdk_window_create_similar_surface(gtk_widget_get_window (FRAME_GTK_WIDGET (f)),
+						      CAIRO_CONTENT_COLOR_ALPHA,
+						      FRAME_PIXEL_WIDTH (f),
+						      FRAME_PIXEL_HEIGHT (f));
           cr = cairo_create (surface);
           cairo_surface_destroy (surface);
         }
