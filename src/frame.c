@@ -263,6 +263,8 @@ See also `frame-live-p'.  */)
       return Qpc;
     case output_ns:
       return Qns;
+    case output_gtk3wl:
+      return Qgtk3wl;
     default:
       emacs_abort ();
     }

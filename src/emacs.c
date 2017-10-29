@@ -1584,6 +1584,7 @@ Using an Emacs configured with --with-x-toolkit=lucid does not have this problem
 #ifdef HAVE_GTK3WL
       syms_of_gtk3wlterm();
       syms_of_gtk3wlfns();
+      syms_of_fontset ();
 #endif
 
       syms_of_gnutls ();

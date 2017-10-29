@@ -977,6 +977,10 @@ defined_color (struct frame *f, const char *color_name, XColor *color_def,
   else if (FRAME_NS_P (f))
     return ns_defined_color (f, color_name, color_def, alloc, true);
 #endif
+#ifdef HAVE_GTK3WL
+  else if (FRAME_GTK3WL_P (f))
+    return gtk3wl_defined_color (f, color_name, color_def, alloc, true);
+#endif
   else
     emacs_abort ();
 }

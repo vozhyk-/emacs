@@ -440,6 +440,8 @@ possible return values.  */)
       return Qpc;
     case output_ns:
       return Qns;
+    case output_gtk3wl:
+      return Qgtk3wl;
     default:
       emacs_abort ();
     }

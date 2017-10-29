@@ -9484,8 +9484,7 @@ Lisp_Object
 x_new_font (struct frame *f, Lisp_Object font_object, int fontset)
 {
   struct font *font = XFONT_OBJECT (font_object);
-#if 0
-  EmacsView *view = FRAME_NS_VIEW (f);
+  // EmacsView *view = FRAME_NS_VIEW (f);
   int font_ascent, font_descent;
 
   if (fontset < 0)
@@ -9531,14 +9530,12 @@ x_new_font (struct frame *f, Lisp_Object font_object, int fontset)
     }
 
   /* Now make the frame display the given font.  */
-  if (FRAME_NS_WINDOW (f) != 0 && ! [view isFullscreen])
+  if (FRAME_GTK_WIDGET (f) != NULL)
     adjust_frame_size (f, FRAME_COLS (f) * FRAME_COLUMN_WIDTH (f),
 		       FRAME_LINES (f) * FRAME_LINE_HEIGHT (f), 3,
 		       false, Qfont);
 
   return font_object;
-#endif
-  return Qnil;
 }
 
 int
@@ -9969,23 +9966,12 @@ gtk3wl_defined_color (struct frame *f,
          Return false if not found
    -------------------------------------------------------------------------- */
 {
-#if 0
-  NSColor *col;
-  NSTRACE_WHEN (NSTRACE_GROUP_COLOR, "ns_defined_color");
+  int r;
 
   block_input ();
-  if (ns_get_color (name, &col) != 0) /* Color not found  */
-    {
-      unblock_input ();
-      return 0;
-    }
-  if (makeIndex && alloc)
-    color_def->pixel = ns_index_color (col, f);
-  ns_query_color (col, color_def, !makeIndex);
+  r = gtk3wl_parse_color (f, name, color_def);
   unblock_input ();
-  return 1;
-#endif
-  return 0;
+  return r;
 }
 
 /* On frame F, translate the color name to RGB values.  Use cached

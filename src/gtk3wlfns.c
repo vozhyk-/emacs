@@ -1200,7 +1200,7 @@ This function is an internal primitive--use `make-frame' instead.  */)
 
   f->terminal = dpyinfo->terminal;
 
-  f->output_method = output_ns;
+  f->output_method = output_gtk3wl;
   f->output_data.gtk3wl = xzalloc (sizeof *f->output_data.gtk3wl);
 
   FRAME_FONTSET (f) = -1;
@@ -1269,6 +1269,10 @@ This function is an internal primitive--use `make-frame' instead.  */)
                                  "font", "Font", RES_TYPE_STRING);
     xfree (fontname);
   }
+#else
+  x_default_parameter (f, parms, Qfont,
+                               build_string ("Monospace"),
+                               "font", "Font", RES_TYPE_STRING);
 #endif
   unblock_input ();
 
