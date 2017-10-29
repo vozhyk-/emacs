@@ -1358,6 +1358,9 @@ struct glyph_string
   XGCValues *gc;
   HDC hdc;
 #endif
+#if defined (HAVE_GTK3WL)
+  XGCValues *gc;
+#endif
 
   /* A pointer to the first glyph in the string.  This glyph
      corresponds to char2b[0].  Needed to draw rectangles if

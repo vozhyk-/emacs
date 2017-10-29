@@ -1302,7 +1302,11 @@ x_query_frame_background_color (struct frame *f, XColor *bgcolor)
 {
 #ifndef HAVE_NS
   bgcolor->pixel = FRAME_BACKGROUND_PIXEL (f);
+#ifndef HAVE_GTK3WL
   x_query_color (f, bgcolor);
+#else
+  gtk3wl_query_color (f, bgcolor);
+#endif
 #else
   ns_query_color (FRAME_BACKGROUND_COLOR (f), bgcolor, 1);
 #endif
@@ -5511,7 +5515,11 @@ pbm_load (struct frame *f, struct image *img)
           || ! x_defined_color (f, SSDATA (fmt[PBM_FOREGROUND].value), &xfg, 0))
         {
           xfg.pixel = fg;
+#ifndef HAVE_GTK3WL
           x_query_color (f, &xfg);
+#else
+          gtk3wl_query_color (f, &xfg);
+#endif
         }
       fga32 = xcolor_to_argb32 (xfg);
 
@@ -5520,7 +5528,11 @@ pbm_load (struct frame *f, struct image *img)
           || ! x_defined_color (f, SSDATA (fmt[PBM_BACKGROUND].value), &xbg, 0))
 	{
           xbg.pixel = bg;
+#ifndef HAVE_GTK3WL
           x_query_color (f, &xbg);
+#else
+          gtk3wl_query_color (f, &xbg);
+#endif
 	}
       bga32 = xcolor_to_argb32 (xbg);
 #else
@@ -5889,6 +5901,8 @@ init_png_functions (void)
 #  define png_sig_cmp fn_png_sig_cmp
 
 # endif /* WINDOWSNT */
+
+#ifdef HAVE_PNG
 
 /* Fast implementations of setjmp and longjmp.  Although setjmp and longjmp
    will do, POSIX _setjmp and _longjmp (if available) are often faster.
@@ -6345,6 +6359,8 @@ png_load (struct frame *f, struct image *img)
   struct png_load_context c;
   return png_load_body (f, img, &c);
 }
+
+#endif
 
 #elif defined HAVE_NS
 

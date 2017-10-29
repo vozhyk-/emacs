@@ -2334,10 +2334,14 @@ xg_get_font (struct frame *f, const char *default_name)
 	  PangoWeight weight = pango_font_description_get_weight (desc);
 	  PangoStyle  style  = pango_font_description_get_style (desc);
 
+#ifndef HAVE_GTK3WL
 #ifdef USE_CAIRO
 #define FONT_TYPE_WANTED (Qftcr)
 #else
 #define FONT_TYPE_WANTED (Qxft)
+#endif
+#else
+#define FONT_TYPE_WANTED (Qfreetype)
 #endif
 	  font = CALLN (Ffont_spec,
 			QCname, build_string (name),
@@ -4365,7 +4369,11 @@ draw_page (GtkPrintOperation *operation, GtkPrintContext *context,
   struct frame *f = XFRAME (Fnth (make_number (page_nr), frames));
   cairo_t *cr = gtk_print_context_get_cairo_context (context);
 
+#ifndef HAVE_GTK3WL
   x_cr_draw_frame (cr, f);
+#else
+  gtk3wl_cr_draw_frame (cr, f);
+#endif
 }
 
 void

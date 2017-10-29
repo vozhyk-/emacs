@@ -325,6 +325,13 @@ struct gtk3wl_output
      at left, right_width if tool bar is at the right.
      Zero if not using an external tool bar or if tool bar is horizontal.  */
   int toolbar_left_width, toolbar_right_width;
+
+#ifdef USE_CAIRO
+  /* Cairo drawing context.  */
+  cairo_t *cr_context;
+  /* Cairo surface for double buffering */
+  cairo_surface_t *cr_surface;
+#endif
 };
 
 /* this dummy decl needed to support TTYs */
@@ -349,6 +356,8 @@ struct x_output
 #define DEFAULT_GDK_DISPLAY() gdk_display_get_default()
 
 #define GDK_DISPLAY_XDISPLAY(gdpy) 0
+
+#define FRAME_X_DOUBLE_BUFFERED_P(f) 0
 
 /* Turning a lisp vector value into a pointer to a struct scroll_bar.  */
 #define XSCROLL_BAR(vec) ((struct scroll_bar *) XVECTOR (vec))
@@ -510,8 +519,14 @@ gtk3wl_defined_color (struct frame *f,
                   const char *name,
                   XColor *color_def, bool alloc,
                   bool makeIndex);
+#if 0
 extern void
 gtk3wl_query_color (void *col, XColor *color_def, int setPixel);
+#endif
+void
+gtk3wl_query_color (struct frame *f, XColor *color);
+void
+gtk3wl_query_colors (struct frame *f, XColor *colors, int ncolors);
 
 int gtk3wl_parse_color (struct frame *f, const char *color_name,
 			XColor *color);
@@ -608,6 +623,11 @@ extern unsigned long gtk3wl_get_rgb_color (struct frame *f,
 struct input_event;
 extern void gtk3wl_init_events (struct input_event *);
 extern void gtk3wl_finish_events (void);
+
+extern cairo_t *gtk3wl_begin_cr_clip (struct frame *f, XGCValues *gc);
+extern void gtk3wl_end_cr_clip (struct frame *f);
+extern void gtk3wl_set_cr_source_with_gc_foreground (struct frame *f, XGCValues *gc);
+extern void gtk3wl_set_cr_source_with_gc_background (struct frame *f, XGCValues *gc);
 
 #ifdef __OBJC__
 /* Needed in gtk3wlfgtk3wl.m.  */

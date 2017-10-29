@@ -3290,11 +3290,38 @@ if test "${HAVE_X11}" = "yes"; then
       fi
     fi
 else
-    HAVE_XFT=no
-    HAVE_FREETYPE=no
-    HAVE_LIBOTF=no
-    HAVE_M17N_FLT=no
+
+    if test $window_system = gtk3wl; then
+      EMACS_CHECK_MODULES([FONTCONFIG], [fontconfig >= 2.2.0])
+      EMACS_CHECK_MODULES([FREETYPE], [freetype2])
+      if test "$HAVE_FONTCONFIG" != yes -o test "$HAVE_FREETYPE" != yes; then
+        AC_MSG_ERROR(fontconfig and freetype is required.)
+      fi
+      HAVE_LIBOTF=no
+      AC_DEFINE(HAVE_FREETYPE, 1,
+		[Define to 1 if using the freetype and fontconfig libraries.])
+      if test "${with_libotf}" != "no"; then
+	EMACS_CHECK_MODULES([LIBOTF], [libotf])
+	if test "$HAVE_LIBOTF" = "yes"; then
+	  AC_DEFINE(HAVE_LIBOTF, 1, [Define to 1 if using libotf.])
+	  AC_CHECK_LIB(otf, OTF_get_variation_glyphs,
+		       HAVE_OTF_GET_VARIATION_GLYPHS=yes,
+		       HAVE_OTF_GET_VARIATION_GLYPHS=no)
+	  if test "${HAVE_OTF_GET_VARIATION_GLYPHS}" = "yes"; then
+	    AC_DEFINE(HAVE_OTF_GET_VARIATION_GLYPHS, 1,
+		      [Define to 1 if libotf has OTF_get_variation_glyphs.])
+	  fi
+	fi
+      fi
+    else
+      HAVE_XFT=no
+      HAVE_FREETYPE=no
+      HAVE_LIBOTF=no
+      HAVE_M17N_FLT=no
+    fi
 fi
+
+
 
 ### End of font-backend (under X11) section.
 
@@ -3308,7 +3335,7 @@ AC_SUBST(M17N_FLT_CFLAGS)
 AC_SUBST(M17N_FLT_LIBS)
 
 HAVE_CAIRO=no
-if test "${HAVE_X11}" = "yes"; then
+if test "${HAVE_X11}" = "yes" -o "$window_system" = gtk3wl; then
   if test "${with_cairo}" != "no"; then
     CAIRO_REQUIRED=1.12.0
     CAIRO_MODULE="cairo >= $CAIRO_REQUIRED"
@@ -3570,7 +3597,7 @@ elif test "${with_png}" != no; then
   # mingw32 loads the library dynamically.
   if test "$opsys" = mingw32; then
     AC_CHECK_HEADER([png.h], [HAVE_PNG=yes])
-  elif test "${HAVE_X11}" = "yes" || test "${HAVE_W32}" = "yes"; then
+  elif test "${HAVE_X11}" = "yes" || test "$window_system" = "gtk3wl" || test "${HAVE_W32}" = "yes"; then
     AC_MSG_CHECKING([for png])
     png_cflags=`(libpng-config --cflags) 2>&AS_MESSAGE_LOG_FD` &&
     png_ldflags=`(libpng-config --ldflags) 2>&AS_MESSAGE_LOG_FD` || {
@@ -5043,6 +5070,9 @@ if test "${HAVE_X_WINDOWS}" = "yes" ; then
     FONT_OBJ="$FONT_OBJ ftfont.o ftxfont.o"
   fi
   AC_SUBST(FONT_OBJ)
+fi
+if test "${window_system}" = "gtk3wl"; then
+   FONT_OBJ="ftfont.o ftcrfont.o"
 fi
 AC_SUBST(XMENU_OBJ)
 AC_SUBST(XOBJ)

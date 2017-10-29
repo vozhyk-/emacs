@@ -38,7 +38,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include "lisp.h"
 #include "blockinput.h"
 #include "sysselect.h"
-#include "gtk3wlterm.h"
+#include "gtkutil.h"
 #include "systime.h"
 #include "character.h"
 #include "fontset.h"
@@ -9219,6 +9219,9 @@ baseline level.  The default value is nil.  */);
 
 /* ==== ==== ==== ==== ==== ==== ==== ==== ==== ==== ==== ==== ==== ==== ==== ==== */
 
+#define FRAME_CR_CONTEXT(f)	((f)->output_data.gtk3wl->cr_context)
+#define FRAME_CR_SURFACE(f)	((f)->output_data.gtk3wl->cr_surface)
+
 struct gtk3wl_display_info *x_display_list; /* Chain of existing displays */
 static int selfds[2] = { -1, -1 };
 static pthread_mutex_t select_mutex;
@@ -10041,6 +10044,35 @@ int gtk3wl_parse_color (struct frame *f, const char *color_name,
   return 0;
 }
 
+
+/* On frame F, translate pixel colors to RGB values for the NCOLORS
+   colors in COLORS.  On W32, we no longer try to map colors to
+   a palette.  */
+void
+gtk3wl_query_colors (struct frame *f, XColor *colors, int ncolors)
+{
+  int i;
+
+  for (i = 0; i < ncolors; i++)
+    {
+      unsigned long pixel = colors[i].pixel;
+      /* Convert to a 16 bit value in range 0 - 0xffff. */
+#define GetRValue(p) (((p) >> 16) & 0xff)
+#define GetGValue(p) (((p) >> 8) & 0xff)
+#define GetBValue(p) (((p) >> 0) & 0xff)
+      colors[i].red = GetRValue (pixel) * 257;
+      colors[i].green = GetGValue (pixel) * 257;
+      colors[i].blue = GetBValue (pixel) * 257;
+    }
+}
+
+void
+gtk3wl_query_color (struct frame *f, XColor *color)
+{
+  gtk3wl_query_colors (f, color, 1);
+}
+
+
 void
 syms_of_gtk3wlterm (void)
 {
@@ -10090,4 +10122,106 @@ baseline level.  The default value is nil.  */);
   /* Tell Emacs about this window system.  */
   Fprovide (Qgtk3wl, Qnil);
 
+}
+
+cairo_t *
+gtk3wl_begin_cr_clip (struct frame *f, XGCValues *gc)
+{
+  cairo_t *cr = FRAME_CR_CONTEXT (f);
+
+  if (!cr)
+    {
+
+      if (! FRAME_CR_SURFACE (f))
+        {
+          cairo_surface_t *surface;
+	  surface = gdk_window_create_similar_image_surface(gtk_widget_get_window (FRAME_GTK_WIDGET (f)),
+							    CAIRO_FORMAT_ARGB32,
+							    FRAME_PIXEL_WIDTH (f),
+							    FRAME_PIXEL_HEIGHT (f),
+							    1.0);
+          cr = cairo_create (surface);
+          cairo_surface_destroy (surface);
+        }
+      else
+        cr = cairo_create (FRAME_CR_SURFACE (f));
+      FRAME_CR_CONTEXT (f) = cr;
+    }
+  cairo_save (cr);
+
+#if 0
+  if (gc)
+    {
+      struct x_gc_ext_data *gc_ext = x_gc_get_ext_data (f, gc, 0);
+
+      if (gc_ext && gc_ext->n_clip_rects)
+	{
+	  int i;
+
+	  for (i = 0; i < gc_ext->n_clip_rects; i++)
+	    cairo_rectangle (cr, gc_ext->clip_rects[i].x,
+			     gc_ext->clip_rects[i].y,
+			     gc_ext->clip_rects[i].width,
+			     gc_ext->clip_rects[i].height);
+	  cairo_clip (cr);
+	}
+    }
+#endif
+
+  return cr;
+}
+
+void
+gtk3wl_end_cr_clip (struct frame *f)
+{
+  cairo_restore (FRAME_CR_CONTEXT (f));
+}
+
+void
+gtk3wl_set_cr_source_with_gc_foreground (struct frame *f, XGCValues *gc)
+{
+#if 0
+  XGCValues xgcv;
+  XColor color;
+
+  XGetGCValues (FRAME_X_DISPLAY (f), gc, GCForeground, &xgcv);
+  color.pixel = xgcv.foreground;
+  x_query_color (f, &color);
+  cairo_set_source_rgb (FRAME_CR_CONTEXT (f), color.red / 65535.0,
+			color.green / 65535.0, color.blue / 65535.0);
+#endif
+  cairo_set_source_rgb (FRAME_CR_CONTEXT (f), 1.0, 1.0, 1.0);
+}
+
+void
+gtk3wl_set_cr_source_with_gc_background (struct frame *f, XGCValues *gc)
+{
+#if 0
+  XGCValues xgcv;
+  XColor color;
+
+  XGetGCValues (FRAME_X_DISPLAY (f), gc, GCBackground, &xgcv);
+  color.pixel = xgcv.background;
+  x_query_color (f, &color);
+  cairo_set_source_rgb (FRAME_CR_CONTEXT (f), color.red / 65535.0,
+			color.green / 65535.0, color.blue / 65535.0);
+#endif
+  cairo_set_source_rgb (FRAME_CR_CONTEXT (f), 0.0, 0.0, 0.0);
+}
+
+void
+gtk3wl_cr_draw_frame (cairo_t *cr, struct frame *f)
+{
+  int width, height;
+
+  width = FRAME_PIXEL_WIDTH (f);
+  height = FRAME_PIXEL_HEIGHT (f);
+
+#if 0
+  x_free_cr_resources (f);
+  FRAME_CR_CONTEXT (f) = cr;
+  x_clear_area (f, 0, 0, width, height);
+  expose_frame (f, 0, 0, width, height);
+  FRAME_CR_CONTEXT (f) = NULL;
+#endif
 }

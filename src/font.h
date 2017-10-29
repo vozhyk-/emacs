@@ -793,7 +793,7 @@ extern Lisp_Object merge_font_spec (Lisp_Object, Lisp_Object);
 
 extern Lisp_Object font_make_entity (void);
 extern Lisp_Object font_make_object (int, Lisp_Object, int);
-#if defined (HAVE_XFT) || defined (HAVE_FREETYPE) || defined (HAVE_NS)
+#if defined (HAVE_XFT) || defined (HAVE_FREETYPE) || defined (HAVE_NS) || defined(HAVE_GTK3WL)
 extern Lisp_Object font_build_object (int, Lisp_Object, Lisp_Object, double);
 #endif
 
@@ -894,6 +894,7 @@ extern void ftfont_filter_properties (Lisp_Object, Lisp_Object);
 extern void ftfont_text_extents (struct font *, unsigned *, int,
 				 struct font_metrics *);
 extern void syms_of_ftfont (void);
+extern struct font_driver const ftfont_driver;
 #endif	/* HAVE_FREETYPE */
 #ifdef HAVE_X_WINDOWS
 extern struct font_driver const xfont_driver;

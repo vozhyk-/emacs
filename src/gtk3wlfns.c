@@ -1244,9 +1244,7 @@ This function is an internal primitive--use `make-frame' instead.  */)
 
   block_input ();
 
-#if 0
-  register_font_driver (&gtk3wlfont_driver, f);
-#endif
+  register_font_driver (&ftcrfont_driver, f);
 
   image_cache_refcount =
     FRAME_IMAGE_CACHE (f) ? FRAME_IMAGE_CACHE (f)->refcount : 0;
@@ -3281,4 +3279,18 @@ Otherwise use Emacs own tooltip implementation.
 When using Gtk+ tooltips, the tooltip face is not used.  */);
   x_gtk_use_system_tooltips = true;
 
+
+  DEFSYM (Qmono, "mono");
+
+#ifdef USE_CAIRO
+  DEFSYM (Qpdf, "pdf");
+
+  DEFSYM (Qorientation, "orientation");
+  DEFSYM (Qtop_margin, "top-margin");
+  DEFSYM (Qbottom_margin, "bottom-margin");
+  DEFSYM (Qportrait, "portrait");
+  DEFSYM (Qlandscape, "landscape");
+  DEFSYM (Qreverse_portrait, "reverse-portrait");
+  DEFSYM (Qreverse_landscape, "reverse-landscape");
+#endif
 }
