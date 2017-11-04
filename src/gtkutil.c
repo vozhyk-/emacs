@@ -941,6 +941,7 @@ xg_frame_resized (struct frame *f, int pixelwidth, int pixelheight)
 
   width = FRAME_PIXEL_TO_TEXT_WIDTH (f, pixelwidth);
   height = FRAME_PIXEL_TO_TEXT_HEIGHT (f, pixelheight);
+  fprintf(stderr, "xg_frame_resized: pixel: %dx%d, char: %dx%d\n", pixelwidth, pixelheight, width, height);
 
   frame_size_history_add
     (f, Qxg_frame_resized, width, height, Qnil);
@@ -952,6 +953,8 @@ xg_frame_resized (struct frame *f, int pixelwidth, int pixelheight)
     {
 #ifndef HAVE_GTK3WL
       x_clear_under_internal_border (f);
+#else
+      gtk3wl_clear_under_internal_border (f);
 #endif
       change_frame_size (f, width, height, 0, 1, 0, 1);
       SET_FRAME_GARBAGED (f);
@@ -1332,8 +1335,9 @@ xg_create_frame_widgets (struct frame *f)
 
   /* Must realize the windows so the X window gets created.  It is used
      by callers of this function.  */
+#ifndef HAVE_GTK3WL
   gtk_widget_realize (wfixed);
-#ifdef HAVE_GTK3WL
+#else
   gtk_widget_show_all(wtop);
 #endif
   FRAME_X_WINDOW (f) = GTK_WIDGET_TO_X_WIN (wfixed);

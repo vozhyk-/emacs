@@ -9346,6 +9346,9 @@ x_set_window_size (struct frame *f,
   fprintf(stderr, "new: %dx%d\n", pixelwidth, pixelheight);
   for (GtkWidget *w = FRAME_GTK_WIDGET(f); w != NULL; w = gtk_widget_get_parent(w)) {
     fprintf(stderr, "%p %s %d %d", w, G_OBJECT_TYPE_NAME(w), gtk_widget_get_mapped(w), gtk_widget_get_visible(w));
+    gint wd, hi;
+    gtk_widget_get_size_request(w, &wd, &hi);
+    fprintf(stderr, " %dx%d", wd, hi);
     GtkAllocation alloc;
     gtk_widget_get_allocation(w, &alloc);
     fprintf(stderr, " %dx%d+%d+%d\n", alloc.width, alloc.height, alloc.x, alloc.y);
@@ -9545,6 +9548,22 @@ x_new_font (struct frame *f, Lisp_Object font_object, int fontset)
   }
 
   FRAME_FONT (f) = font;
+  fprintf(stderr, "font:\n");
+  fprintf(stderr, "  name: %s\n", SSDATA(font_get_name(font_object)));
+  fprintf(stderr, "  width: %d..%d\n", font->min_width, font->max_width);
+  fprintf(stderr, "  pixel_size: %d\n", font->pixel_size);
+  fprintf(stderr, "  height: %d\n", font->height);
+  fprintf(stderr, "  space_width: %d\n", font->space_width);
+  fprintf(stderr, "  average_width: %d\n", font->average_width);
+  fprintf(stderr, "  asc/desc: %d,%d\n", font->ascent, font->descent);
+  fprintf(stderr, "  ul thickness: %d\n", font->underline_thickness);
+  fprintf(stderr, "  ul position: %d\n", font->underline_position);
+  fprintf(stderr, "  vertical_centering: %d\n", font->vertical_centering);
+  fprintf(stderr, "  baseline_offset: %d\n", font->baseline_offset);
+  fprintf(stderr, "  relative_compose: %d\n", font->relative_compose);
+  fprintf(stderr, "  default_ascent: %d\n", font->default_ascent);
+  fprintf(stderr, "  encoding_charset: %d\n", font->encoding_charset);
+  fprintf(stderr, "  repertory_charset: %d\n", font->repertory_charset);
 
   FRAME_BASELINE_OFFSET (f) = font->baseline_offset;
   FRAME_COLUMN_WIDTH (f) = font->average_width;
@@ -9591,38 +9610,22 @@ int
 x_display_pixel_height (struct gtk3wl_display_info *dpyinfo)
 {
   fprintf(stderr, "x_display_pixel_height\n");
-#if 0
-  NSArray *screens = [NSScreen screens];
-  NSEnumerator *enumerator = [screens objectEnumerator];
-  NSScreen *screen;
-  NSRect frame;
 
-  frame = NSZeroRect;
-  while ((screen = [enumerator nextObject]) != nil)
-    frame = NSUnionRect (frame, [screen frame]);
-
-  return NSHeight (frame);
-#endif
-  return 1024;
+  GdkDisplay *dpy = gdk_display_get_default();
+  GdkScreen *scr = gdk_display_get_default_screen(dpy);
+  fprintf(stderr, " = %d\n", gdk_screen_get_height(scr));
+  return gdk_screen_get_height(scr);
 }
 
 int
 x_display_pixel_width (struct gtk3wl_display_info *dpyinfo)
 {
   fprintf(stderr, "x_display_pixel_width\n");
-#if 0
-  NSArray *screens = [NSScreen screens];
-  NSEnumerator *enumerator = [screens objectEnumerator];
-  NSScreen *screen;
-  NSRect frame;
 
-  frame = NSZeroRect;
-  while ((screen = [enumerator nextObject]) != nil)
-    frame = NSUnionRect (frame, [screen frame]);
-
-  return NSWidth (frame);
-#endif
-  return 768;
+  GdkDisplay *dpy = gdk_display_get_default();
+  GdkScreen *scr = gdk_display_get_default_screen(dpy);
+  fprintf(stderr, " = %d\n", gdk_screen_get_width(scr));
+  return gdk_screen_get_width(scr);
 }
 
 void
@@ -11551,6 +11554,9 @@ gtk3wl_handle_draw(GtkWidget *widget, cairo_t *cr, gpointer *data)
 
   for (GtkWidget *w = widget; w != NULL; w = gtk_widget_get_parent(w)) {
     fprintf(stderr, "%p %s %d %d", w, G_OBJECT_TYPE_NAME(w), gtk_widget_get_mapped(w), gtk_widget_get_visible(w));
+    gint wd, hi;
+    gtk_widget_get_size_request(w, &wd, &hi);
+    fprintf(stderr, " %dx%d", wd, hi);
     GtkAllocation alloc;
     gtk_widget_get_allocation(w, &alloc);
     fprintf(stderr, " %dx%d+%d+%d\n", alloc.width, alloc.height, alloc.x, alloc.y);
@@ -11665,9 +11671,15 @@ gtk3wl_handle_draw(GtkWidget *widget, cairo_t *cr, gpointer *data)
   return FALSE;
 }
 
+static void debug(GtkWidget *widget, GtkAllocation *alloc)
+{
+  fprintf(stderr, "size-alloc: %dx%d+%d+%d.\n", alloc->width, alloc->height, alloc->x, alloc->y);
+}
+
 void
 gtk3wl_set_event_handler(struct frame *f)
 {
+  g_signal_connect(G_OBJECT(FRAME_GTK_WIDGET(f)), "size-allocate", G_CALLBACK(debug), NULL);
   g_signal_connect(G_OBJECT(FRAME_GTK_WIDGET(f)), "event", G_CALLBACK(gtk3wl_handle_event), NULL);
   g_signal_connect(G_OBJECT(FRAME_GTK_WIDGET(f)), "draw", G_CALLBACK(gtk3wl_handle_draw), NULL);
 }
