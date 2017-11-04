@@ -9802,6 +9802,321 @@ static void gtk3wl_update_window_end_hook(struct window *w)
 static void gtk3wl_draw_glyph_string(struct glyph_string *s)
 {
   fprintf(stderr, "draw_glyph_string.\n");
+
+  fprintf(stderr, "chars:");
+  for (int i = 0; i < s->nchars; i++)
+    fprintf(stderr, " %04x", s->char2b[i]);
+  fprintf(stderr, "\n");
+
+  cairo_glyph_t *glyphs = malloc(sizeof *glyphs * s->nchars);
+  for (int i = 0; i < s->nchars; i++) {
+    glyphs[i].index = s->char2b[i];
+    glyphs[i].x = i * 20;
+    glyphs[i].y = 50;
+  }
+
+  cairo_t *cr = gtk3wl_begin_cr_clip(s->f, NULL);
+  cairo_select_font_face(cr, "Noto Sans Mono CJK", CAIRO_FONT_SLANT_NORMAL, CAIRO_FONT_WEIGHT_NORMAL);
+  cairo_set_font_size(cr, 12);
+  cairo_move_to(cr, 20, 50);
+  cairo_show_glyphs(cr, glyphs, s->nchars);
+  gtk3wl_end_cr_clip(s->f);
+
+#if 0
+  bool relief_drawn_p = false;
+
+  /* If S draws into the background of its successors, draw the
+     background of the successors first so that S can draw into it.
+     This makes S->next use XDrawString instead of XDrawImageString.  */
+  if (s->next && s->right_overhang && !s->for_overlaps)
+    {
+      int width;
+      struct glyph_string *next;
+
+      for (width = 0, next = s->next;
+	   next && width < s->right_overhang;
+	   width += next->width, next = next->next)
+	if (next->first_glyph->type != IMAGE_GLYPH)
+	  {
+	    x_set_glyph_string_gc (next);
+	    x_set_glyph_string_clipping (next);
+	    if (next->first_glyph->type == STRETCH_GLYPH)
+	      x_draw_stretch_glyph_string (next);
+	    else
+	      x_draw_glyph_string_background (next, true);
+	    next->num_clips = 0;
+	  }
+    }
+
+  /* Set up S->gc, set clipping and draw S.  */
+  x_set_glyph_string_gc (s);
+
+  /* Draw relief (if any) in advance for char/composition so that the
+     glyph string can be drawn over it.  */
+  if (!s->for_overlaps
+      && s->face->box != FACE_NO_BOX
+      && (s->first_glyph->type == CHAR_GLYPH
+	  || s->first_glyph->type == COMPOSITE_GLYPH))
+
+    {
+      x_set_glyph_string_clipping (s);
+      x_draw_glyph_string_background (s, true);
+      x_draw_glyph_string_box (s);
+      x_set_glyph_string_clipping (s);
+      relief_drawn_p = true;
+    }
+  else if (!s->clip_head /* draw_glyphs didn't specify a clip mask. */
+	   && !s->clip_tail
+	   && ((s->prev && s->prev->hl != s->hl && s->left_overhang)
+	       || (s->next && s->next->hl != s->hl && s->right_overhang)))
+    /* We must clip just this glyph.  left_overhang part has already
+       drawn when s->prev was drawn, and right_overhang part will be
+       drawn later when s->next is drawn. */
+    x_set_glyph_string_clipping_exactly (s, s);
+  else
+    x_set_glyph_string_clipping (s);
+
+  switch (s->first_glyph->type)
+    {
+    case IMAGE_GLYPH:
+      // x_draw_image_glyph_string (s);
+      break;
+
+    case XWIDGET_GLYPH:
+      // x_draw_xwidget_glyph_string (s);
+      break;
+
+    case STRETCH_GLYPH:
+      // x_draw_stretch_glyph_string (s);
+      break;
+
+    case CHAR_GLYPH:
+      if (s->for_overlaps)
+	s->background_filled_p = true;
+      else
+	x_draw_glyph_string_background (s, false);
+      x_draw_glyph_string_foreground (s);
+      break;
+
+    case COMPOSITE_GLYPH:
+#if 0
+      if (s->for_overlaps || (s->cmp_from > 0
+			      && ! s->first_glyph->u.cmp.automatic))
+	s->background_filled_p = true;
+      else
+	x_draw_glyph_string_background (s, true);
+      x_draw_composite_glyph_string_foreground (s);
+#endif
+      break;
+
+    case GLYPHLESS_GLYPH:
+#if 0
+      if (s->for_overlaps)
+	s->background_filled_p = true;
+      else
+	x_draw_glyph_string_background (s, true);
+      x_draw_glyphless_glyph_string_foreground (s);
+#endif
+      break;
+
+    default:
+      emacs_abort ();
+    }
+#endif
+
+#if 0
+  if (!s->for_overlaps)
+    {
+      /* Draw underline.  */
+      if (s->face->underline_p)
+        {
+          if (s->face->underline_type == FACE_UNDER_WAVE)
+            {
+              if (s->face->underline_defaulted_p)
+                x_draw_underwave (s);
+              else
+                {
+                  XGCValues xgcv;
+                  XGetGCValues (s->display, s->gc, GCForeground, &xgcv);
+                  XSetForeground (s->display, s->gc, s->face->underline_color);
+                  x_draw_underwave (s);
+                  XSetForeground (s->display, s->gc, xgcv.foreground);
+                }
+            }
+          else if (s->face->underline_type == FACE_UNDER_LINE)
+            {
+              unsigned long thickness, position;
+              int y;
+
+              if (s->prev && s->prev->face->underline_p
+		  && s->prev->face->underline_type == FACE_UNDER_LINE)
+                {
+                  /* We use the same underline style as the previous one.  */
+                  thickness = s->prev->underline_thickness;
+                  position = s->prev->underline_position;
+                }
+              else
+                {
+		  struct font *font = font_for_underline_metrics (s);
+
+                  /* Get the underline thickness.  Default is 1 pixel.  */
+                  if (font && font->underline_thickness > 0)
+                    thickness = font->underline_thickness;
+                  else
+                    thickness = 1;
+                  if (x_underline_at_descent_line)
+                    position = (s->height - thickness) - (s->ybase - s->y);
+                  else
+                    {
+                      /* Get the underline position.  This is the recommended
+                         vertical offset in pixels from the baseline to the top of
+                         the underline.  This is a signed value according to the
+                         specs, and its default is
+
+                         ROUND ((maximum descent) / 2), with
+                         ROUND(x) = floor (x + 0.5)  */
+
+                      if (x_use_underline_position_properties
+                          && font && font->underline_position >= 0)
+                        position = font->underline_position;
+                      else if (font)
+                        position = (font->descent + 1) / 2;
+                      else
+                        position = underline_minimum_offset;
+                    }
+                  position = max (position, underline_minimum_offset);
+                }
+              /* Check the sanity of thickness and position.  We should
+                 avoid drawing underline out of the current line area.  */
+              if (s->y + s->height <= s->ybase + position)
+                position = (s->height - 1) - (s->ybase - s->y);
+              if (s->y + s->height < s->ybase + position + thickness)
+                thickness = (s->y + s->height) - (s->ybase + position);
+              s->underline_thickness = thickness;
+              s->underline_position = position;
+              y = s->ybase + position;
+              if (s->face->underline_defaulted_p)
+                x_fill_rectangle (s->f, s->gc,
+                                s->x, y, s->width, thickness);
+              else
+                {
+                  XGCValues xgcv;
+                  XGetGCValues (s->display, s->gc, GCForeground, &xgcv);
+                  XSetForeground (s->display, s->gc, s->face->underline_color);
+                  x_fill_rectangle (s->f, s->gc,
+                                  s->x, y, s->width, thickness);
+                  XSetForeground (s->display, s->gc, xgcv.foreground);
+                }
+            }
+        }
+      /* Draw overline.  */
+      if (s->face->overline_p)
+	{
+	  unsigned long dy = 0, h = 1;
+
+	  if (s->face->overline_color_defaulted_p)
+	    x_fill_rectangle (s->f, s->gc, s->x, s->y + dy,
+			    s->width, h);
+	  else
+	    {
+	      XGCValues xgcv;
+	      XGetGCValues (s->display, s->gc, GCForeground, &xgcv);
+	      XSetForeground (s->display, s->gc, s->face->overline_color);
+	      x_fill_rectangle (s->f, s->gc, s->x, s->y + dy,
+			      s->width, h);
+	      XSetForeground (s->display, s->gc, xgcv.foreground);
+	    }
+	}
+
+      /* Draw strike-through.  */
+      if (s->face->strike_through_p)
+	{
+	  /* Y-coordinate and height of the glyph string's first
+	     glyph.  We cannot use s->y and s->height because those
+	     could be larger if there are taller display elements
+	     (e.g., characters displayed with a larger font) in the
+	     same glyph row.  */
+	  int glyph_y = s->ybase - s->first_glyph->ascent;
+	  int glyph_height = s->first_glyph->ascent + s->first_glyph->descent;
+	  /* Strike-through width and offset from the glyph string's
+	     top edge.  */
+          unsigned long h = 1;
+          unsigned long dy = (glyph_height - h) / 2;
+
+	  if (s->face->strike_through_color_defaulted_p)
+	    x_fill_rectangle (s->f, s->gc, s->x, glyph_y + dy,
+			    s->width, h);
+	  else
+	    {
+	      XGCValues xgcv;
+	      XGetGCValues (s->display, s->gc, GCForeground, &xgcv);
+	      XSetForeground (s->display, s->gc, s->face->strike_through_color);
+	      x_fill_rectangle (s->f, s->gc, s->x, glyph_y + dy,
+			      s->width, h);
+	      XSetForeground (s->display, s->gc, xgcv.foreground);
+	    }
+	}
+
+      /* Draw relief if not yet drawn.  */
+      if (!relief_drawn_p && s->face->box != FACE_NO_BOX)
+	x_draw_glyph_string_box (s);
+
+      if (s->prev)
+	{
+	  struct glyph_string *prev;
+
+	  for (prev = s->prev; prev; prev = prev->prev)
+	    if (prev->hl != s->hl
+		&& prev->x + prev->width + prev->right_overhang > s->x)
+	      {
+		/* As prev was drawn while clipped to its own area, we
+		   must draw the right_overhang part using s->hl now.  */
+		enum draw_glyphs_face save = prev->hl;
+
+		prev->hl = s->hl;
+		x_set_glyph_string_gc (prev);
+		x_set_glyph_string_clipping_exactly (s, prev);
+		if (prev->first_glyph->type == CHAR_GLYPH)
+		  x_draw_glyph_string_foreground (prev);
+		else
+		  x_draw_composite_glyph_string_foreground (prev);
+		x_reset_clip_rectangles (prev->f, prev->gc);
+		prev->hl = save;
+		prev->num_clips = 0;
+	      }
+	}
+
+      if (s->next)
+	{
+	  struct glyph_string *next;
+
+	  for (next = s->next; next; next = next->next)
+	    if (next->hl != s->hl
+		&& next->x - next->left_overhang < s->x + s->width)
+	      {
+		/* As next will be drawn while clipped to its own area,
+		   we must draw the left_overhang part using s->hl now.  */
+		enum draw_glyphs_face save = next->hl;
+
+		next->hl = s->hl;
+		x_set_glyph_string_gc (next);
+		x_set_glyph_string_clipping_exactly (s, next);
+		if (next->first_glyph->type == CHAR_GLYPH)
+		  x_draw_glyph_string_foreground (next);
+		else
+		  x_draw_composite_glyph_string_foreground (next);
+		x_reset_clip_rectangles (next->f, next->gc);
+		next->hl = save;
+		next->num_clips = 0;
+		next->clip_head = s->next;
+	      }
+	}
+    }
+
+  /* Reset clipping.  */
+  x_reset_clip_rectangles (s->f, s->gc);
+  s->num_clips = 0;
+#endif
 }
 
 static void gtk3wl_after_update_window_line(struct window *w, struct glyph_row *desired_row)
