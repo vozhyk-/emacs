@@ -1232,7 +1232,11 @@ xg_create_frame_widgets (struct frame *f)
   gtk_box_set_homogeneous (GTK_BOX (whbox), FALSE);
 
 #ifdef HAVE_GTK3
+#ifndef HAVE_GTK3WL
   wfixed = emacs_fixed_new (f);
+#else
+  wfixed = gtk_drawing_area_new ();
+#endif
 #else
   wfixed = gtk_fixed_new ();
 #endif
@@ -1273,7 +1277,9 @@ xg_create_frame_widgets (struct frame *f)
   f->output_data.wx->vbox_widget = wvbox;
   f->output_data.wx->hbox_widget = whbox;
 
+#ifndef HAVE_GTK3WL
   gtk_widget_set_has_window (wfixed, TRUE);
+#endif
 
   gtk_container_add (GTK_CONTAINER (wtop), wvbox);
   gtk_box_pack_start (GTK_BOX (wvbox), whbox, TRUE, TRUE, 0);
@@ -1312,7 +1318,9 @@ xg_create_frame_widgets (struct frame *f)
 
   gtk_widget_add_events (wfixed,
                          GDK_POINTER_MOTION_MASK
+#ifndef HAVE_GTK3WL
                          | GDK_EXPOSURE_MASK
+#endif
                          | GDK_BUTTON_PRESS_MASK
                          | GDK_BUTTON_RELEASE_MASK
                          | GDK_KEY_PRESS_MASK
@@ -3864,8 +3872,10 @@ xg_finish_scroll_bar_creation (struct frame *f,
      also, which causes flicker.  Put an event box between the edit widget
      and the scroll bar, so the scroll bar instead draws itself on the
      event box window.  */
+#ifndef HAVE_GTK3WL
   gtk_fixed_put (GTK_FIXED (f->output_data.wx->edit_widget), webox, -1, -1);
   gtk_container_add (GTK_CONTAINER (webox), wscroll);
+#endif
 
   xg_set_widget_bg (f, webox, FRAME_BACKGROUND_PIXEL (f));
 
@@ -3999,7 +4009,9 @@ xg_update_scrollbar_pos (struct frame *f,
         }
 
       /* Move and resize to new values.  */
+#ifndef HAVE_GTK3WL
       gtk_fixed_move (GTK_FIXED (wfixed), wparent, left, top);
+#endif
       gtk_widget_style_get (wscroll, "min-slider-length", &msl, NULL);
       bool hidden = height < msl;
       if (hidden)
@@ -4021,6 +4033,8 @@ xg_update_scrollbar_pos (struct frame *f,
 	  oldx -= (scale - 1) * oldw;
 #ifndef HAVE_GTK3WL
           x_clear_area (f, oldx, oldy, oldw, oldh);
+#else
+          gtk3wl_clear_area (f, oldx, oldy, oldw, oldh);
 #endif
         }
 
@@ -4080,7 +4094,9 @@ xg_update_horizontal_scrollbar_pos (struct frame *f,
         }
 
       /* Move and resize to new values.  */
+#ifndef HAVE_GTK3WL
       gtk_fixed_move (GTK_FIXED (wfixed), wparent, left, top);
+#endif
       gtk_widget_style_get (wscroll, "min-slider-length", &msl, NULL);
       if (msl > width)
         {
@@ -4094,10 +4110,12 @@ xg_update_horizontal_scrollbar_pos (struct frame *f,
           gtk_widget_show_all (wparent);
           gtk_widget_set_size_request (wscroll, width, height);
         }
-#ifndef HAVE_GTK3WL
       if (oldx != -1 && oldw > 0 && oldh > 0)
         /* Clear under old scroll bar position.  */
+#ifndef HAVE_GTK3WL
         x_clear_area (f, oldx, oldy, oldw, oldh);
+#else
+        gtk3wl_clear_area (f, oldx, oldy, oldw, oldh);
 #endif
 
       /* GTK does not redraw until the main loop is entered again, but

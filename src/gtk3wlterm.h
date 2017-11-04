@@ -332,6 +332,8 @@ struct gtk3wl_output
   /* Cairo surface for double buffering */
   cairo_surface_t *cr_surface;
 #endif
+
+  int has_been_visible;
 };
 
 /* this dummy decl needed to support TTYs */
@@ -388,13 +390,15 @@ struct x_output
 #define XGTK3WL_SCROLL_BAR(vec) XSAVE_POINTER (vec, 0)
 
 /* Compute pixel height of the frame's titlebar. */
-#define FRAME_GTK3WL_TITLEBAR_HEIGHT(f)                                     \
+#define FRAME_GTK3WL_TITLEBAR_HEIGHT(f)                                     0
+#if 0
   (GTK3WLHeight([FRAME_GTK3WL_VIEW (f) frame]) == 0 ?                           \
    0                                                                    \
    : (int)(GTK3WLHeight([FRAME_GTK3WL_VIEW (f) window].frame)                   \
            - GTK3WLHeight([GTK3WLWindow contentRectForFrameRect:                \
                        [[FRAME_GTK3WL_VIEW (f) window] frame]               \
                        styleMask:[[FRAME_GTK3WL_VIEW (f) window] styleMask]])))
+#endif
 
 /* Compute pixel height of the toolbar. */
 #define FRAME_TOOLBAR_HEIGHT(f)                                         0

@@ -1412,6 +1412,7 @@ This function is an internal primitive--use `make-frame' instead.  */)
 
   // [[EmacsView alloc] initFrameFromEmacs: f];
   xg_create_frame_widgets(f);
+  gtk3wl_set_event_handler(f);
 
   x_icon (f, parms);
 

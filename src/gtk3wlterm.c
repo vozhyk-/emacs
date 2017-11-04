@@ -9234,6 +9234,7 @@ x_get_keysym_name (int keysym)
     that it be unique.
    -------------------------------------------------------------------------- */
 {
+  fprintf(stderr, "x_get_ksysym_name\n");
   static char value[16];
   sprintf (value, "%d", keysym);
   return value;
@@ -9245,6 +9246,7 @@ frame_set_mouse_pixel_position (struct frame *f, int pix_x, int pix_y)
      Programmatically reposition mouse pointer in pixel coordinates
    -------------------------------------------------------------------------- */
 {
+  fprintf(stderr, "frame_set_mouse_pixel_position\n");
 }
 
 void
@@ -9253,6 +9255,7 @@ x_set_offset (struct frame *f, int xoff, int yoff, int change_grav)
      External: Position the window
    -------------------------------------------------------------------------- */
 {
+  fprintf(stderr, "x_set_offset\n");
 #if 0
   NSView *view = FRAME_NS_VIEW (f);
   NSArray *screens = [NSScreen screens];
@@ -9313,6 +9316,45 @@ x_set_window_size (struct frame *f,
      internal clipping.
    -------------------------------------------------------------------------- */
 {
+  fprintf(stderr, "x_set_window_size(%dx%d, %s)\n", width, height, pixelwise ? "pixel" : "char");
+  int pixelwidth, pixelheight;
+
+  block_input ();
+
+  gtk_widget_get_size_request(FRAME_GTK_WIDGET(f), &pixelwidth, &pixelheight);
+  fprintf(stderr, "old: %dx%d\n", pixelwidth, pixelheight);
+
+  if (pixelwise)
+    {
+      pixelwidth = FRAME_TEXT_TO_PIXEL_WIDTH (f, width);
+      pixelheight = FRAME_TEXT_TO_PIXEL_HEIGHT (f, height);
+    }
+  else
+    {
+      pixelwidth =  FRAME_TEXT_COLS_TO_PIXEL_WIDTH   (f, width);
+      pixelheight = FRAME_TEXT_LINES_TO_PIXEL_HEIGHT (f, height);
+    }
+
+  frame_size_history_add
+    (f, Qx_set_window_size_1, width, height,
+     list5 (Fcons (make_number (pixelwidth), make_number (pixelheight)),
+	    Fcons (make_number (pixelwidth), make_number (pixelheight)),
+	    make_number (f->border_width),
+	    make_number (FRAME_GTK3WL_TITLEBAR_HEIGHT (f)),
+	    make_number (FRAME_TOOLBAR_HEIGHT (f))));
+
+  fprintf(stderr, "new: %dx%d\n", pixelwidth, pixelheight);
+  for (GtkWidget *w = FRAME_GTK_WIDGET(f); w != NULL; w = gtk_widget_get_parent(w)) {
+    fprintf(stderr, "%p %s %d %d", w, G_OBJECT_TYPE_NAME(w), gtk_widget_get_mapped(w), gtk_widget_get_visible(w));
+    GtkAllocation alloc;
+    gtk_widget_get_allocation(w, &alloc);
+    fprintf(stderr, " %dx%d+%d+%d\n", alloc.width, alloc.height, alloc.x, alloc.y);
+  }
+
+  gtk_widget_set_size_request(FRAME_GTK_WIDGET(f), pixelwidth, pixelheight);
+
+  unblock_input ();
+
 #if 0
   EmacsView *view = FRAME_NS_VIEW (f);
   NSWindow *window = [view window];
@@ -9377,6 +9419,7 @@ x_iconify_frame (struct frame *f)
      External: Iconify window
    -------------------------------------------------------------------------- */
 {
+  fprintf(stderr, "x_iconify_frame\n");
 #if 0
   NSView *view;
   struct ns_display_info *dpyinfo;
@@ -9416,6 +9459,7 @@ x_make_frame_visible (struct frame *f)
      External: Show the window (X11 semantics)
    -------------------------------------------------------------------------- */
 {
+  fprintf(stderr, "x_make_frame_visible\n");
 #if 0
   NSTRACE ("x_make_frame_visible");
   /* XXX: at some points in past this was not needed, as the only place that
@@ -9469,6 +9513,7 @@ x_make_frame_invisible (struct frame *f)
      External: Hide the window (X11 semantics)
    -------------------------------------------------------------------------- */
 {
+  fprintf(stderr, "x_make_frame_invisible\n");
 #if 0
   NSView *view;
   NSTRACE ("x_make_frame_invisible");
@@ -9483,6 +9528,7 @@ x_make_frame_invisible (struct frame *f)
 Lisp_Object
 x_new_font (struct frame *f, Lisp_Object font_object, int fontset)
 {
+  fprintf(stderr, "x_new_font\n");
   struct font *font = XFONT_OBJECT (font_object);
   // EmacsView *view = FRAME_NS_VIEW (f);
   int font_ascent, font_descent;
@@ -9491,10 +9537,12 @@ x_new_font (struct frame *f, Lisp_Object font_object, int fontset)
     fontset = fontset_from_font (font_object);
   FRAME_FONTSET (f) = fontset;
 
-  if (FRAME_FONT (f) == font)
+  if (FRAME_FONT (f) == font) {
     /* This font is already set in frame F.  There's nothing more to
        do.  */
+    fprintf(stderr, "already set.\n");
     return font_object;
+  }
 
   FRAME_FONT (f) = font;
 
@@ -9535,12 +9583,14 @@ x_new_font (struct frame *f, Lisp_Object font_object, int fontset)
 		       FRAME_LINES (f) * FRAME_LINE_HEIGHT (f), 3,
 		       false, Qfont);
 
+  fprintf(stderr, "set new.\n");
   return font_object;
 }
 
 int
 x_display_pixel_height (struct gtk3wl_display_info *dpyinfo)
 {
+  fprintf(stderr, "x_display_pixel_height\n");
 #if 0
   NSArray *screens = [NSScreen screens];
   NSEnumerator *enumerator = [screens objectEnumerator];
@@ -9559,6 +9609,7 @@ x_display_pixel_height (struct gtk3wl_display_info *dpyinfo)
 int
 x_display_pixel_width (struct gtk3wl_display_info *dpyinfo)
 {
+  fprintf(stderr, "x_display_pixel_width\n");
 #if 0
   NSArray *screens = [NSScreen screens];
   NSEnumerator *enumerator = [screens objectEnumerator];
@@ -9598,6 +9649,7 @@ x_set_parent_frame (struct frame *f, Lisp_Object new_value, Lisp_Object old_valu
      Some window managers may not honor this parameter.
    -------------------------------------------------------------------------- */
 {
+  fprintf(stderr, "x_set_parent_frame\n");
 #if 0
   struct frame *p = NULL;
   NSWindow *parent, *child;
@@ -9638,6 +9690,7 @@ x_set_no_focus_on_map (struct frame *f, Lisp_Object new_value, Lisp_Object old_v
  *
  * Some window managers may not honor this parameter. */
 {
+  fprintf(stderr, "x_set_no_accept_focus_on_map\n");
 #if 0
   NSTRACE ("x_set_no_focus_on_map");
 
@@ -9659,6 +9712,7 @@ x_set_no_accept_focus (struct frame *f, Lisp_Object new_value, Lisp_Object old_v
  *
  * Some window managers may not honor this parameter. */
 {
+  fprintf(stderr, "x_set_no_accept_focus\n");
 #if 0
   NSTRACE ("x_set_no_accept_focus");
 
@@ -9678,6 +9732,7 @@ x_set_z_group (struct frame *f, Lisp_Object new_value, Lisp_Object old_value)
 
    Some window managers may not honor this parameter. */
 {
+  fprintf(stderr, "x_set_z_group\n");
 #if 0
   EmacsView *view = (EmacsView *)FRAME_NS_VIEW (f);
   NSWindow *window = [view window];
@@ -9731,6 +9786,46 @@ gtk3wl_initialize_display_info (struct gtk3wl_display_info *dpyinfo)
     reset_mouse_highlight (&dpyinfo->mouse_highlight);
 }
 
+static void gtk3wl_update_window_begin_hook(struct window *w)
+{
+  fprintf(stderr, "update_window_begin_hook.\n");
+}
+
+static void gtk3wl_update_window_end_hook(struct window *w)
+{
+  fprintf(stderr, "update_window_end_hook.\n");
+}
+
+static void gtk3wl_draw_glyph_string(struct glyph_string *s)
+{
+  fprintf(stderr, "draw_glyph_string.\n");
+}
+
+static void gtk3wl_after_update_window_line(struct window *w, struct glyph_row *desired_row)
+{
+  fprintf(stderr, "after_update_window_line.\n");
+}
+
+static void gtk3wl_clear_frame_area(struct frame *f, int x, int y, int width, int height)
+{
+  fprintf(stderr, "clear_frame_area.\n");
+  gtk3wl_clear_area (f, x, y, width, height);
+}
+
+static void gtk3wl_draw_fringe_bitmap(struct window *w, struct glyph_row *row, struct draw_fringe_bitmap_params *p)
+{
+  fprintf(stderr, "draw_fringe_bitmap.\n");
+}
+
+static void gtk3wl_draw_window_cursor(struct window *w,
+			      struct glyph_row *glyph_row,
+			      int x, int y,
+			      enum text_cursor_kinds cursor_type,
+			      int cursor_width, bool on_p, bool active_p)
+{
+  fprintf(stderr, "draw_window_cursor.\n");
+}
+
 extern frame_parm_handler gtk3wl_frame_parm_handlers[];
 
 static struct redisplay_interface gtk3wl_redisplay_interface =
@@ -9741,21 +9836,21 @@ static struct redisplay_interface gtk3wl_redisplay_interface =
   x_insert_glyphs,
   x_clear_end_of_line,
   NULL, // gtk3wl_scroll_run,
-  NULL, // gtk3wl_after_update_window_line,
-  NULL, // gtk3wl_update_window_begin,
-  NULL, // gtk3wl_update_window_end,
+  gtk3wl_after_update_window_line,
+  gtk3wl_update_window_begin_hook,
+  gtk3wl_update_window_end_hook,
   0, /* flush_display */
   x_clear_window_mouse_face,
   x_get_glyph_overhangs,
   x_fix_overlapping_area,
-  NULL, // gtk3wl_draw_fringe_bitmap,
+  gtk3wl_draw_fringe_bitmap,
   0, /* define_fringe_bitmap */ /* FIXME: simplify gtk3wl_draw_fringe_bitmap */
   0, /* destroy_fringe_bitmap */
   NULL, // gtk3wl_compute_glyph_string_overhangs,
-  NULL, // gtk3wl_draw_glyph_string,
+  gtk3wl_draw_glyph_string,
   NULL, // gtk3wl_define_frame_cursor,
-  NULL, // gtk3wl_clear_frame_area,
-  NULL, // gtk3wl_draw_window_cursor,
+  gtk3wl_clear_frame_area,
+  gtk3wl_draw_window_cursor,
   NULL, // gtk3wl_draw_vertical_window_border,
   NULL, // gtk3wl_draw_window_divider,
   NULL, // gtk3wl_shift_glyphs_for_insert,
@@ -9766,6 +9861,7 @@ static struct redisplay_interface gtk3wl_redisplay_interface =
 static void
 gtk3wl_redraw_scroll_bars (struct frame *f)
 {
+  fprintf(stderr, "gtk3wl_redraw_scroll_bars\n");
 }
 
 void
@@ -9774,6 +9870,7 @@ gtk3wl_clear_frame (struct frame *f)
       External (hook): Erase the entire frame
    -------------------------------------------------------------------------- */
 {
+  fprintf(stderr, "gtk3wl_clear_frame\n");
  /* comes on initial frame because we have
     after-make-frame-functions = select-frame */
   if (!FRAME_DEFAULT_FACE (f))
@@ -9782,6 +9879,8 @@ gtk3wl_clear_frame (struct frame *f)
   // mark_window_cursors_off (XWINDOW (FRAME_ROOT_WINDOW (f)));
 
   block_input ();
+
+  gtk3wl_clear_area(f, 0, 0, FRAME_PIXEL_WIDTH(f), FRAME_PIXEL_HEIGHT(f));
 
   /* as of 2006/11 or so this is now needed */
   gtk3wl_redraw_scroll_bars (f);
@@ -9799,6 +9898,7 @@ gtk3wl_clear_frame (struct frame *f)
 static int
 gtk3wl_read_socket (struct terminal *terminal, struct input_event *hold_quit)
 {
+  // fprintf(stderr, "gtk3wl_read_socket\n");
   int count = 0;
   bool event_found = false;
   struct x_display_info *dpyinfo = terminal->display_info.x;
@@ -9822,7 +9922,8 @@ gtk3wl_read_socket (struct terminal *terminal, struct input_event *hold_quit)
      There is no way to do one display at the time, GTK just does events
      from all displays.  */
 
-  fprintf(stderr, "gtk main...\n");
+  static int ctr = 0;
+  // fprintf(stderr, "gtk main... %d.\n", ctr++);
   while (gtk_events_pending ())
     {
 #if 0
@@ -9841,6 +9942,7 @@ gtk3wl_read_socket (struct terminal *terminal, struct input_event *hold_quit)
         break;
 #endif
     }
+  // fprintf(stderr, "gtk main... end.\n");
 
 #if 0
   /* On some systems, an X bug causes Emacs to get no more events
@@ -9918,6 +10020,1658 @@ gtk3wl_create_terminal (struct gtk3wl_display_info *dpyinfo)
   return terminal;
 }
 
+/* Like x_window_to_frame but also compares the window with the widget's
+   windows.  */
+static struct frame *
+gtk3wl_any_window_to_frame (GdkWindow *window)
+{
+  Lisp_Object tail, frame;
+  struct frame *f, *found = NULL;
+  struct gtk3wl_output *x;
+
+  if (window == NULL)
+    return NULL;
+
+  FOR_EACH_FRAME (tail, frame)
+    {
+      if (found)
+        break;
+      f = XFRAME (frame);
+      if (FRAME_GTK3WL_P (f))
+	{
+#if 1
+	  if (FRAME_GTK_OUTER_WIDGET(f) && gtk_widget_get_window(FRAME_GTK_OUTER_WIDGET(f)) == window)
+	    found = f;
+	  if (FRAME_GTK_WIDGET(f) && gtk_widget_get_window(FRAME_GTK_WIDGET(f)) == window)
+	    found = f;
+#else
+	  /* This frame matches if the window is any of its widgets.  */
+	  x = f->output_data.gtk3wl;
+	  if (x->hourglass_window == wdesc)
+	    found = f;
+	  else if (x->widget)
+	    {
+              GtkWidget *gwdesc = xg_win_to_widget (dpyinfo->display, wdesc);
+              if (gwdesc != 0
+                  && gtk_widget_get_toplevel (gwdesc) == x->widget)
+                found = f;
+	    }
+	  else if (FRAME_GTK_WIDGET (f) == widget)
+	    /* A tooltip frame.  */
+	    found = f;
+#endif
+	}
+    }
+
+  return found;
+}
+
+#if 0
+/* Handles the XEvent EVENT on display DPYINFO.
+
+   *FINISH is X_EVENT_GOTO_OUT if caller should stop reading events.
+   *FINISH is zero if caller should continue reading events.
+   *FINISH is X_EVENT_DROP if event should not be passed to the toolkit.
+   *EVENT is unchanged unless we're processing KeyPress event.
+
+   We return the number of characters stored into the buffer.  */
+
+static int
+handle_one_event (struct x_display_info *dpyinfo,
+		  const GdkEvent *event,
+		  int *finish, struct input_event *hold_quit)
+{
+  union buffered_input_event inev;
+  int count = 0;
+  int do_help = 0;
+  ptrdiff_t nbytes = 0;
+  struct frame *any, *f = NULL;
+  struct coding_system coding;
+  Mouse_HLInfo *hlinfo = &dpyinfo->mouse_highlight;
+  /* This holds the state XLookupString needs to implement dead keys
+     and other tricks known as "compose processing".  _X Window System_
+     says that a portable program can't use this, but Stephen Gildea assures
+     me that letting the compiler initialize it to zeros will work okay.  */
+  static XComposeStatus compose_status;
+  XEvent configureEvent;
+  XEvent next_event;
+
+  USE_SAFE_ALLOCA;
+
+  *finish = X_EVENT_NORMAL;
+
+  EVENT_INIT (inev.ie);
+  inev.ie.kind = NO_EVENT;
+  inev.ie.arg = Qnil;
+
+  any = x_any_window_to_frame (dpyinfo, event->xany.window);
+
+  if (any && any->wait_event_type == event->type)
+    any->wait_event_type = 0; /* Indicates we got it.  */
+
+  switch (event->type)
+    {
+    case ClientMessage:
+      {
+        if (event->xclient.message_type == dpyinfo->Xatom_wm_protocols
+            && event->xclient.format == 32)
+          {
+            if (event->xclient.data.l[0] == dpyinfo->Xatom_wm_take_focus)
+              {
+                /* Use the value returned by x_any_window_to_frame
+		   because this could be the shell widget window
+		   if the frame has no title bar.  */
+                f = any;
+		goto done;
+              }
+
+            if (event->xclient.data.l[0] == dpyinfo->Xatom_wm_save_yourself)
+              {
+                /* Save state modify the WM_COMMAND property to
+                   something which can reinstate us.  This notifies
+                   the session manager, who's looking for such a
+                   PropertyNotify.  Can restart processing when
+                   a keyboard or mouse event arrives.  */
+                /* If we have a session manager, don't set this.
+                   KDE will then start two Emacsen, one for the
+                   session manager and one for this. */
+#ifdef HAVE_X_SM
+                if (! x_session_have_connection ())
+#endif
+                  {
+                    f = x_top_window_to_frame (dpyinfo,
+                                               event->xclient.window);
+                    /* This is just so we only give real data once
+                       for a single Emacs process.  */
+                    if (f == SELECTED_FRAME ())
+                      XSetCommand (FRAME_X_DISPLAY (f),
+                                   event->xclient.window,
+                                   initial_argv, initial_argc);
+                    else if (f)
+                      XSetCommand (FRAME_X_DISPLAY (f),
+                                   event->xclient.window,
+                                   0, 0);
+                  }
+		goto done;
+              }
+
+            if (event->xclient.data.l[0] == dpyinfo->Xatom_wm_delete_window)
+              {
+                f = any;
+                if (!f)
+		  goto OTHER; /* May be a dialog that is to be removed  */
+
+		inev.ie.kind = DELETE_WINDOW_EVENT;
+		XSETFRAME (inev.ie.frame_or_window, f);
+		goto done;
+              }
+
+	    goto done;
+          }
+
+        if (event->xclient.message_type == dpyinfo->Xatom_wm_configure_denied)
+	  goto done;
+
+        if (event->xclient.message_type == dpyinfo->Xatom_wm_window_moved)
+          {
+            int new_x, new_y;
+	    f = x_window_to_frame (dpyinfo, event->xclient.window);
+
+            new_x = event->xclient.data.s[0];
+            new_y = event->xclient.data.s[1];
+
+            if (f)
+              {
+                f->left_pos = new_x;
+                f->top_pos = new_y;
+              }
+	    goto done;
+          }
+
+        if (event->xclient.message_type == dpyinfo->Xatom_DONE
+	    || event->xclient.message_type == dpyinfo->Xatom_PAGE)
+          {
+            /* Ghostview job completed.  Kill it.  We could
+               reply with "Next" if we received "Page", but we
+               currently never do because we are interested in
+               images, only, which should have 1 page.  */
+            Pixmap pixmap = (Pixmap) event->xclient.data.l[1];
+	    f = x_window_to_frame (dpyinfo, event->xclient.window);
+	    if (!f)
+	      goto OTHER;
+            x_kill_gs_process (pixmap, f);
+            expose_frame (f, 0, 0, 0, 0);
+	    goto done;
+          }
+
+	/* XEmbed messages from the embedder (if any).  */
+        if (event->xclient.message_type == dpyinfo->Xatom_XEMBED)
+          {
+	    enum xembed_message msg = event->xclient.data.l[1];
+	    if (msg == XEMBED_FOCUS_IN || msg == XEMBED_FOCUS_OUT)
+	      x_detect_focus_change (dpyinfo, any, event, &inev.ie);
+
+	    *finish = X_EVENT_GOTO_OUT;
+            goto done;
+          }
+
+        xft_settings_event (dpyinfo, event);
+
+	f = any;
+	if (!f)
+	  goto OTHER;
+	if (x_handle_dnd_message (f, &event->xclient, dpyinfo, &inev.ie))
+	  *finish = X_EVENT_DROP;
+      }
+      break;
+
+    case SelectionNotify:
+      x_display_set_last_user_time (dpyinfo, event->xselection.time);
+      x_handle_selection_notify (&event->xselection);
+      break;
+
+    case SelectionClear:	/* Someone has grabbed ownership.  */
+      x_display_set_last_user_time (dpyinfo, event->xselectionclear.time);
+      {
+        const XSelectionClearEvent *eventp = &event->xselectionclear;
+
+        inev.sie.kind = SELECTION_CLEAR_EVENT;
+        SELECTION_EVENT_DPYINFO (&inev.sie) = dpyinfo;
+        SELECTION_EVENT_SELECTION (&inev.sie) = eventp->selection;
+        SELECTION_EVENT_TIME (&inev.sie) = eventp->time;
+      }
+      break;
+
+    case SelectionRequest:	/* Someone wants our selection.  */
+      x_display_set_last_user_time (dpyinfo, event->xselectionrequest.time);
+      {
+	const XSelectionRequestEvent *eventp = &event->xselectionrequest;
+
+	inev.sie.kind = SELECTION_REQUEST_EVENT;
+	SELECTION_EVENT_DPYINFO (&inev.sie) = dpyinfo;
+	SELECTION_EVENT_REQUESTOR (&inev.sie) = eventp->requestor;
+	SELECTION_EVENT_SELECTION (&inev.sie) = eventp->selection;
+	SELECTION_EVENT_TARGET (&inev.sie) = eventp->target;
+	SELECTION_EVENT_PROPERTY (&inev.sie) = eventp->property;
+	SELECTION_EVENT_TIME (&inev.sie) = eventp->time;
+      }
+      break;
+
+    case PropertyNotify:
+      x_display_set_last_user_time (dpyinfo, event->xproperty.time);
+      f = x_top_window_to_frame (dpyinfo, event->xproperty.window);
+      if (f && event->xproperty.atom == dpyinfo->Xatom_net_wm_state)
+	{
+          bool not_hidden = x_handle_net_wm_state (f, &event->xproperty);
+	  if (not_hidden && FRAME_ICONIFIED_P (f))
+	    {
+	      /* Gnome shell does not iconify us when C-z is pressed.
+		 It hides the frame.  So if our state says we aren't
+		 hidden anymore, treat it as deiconified.  */
+	      SET_FRAME_VISIBLE (f, 1);
+	      SET_FRAME_ICONIFIED (f, false);
+	      f->output_data.x->has_been_visible = true;
+	      inev.ie.kind = DEICONIFY_EVENT;
+	      XSETFRAME (inev.ie.frame_or_window, f);
+	    }
+	  else if (! not_hidden && ! FRAME_ICONIFIED_P (f))
+	    {
+	      SET_FRAME_VISIBLE (f, 0);
+	      SET_FRAME_ICONIFIED (f, true);
+	      inev.ie.kind = ICONIFY_EVENT;
+	      XSETFRAME (inev.ie.frame_or_window, f);
+	    }
+	}
+
+      x_handle_property_notify (&event->xproperty);
+      xft_settings_event (dpyinfo, event);
+      goto OTHER;
+
+    case ReparentNotify:
+      f = x_top_window_to_frame (dpyinfo, event->xreparent.window);
+      if (f)
+        {
+	  /* Maybe we shouldn't set this for child frames ??  */
+	  f->output_data.x->parent_desc = event->xreparent.parent;
+	  if (!FRAME_PARENT_FRAME (f))
+	    x_real_positions (f, &f->left_pos, &f->top_pos);
+	  else
+	    {
+	      Window root;
+	      unsigned int dummy_uint;
+
+	      block_input ();
+	      XGetGeometry (FRAME_X_DISPLAY (f), FRAME_OUTER_WINDOW (f),
+			    &root, &f->left_pos, &f->top_pos,
+			    &dummy_uint, &dummy_uint, &dummy_uint, &dummy_uint);
+	      unblock_input ();
+	    }
+
+          /* Perhaps reparented due to a WM restart.  Reset this.  */
+          FRAME_DISPLAY_INFO (f)->wm_type = X_WMTYPE_UNKNOWN;
+          FRAME_DISPLAY_INFO (f)->net_supported_window = 0;
+
+          x_set_frame_alpha (f);
+        }
+      goto OTHER;
+
+    case Expose:
+      f = x_window_to_frame (dpyinfo, event->xexpose.window);
+      if (f)
+        {
+          if (!FRAME_VISIBLE_P (f))
+            {
+              block_input ();
+              SET_FRAME_VISIBLE (f, 1);
+              SET_FRAME_ICONIFIED (f, false);
+              if (FRAME_X_DOUBLE_BUFFERED_P (f))
+                font_drop_xrender_surfaces (f);
+              f->output_data.x->has_been_visible = true;
+              SET_FRAME_GARBAGED (f);
+              unblock_input ();
+            }
+          else if (FRAME_GARBAGED_P (f))
+            {
+              /* Go around the back buffer and manually clear the
+                 window the first time we show it.  This way, we avoid
+                 showing users the sanity-defying horror of whatever
+                 GtkWindow is rendering beneath us.  We've garbaged
+                 the frame, so we'll redraw the whole thing on next
+                 redisplay anyway.  Yuck.  */
+              x_clear_area1 (
+                FRAME_X_DISPLAY (f),
+                FRAME_X_WINDOW (f),
+                event->xexpose.x, event->xexpose.y,
+                event->xexpose.width, event->xexpose.height,
+                0);
+	      x_clear_under_internal_border (f);
+            }
+
+
+          if (!FRAME_GARBAGED_P (f))
+            {
+              /* This seems to be needed for GTK 2.6 and later, see
+                 https://debbugs.gnu.org/cgi/bugreport.cgi?bug=15398.  */
+              x_clear_area (f,
+                            event->xexpose.x, event->xexpose.y,
+                            event->xexpose.width, event->xexpose.height);
+              expose_frame (f, event->xexpose.x, event->xexpose.y,
+			    event->xexpose.width, event->xexpose.height);
+	      x_clear_under_internal_border (f);
+            }
+
+          if (!FRAME_GARBAGED_P (f))
+            show_back_buffer (f);
+        }
+      else
+        {
+          struct scroll_bar *bar;
+
+          bar = x_window_to_scroll_bar (event->xexpose.display,
+                                        event->xexpose.window, 2);
+
+          if (bar)
+            x_scroll_bar_expose (bar, event);
+        }
+      break;
+
+    case GraphicsExpose:	/* This occurs when an XCopyArea's
+                                   source area was obscured or not
+                                   available.  */
+      f = x_window_to_frame (dpyinfo, event->xgraphicsexpose.drawable);
+      if (f)
+        {
+          expose_frame (f, event->xgraphicsexpose.x,
+                        event->xgraphicsexpose.y,
+                        event->xgraphicsexpose.width,
+                        event->xgraphicsexpose.height);
+	  x_clear_under_internal_border (f);
+	  show_back_buffer (f);
+        }
+      break;
+
+    case NoExpose:		/* This occurs when an XCopyArea's
+                                   source area was completely
+                                   available.  */
+      break;
+
+    case UnmapNotify:
+      /* Redo the mouse-highlight after the tooltip has gone.  */
+      if (event->xunmap.window == tip_window)
+        {
+          tip_window = 0;
+          x_redo_mouse_highlight (dpyinfo);
+        }
+
+      f = x_top_window_to_frame (dpyinfo, event->xunmap.window);
+      if (f)		/* F may no longer exist if
+                           the frame was deleted.  */
+        {
+	  bool visible = FRAME_VISIBLE_P (f);
+          /* While a frame is unmapped, display generation is
+             disabled; you don't want to spend time updating a
+             display that won't ever be seen.  */
+          SET_FRAME_VISIBLE (f, 0);
+          /* We can't distinguish, from the event, whether the window
+             has become iconified or invisible.  So assume, if it
+             was previously visible, than now it is iconified.
+             But x_make_frame_invisible clears both
+             the visible flag and the iconified flag;
+             and that way, we know the window is not iconified now.  */
+          if (visible || FRAME_ICONIFIED_P (f))
+            {
+              SET_FRAME_ICONIFIED (f, true);
+              inev.ie.kind = ICONIFY_EVENT;
+              XSETFRAME (inev.ie.frame_or_window, f);
+            }
+        }
+      goto OTHER;
+
+    case MapNotify:
+      /* We use x_top_window_to_frame because map events can
+         come for sub-windows and they don't mean that the
+         frame is visible.  */
+      f = x_top_window_to_frame (dpyinfo, event->xmap.window);
+      if (f)
+        {
+	  bool iconified = FRAME_ICONIFIED_P (f);
+
+          /* Check if fullscreen was specified before we where mapped the
+             first time, i.e. from the command line.  */
+          if (!f->output_data.x->has_been_visible)
+	    {
+
+	      x_check_fullscreen (f);
+	    }
+
+	  if (!iconified)
+	    {
+	      /* The `z-group' is reset every time a frame becomes
+		 invisible.  Handle this here.  */
+	      if (FRAME_Z_GROUP (f) == z_group_above)
+		x_set_z_group (f, Qabove, Qnil);
+	      else if (FRAME_Z_GROUP (f) == z_group_below)
+		x_set_z_group (f, Qbelow, Qnil);
+	    }
+
+          SET_FRAME_VISIBLE (f, 1);
+          SET_FRAME_ICONIFIED (f, false);
+          f->output_data.x->has_been_visible = true;
+
+          if (iconified)
+            {
+              inev.ie.kind = DEICONIFY_EVENT;
+              XSETFRAME (inev.ie.frame_or_window, f);
+            }
+          else if (! NILP (Vframe_list) && ! NILP (XCDR (Vframe_list)))
+            /* Force a redisplay sooner or later to update the
+	       frame titles in case this is the second frame.  */
+            record_asynch_buffer_change ();
+        }
+      goto OTHER;
+
+    case KeyPress:
+
+      x_display_set_last_user_time (dpyinfo, event->xkey.time);
+      ignore_next_mouse_click_timeout = 0;
+
+      /* Dispatch KeyPress events when in menu.  */
+      if (popup_activated ())
+        goto OTHER;
+
+      f = any;
+
+      /* If mouse-highlight is an integer, input clears out
+	 mouse highlighting.  */
+      if (!hlinfo->mouse_face_hidden && INTEGERP (Vmouse_highlight)
+	  )
+        {
+          clear_mouse_face (hlinfo);
+          hlinfo->mouse_face_hidden = true;
+        }
+
+      if (f != 0)
+        {
+          KeySym keysym, orig_keysym;
+          /* al%imercury@uunet.uu.net says that making this 81
+             instead of 80 fixed a bug whereby meta chars made
+             his Emacs hang.
+
+             It seems that some version of XmbLookupString has
+             a bug of not returning XBufferOverflow in
+             status_return even if the input is too long to
+             fit in 81 bytes.  So, we must prepare sufficient
+             bytes for copy_buffer.  513 bytes (256 chars for
+             two-byte character set) seems to be a fairly good
+             approximation.  -- 2000.8.10 handa@etl.go.jp  */
+          unsigned char copy_buffer[513];
+          unsigned char *copy_bufptr = copy_buffer;
+          int copy_bufsiz = sizeof (copy_buffer);
+          int modifiers;
+          Lisp_Object coding_system = Qlatin_1;
+	  Lisp_Object c;
+	  /* Event will be modified.  */
+	  XKeyEvent xkey = event->xkey;
+
+          /* Don't pass keys to GTK.  A Tab will shift focus to the
+             tool bar in GTK 2.4.  Keys will still go to menus and
+             dialogs because in that case popup_activated is nonzero
+             (see above).  */
+          *finish = X_EVENT_DROP;
+
+          xkey.state |= x_emacs_to_x_modifiers (FRAME_DISPLAY_INFO (f),
+						extra_keyboard_modifiers);
+          modifiers = xkey.state;
+
+          /* This will have to go some day...  */
+
+          /* make_lispy_event turns chars into control chars.
+             Don't do it here because XLookupString is too eager.  */
+          xkey.state &= ~ControlMask;
+          xkey.state &= ~(dpyinfo->meta_mod_mask
+			  | dpyinfo->super_mod_mask
+			  | dpyinfo->hyper_mod_mask
+			  | dpyinfo->alt_mod_mask);
+
+          /* In case Meta is ComposeCharacter,
+             clear its status.  According to Markus Ehrnsperger
+             Markus.Ehrnsperger@lehrstuhl-bross.physik.uni-muenchen.de
+             this enables ComposeCharacter to work whether or
+             not it is combined with Meta.  */
+          if (modifiers & dpyinfo->meta_mod_mask)
+            memset (&compose_status, 0, sizeof (compose_status));
+
+          nbytes = XLookupString (&xkey, (char *) copy_bufptr,
+                                  copy_bufsiz, &keysym,
+                                  &compose_status);
+
+          /* If not using XIM/XIC, and a compose sequence is in progress,
+             we break here.  Otherwise, chars_matched is always 0.  */
+          if (compose_status.chars_matched > 0 && nbytes == 0)
+            break;
+
+          memset (&compose_status, 0, sizeof (compose_status));
+          orig_keysym = keysym;
+
+	  /* Common for all keysym input events.  */
+	  XSETFRAME (inev.ie.frame_or_window, f);
+	  inev.ie.modifiers
+	    = x_x_to_emacs_modifiers (FRAME_DISPLAY_INFO (f), modifiers);
+	  inev.ie.timestamp = xkey.time;
+
+	  /* First deal with keysyms which have defined
+	     translations to characters.  */
+	  if (keysym >= 32 && keysym < 128)
+	    /* Avoid explicitly decoding each ASCII character.  */
+	    {
+	      inev.ie.kind = ASCII_KEYSTROKE_EVENT;
+	      inev.ie.code = keysym;
+	      goto done_keysym;
+	    }
+
+	  /* Keysyms directly mapped to Unicode characters.  */
+	  if (keysym >= 0x01000000 && keysym <= 0x0110FFFF)
+	    {
+	      if (keysym < 0x01000080)
+		inev.ie.kind = ASCII_KEYSTROKE_EVENT;
+	      else
+		inev.ie.kind = MULTIBYTE_CHAR_KEYSTROKE_EVENT;
+	      inev.ie.code = keysym & 0xFFFFFF;
+	      goto done_keysym;
+	    }
+
+	  /* Now non-ASCII.  */
+	  if (HASH_TABLE_P (Vx_keysym_table)
+	      && (c = Fgethash (make_number (keysym),
+				Vx_keysym_table,
+				Qnil),
+		  NATNUMP (c)))
+	    {
+	      inev.ie.kind = (SINGLE_BYTE_CHAR_P (XFASTINT (c))
+                              ? ASCII_KEYSTROKE_EVENT
+                              : MULTIBYTE_CHAR_KEYSTROKE_EVENT);
+	      inev.ie.code = XFASTINT (c);
+	      goto done_keysym;
+	    }
+
+	  /* Random non-modifier sorts of keysyms.  */
+	  if (((keysym >= XK_BackSpace && keysym <= XK_Escape)
+                        || keysym == XK_Delete
+#ifdef XK_ISO_Left_Tab
+                        || (keysym >= XK_ISO_Left_Tab
+                            && keysym <= XK_ISO_Enter)
+#endif
+                        || IsCursorKey (keysym) /* 0xff50 <= x < 0xff60 */
+                        || IsMiscFunctionKey (keysym) /* 0xff60 <= x < VARIES */
+#ifdef HPUX
+                        /* This recognizes the "extended function
+                           keys".  It seems there's no cleaner way.
+                           Test IsModifierKey to avoid handling
+                           mode_switch incorrectly.  */
+                        || (XK_Select <= keysym && keysym < XK_KP_Space)
+#endif
+#ifdef XK_dead_circumflex
+                        || orig_keysym == XK_dead_circumflex
+#endif
+#ifdef XK_dead_grave
+                        || orig_keysym == XK_dead_grave
+#endif
+#ifdef XK_dead_tilde
+                        || orig_keysym == XK_dead_tilde
+#endif
+#ifdef XK_dead_diaeresis
+                        || orig_keysym == XK_dead_diaeresis
+#endif
+#ifdef XK_dead_macron
+                        || orig_keysym == XK_dead_macron
+#endif
+#ifdef XK_dead_degree
+                        || orig_keysym == XK_dead_degree
+#endif
+#ifdef XK_dead_acute
+                        || orig_keysym == XK_dead_acute
+#endif
+#ifdef XK_dead_cedilla
+                        || orig_keysym == XK_dead_cedilla
+#endif
+#ifdef XK_dead_breve
+                        || orig_keysym == XK_dead_breve
+#endif
+#ifdef XK_dead_ogonek
+                        || orig_keysym == XK_dead_ogonek
+#endif
+#ifdef XK_dead_caron
+                        || orig_keysym == XK_dead_caron
+#endif
+#ifdef XK_dead_doubleacute
+                        || orig_keysym == XK_dead_doubleacute
+#endif
+#ifdef XK_dead_abovedot
+                        || orig_keysym == XK_dead_abovedot
+#endif
+                        || IsKeypadKey (keysym) /* 0xff80 <= x < 0xffbe */
+                        || IsFunctionKey (keysym) /* 0xffbe <= x < 0xffe1 */
+                        /* Any "vendor-specific" key is ok.  */
+                        || (orig_keysym & (1 << 28))
+                        || (keysym != NoSymbol && nbytes == 0))
+                       && ! (IsModifierKey (orig_keysym)
+                             /* The symbols from XK_ISO_Lock
+                                to XK_ISO_Last_Group_Lock
+                                don't have real modifiers but
+                                should be treated similarly to
+                                Mode_switch by Emacs. */
+#if defined XK_ISO_Lock && defined XK_ISO_Last_Group_Lock
+                             || (XK_ISO_Lock <= orig_keysym
+				 && orig_keysym <= XK_ISO_Last_Group_Lock)
+#endif
+                             ))
+	    {
+	      STORE_KEYSYM_FOR_DEBUG (keysym);
+	      /* make_lispy_event will convert this to a symbolic
+		 key.  */
+	      inev.ie.kind = NON_ASCII_KEYSTROKE_EVENT;
+	      inev.ie.code = keysym;
+	      goto done_keysym;
+	    }
+
+	  {	/* Raw bytes, not keysym.  */
+	    ptrdiff_t i;
+	    int nchars, len;
+
+	    for (i = 0, nchars = 0; i < nbytes; i++)
+	      {
+		if (ASCII_CHAR_P (copy_bufptr[i]))
+		  nchars++;
+		STORE_KEYSYM_FOR_DEBUG (copy_bufptr[i]);
+	      }
+
+	    if (nchars < nbytes)
+	      {
+		/* Decode the input data.  */
+
+		/* The input should be decoded with `coding_system'
+		   which depends on which X*LookupString function
+		   we used just above and the locale.  */
+		setup_coding_system (coding_system, &coding);
+		coding.src_multibyte = false;
+		coding.dst_multibyte = true;
+		/* The input is converted to events, thus we can't
+		   handle composition.  Anyway, there's no XIM that
+		   gives us composition information.  */
+		coding.common_flags &= ~CODING_ANNOTATION_MASK;
+
+		SAFE_NALLOCA (coding.destination, MAX_MULTIBYTE_LENGTH,
+			      nbytes);
+		coding.dst_bytes = MAX_MULTIBYTE_LENGTH * nbytes;
+		coding.mode |= CODING_MODE_LAST_BLOCK;
+		decode_coding_c_string (&coding, copy_bufptr, nbytes, Qnil);
+		nbytes = coding.produced;
+		nchars = coding.produced_char;
+		copy_bufptr = coding.destination;
+	      }
+
+	    /* Convert the input data to a sequence of
+	       character events.  */
+	    for (i = 0; i < nbytes; i += len)
+	      {
+		int ch;
+		if (nchars == nbytes)
+		  ch = copy_bufptr[i], len = 1;
+		else
+		  ch = STRING_CHAR_AND_LENGTH (copy_bufptr + i, len);
+		inev.ie.kind = (SINGLE_BYTE_CHAR_P (ch)
+				? ASCII_KEYSTROKE_EVENT
+				: MULTIBYTE_CHAR_KEYSTROKE_EVENT);
+		inev.ie.code = ch;
+		kbd_buffer_store_buffered_event (&inev, hold_quit);
+	      }
+
+	    count += nchars;
+
+	    inev.ie.kind = NO_EVENT;  /* Already stored above.  */
+
+	    if (keysym == NoSymbol)
+	      break;
+	  }
+	  /* FIXME: check side effects and remove this.  */
+	  ((XEvent *) event)->xkey = xkey;
+        }
+    done_keysym:
+      goto OTHER;
+
+    case KeyRelease:
+      x_display_set_last_user_time (dpyinfo, event->xkey.time);
+      goto OTHER;
+
+    case EnterNotify:
+      x_display_set_last_user_time (dpyinfo, event->xcrossing.time);
+      x_detect_focus_change (dpyinfo, any, event, &inev.ie);
+
+      f = any;
+
+      if (f && x_mouse_click_focus_ignore_position)
+	ignore_next_mouse_click_timeout = event->xmotion.time + 200;
+
+      /* EnterNotify counts as mouse movement,
+	 so update things that depend on mouse position.  */
+      if (f && !f->output_data.x->hourglass_p)
+	note_mouse_movement (f, &event->xmotion);
+      /* We may get an EnterNotify on the buttons in the toolbar.  In that
+         case we moved out of any highlighted area and need to note this.  */
+      if (!f && dpyinfo->last_mouse_glyph_frame)
+        note_mouse_movement (dpyinfo->last_mouse_glyph_frame, &event->xmotion);
+      goto OTHER;
+
+    case FocusIn:
+      x_detect_focus_change (dpyinfo, any, event, &inev.ie);
+      goto OTHER;
+
+    case LeaveNotify:
+      x_display_set_last_user_time (dpyinfo, event->xcrossing.time);
+      x_detect_focus_change (dpyinfo, any, event, &inev.ie);
+
+      f = x_top_window_to_frame (dpyinfo, event->xcrossing.window);
+      if (f)
+        {
+          if (f == hlinfo->mouse_face_mouse_frame)
+            {
+              /* If we move outside the frame, then we're
+                 certainly no longer on any text in the frame.  */
+              clear_mouse_face (hlinfo);
+              hlinfo->mouse_face_mouse_frame = 0;
+            }
+
+          /* Generate a nil HELP_EVENT to cancel a help-echo.
+             Do it only if there's something to cancel.
+             Otherwise, the startup message is cleared when
+             the mouse leaves the frame.  */
+          if (any_help_event_p)
+	    do_help = -1;
+        }
+      /* See comment in EnterNotify above */
+      else if (dpyinfo->last_mouse_glyph_frame)
+        note_mouse_movement (dpyinfo->last_mouse_glyph_frame, &event->xmotion);
+      goto OTHER;
+
+    case FocusOut:
+      x_detect_focus_change (dpyinfo, any, event, &inev.ie);
+      goto OTHER;
+
+    case MotionNotify:
+      {
+        x_display_set_last_user_time (dpyinfo, event->xmotion.time);
+        previous_help_echo_string = help_echo_string;
+        help_echo_string = Qnil;
+
+	f = (x_mouse_grabbed (dpyinfo) ? dpyinfo->last_mouse_frame
+	     : x_window_to_frame (dpyinfo, event->xmotion.window));
+
+        if (hlinfo->mouse_face_hidden)
+          {
+            hlinfo->mouse_face_hidden = false;
+            clear_mouse_face (hlinfo);
+          }
+
+        if (f && xg_event_is_for_scrollbar (f, event))
+          f = 0;
+        if (f)
+          {
+	    /* Maybe generate a SELECT_WINDOW_EVENT for
+	       `mouse-autoselect-window' but don't let popup menus
+	       interfere with this (Bug#1261).  */
+            if (!NILP (Vmouse_autoselect_window)
+		&& !popup_activated ()
+		/* Don't switch if we're currently in the minibuffer.
+		   This tries to work around problems where the
+		   minibuffer gets unselected unexpectedly, and where
+		   you then have to move your mouse all the way down to
+		   the minibuffer to select it.  */
+		&& !MINI_WINDOW_P (XWINDOW (selected_window))
+		/* With `focus-follows-mouse' non-nil create an event
+		   also when the target window is on another frame.  */
+		&& (f == XFRAME (selected_frame)
+		    || !NILP (focus_follows_mouse)))
+	      {
+		static Lisp_Object last_mouse_window;
+		Lisp_Object window = window_from_coordinates
+		  (f, event->xmotion.x, event->xmotion.y, 0, false);
+
+		/* A window will be autoselected only when it is not
+		   selected now and the last mouse movement event was
+		   not in it.  The remainder of the code is a bit vague
+		   wrt what a "window" is.  For immediate autoselection,
+		   the window is usually the entire window but for GTK
+		   where the scroll bars don't count.  For delayed
+		   autoselection the window is usually the window's text
+		   area including the margins.  */
+		if (WINDOWP (window)
+		    && !EQ (window, last_mouse_window)
+		    && !EQ (window, selected_window))
+		  {
+		    inev.ie.kind = SELECT_WINDOW_EVENT;
+		    inev.ie.frame_or_window = window;
+		  }
+
+		/* Remember the last window where we saw the mouse.  */
+		last_mouse_window = window;
+	      }
+
+            if (!note_mouse_movement (f, &event->xmotion))
+	      help_echo_string = previous_help_echo_string;
+          }
+        else
+          {
+            /* If we move outside the frame, then we're
+               certainly no longer on any text in the frame.  */
+            clear_mouse_face (hlinfo);
+          }
+
+        /* If the contents of the global variable help_echo_string
+           has changed, generate a HELP_EVENT.  */
+        if (!NILP (help_echo_string)
+            || !NILP (previous_help_echo_string))
+	  do_help = 1;
+        goto OTHER;
+      }
+
+    case ConfigureNotify:
+      /* An opaque move can generate a stream of events as the window
+         is dragged around.  If the connection round trip time isn't
+         really short, they may come faster than we can respond to
+         them, given the multiple queries we can do to check window
+         manager state, translate coordinates, etc.
+
+         So if this ConfigureNotify is immediately followed by another
+         for the same window, use the info from the latest update, and
+         consider the events all handled.  */
+      /* Opaque resize may be trickier; ConfigureNotify events are
+         mixed with Expose events for multiple windows.  */
+      configureEvent = *event;
+      while (XPending (dpyinfo->display))
+        {
+          XNextEvent (dpyinfo->display, &next_event);
+          if (next_event.type != ConfigureNotify
+              || next_event.xconfigure.window != event->xconfigure.window
+              /* Skipping events with different sizes can lead to a
+                 mispositioned mode line at initial window creation.
+                 Only drop window motion events for now.  */
+              || next_event.xconfigure.width != event->xconfigure.width
+              || next_event.xconfigure.height != event->xconfigure.height)
+            {
+              XPutBackEvent (dpyinfo->display, &next_event);
+              break;
+            }
+          else
+	    configureEvent = next_event;
+        }
+
+      f = x_top_window_to_frame (dpyinfo, configureEvent.xconfigure.window);
+      /* Unfortunately, we need to call font_drop_xrender_surfaces for
+         _all_ ConfigureNotify events, otherwise we miss some and
+         flicker.  Don't try to optimize these calls by looking only
+         for size changes: that's not sufficient.  We miss some
+         surface invalidations and flicker.  */
+      block_input ();
+      if (f && FRAME_X_DOUBLE_BUFFERED_P (f))
+        font_drop_xrender_surfaces (f);
+      unblock_input ();
+      if (f) x_cr_destroy_surface (f);
+      if (!f
+          && (f = any)
+          && configureEvent.xconfigure.window == FRAME_X_WINDOW (f))
+        {
+          block_input ();
+          if (FRAME_X_DOUBLE_BUFFERED_P (f))
+            font_drop_xrender_surfaces (f);
+          unblock_input ();
+          xg_frame_resized (f, configureEvent.xconfigure.width,
+                            configureEvent.xconfigure.height);
+          x_cr_destroy_surface (f);
+          f = 0;
+        }
+      if (f)
+        {
+	  /* For GTK+ don't call x_net_wm_state for the scroll bar
+	     window.  (Bug#24963, Bug#25887) */
+	  if (configureEvent.xconfigure.window == FRAME_X_WINDOW (f))
+	    x_net_wm_state (f, configureEvent.xconfigure.window);
+
+          /* GTK creates windows but doesn't map them.
+             Only get real positions when mapped.  */
+          if (FRAME_GTK_OUTER_WIDGET (f)
+              && gtk_widget_get_mapped (FRAME_GTK_OUTER_WIDGET (f)))
+	    {
+	      int old_left = f->left_pos;
+	      int old_top = f->top_pos;
+	      Lisp_Object frame = Qnil;
+
+	      XSETFRAME (frame, f);
+
+	      if (!FRAME_PARENT_FRAME (f))
+		x_real_positions (f, &f->left_pos, &f->top_pos);
+	      else
+		{
+		  Window root;
+		  unsigned int dummy_uint;
+
+		  block_input ();
+		  XGetGeometry (FRAME_X_DISPLAY (f), FRAME_OUTER_WINDOW (f),
+				&root, &f->left_pos, &f->top_pos,
+				&dummy_uint, &dummy_uint, &dummy_uint, &dummy_uint);
+		  unblock_input ();
+		}
+
+	      if (old_left != f->left_pos || old_top != f->top_pos)
+		{
+		  inev.ie.kind = MOVE_FRAME_EVENT;
+		  XSETFRAME (inev.ie.frame_or_window, f);
+		}
+	    }
+
+
+        }
+      goto OTHER;
+
+    case ButtonRelease:
+    case ButtonPress:
+      {
+        /* If we decide we want to generate an event to be seen
+           by the rest of Emacs, we put it here.  */
+        bool tool_bar_p = false;
+
+	memset (&compose_status, 0, sizeof (compose_status));
+	dpyinfo->last_mouse_glyph_frame = NULL;
+	x_display_set_last_user_time (dpyinfo, event->xbutton.time);
+
+	if (x_mouse_grabbed (dpyinfo))
+	  f = dpyinfo->last_mouse_frame;
+	else
+	  {
+	    f = x_window_to_frame (dpyinfo, event->xbutton.window);
+
+	    if (f && event->xbutton.type == ButtonPress
+		&& !popup_activated ()
+		&& !x_window_to_scroll_bar (event->xbutton.display,
+					    event->xbutton.window, 2)
+		&& !FRAME_NO_ACCEPT_FOCUS (f))
+	      {
+		/* When clicking into a child frame or when clicking
+		   into a parent frame with the child frame selected and
+		   `no-accept-focus' is not set, select the clicked
+		   frame.  */
+		struct frame *hf = dpyinfo->x_highlight_frame;
+
+		if (FRAME_PARENT_FRAME (f) || (hf && frame_ancestor_p (f, hf)))
+		  {
+		    block_input ();
+		    XSetInputFocus (FRAME_X_DISPLAY (f), FRAME_OUTER_WINDOW (f),
+				    RevertToParent, CurrentTime);
+		    if (FRAME_PARENT_FRAME (f))
+		      XRaiseWindow (FRAME_X_DISPLAY (f), FRAME_OUTER_WINDOW (f));
+		    unblock_input ();
+		  }
+	      }
+	  }
+
+        if (f && xg_event_is_for_scrollbar (f, event))
+          f = 0;
+        if (f)
+          {
+            if (!tool_bar_p)
+              if (! popup_activated ())
+                {
+                  if (ignore_next_mouse_click_timeout)
+                    {
+                      if (event->type == ButtonPress
+                          && event->xbutton.time > ignore_next_mouse_click_timeout)
+                        {
+                          ignore_next_mouse_click_timeout = 0;
+                          construct_mouse_click (&inev.ie, &event->xbutton, f);
+                        }
+                      if (event->type == ButtonRelease)
+                        ignore_next_mouse_click_timeout = 0;
+                    }
+                  else
+                    construct_mouse_click (&inev.ie, &event->xbutton, f);
+                }
+            if (FRAME_X_EMBEDDED_P (f))
+              xembed_send_message (f, event->xbutton.time,
+                                   XEMBED_REQUEST_FOCUS, 0, 0, 0);
+          }
+        else
+          {
+            struct scroll_bar *bar
+              = x_window_to_scroll_bar (event->xbutton.display,
+                                        event->xbutton.window, 2);
+
+            if (bar)
+              x_scroll_bar_handle_click (bar, event, &inev.ie);
+          }
+
+        if (event->type == ButtonPress)
+          {
+            dpyinfo->grabbed |= (1 << event->xbutton.button);
+            dpyinfo->last_mouse_frame = f;
+          }
+        else
+          dpyinfo->grabbed &= ~(1 << event->xbutton.button);
+
+	/* Ignore any mouse motion that happened before this event;
+	   any subsequent mouse-movement Emacs events should reflect
+	   only motion after the ButtonPress/Release.  */
+	if (f != 0)
+	  f->mouse_moved = false;
+
+        f = x_menubar_window_to_frame (dpyinfo, event);
+        /* For a down-event in the menu bar,
+           don't pass it to Xt right now.
+           Instead, save it away
+           and we will pass it to Xt from kbd_buffer_get_event.
+           That way, we can run some Lisp code first.  */
+        if (! popup_activated ()
+            /* Gtk+ menus only react to the first three buttons. */
+            && event->xbutton.button < 3
+            && f && event->type == ButtonPress
+            /* Verify the event is really within the menu bar
+               and not just sent to it due to grabbing.  */
+            && event->xbutton.x >= 0
+            && event->xbutton.x < FRAME_PIXEL_WIDTH (f)
+            && event->xbutton.y >= 0
+            && event->xbutton.y < FRAME_MENUBAR_HEIGHT (f)
+            && event->xbutton.same_screen)
+          {
+	    if (!f->output_data.x->saved_menu_event)
+	      f->output_data.x->saved_menu_event = xmalloc (sizeof *event);
+	    *f->output_data.x->saved_menu_event = *event;
+	    inev.ie.kind = MENU_BAR_ACTIVATE_EVENT;
+	    XSETFRAME (inev.ie.frame_or_window, f);
+	    *finish = X_EVENT_DROP;
+          }
+        else
+          goto OTHER;
+      }
+      break;
+
+    case CirculateNotify:
+      goto OTHER;
+
+    case CirculateRequest:
+      goto OTHER;
+
+    case VisibilityNotify:
+      goto OTHER;
+
+    case MappingNotify:
+      /* Someone has changed the keyboard mapping - update the
+         local cache.  */
+      switch (event->xmapping.request)
+        {
+        case MappingModifier:
+          x_find_modifier_meanings (dpyinfo);
+	  FALLTHROUGH;
+        case MappingKeyboard:
+          XRefreshKeyboardMapping ((XMappingEvent *) &event->xmapping);
+        }
+      goto OTHER;
+
+    case DestroyNotify:
+      xft_settings_event (dpyinfo, event);
+      break;
+
+    default:
+    OTHER:
+    break;
+    }
+
+ done:
+  if (inev.ie.kind != NO_EVENT)
+    {
+      kbd_buffer_store_buffered_event (&inev, hold_quit);
+      count++;
+    }
+
+  if (do_help
+      && !(hold_quit && hold_quit->kind != NO_EVENT))
+    {
+      Lisp_Object frame;
+
+      if (f)
+	XSETFRAME (frame, f);
+      else
+	frame = Qnil;
+
+      if (do_help > 0)
+	{
+	  any_help_event_p = true;
+	  gen_help_event (help_echo_string, frame, help_echo_window,
+			  help_echo_object, help_echo_pos);
+	}
+      else
+	{
+	  help_echo_string = Qnil;
+	  gen_help_event (Qnil, frame, Qnil, Qnil, 0);
+	}
+      count++;
+    }
+
+  /* Sometimes event processing draws to the frame outside redisplay.
+     To ensure that these changes become visible, draw them here.  */
+  flush_dirty_back_buffers ();
+  SAFE_FREE ();
+  return count;
+}
+#endif
+
+#if 0
+
+/* Handles the XEvent EVENT on display DISPLAY.
+   This is used for event loops outside the normal event handling,
+   i.e. looping while a popup menu or a dialog is posted.
+
+   Returns the value handle_one_xevent sets in the finish argument.  */
+int
+x_dispatch_event (XEvent *event, Display *display)
+{
+  struct x_display_info *dpyinfo;
+  int finish = X_EVENT_NORMAL;
+
+  dpyinfo = x_display_info_for_display (display);
+
+  if (dpyinfo)
+    handle_one_xevent (dpyinfo, event, &finish, 0);
+
+  return finish;
+}
+#endif
+
+#if 0
+/* This is the filter function invoked by the GTK event loop.
+   It is invoked before the XEvent is translated to a GdkEvent,
+   so we have a chance to act on the event before GTK.  */
+static GdkFilterReturn
+event_handler_gdk (GdkXEvent *gxev, GdkEvent *ev, gpointer data)
+{
+  XEvent *xev = (XEvent *) gxev;
+
+  block_input ();
+  if (current_count >= 0)
+    {
+      struct x_display_info *dpyinfo;
+
+      dpyinfo = x_display_info_for_display (xev->xany.display);
+
+      if (! dpyinfo)
+        current_finish = X_EVENT_NORMAL;
+      else
+	current_count
+	  += handle_one_xevent (dpyinfo, xev, &current_finish,
+				current_hold_quit);
+    }
+  else
+    current_finish = x_dispatch_event (xev, xev->xany.display);
+
+  unblock_input ();
+
+  if (current_finish == X_EVENT_GOTO_OUT || current_finish == X_EVENT_DROP)
+    return GDK_FILTER_REMOVE;
+
+  return GDK_FILTER_CONTINUE;
+}
+#endif
+
+/*
+  event の処理、どうしようかなぁ。
+
+  g_signal_connect() で処理するしかないよね…
+  どの GdkWindow / GtkWidget で起きたか → frame に変換。
+
+  ClientMessage:
+    delete は処理しようか。
+
+  SelectionNotify:
+  SelectionClear:
+  SelectionRequest:
+    何だっけ? あぁ、コピペか。
+
+  PropertyNotify:
+    iconify/deiconify された時。
+
+  ReparentNotify:
+    そんなことあるの?
+
+  Expose:
+    やっぱりここで描画するんだな。
+
+  GraphicsExpose:
+    要らんだろ。
+
+  NoExpose:
+    要らんだろ。
+
+  UnmapNotify:
+    まぁ要るんだろうなぁ。
+
+  MapNotify:
+    よく解らん。
+
+  KeyPress:
+    これは大変そう… でも必要。
+
+  KeyRelease:
+    必要。
+
+  EnterNotify:
+    必要。
+
+  FocusIn:
+    必要。
+
+  LeaveNotify:
+    必要。
+
+  FocusOut:
+    必要。
+
+  MotionNotify:
+    ちょっと大変そう。
+    xg_event_is_for_scrollbar とかが必要になる。
+
+  ConfigureNotify:
+    resize 時の処理は必要だなぁ。
+
+  ButtonRelease:
+  ButtonPress:
+    後回しか。
+
+  CirculateNotify:
+  CirculateRequest:
+  VisibilityNotify:
+    後回し。
+
+  MappingNotify:
+    これも後回しだな。
+
+  DestroyNotify:
+    何故 xft?
+
+ */
+
+gboolean
+gtk3wl_handle_event(GtkWidget *widget, GdkEvent *event, gpointer *data)
+{
+  struct frame *f;
+  union buffered_input_event inev;
+
+  EVENT_INIT (inev.ie);
+  inev.ie.kind = NO_EVENT;
+  inev.ie.arg = Qnil;
+
+  switch (event->type) {
+  case GDK_NOTHING:               fprintf(stderr, "GDK_NOTHING\n"); break;
+  case GDK_DELETE:                fprintf(stderr, "GDK_DELETE\n"); break;
+  case GDK_DESTROY:               fprintf(stderr, "GDK_DESTROY\n"); break;
+  case GDK_EXPOSE:
+    fprintf(stderr, "GDK_EXPOSE\n");
+    f = gtk3wl_any_window_to_frame (event->expose.window);
+#if 0
+    if (f)
+      {
+	if (!FRAME_VISIBLE_P (f))
+	  {
+	    block_input ();
+	    SET_FRAME_VISIBLE (f, 1);
+	    SET_FRAME_ICONIFIED (f, false);
+	    if (FRAME_X_DOUBLE_BUFFERED_P (f))
+	      font_drop_xrender_surfaces (f);
+	    f->output_data.x->has_been_visible = true;
+	    SET_FRAME_GARBAGED (f);
+	    unblock_input ();
+	  }
+	else if (FRAME_GARBAGED_P (f))
+	  {
+	    /* Go around the back buffer and manually clear the
+	       window the first time we show it.  This way, we avoid
+	       showing users the sanity-defying horror of whatever
+	       GtkWindow is rendering beneath us.  We've garbaged
+	       the frame, so we'll redraw the whole thing on next
+	       redisplay anyway.  Yuck.  */
+	    x_clear_area1 (
+	      FRAME_X_DISPLAY (f),
+	      FRAME_X_WINDOW (f),
+	      event->xexpose.x, event->xexpose.y,
+	      event->xexpose.width, event->xexpose.height,
+	      0);
+	    x_clear_under_internal_border (f);
+	  }
+
+
+	if (!FRAME_GARBAGED_P (f))
+	  {
+	    /* This seems to be needed for GTK 2.6 and later, see
+	       https://debbugs.gnu.org/cgi/bugreport.cgi?bug=15398.  */
+	    x_clear_area (f,
+			  event->xexpose.x, event->xexpose.y,
+			  event->xexpose.width, event->xexpose.height);
+	    expose_frame (f, event->xexpose.x, event->xexpose.y,
+			  event->xexpose.width, event->xexpose.height);
+	    x_clear_under_internal_border (f);
+	  }
+
+	if (!FRAME_GARBAGED_P (f))
+	  show_back_buffer (f);
+      }
+    else
+      {
+	struct scroll_bar *bar;
+
+	bar = x_window_to_scroll_bar (event->xexpose.display,
+				      event->xexpose.window, 2);
+
+	if (bar)
+	  x_scroll_bar_expose (bar, event);
+      }
+#endif
+      break;
+
+  case GDK_MOTION_NOTIFY:         fprintf(stderr, "GDK_MOTION_NOTIFY\n"); break;
+  case GDK_BUTTON_PRESS:          fprintf(stderr, "GDK_BUTTON_PRESS\n"); break;
+  case GDK_2BUTTON_PRESS:         fprintf(stderr, "GDK_2BUTTON_PRESS\n"); break;
+  case GDK_3BUTTON_PRESS:         fprintf(stderr, "GDK_3BUTTON_PRESS\n"); break;
+  case GDK_BUTTON_RELEASE:        fprintf(stderr, "GDK_BUTTON_RELEASE\n"); break;
+  case GDK_KEY_PRESS:             fprintf(stderr, "GDK_KEY_PRESS\n"); break;
+  case GDK_KEY_RELEASE:           fprintf(stderr, "GDK_KEY_RELEASE\n"); break;
+  case GDK_ENTER_NOTIFY:          fprintf(stderr, "GDK_ENTER_NOTIFY\n"); break;
+  case GDK_LEAVE_NOTIFY:          fprintf(stderr, "GDK_LEAVE_NOTIFY\n"); break;
+  case GDK_FOCUS_CHANGE:          fprintf(stderr, "GDK_FOCUS_CHANGE\n"); break;
+  case GDK_CONFIGURE:
+    fprintf(stderr, "GDK_CONFIGURE\n");
+    f = gtk3wl_any_window_to_frame (event->configure.window);
+    if (f) {
+      gtk3wl_cr_destroy_surface (f);
+
+      fprintf(stderr, "%dx%d\n", event->configure.width, event->configure.height);
+      xg_frame_resized(f, event->configure.width, event->configure.height);
+    }
+    break;
+
+  case GDK_MAP:
+    fprintf(stderr, "GDK_MAP\n");
+      f = gtk3wl_any_window_to_frame (event->any.window);
+      if (f)
+        {
+	  bool iconified = FRAME_ICONIFIED_P (f);
+
+#if 0
+          /* Check if fullscreen was specified before we where mapped the
+             first time, i.e. from the command line.  */
+          if (!f->output_data.gtk3wl->has_been_visible)
+	    {
+	      x_check_fullscreen (f);
+	    }
+#endif
+
+	  if (!iconified)
+	    {
+	      /* The `z-group' is reset every time a frame becomes
+		 invisible.  Handle this here.  */
+	      if (FRAME_Z_GROUP (f) == z_group_above)
+		x_set_z_group (f, Qabove, Qnil);
+	      else if (FRAME_Z_GROUP (f) == z_group_below)
+		x_set_z_group (f, Qbelow, Qnil);
+	    }
+
+          SET_FRAME_VISIBLE (f, 1);
+          SET_FRAME_ICONIFIED (f, false);
+          f->output_data.gtk3wl->has_been_visible = true;
+
+          if (iconified)
+            {
+              inev.ie.kind = DEICONIFY_EVENT;
+              XSETFRAME (inev.ie.frame_or_window, f);
+            }
+          else if (! NILP (Vframe_list) && ! NILP (XCDR (Vframe_list)))
+            /* Force a redisplay sooner or later to update the
+	       frame titles in case this is the second frame.  */
+            record_asynch_buffer_change ();
+        }
+    break;
+  case GDK_UNMAP:                 fprintf(stderr, "GDK_UNMAP\n"); break;
+  case GDK_PROPERTY_NOTIFY:       fprintf(stderr, "GDK_PROPERTY_NOTIFY\n"); break;
+  case GDK_SELECTION_CLEAR:       fprintf(stderr, "GDK_SELECTION_CLEAR\n"); break;
+  case GDK_SELECTION_REQUEST:     fprintf(stderr, "GDK_SELECTION_REQUEST\n"); break;
+  case GDK_SELECTION_NOTIFY:      fprintf(stderr, "GDK_SELECTION_NOTIFY\n"); break;
+  case GDK_PROXIMITY_IN:          fprintf(stderr, "GDK_PROXIMITY_IN\n"); break;
+  case GDK_PROXIMITY_OUT:         fprintf(stderr, "GDK_PROXIMITY_OUT\n"); break;
+  case GDK_DRAG_ENTER:            fprintf(stderr, "GDK_DRAG_ENTER\n"); break;
+  case GDK_DRAG_LEAVE:            fprintf(stderr, "GDK_DRAG_LEAVE\n"); break;
+  case GDK_DRAG_MOTION:           fprintf(stderr, "GDK_DRAG_MOTION\n"); break;
+  case GDK_DRAG_STATUS:           fprintf(stderr, "GDK_DRAG_STATUS\n"); break;
+  case GDK_DROP_START:            fprintf(stderr, "GDK_DROP_START\n"); break;
+  case GDK_DROP_FINISHED:         fprintf(stderr, "GDK_DROP_FINISHED\n"); break;
+  case GDK_CLIENT_EVENT:          fprintf(stderr, "GDK_CLIENT_EVENT\n"); break;
+  case GDK_VISIBILITY_NOTIFY:     fprintf(stderr, "GDK_VISIBILITY_NOTIFY\n"); break;
+  case GDK_SCROLL:                fprintf(stderr, "GDK_SCROLL\n"); break;
+  case GDK_WINDOW_STATE:
+    fprintf(stderr, "GDK_WINDOW_STATE\n");
+    f = gtk3wl_any_window_to_frame (event->window_state.window);
+    if (f && (event->window_state.changed_mask & GDK_WINDOW_STATE_ICONIFIED)) {
+      if (FRAME_ICONIFIED_P (f))
+	{
+	  /* Gnome shell does not iconify us when C-z is pressed.
+	     It hides the frame.  So if our state says we aren't
+	     hidden anymore, treat it as deiconified.  */
+	  SET_FRAME_VISIBLE (f, 1);
+	  SET_FRAME_ICONIFIED (f, false);
+	  f->output_data.gtk3wl->has_been_visible = true;
+	  inev.ie.kind = DEICONIFY_EVENT;
+	  XSETFRAME (inev.ie.frame_or_window, f);
+	}
+      else
+	{
+	  SET_FRAME_VISIBLE (f, 0);
+	  SET_FRAME_ICONIFIED (f, true);
+	  inev.ie.kind = ICONIFY_EVENT;
+	  XSETFRAME (inev.ie.frame_or_window, f);
+	}
+    }
+    break;
+  case GDK_SETTING:               fprintf(stderr, "GDK_SETTING\n"); break;
+  case GDK_OWNER_CHANGE:          fprintf(stderr, "GDK_OWNER_CHANGE\n"); break;
+  case GDK_GRAB_BROKEN:           fprintf(stderr, "GDK_GRAB_BROKEN\n"); break;
+  case GDK_DAMAGE:                fprintf(stderr, "GDK_DAMAGE\n"); break;
+  case GDK_TOUCH_BEGIN:           fprintf(stderr, "GDK_TOUCH_BEGIN\n"); break;
+  case GDK_TOUCH_UPDATE:          fprintf(stderr, "GDK_TOUCH_UPDATE\n"); break;
+  case GDK_TOUCH_END:             fprintf(stderr, "GDK_TOUCH_END\n"); break;
+  case GDK_TOUCH_CANCEL:          fprintf(stderr, "GDK_TOUCH_CANCEL\n"); break;
+  case GDK_TOUCHPAD_SWIPE:        fprintf(stderr, "GDK_TOUCHPAD_SWIPE\n"); break;
+  case GDK_TOUCHPAD_PINCH:        fprintf(stderr, "GDK_TOUCHPAD_PINCH\n"); break;
+  case GDK_PAD_BUTTON_PRESS:      fprintf(stderr, "GDK_PAD_BUTTON_PRESS\n"); break;
+  case GDK_PAD_BUTTON_RELEASE:    fprintf(stderr, "GDK_PAD_BUTTON_RELEASE\n"); break;
+  case GDK_PAD_RING:              fprintf(stderr, "GDK_PAD_RING\n"); break;
+  case GDK_PAD_STRIP:             fprintf(stderr, "GDK_PAD_STRIP\n"); break;
+  case GDK_PAD_GROUP_MODE:        fprintf(stderr, "GDK_PAD_GROUP_MODE\n"); break;
+  default:                        fprintf(stderr, "%d\n", event->type);
+  }
+  return FALSE;
+}
+
+static void
+gtk3wl_fill_rectangle(struct frame *f, unsigned long color, int x, int y, int width, int height)
+{
+  fprintf(stderr, "gtk3wl_fill_rectangle\n");
+  cairo_t *cr;
+  cr = gtk3wl_begin_cr_clip (f, NULL);
+  gtk3wl_set_cr_source_with_gc_background (f, color);
+  cairo_rectangle (cr, x, y, width, height);
+  cairo_fill (cr);
+  gtk3wl_end_cr_clip (f);
+}
+
+void
+gtk3wl_clear_under_internal_border (struct frame *f)
+{
+  fprintf(stderr, "gtk3wl_clear_under_internal_border\n");
+  if (FRAME_INTERNAL_BORDER_WIDTH (f) > 0)
+    {
+      int border = FRAME_INTERNAL_BORDER_WIDTH (f);
+      int width = FRAME_PIXEL_WIDTH (f);
+      int height = FRAME_PIXEL_HEIGHT (f);
+      int margin = 0;
+      struct face *face = FACE_FROM_ID_OR_NULL (f, INTERNAL_BORDER_FACE_ID);
+
+      block_input ();
+
+      if (face)
+	{
+	  unsigned long color = face->background;
+
+	  gtk3wl_fill_rectangle (f, color, 0, margin, width, border);
+	  gtk3wl_fill_rectangle (f, color, 0, 0, border, height);
+	  gtk3wl_fill_rectangle (f, color, width - border, 0, border, height);
+	  gtk3wl_fill_rectangle (f, color, 0, height - border, width, border);
+	}
+      else
+	{
+	  gtk3wl_clear_area (f, 0, 0, border, height);
+	  gtk3wl_clear_area (f, 0, margin, width, border);
+	  gtk3wl_clear_area (f, width - border, 0, border, height);
+	  gtk3wl_clear_area (f, 0, height - border, width, border);
+	}
+
+      unblock_input ();
+    }
+}
+
+gboolean
+gtk3wl_handle_draw(GtkWidget *widget, cairo_t *cr, gpointer *data)
+{
+  struct frame *f;
+
+  fprintf(stderr, "gtk3wl_handle_draw\n");
+
+  for (GtkWidget *w = widget; w != NULL; w = gtk_widget_get_parent(w)) {
+    fprintf(stderr, "%p %s %d %d", w, G_OBJECT_TYPE_NAME(w), gtk_widget_get_mapped(w), gtk_widget_get_visible(w));
+    GtkAllocation alloc;
+    gtk_widget_get_allocation(w, &alloc);
+    fprintf(stderr, " %dx%d+%d+%d\n", alloc.width, alloc.height, alloc.x, alloc.y);
+  }
+
+#if 1
+  {
+#if 0
+    fprintf(stderr, "widget: %s (window %s) (%p)\n", G_OBJECT_TYPE_NAME(widget), gtk_widget_get_has_window(widget) ? "yes" : "no", gtk_widget_get_window(widget));
+    {
+      GtkWidget *w = widget;
+      while (w != NULL) {
+	w = gtk_widget_get_parent(w);
+	if (w != NULL)
+	  fprintf(stderr, "widget: %s (window %s) (%p)\n", G_OBJECT_TYPE_NAME(w), gtk_widget_get_has_window(w) ? "yes" : "no", gtk_widget_get_window(w));
+      }
+    }
+#endif
+
+    GdkWindow *win = gtk_widget_get_window(widget);
+#if 0
+    {
+      GdkWindow *w = win;
+      fprintf(stderr, "window: %s %p %s\n", G_OBJECT_TYPE_NAME(w), w, gdk_window_has_native(w) ? "native" :"");
+      while (w != NULL) {
+	w = gdk_window_get_parent(w);
+	if (w != NULL)
+	  fprintf(stderr, "window: %s %p %s\n", G_OBJECT_TYPE_NAME(w), w, gdk_window_has_native(w) ? "native" :"");
+      }
+    }
+#endif
+
+    if (win != NULL) {
+      f = gtk3wl_any_window_to_frame(win);
+      if (f != NULL && FRAME_CR_SURFACE(f) != NULL) {
+	cairo_set_source_surface(cr, FRAME_CR_SURFACE(f), 0, 0);
+	cairo_paint(cr);
+      }
+    }
+    return TRUE;
+  }
+#endif
+
+
+  GdkWindow *win = gtk_widget_get_window(widget);
+  if (win == NULL) {
+    fprintf(stderr, "win == NULL\n");
+    return TRUE;
+  }
+  f = gtk3wl_any_window_to_frame(win);
+
+  if (f)
+    {
+      fprintf(stderr, "f != NULL\n");
+      if (!FRAME_VISIBLE_P (f))
+	{
+	  fprintf(stderr, "not visible\n");
+	  block_input ();
+	  SET_FRAME_VISIBLE (f, 1);
+	  SET_FRAME_ICONIFIED (f, false);
+#if 0
+	  if (FRAME_X_DOUBLE_BUFFERED_P (f))
+	    font_drop_xrender_surfaces (f);
+#endif
+	  f->output_data.gtk3wl->has_been_visible = true;
+	  SET_FRAME_GARBAGED (f);
+	  unblock_input ();
+	}
+      else if (FRAME_GARBAGED_P (f))
+	{
+	  fprintf(stderr, "garbaged.\n");
+	  /* Go around the back buffer and manually clear the
+	     window the first time we show it.  This way, we avoid
+	     showing users the sanity-defying horror of whatever
+	     GtkWindow is rendering beneath us.  We've garbaged
+	     the frame, so we'll redraw the whole thing on next
+	     redisplay anyway.  Yuck.  */
+	  gtk3wl_clear_area(f, 0, 0, FRAME_PIXEL_WIDTH(f), FRAME_PIXEL_HEIGHT(f));
+	  gtk3wl_clear_under_internal_border (f);
+	}
+
+
+      if (!FRAME_GARBAGED_P (f))
+	{
+	  fprintf(stderr, "not garbaged.\n");
+	  /* This seems to be needed for GTK 2.6 and later, see
+	     https://debbugs.gnu.org/cgi/bugreport.cgi?bug=15398.  */
+	  fprintf(stderr, "%dx%d.\n", FRAME_PIXEL_WIDTH(f), FRAME_PIXEL_HEIGHT(f));
+	  gtk3wl_clear_area(f, 0, 0, FRAME_PIXEL_WIDTH(f), FRAME_PIXEL_HEIGHT(f));
+	  expose_frame (f, 0, 0, FRAME_PIXEL_WIDTH(f), FRAME_PIXEL_HEIGHT(f));
+	  gtk3wl_clear_under_internal_border (f);
+	}
+
+#if 0
+      if (!FRAME_GARBAGED_P (f))
+	show_back_buffer (f);
+#endif
+    }
+  else
+    {
+#if 0
+      struct scroll_bar *bar;
+
+      bar = x_window_to_scroll_bar (event->xexpose.display,
+				    event->xexpose.window, 2);
+
+      if (bar)
+	x_scroll_bar_expose (bar, event);
+#endif
+    }
+
+  return FALSE;
+}
+
+void
+gtk3wl_set_event_handler(struct frame *f)
+{
+  g_signal_connect(G_OBJECT(FRAME_GTK_WIDGET(f)), "event", G_CALLBACK(gtk3wl_handle_event), NULL);
+  g_signal_connect(G_OBJECT(FRAME_GTK_WIDGET(f)), "draw", G_CALLBACK(gtk3wl_handle_draw), NULL);
+}
+
 static void
 my_log_handler (const gchar *log_domain, GLogLevelFlags log_level,
 		const gchar *msg, gpointer user_data)
@@ -9980,9 +11734,11 @@ gtk3wl_term_init (Lisp_Object display_name)
         id = g_log_set_handler ("GLib", G_LOG_LEVEL_WARNING | G_LOG_FLAG_FATAL
                                   | G_LOG_FLAG_RECURSION, my_log_handler, NULL);
 
+#if 0
         /* NULL window -> events for all windows go to our function.
            Call before gtk_init so Gtk+ event filters comes after our.  */
-        // gdk_window_add_filter (NULL, event_handler_gdk, NULL);
+        gdk_window_add_filter (NULL, event_handler_gdk, NULL);
+#endif
 
         /* gtk_init does set_locale.  Fix locale before and after.  */
         // fixup_locale ();
@@ -10072,6 +11828,7 @@ gtk3wl_xlfd_to_fontname (const char *xlfd)
     The string returned is temporarily allocated.
    -------------------------------------------------------------------------- */
 {
+  fprintf(stderr, "gtk3wl_xlfd_to_fontname\n");
 #if 0
   char *name = xmalloc (180);
   int i, len;
@@ -10126,6 +11883,7 @@ gtk3wl_defined_color (struct frame *f,
          Return false if not found
    -------------------------------------------------------------------------- */
 {
+  // fprintf(stderr, "gtk3wl_defined_color(%s)\n", name);
   int r;
 
   block_input ();
@@ -10145,6 +11903,22 @@ gtk3wl_defined_color (struct frame *f,
 int gtk3wl_parse_color (struct frame *f, const char *color_name,
 		        XColor *color)
 {
+  // fprintf(stderr, "gtk3wl_parse_color(%s)\n", color_name);
+
+  GdkRGBA rgba;
+  if (gdk_rgba_parse(&rgba, color_name)) {
+    color->red = rgba.red * 65535;
+    color->green = rgba.green * 65535;
+    color->blue = rgba.blue * 65535;
+    color->pixel =
+      (color->red >> 8) << 16 |
+      (color->green >> 8) << 8 |
+      (color->blue >> 8) << 0;
+    return 1;
+  }
+  return 0;
+
+#if 0
   if (color_name[0] == '#')
     {
       if (strlen(color_name + 1) == 6) {
@@ -10188,6 +11962,7 @@ int gtk3wl_parse_color (struct frame *f, const char *color_name,
     }
 
   return 0;
+#endif
 }
 
 
@@ -10197,6 +11972,7 @@ int gtk3wl_parse_color (struct frame *f, const char *color_name,
 void
 gtk3wl_query_colors (struct frame *f, XColor *colors, int ncolors)
 {
+  fprintf(stderr, "gtk3wl_query_colors\n");
   int i;
 
   for (i = 0; i < ncolors; i++)
@@ -10215,7 +11991,24 @@ gtk3wl_query_colors (struct frame *f, XColor *colors, int ncolors)
 void
 gtk3wl_query_color (struct frame *f, XColor *color)
 {
+  fprintf(stderr, "gtk3wl_query_color\n");
   gtk3wl_query_colors (f, color, 1);
+}
+
+void
+gtk3wl_clear_area (struct frame *f, int x, int y, int width, int height)
+{
+  fprintf(stderr, "gtk3wl_clear_area\n");
+  cairo_t *cr;
+
+  eassert (width > 0 && height > 0);
+
+  cr = gtk3wl_begin_cr_clip (f, NULL);
+  fprintf(stderr, "back color %08lx.\n", (unsigned long) f->output_data.gtk3wl->background_color);
+  gtk3wl_set_cr_source_with_gc_background (f, f->output_data.gtk3wl->background_color);
+  cairo_rectangle (cr, x, y, width, height);
+  cairo_fill (cr);
+  gtk3wl_end_cr_clip (f);
 }
 
 
@@ -10275,23 +12068,21 @@ gtk3wl_begin_cr_clip (struct frame *f, XGCValues *gc)
 {
   cairo_t *cr = FRAME_CR_CONTEXT (f);
 
+  fprintf(stderr, "gtk3wl_begin_cr_clip\n");
+  if (! FRAME_CR_SURFACE (f))
+    {
+      FRAME_CR_SURFACE(f) = gdk_window_create_similar_surface(gtk_widget_get_window (FRAME_GTK_WIDGET (f)),
+							      CAIRO_CONTENT_COLOR_ALPHA,
+							      FRAME_PIXEL_WIDTH (f),
+							      FRAME_PIXEL_HEIGHT (f));
+    }
+
   if (!cr)
     {
-
-      if (! FRAME_CR_SURFACE (f))
-        {
-          cairo_surface_t *surface;
-	  surface = gdk_window_create_similar_surface(gtk_widget_get_window (FRAME_GTK_WIDGET (f)),
-						      CAIRO_CONTENT_COLOR_ALPHA,
-						      FRAME_PIXEL_WIDTH (f),
-						      FRAME_PIXEL_HEIGHT (f));
-          cr = cairo_create (surface);
-          cairo_surface_destroy (surface);
-        }
-      else
-        cr = cairo_create (FRAME_CR_SURFACE (f));
+      cr = cairo_create (FRAME_CR_SURFACE (f));
       FRAME_CR_CONTEXT (f) = cr;
     }
+
   cairo_save (cr);
 
 #if 0
@@ -10319,12 +12110,21 @@ gtk3wl_begin_cr_clip (struct frame *f, XGCValues *gc)
 void
 gtk3wl_end_cr_clip (struct frame *f)
 {
+  fprintf(stderr, "gtk3wl_end_cr_clip\n");
   cairo_restore (FRAME_CR_CONTEXT (f));
+
+  GtkWidget *widget = FRAME_GTK_WIDGET(f);
+  GdkWindow *win = gtk_widget_get_window(widget);
+  if (win != NULL) {
+    cairo_region_t *region = gdk_window_get_clip_region(win);
+    gdk_window_invalidate_region(win, region, FALSE);
+  }
 }
 
 void
 gtk3wl_set_cr_source_with_gc_foreground (struct frame *f, XGCValues *gc)
 {
+  fprintf(stderr, "gtk3wl_set_cr_source_with_gc_foreground\n");
 #if 0
   XGCValues xgcv;
   XColor color;
@@ -10335,12 +12135,13 @@ gtk3wl_set_cr_source_with_gc_foreground (struct frame *f, XGCValues *gc)
   cairo_set_source_rgb (FRAME_CR_CONTEXT (f), color.red / 65535.0,
 			color.green / 65535.0, color.blue / 65535.0);
 #endif
-  cairo_set_source_rgb (FRAME_CR_CONTEXT (f), 1.0, 1.0, 1.0);
+  cairo_set_source_rgba (FRAME_CR_CONTEXT (f), 1.0, 1.0, 1.0, 1.0);
 }
 
 void
 gtk3wl_set_cr_source_with_gc_background (struct frame *f, XGCValues *gc)
 {
+  fprintf(stderr, "gtk3wl_set_cr_source_with_gc_background\n");
 #if 0
   XGCValues xgcv;
   XColor color;
@@ -10351,12 +12152,14 @@ gtk3wl_set_cr_source_with_gc_background (struct frame *f, XGCValues *gc)
   cairo_set_source_rgb (FRAME_CR_CONTEXT (f), color.red / 65535.0,
 			color.green / 65535.0, color.blue / 65535.0);
 #endif
-  cairo_set_source_rgb (FRAME_CR_CONTEXT (f), 0.0, 0.0, 0.0);
+  cairo_set_source_rgba (FRAME_CR_CONTEXT (f), 0.5, 0.5, 0.0, 1.0);
 }
 
 void
 gtk3wl_cr_draw_frame (cairo_t *cr, struct frame *f)
 {
+  fprintf(stderr, "gtk3wl_cr_draw_frame\n");
+#if 0
   int width, height;
 
   width = FRAME_PIXEL_WIDTH (f);
@@ -10364,9 +12167,24 @@ gtk3wl_cr_draw_frame (cairo_t *cr, struct frame *f)
 
 #if 0
   x_free_cr_resources (f);
+#endif
   FRAME_CR_CONTEXT (f) = cr;
-  x_clear_area (f, 0, 0, width, height);
+  gtk3wl_clear_area (f, 0, 0, width, height);
   expose_frame (f, 0, 0, width, height);
   FRAME_CR_CONTEXT (f) = NULL;
 #endif
+}
+
+void
+gtk3wl_cr_destroy_surface(struct frame *f)
+{
+  fprintf(stderr, "gtk3wl_cr_destroy_surface\n");
+  if (FRAME_CR_CONTEXT(f) != NULL) {
+    cairo_destroy(FRAME_CR_CONTEXT(f));
+    FRAME_CR_CONTEXT(f) = NULL;
+  }
+  if (FRAME_CR_SURFACE(f) != NULL) {
+    cairo_surface_destroy(FRAME_CR_SURFACE(f));
+    FRAME_CR_SURFACE(f) = NULL;
+  }
 }
