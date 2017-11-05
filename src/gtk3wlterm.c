@@ -9811,7 +9811,7 @@ static void gtk3wl_draw_glyph_string(struct glyph_string *s)
     for (int i = 0; i < s->nchars; i++)
       fprintf(stderr, " %04x", s->char2b[i]);
     fprintf(stderr, "\n");
-    s->font->driver->draw(s, 0, s->nchars, s->x, s->y, false);
+    s->font->driver->draw(s, 0, s->nchars, s->x, s->y + s->first_glyph->ascent, false);
   }
 
 #if 0
