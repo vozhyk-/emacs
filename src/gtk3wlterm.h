@@ -501,7 +501,7 @@ extern void gtk3wlfont_make_fontset_for_font (Lisp_Object name,
 struct glyph_string;
 void gtk3wl_dump_glyphstring (struct glyph_string *s) EXTERNALLY_VISIBLE;
 
-/* Implemented in gtk3wlterm, published in or needed from gtk3wlfgtk3wl. */
+/* Implemented in gtk3wlterm, published in or needed from gtk3wlfns. */
 extern Lisp_Object gtk3wl_list_fonts (struct frame *f, Lisp_Object pattern,
                                   int size, int maxnames);
 extern void gtk3wl_clear_frame (struct frame *f);

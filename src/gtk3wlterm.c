@@ -9549,6 +9549,7 @@ x_new_font (struct frame *f, Lisp_Object font_object, int fontset)
 
   FRAME_FONT (f) = font;
   fprintf(stderr, "font:\n");
+  fprintf(stderr, "  %p\n", font);
   fprintf(stderr, "  name: %s\n", SSDATA(font_get_name(font_object)));
   fprintf(stderr, "  width: %d..%d\n", font->min_width, font->max_width);
   fprintf(stderr, "  pixel_size: %d\n", font->pixel_size);
@@ -9803,15 +9804,27 @@ static void gtk3wl_draw_glyph_string(struct glyph_string *s)
 {
   fprintf(stderr, "draw_glyph_string.\n");
 
+  fprintf(stderr, "%s\n", SSDATA(SYMBOL_NAME(s->font->driver->type)));
+  fprintf(stderr, "type: %d\n", s->first_glyph->type);
+  if (s->first_glyph->type == CHAR_GLYPH) {
+    fprintf(stderr, "(%d,%d)", s->x, s->y);
+    for (int i = 0; i < s->nchars; i++)
+      fprintf(stderr, " %04x", s->char2b[i]);
+    fprintf(stderr, "\n");
+    s->font->driver->draw(s, 0, s->nchars, s->x, s->y, false);
+  }
+
+#if 0
   fprintf(stderr, "chars:");
   for (int i = 0; i < s->nchars; i++)
     fprintf(stderr, " %04x", s->char2b[i]);
   fprintf(stderr, "\n");
 
+  // ftcr を使う必要がある。
   cairo_glyph_t *glyphs = malloc(sizeof *glyphs * s->nchars);
   for (int i = 0; i < s->nchars; i++) {
     glyphs[i].index = s->char2b[i];
-    glyphs[i].x = i * 20;
+    glyphs[i].x = i * 10;
     glyphs[i].y = 50;
   }
 
@@ -9821,6 +9834,7 @@ static void gtk3wl_draw_glyph_string(struct glyph_string *s)
   cairo_move_to(cr, 20, 50);
   cairo_show_glyphs(cr, glyphs, s->nchars);
   gtk3wl_end_cr_clip(s->f);
+#endif
 
 #if 0
   bool relief_drawn_p = false;
