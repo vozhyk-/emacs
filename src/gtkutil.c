@@ -941,10 +941,15 @@ xg_frame_resized (struct frame *f, int pixelwidth, int pixelheight)
 
   width = FRAME_PIXEL_TO_TEXT_WIDTH (f, pixelwidth);
   height = FRAME_PIXEL_TO_TEXT_HEIGHT (f, pixelheight);
-  fprintf(stderr, "xg_frame_resized: pixel: %dx%d, char: %dx%d\n", pixelwidth, pixelheight, width, height);
+  fprintf(stderr, "xg_frame_resized: pixel: %dx%d, text: %dx%d\n", pixelwidth, pixelheight, width, height);
 
   frame_size_history_add
     (f, Qxg_frame_resized, width, height, Qnil);
+
+  fprintf(stderr, "width: %d -> %d.\n", FRAME_TEXT_WIDTH(f), width);
+  fprintf(stderr, "height: %d -> %d.\n", FRAME_TEXT_HEIGHT(f), height);
+  fprintf(stderr, "pixelwidth: %d -> %d.\n", FRAME_PIXEL_WIDTH(f), pixelwidth);
+  fprintf(stderr, "pixelheight: %d -> %d.\n", FRAME_PIXEL_HEIGHT(f), pixelheight);
 
   if (width != FRAME_TEXT_WIDTH (f)
       || height != FRAME_TEXT_HEIGHT (f)

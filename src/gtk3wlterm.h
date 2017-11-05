@@ -485,7 +485,7 @@ struct x_output
 extern struct gtk3wl_display_info *gtk3wl_term_init (Lisp_Object display_name);
 extern void gtk3wl_term_shutdown (int sig);
 
-/* cogtk3wltants for text rendering */
+/* constants for text rendering */
 #define GTK3WL_DUMPGLYPH_NORMAL             0
 #define GTK3WL_DUMPGLYPH_CURSOR             1
 #define GTK3WL_DUMPGLYPH_FOREGROUND         2
