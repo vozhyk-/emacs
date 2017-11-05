@@ -39,6 +39,8 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 
 #ifdef HAVE_GTK3WL
 
+#define wx gtk3wl
+
 //static EmacsTooltip *gtk3wl_tooltip = nil;
 
 /* Static variables to handle applescript execution.  */
@@ -232,9 +234,7 @@ interpret_services_menu (NSMenu *menu, Lisp_Object prefix, Lisp_Object old)
 static void
 x_set_foreground_color (struct frame *f, Lisp_Object arg, Lisp_Object oldval)
 {
-#if 0
-  NSColor *col;
-  EmacsCGFloat r, g, b, alpha;
+  XColor col;
 
   /* Must block_input, because gtk3wl_lisp_to_color does block/unblock_input
      which means that col may be deallocated in its unblock_input if there
@@ -247,13 +247,9 @@ x_set_foreground_color (struct frame *f, Lisp_Object arg, Lisp_Object oldval)
       error ("Unknown color");
     }
 
-  [col retain];
-  [f->output_data.gtk3wl->foreground_color release];
-  f->output_data.gtk3wl->foreground_color = col;
+  f->output_data.gtk3wl->foreground_color = col.pixel;
 
-  [col getRed: &r green: &g blue: &b alpha: &alpha];
-  FRAME_FOREGROUND_PIXEL (f) =
-    ARGB_TO_ULONG ((int)(alpha*0xff), (int)(r*0xff), (int)(g*0xff), (int)(b*0xff));
+  FRAME_FOREGROUND_PIXEL (f) = col.pixel;
 
   if (FRAME_GTK3WL_VIEW (f))
     {
@@ -263,18 +259,14 @@ x_set_foreground_color (struct frame *f, Lisp_Object arg, Lisp_Object oldval)
         SET_FRAME_GARBAGED (f);
     }
   unblock_input ();
-#endif
 }
 
 
 static void
 x_set_background_color (struct frame *f, Lisp_Object arg, Lisp_Object oldval)
 {
-#if 0
+  XColor col;
   struct face *face;
-  NSColor *col;
-  NSView *view = FRAME_GTK3WL_VIEW (f);
-  EmacsCGFloat r, g, b, alpha;
 
   block_input ();
   if (gtk3wl_lisp_to_color (arg, &col))
@@ -289,38 +281,15 @@ x_set_background_color (struct frame *f, Lisp_Object arg, Lisp_Object oldval)
   if (FRAME_VISIBLE_P (f))
     gtk3wl_clear_frame (f);
 
-  [col retain];
-  [f->output_data.gtk3wl->background_color release];
-  f->output_data.gtk3wl->background_color = col;
+  f->output_data.gtk3wl->background_color = col.pixel;
 
-  [col getRed: &r green: &g blue: &b alpha: &alpha];
-  FRAME_BACKGROUND_PIXEL (f) =
-    ARGB_TO_ULONG ((int)(alpha*0xff), (int)(r*0xff), (int)(g*0xff), (int)(b*0xff));
+  xg_set_background_color(f, col.pixel);
+  update_face_from_frame_parameter (f, Qbackground_color, arg);
 
-  if (view != nil)
-    {
-      [[view window] setBackgroundColor: col];
+  if (FRAME_VISIBLE_P (f))
+    SET_FRAME_GARBAGED (f);
 
-      if (alpha != (EmacsCGFloat) 1.0)
-          [[view window] setOpaque: NO];
-      else
-          [[view window] setOpaque: YES];
-
-      face = FRAME_DEFAULT_FACE (f);
-      if (face)
-        {
-          col = gtk3wl_lookup_indexed_color (GTK3WL_FACE_BACKGROUND (face), f);
-          face->background = gtk3wl_index_color
-            ([col colorWithAlphaComponent: alpha], f);
-
-          update_face_from_frame_parameter (f, Qbackground_color, arg);
-        }
-
-      if (FRAME_VISIBLE_P (f))
-        SET_FRAME_GARBAGED (f);
-    }
   unblock_input ();
-#endif
 }
 
 

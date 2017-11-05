@@ -413,24 +413,20 @@ struct x_output
 #endif
 
 /* Compute pixel size for vertical scroll bars */
-#define GTK3WL_SCROLL_BAR_WIDTH(f)					0
-#if 0
+#define GTK3WL_SCROLL_BAR_WIDTH(f)					\
   (FRAME_HAS_VERTICAL_SCROLL_BARS (f)					\
    ? rint (FRAME_CONFIG_SCROLL_BAR_WIDTH (f) > 0			\
 	   ? FRAME_CONFIG_SCROLL_BAR_WIDTH (f)				\
 	   : (FRAME_SCROLL_BAR_COLS (f) * FRAME_COLUMN_WIDTH (f)))	\
    : 0)
-#endif
 
 /* Compute pixel size for horizontal scroll bars */
-#define GTK3WL_SCROLL_BAR_HEIGHT(f)					0
-#if 0
+#define GTK3WL_SCROLL_BAR_HEIGHT(f)					\
   (FRAME_HAS_HORIZONTAL_SCROLL_BARS (f)					\
    ? rint (FRAME_CONFIG_SCROLL_BAR_HEIGHT (f) > 0			\
 	   ? FRAME_CONFIG_SCROLL_BAR_HEIGHT (f)				\
 	   : (FRAME_SCROLL_BAR_LINES (f) * FRAME_LINE_HEIGHT (f)))	\
    : 0)
-#endif
 
 /* Difference btwn char-column-calculated and actual SB widths.
    This is only a concern for rendering when SB on left. */
@@ -532,8 +528,7 @@ gtk3wl_query_color (struct frame *f, XColor *color);
 void
 gtk3wl_query_colors (struct frame *f, XColor *colors, int ncolors);
 
-int gtk3wl_parse_color (struct frame *f, const char *color_name,
-			XColor *color);
+int gtk3wl_parse_color (const char *color_name, XColor *color);
 
 #ifdef __OBJC__
 extern int gtk3wl_lisp_to_color (Lisp_Object color, GTK3WLColor **col);
@@ -632,6 +627,7 @@ extern cairo_t *gtk3wl_begin_cr_clip (struct frame *f, XGCValues *gc);
 extern void gtk3wl_end_cr_clip (struct frame *f);
 extern void gtk3wl_set_cr_source_with_gc_foreground (struct frame *f, XGCValues *gc);
 extern void gtk3wl_set_cr_source_with_gc_background (struct frame *f, XGCValues *gc);
+extern void gtk3wl_set_cr_source_with_color (struct frame *f, unsigned long color);
 
 #ifdef __OBJC__
 /* Needed in gtk3wlfgtk3wl.m.  */

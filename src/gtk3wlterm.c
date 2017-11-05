@@ -11833,7 +11833,7 @@ gtk3wl_fill_rectangle(struct frame *f, unsigned long color, int x, int y, int wi
   fprintf(stderr, "gtk3wl_fill_rectangle\n");
   cairo_t *cr;
   cr = gtk3wl_begin_cr_clip (f, NULL);
-  gtk3wl_set_cr_source_with_gc_background (f, color);
+  gtk3wl_set_cr_source_with_color (f, color);
   cairo_rectangle (cr, x, y, width, height);
   cairo_fill (cr);
   gtk3wl_end_cr_clip (f);
@@ -12228,7 +12228,7 @@ gtk3wl_defined_color (struct frame *f,
   int r;
 
   block_input ();
-  r = gtk3wl_parse_color (f, name, color_def);
+  r = gtk3wl_parse_color (name, color_def);
   unblock_input ();
   return r;
 }
@@ -12241,8 +12241,7 @@ gtk3wl_defined_color (struct frame *f,
    and names we've actually looked up; list-colors-display is probably
    the most color-intensive case we're likely to hit.  */
 
-int gtk3wl_parse_color (struct frame *f, const char *color_name,
-		        XColor *color)
+int gtk3wl_parse_color (const char *color_name, XColor *color)
 {
   // fprintf(stderr, "gtk3wl_parse_color(%s)\n", color_name);
 
@@ -12252,60 +12251,28 @@ int gtk3wl_parse_color (struct frame *f, const char *color_name,
     color->green = rgba.green * 65535;
     color->blue = rgba.blue * 65535;
     color->pixel =
+      0xffff << 24 |
       (color->red >> 8) << 16 |
       (color->green >> 8) << 8 |
       (color->blue >> 8) << 0;
     return 1;
   }
   return 0;
-
-#if 0
-  if (color_name[0] == '#')
-    {
-      if (strlen(color_name + 1) == 6) {
-	unsigned int r, g, b;
-	if (sscanf(color_name, "%02x%02x%02x", &r, &g, &b) != 3)
-	  return 0;
-	color->pixel = r << 16 | g << 8 | b;
-	color->red = r << 8 | r;
-	color->green = g << 8 | g;
-	color->blue = b << 8 | b;
-	return 1;
-      }
-      if (strlen(color_name + 1) == 3) {
-	unsigned int r, g, b;
-	if (sscanf(color_name, "%1x%1x%1x", &r, &g, &b) != 3)
-	  return 0;
-	color->pixel = r << 20 | r << 16 | g << 12 | g << 8 | b << 4 | b;
-	color->red = r << 12 | r << 8 | r << 4 | r;
-	color->green = g << 12 | g << 8 | g << 4 | g;
-	color->blue = b << 12 | b << 8 | b << 4 | b;
-	return 1;
-      }
-
-      return 0;
-    }
-
-  if (strncmp(color_name, "rgb:", 4) == 0)
-    {
-      if (strlen(color_name + 4) == 14) {
-	unsigned int r, g, b;
-	if (sscanf(color_name, "%04x/%04x/%04x", &r, &g, &b) != 3)
-	  return 0;
-	color->pixel = r >> 8 << 16 | g >> 8 << 8 | b >> 8;
-	color->red = r;
-	color->green = g;
-	color->blue = b;
-	return 1;
-      }
-
-      return 0;
-    }
-
-  return 0;
-#endif
 }
 
+int
+gtk3wl_lisp_to_color (Lisp_Object color, XColor *col)
+/* --------------------------------------------------------------------------
+     Convert a Lisp string object to a NS color
+   -------------------------------------------------------------------------- */
+{
+  fprintf(stderr, "gtk3wl_lisp_to_color\n");
+  if (STRINGP (color))
+    return !gtk3wl_parse_color (SSDATA (color), col);
+  else if (SYMBOLP (color))
+    return !gtk3wl_parse_color (SSDATA (SYMBOL_NAME (color)), col);
+  return 1;
+}
 
 /* On frame F, translate pixel colors to RGB values for the NCOLORS
    colors in COLORS.  On W32, we no longer try to map colors to
@@ -12346,7 +12313,7 @@ gtk3wl_clear_area (struct frame *f, int x, int y, int width, int height)
 
   cr = gtk3wl_begin_cr_clip (f, NULL);
   fprintf(stderr, "back color %08lx.\n", (unsigned long) f->output_data.gtk3wl->background_color);
-  gtk3wl_set_cr_source_with_gc_background (f, f->output_data.gtk3wl->background_color);
+  gtk3wl_set_cr_source_with_color (f, f->output_data.gtk3wl->background_color);
   cairo_rectangle (cr, x, y, width, height);
   cairo_fill (cr);
   gtk3wl_end_cr_clip (f);
@@ -12466,34 +12433,25 @@ void
 gtk3wl_set_cr_source_with_gc_foreground (struct frame *f, XGCValues *gc)
 {
   fprintf(stderr, "gtk3wl_set_cr_source_with_gc_foreground\n");
-#if 0
-  XGCValues xgcv;
-  XColor color;
-
-  XGetGCValues (FRAME_X_DISPLAY (f), gc, GCForeground, &xgcv);
-  color.pixel = xgcv.foreground;
-  x_query_color (f, &color);
-  cairo_set_source_rgb (FRAME_CR_CONTEXT (f), color.red / 65535.0,
-			color.green / 65535.0, color.blue / 65535.0);
-#endif
-  cairo_set_source_rgba (FRAME_CR_CONTEXT (f), 1.0, 1.0, 1.0, 1.0);
+  gtk3wl_set_cr_source_with_color(f, gc->foreground);
 }
 
 void
 gtk3wl_set_cr_source_with_gc_background (struct frame *f, XGCValues *gc)
 {
   fprintf(stderr, "gtk3wl_set_cr_source_with_gc_background\n");
-#if 0
-  XGCValues xgcv;
-  XColor color;
+  gtk3wl_set_cr_source_with_color(f, gc->background);
+}
 
-  XGetGCValues (FRAME_X_DISPLAY (f), gc, GCBackground, &xgcv);
-  color.pixel = xgcv.background;
-  x_query_color (f, &color);
-  cairo_set_source_rgb (FRAME_CR_CONTEXT (f), color.red / 65535.0,
-			color.green / 65535.0, color.blue / 65535.0);
-#endif
-  cairo_set_source_rgba (FRAME_CR_CONTEXT (f), 0.5, 0.5, 0.0, 1.0);
+void
+gtk3wl_set_cr_source_with_color (struct frame *f, unsigned long color)
+{
+  fprintf(stderr, "gtk3wl_set_cr_source_with_color\n");
+  XColor col;
+  col.pixel = color;
+  gtk3wl_query_color(f, &col);
+  cairo_set_source_rgb (FRAME_CR_CONTEXT (f), col.red / 65535.0,
+			col.green / 65535.0, col.blue / 65535.0);
 }
 
 void
