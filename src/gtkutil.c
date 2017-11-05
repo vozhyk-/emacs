@@ -1067,7 +1067,6 @@ xg_frame_set_char_size (struct frame *f, int width, int height)
 /* Handle height/width changes (i.e. add/remove/move menu/toolbar).
    The policy is to keep the number of editable lines.  */
 
-#if 0
 static void
 xg_height_or_width_changed (struct frame *f)
 {
@@ -1075,9 +1074,10 @@ xg_height_or_width_changed (struct frame *f)
                      FRAME_TOTAL_PIXEL_WIDTH (f),
                      FRAME_TOTAL_PIXEL_HEIGHT (f));
   f->output_data.wx->hint_flags = 0;
+#ifndef HAVE_GTK3WL
   x_wm_set_size_hint (f, 0, 0);
-}
 #endif
+}
 
 #ifndef HAVE_GTK3WL
 /* Convert an X Window WSESC on display DPY to its corresponding GtkWidget.
@@ -1114,11 +1114,19 @@ xg_win_to_widget (Display *dpy, Window wdesc)
 static void
 xg_set_widget_bg (struct frame *f, GtkWidget *w, unsigned long pixel)
 {
-#ifndef HAVE_GTK3WL
 #ifdef HAVE_GTK3
   XColor xbg;
   xbg.pixel = pixel;
+#ifndef HAVE_GTK3WL
   if (XQueryColor (FRAME_X_DISPLAY (f), FRAME_X_COLORMAP (f), &xbg))
+#else
+  xbg.red = (pixel >> 16) & 0xff;
+  xbg.green = (pixel >> 8) & 0xff;
+  xbg.blue = (pixel >> 0) & 0xff;
+  xbg.red |= xbg.red << 8;
+  xbg.green |= xbg.green << 8;
+  xbg.blue |= xbg.blue << 8;
+#endif
     {
       const char format[] = "* { background-color: #%02x%02x%02x; }";
       /* The format is always longer than the resulting string.  */
@@ -1139,7 +1147,6 @@ xg_set_widget_bg (struct frame *f, GtkWidget *w, unsigned long pixel)
   GdkColormap *map = gtk_widget_get_colormap (w);
   gdk_colormap_query_color (map, pixel, &bg);
   gtk_widget_modify_bg (FRAME_GTK_WIDGET (f), GTK_STATE_NORMAL, &bg);
-#endif
 #endif
 }
 
@@ -1285,9 +1292,7 @@ xg_create_frame_widgets (struct frame *f)
   f->output_data.wx->vbox_widget = wvbox;
   f->output_data.wx->hbox_widget = whbox;
 
-#ifndef HAVE_GTK3WL
   gtk_widget_set_has_window (wfixed, TRUE);
-#endif
 
   gtk_container_add (GTK_CONTAINER (wtop), wvbox);
   gtk_box_pack_start (GTK_BOX (wvbox), whbox, TRUE, TRUE, 0);
@@ -1615,7 +1620,6 @@ xg_set_undecorated (struct frame *f, Lisp_Object undecorated)
 }
 
 
-#ifndef HAVE_GTK3WL
 /* Restack F1 below F2, above if ABOVE_FLAG is true.  This might not
    work with all window managers.  */
 void
@@ -1633,12 +1637,15 @@ xg_frame_restack (struct frame *f1, struct frame *f2, bool above_flag)
       XSETFRAME (frame2, f2);
 
       gdk_window_restack (gwin1, gwin2, above_flag);
+#ifndef HAVE_GTK3WL
       x_sync (f1);
+#else
+      gdk_flush();
+#endif
     }
   unblock_input ();
 #endif
 }
-#endif
 
 
 /* Don't show frame in taskbar, don't ALT-TAB to it.  */
