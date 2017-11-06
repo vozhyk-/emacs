@@ -9354,7 +9354,9 @@ x_set_window_size (struct frame *f,
     fprintf(stderr, " %dx%d+%d+%d\n", alloc.width, alloc.height, alloc.x, alloc.y);
   }
 
+#if 0
   gtk_widget_set_size_request(FRAME_GTK_WIDGET(f), pixelwidth, pixelheight);
+#endif
 
   unblock_input ();
 
@@ -10314,6 +10316,8 @@ gtk3wl_read_socket (struct terminal *terminal, struct input_event *hold_quit)
 
   return count;
 }
+
+
 
 static struct terminal *
 gtk3wl_create_terminal (struct gtk3wl_display_info *dpyinfo)
@@ -12000,15 +12004,23 @@ gtk3wl_handle_draw(GtkWidget *widget, cairo_t *cr, gpointer *data)
   return FALSE;
 }
 
-static void debug(GtkWidget *widget, GtkAllocation *alloc)
+static void size_allocate(GtkWidget *widget, GtkAllocation *alloc, gpointer *user_data)
 {
   fprintf(stderr, "size-alloc: %dx%d+%d+%d.\n", alloc->width, alloc->height, alloc->x, alloc->y);
+
+  struct frame *f = gtk3wl_any_window_to_frame (gtk_widget_get_window(widget));
+  if (f) {
+    gtk3wl_cr_destroy_surface (f);
+
+    fprintf(stderr, "%dx%d\n", alloc->width, alloc->height);
+    xg_frame_resized(f, alloc->width, alloc->height);
+  }
 }
 
 void
 gtk3wl_set_event_handler(struct frame *f)
 {
-  g_signal_connect(G_OBJECT(FRAME_GTK_WIDGET(f)), "size-allocate", G_CALLBACK(debug), NULL);
+  g_signal_connect(G_OBJECT(FRAME_GTK_WIDGET(f)), "size-allocate", G_CALLBACK(size_allocate), NULL);
   g_signal_connect(G_OBJECT(FRAME_GTK_WIDGET(f)), "event", G_CALLBACK(gtk3wl_handle_event), NULL);
   g_signal_connect(G_OBJECT(FRAME_GTK_WIDGET(f)), "draw", G_CALLBACK(gtk3wl_handle_draw), NULL);
 }

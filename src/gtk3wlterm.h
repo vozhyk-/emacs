@@ -472,7 +472,7 @@ struct x_output
 #define BLACK_PIX_DEFAULT(f) 0x000000
 #define WHITE_PIX_DEFAULT(f) 0xFFFFFF
 
-/* First position where characters can be shown (igtk3wltead of scrollbar, if
+/* First position where characters can be shown (instead of scrollbar, if
    it is on left. */
 #define FIRST_CHAR_POSITION(f)				\
   (! (FRAME_HAS_VERTICAL_SCROLL_BARS_ON_LEFT (f)) ? 0	\

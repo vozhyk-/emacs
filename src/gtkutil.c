@@ -1247,11 +1247,7 @@ xg_create_frame_widgets (struct frame *f)
   gtk_box_set_homogeneous (GTK_BOX (whbox), FALSE);
 
 #ifdef HAVE_GTK3
-#ifndef HAVE_GTK3WL
   wfixed = emacs_fixed_new (f);
-#else
-  wfixed = gtk_drawing_area_new ();
-#endif
 #else
   wfixed = gtk_fixed_new ();
 #endif
@@ -3888,10 +3884,8 @@ xg_finish_scroll_bar_creation (struct frame *f,
      also, which causes flicker.  Put an event box between the edit widget
      and the scroll bar, so the scroll bar instead draws itself on the
      event box window.  */
-#ifndef HAVE_GTK3WL
   gtk_fixed_put (GTK_FIXED (f->output_data.wx->edit_widget), webox, -1, -1);
   gtk_container_add (GTK_CONTAINER (webox), wscroll);
-#endif
 
   xg_set_widget_bg (f, webox, FRAME_BACKGROUND_PIXEL (f));
 
@@ -3900,6 +3894,9 @@ xg_finish_scroll_bar_creation (struct frame *f,
      real X window, it and its scroll-bar child try to draw on the
      Emacs main window, which we draw over using Xlib.  */
   gtk_widget_realize (webox);
+#ifdef HAVE_GTK3WL
+  gtk_widget_show_all(webox);
+#endif
   GTK_WIDGET_TO_X_WIN (webox);
 
   /* Set the cursor to an arrow.  */
