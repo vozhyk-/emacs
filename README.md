@@ -49,6 +49,7 @@ Many many debugging outputs. Please ignore them.
   - no scrollbar
   - no toolbar
   - no menubar
+  - no fringe
   - C-x 5 2, I don't know.
   - fullscreen not supported.
 
@@ -56,11 +57,10 @@ Many many debugging outputs. Please ignore them.
   - `-fn`, `-bg`, and `-fg` are available.
 
 - other features
-  - many many features not supported.
+  - so many features not supported.
 
 - bugs
   - when scrolling, segv occurs.
-
 
 ## My Environment
 
