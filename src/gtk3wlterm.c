@@ -9219,6 +9219,8 @@ baseline level.  The default value is nil.  */);
 
 /* ==== ==== ==== ==== ==== ==== ==== ==== ==== ==== ==== ==== ==== ==== ==== ==== */
 
+#define STORE_KEYSYM_FOR_DEBUG(keysym) ((void)0)
+
 #define FRAME_CR_CONTEXT(f)	((f)->output_data.gtk3wl->cr_context)
 #define FRAME_CR_SURFACE(f)	((f)->output_data.gtk3wl->cr_surface)
 
@@ -12017,10 +12019,362 @@ static void size_allocate(GtkWidget *widget, GtkAllocation *alloc, gpointer *use
   }
 }
 
+int
+gtk3wl_gtk_to_emacs_modifiers (int state)
+{
+  int mod_ctrl = ctrl_modifier;
+  int mod_meta = meta_modifier;
+  int mod_alt  = alt_modifier;
+  int mod_hyper = hyper_modifier;
+  int mod_super = super_modifier;
+  Lisp_Object tem;
+
+  tem = Fget (Vx_ctrl_keysym, Qmodifier_value);
+  if (INTEGERP (tem)) mod_ctrl = XINT (tem) & INT_MAX;
+  tem = Fget (Vx_alt_keysym, Qmodifier_value);
+  if (INTEGERP (tem)) mod_alt = XINT (tem) & INT_MAX;
+  tem = Fget (Vx_meta_keysym, Qmodifier_value);
+  if (INTEGERP (tem)) mod_meta = XINT (tem) & INT_MAX;
+  tem = Fget (Vx_hyper_keysym, Qmodifier_value);
+  if (INTEGERP (tem)) mod_hyper = XINT (tem) & INT_MAX;
+  tem = Fget (Vx_super_keysym, Qmodifier_value);
+  if (INTEGERP (tem)) mod_super = XINT (tem) & INT_MAX;
+
+  return (  ((state & GDK_SHIFT_MASK)     ? shift_modifier : 0)
+            | ((state & GDK_CONTROL_MASK) ? mod_ctrl	: 0)
+            | ((state & GDK_META_MASK)	  ? mod_meta	: 0)
+            | ((state & GDK_MOD1_MASK)	  ? mod_alt	: 0)
+            | ((state & GDK_SUPER_MASK)	  ? mod_super	: 0)
+            | ((state & GDK_HYPER_MASK)	  ? mod_hyper	: 0));
+}
+
+static int
+gtk3wl_emacs_to_gtk_modifiers (EMACS_INT state)
+{
+  EMACS_INT mod_ctrl = ctrl_modifier;
+  EMACS_INT mod_meta = meta_modifier;
+  EMACS_INT mod_alt  = alt_modifier;
+  EMACS_INT mod_hyper = hyper_modifier;
+  EMACS_INT mod_super = super_modifier;
+
+  Lisp_Object tem;
+
+  tem = Fget (Vx_ctrl_keysym, Qmodifier_value);
+  if (INTEGERP (tem)) mod_ctrl = XINT (tem);
+  tem = Fget (Vx_alt_keysym, Qmodifier_value);
+  if (INTEGERP (tem)) mod_alt = XINT (tem);
+  tem = Fget (Vx_meta_keysym, Qmodifier_value);
+  if (INTEGERP (tem)) mod_meta = XINT (tem);
+  tem = Fget (Vx_hyper_keysym, Qmodifier_value);
+  if (INTEGERP (tem)) mod_hyper = XINT (tem);
+  tem = Fget (Vx_super_keysym, Qmodifier_value);
+  if (INTEGERP (tem)) mod_super = XINT (tem);
+
+
+  return (  ((state & mod_alt)		? GDK_MOD1_MASK    : 0)
+            | ((state & mod_super)	? GDK_SUPER_MASK   : 0)
+            | ((state & mod_hyper)	? GDK_HYPER_MASK   : 0)
+            | ((state & shift_modifier)	? GDK_SHIFT_MASK   : 0)
+            | ((state & mod_ctrl)	? GDK_CONTROL_MASK : 0)
+            | ((state & mod_meta)	? GDK_META_MASK    : 0));
+}
+
+#define IsCursorKey(keysym)       (0xff50 <= (keysym) && (keysym) < 0xff60)
+#define IsMiscFunctionKey(keysym) (0xff60 <= (keysym) && (keysym) < 0xff6c)
+#define IsKeypadKey(keysym)       (0xff80 <= (keysym) && (keysym) < 0xffbe)
+#define IsFunctionKey(keysym)     (0xffbe <= (keysym) && (keysym) < 0xffe1)
+
+static gboolean key_press_event(GtkWidget *widget, GdkEvent *event, gpointer *user_data)
+{
+  struct coding_system coding;
+  union buffered_input_event inev;
+  ptrdiff_t nbytes = 0;
+
+  USE_SAFE_ALLOCA;
+
+  fprintf(stderr, "key_press_event\n");
+
+#if 0
+  /* Dispatch KeyPress events when in menu.  */
+  if (popup_activated ())
+    goto done;
+#endif
+
+  struct frame *f = gtk3wl_any_window_to_frame(gtk_widget_get_window(widget));
+
+#if 0
+  /* If mouse-highlight is an integer, input clears out
+     mouse highlighting.  */
+  if (!hlinfo->mouse_face_hidden && INTEGERP (Vmouse_highlight))
+    {
+      clear_mouse_face (hlinfo);
+      hlinfo->mouse_face_hidden = true;
+    }
+#endif
+
+  if (f != 0)
+    {
+      guint keysym, orig_keysym;
+      /* al%imercury@uunet.uu.net says that making this 81
+	 instead of 80 fixed a bug whereby meta chars made
+	 his Emacs hang.
+
+	 It seems that some version of XmbLookupString has
+	 a bug of not returning XBufferOverflow in
+	 status_return even if the input is too long to
+	 fit in 81 bytes.  So, we must prepare sufficient
+	 bytes for copy_buffer.  513 bytes (256 chars for
+	 two-byte character set) seems to be a fairly good
+	 approximation.  -- 2000.8.10 handa@etl.go.jp  */
+      unsigned char copy_buffer[513];
+      unsigned char *copy_bufptr = copy_buffer;
+      int copy_bufsiz = sizeof (copy_buffer);
+      int modifiers;
+      Lisp_Object coding_system = Qlatin_1;
+      Lisp_Object c;
+      guint state = event->key.state;
+
+      /* Don't pass keys to GTK.  A Tab will shift focus to the
+	 tool bar in GTK 2.4.  Keys will still go to menus and
+	 dialogs because in that case popup_activated is nonzero
+	 (see above).  */
+      // *finish = X_EVENT_DROP;
+
+      state |= gtk3wl_emacs_to_gtk_modifiers (extra_keyboard_modifiers);
+      modifiers = state;
+
+      /* This will have to go some day...  */
+
+      /* make_lispy_event turns chars into control chars.
+	 Don't do it here because XLookupString is too eager.  */
+      state &= ~GDK_CONTROL_MASK;
+      state &= ~(GDK_META_MASK
+		 | GDK_SUPER_MASK
+		 | GDK_HYPER_MASK
+		 | GDK_MOD1_MASK);
+
+      nbytes = event->key.length;
+      if (nbytes > copy_bufsiz)
+	nbytes = copy_bufsiz;
+      memcpy(copy_bufptr, event->key.string, nbytes);
+
+      keysym = event->key.keyval;
+      orig_keysym = keysym;
+
+      /* Common for all keysym input events.  */
+      XSETFRAME (inev.ie.frame_or_window, f);
+      inev.ie.modifiers = gtk3wl_gtk_to_emacs_modifiers (modifiers);
+      inev.ie.timestamp = event->key.time;
+
+      /* First deal with keysyms which have defined
+	 translations to characters.  */
+      if (keysym >= 32 && keysym < 128)
+	/* Avoid explicitly decoding each ASCII character.  */
+	{
+	  inev.ie.kind = ASCII_KEYSTROKE_EVENT;
+	  inev.ie.code = keysym;
+	  goto done;
+	}
+
+      /* Keysyms directly mapped to Unicode characters.  */
+      if (keysym >= 0x01000000 && keysym <= 0x0110FFFF)
+	{
+	  if (keysym < 0x01000080)
+	    inev.ie.kind = ASCII_KEYSTROKE_EVENT;
+	  else
+	    inev.ie.kind = MULTIBYTE_CHAR_KEYSTROKE_EVENT;
+	  inev.ie.code = keysym & 0xFFFFFF;
+	  goto done;
+	}
+
+#if 0
+      /* Now non-ASCII.  */
+      if (HASH_TABLE_P (Vx_keysym_table)
+	  && (c = Fgethash (make_number (keysym),
+			    Vx_keysym_table,
+			    Qnil),
+	      NATNUMP (c)))
+	{
+	  inev.ie.kind = (SINGLE_BYTE_CHAR_P (XFASTINT (c))
+			  ? ASCII_KEYSTROKE_EVENT
+			  : MULTIBYTE_CHAR_KEYSTROKE_EVENT);
+	  inev.ie.code = XFASTINT (c);
+	  goto done;
+	}
+#endif
+
+      /* Random non-modifier sorts of keysyms.  */
+      if (((keysym >= GDK_KEY_BackSpace && keysym <= GDK_KEY_Escape)
+	   || keysym == GDK_KEY_Delete
+#ifdef GDK_KEY_ISO_Left_Tab
+	   || (keysym >= GDK_KEY_ISO_Left_Tab
+	       && keysym <= GDK_KEY_ISO_Enter)
+#endif
+	   || IsCursorKey (keysym) /* 0xff50 <= x < 0xff60 */
+	   || IsMiscFunctionKey (keysym) /* 0xff60 <= x < VARIES */
+#ifdef HPUX
+	   /* This recognizes the "extended function
+	      keys".  It seems there's no cleaner way.
+	      Test IsModifierKey to avoid handling
+	      mode_switch incorrectly.  */
+	   || (GDK_KEY_Select <= keysym && keysym < GDK_KEY_KP_Space)
+#endif
+#ifdef GDK_KEY_dead_circumflex
+	   || orig_keysym == GDK_KEY_dead_circumflex
+#endif
+#ifdef GDK_KEY_dead_grave
+	   || orig_keysym == GDK_KEY_dead_grave
+#endif
+#ifdef GDK_KEY_dead_tilde
+	   || orig_keysym == GDK_KEY_dead_tilde
+#endif
+#ifdef GDK_KEY_dead_diaeresis
+	   || orig_keysym == GDK_KEY_dead_diaeresis
+#endif
+#ifdef GDK_KEY_dead_macron
+	   || orig_keysym == GDK_KEY_dead_macron
+#endif
+#ifdef GDK_KEY_dead_degree
+	   || orig_keysym == GDK_KEY_dead_degree
+#endif
+#ifdef GDK_KEY_dead_acute
+	   || orig_keysym == GDK_KEY_dead_acute
+#endif
+#ifdef GDK_KEY_dead_cedilla
+	   || orig_keysym == GDK_KEY_dead_cedilla
+#endif
+#ifdef GDK_KEY_dead_breve
+	   || orig_keysym == GDK_KEY_dead_breve
+#endif
+#ifdef GDK_KEY_dead_ogonek
+	   || orig_keysym == GDK_KEY_dead_ogonek
+#endif
+#ifdef GDK_KEY_dead_caron
+	   || orig_keysym == GDK_KEY_dead_caron
+#endif
+#ifdef GDK_KEY_dead_doubleacute
+	   || orig_keysym == GDK_KEY_dead_doubleacute
+#endif
+#ifdef GDK_KEY_dead_abovedot
+	   || orig_keysym == GDK_KEY_dead_abovedot
+#endif
+	   || IsKeypadKey (keysym) /* 0xff80 <= x < 0xffbe */
+	   || IsFunctionKey (keysym) /* 0xffbe <= x < 0xffe1 */
+	   /* Any "vendor-specific" key is ok.  */
+	   || (orig_keysym & (1 << 28))
+	   || (keysym != GDK_KEY_VoidSymbol && nbytes == 0))
+	  && ! (event->key.is_modifier
+		/* The symbols from GDK_KEY_ISO_Lock
+		   to GDK_KEY_ISO_Last_Group_Lock
+		   don't have real modifiers but
+		   should be treated similarly to
+		   Mode_switch by Emacs. */
+#if defined GDK_KEY_ISO_Lock && defined GDK_KEY_ISO_Last_Group_Lock
+		|| (GDK_KEY_ISO_Lock <= orig_keysym
+		    && orig_keysym <= GDK_KEY_ISO_Last_Group_Lock)
+#endif
+		))
+	{
+	  STORE_KEYSYM_FOR_DEBUG (keysym);
+	  /* make_lispy_event will convert this to a symbolic
+	     key.  */
+	  inev.ie.kind = NON_ASCII_KEYSTROKE_EVENT;
+	  inev.ie.code = keysym;
+	  goto done;
+	}
+
+      {	/* Raw bytes, not keysym.  */
+	ptrdiff_t i;
+	int nchars, len;
+
+	for (i = 0, nchars = 0; i < nbytes; i++)
+	  {
+	    if (ASCII_CHAR_P (copy_bufptr[i]))
+	      nchars++;
+	    STORE_KEYSYM_FOR_DEBUG (copy_bufptr[i]);
+	  }
+
+	if (nchars < nbytes)
+	  {
+	    /* Decode the input data.  */
+
+	    /* The input should be decoded with `coding_system'
+	       which depends on which X*LookupString function
+	       we used just above and the locale.  */
+	    setup_coding_system (coding_system, &coding);
+	    coding.src_multibyte = false;
+	    coding.dst_multibyte = true;
+	    /* The input is converted to events, thus we can't
+	       handle composition.  Anyway, there's no XIM that
+	       gives us composition information.  */
+	    coding.common_flags &= ~CODING_ANNOTATION_MASK;
+
+	    SAFE_NALLOCA (coding.destination, MAX_MULTIBYTE_LENGTH,
+			  nbytes);
+	    coding.dst_bytes = MAX_MULTIBYTE_LENGTH * nbytes;
+	    coding.mode |= CODING_MODE_LAST_BLOCK;
+	    decode_coding_c_string (&coding, copy_bufptr, nbytes, Qnil);
+	    nbytes = coding.produced;
+	    nchars = coding.produced_char;
+	    copy_bufptr = coding.destination;
+	  }
+
+	/* Convert the input data to a sequence of
+	   character events.  */
+	for (i = 0; i < nbytes; i += len)
+	  {
+	    int ch;
+	    if (nchars == nbytes)
+	      ch = copy_bufptr[i], len = 1;
+	    else
+	      ch = STRING_CHAR_AND_LENGTH (copy_bufptr + i, len);
+	    inev.ie.kind = (SINGLE_BYTE_CHAR_P (ch)
+			    ? ASCII_KEYSTROKE_EVENT
+			    : MULTIBYTE_CHAR_KEYSTROKE_EVENT);
+	    inev.ie.code = ch;
+#if 0
+	    kbd_buffer_store_buffered_event (&inev, hold_quit);
+#else
+	    kbd_buffer_store_buffered_event (&inev, NULL);
+#endif
+	  }
+
+	// count += nchars;
+
+	inev.ie.kind = NO_EVENT;  /* Already stored above.  */
+
+	if (keysym == GDK_KEY_VoidSymbol)
+	  return TRUE;
+      }
+    }
+
+ done:
+  if (inev.ie.kind != NO_EVENT)
+    {
+      kbd_buffer_store_buffered_event (&inev, NULL);
+      // count++;
+    }
+
+  return TRUE;
+}
+
+static gboolean
+focus_in_event(GtkWidget *widget, GdkEvent *event, gpointer *user_data)
+{
+  return TRUE;
+}
+
+static gboolean
+focus_out_event(GtkWidget *widget, GdkEvent *event, gpointer *user_data)
+{
+  return TRUE;
+}
+
 void
 gtk3wl_set_event_handler(struct frame *f)
 {
   g_signal_connect(G_OBJECT(FRAME_GTK_WIDGET(f)), "size-allocate", G_CALLBACK(size_allocate), NULL);
+  g_signal_connect(G_OBJECT(FRAME_GTK_WIDGET(f)), "key-press-event", G_CALLBACK(key_press_event), NULL);
   g_signal_connect(G_OBJECT(FRAME_GTK_WIDGET(f)), "event", G_CALLBACK(gtk3wl_handle_event), NULL);
   g_signal_connect(G_OBJECT(FRAME_GTK_WIDGET(f)), "draw", G_CALLBACK(gtk3wl_handle_draw), NULL);
 }
@@ -12347,11 +12701,48 @@ syms_of_gtk3wlterm (void)
   DEFSYM (Qfile, "file");
   DEFSYM (Qurl, "url");
 
+  DEFSYM (Qlatin_1, "latin-1");
+
   Fput (Qalt, Qmodifier_value, make_number (alt_modifier));
   Fput (Qhyper, Qmodifier_value, make_number (hyper_modifier));
   Fput (Qmeta, Qmodifier_value, make_number (meta_modifier));
   Fput (Qsuper, Qmodifier_value, make_number (super_modifier));
   Fput (Qcontrol, Qmodifier_value, make_number (ctrl_modifier));
+
+  DEFVAR_LISP ("x-ctrl-keysym", Vx_ctrl_keysym,
+    doc: /* Which keys Emacs uses for the ctrl modifier.
+This should be one of the symbols `ctrl', `alt', `hyper', `meta',
+`super'.  For example, `ctrl' means use the Ctrl_L and Ctrl_R keysyms.
+The default is nil, which is the same as `ctrl'.  */);
+  Vx_ctrl_keysym = Qnil;
+
+  DEFVAR_LISP ("x-alt-keysym", Vx_alt_keysym,
+    doc: /* Which keys Emacs uses for the alt modifier.
+This should be one of the symbols `ctrl', `alt', `hyper', `meta',
+`super'.  For example, `alt' means use the Alt_L and Alt_R keysyms.
+The default is nil, which is the same as `alt'.  */);
+  Vx_alt_keysym = Qnil;
+
+  DEFVAR_LISP ("x-hyper-keysym", Vx_hyper_keysym,
+    doc: /* Which keys Emacs uses for the hyper modifier.
+This should be one of the symbols `ctrl', `alt', `hyper', `meta',
+`super'.  For example, `hyper' means use the Hyper_L and Hyper_R
+keysyms.  The default is nil, which is the same as `hyper'.  */);
+  Vx_hyper_keysym = Qnil;
+
+  DEFVAR_LISP ("x-meta-keysym", Vx_meta_keysym,
+    doc: /* Which keys Emacs uses for the meta modifier.
+This should be one of the symbols `ctrl', `alt', `hyper', `meta',
+`super'.  For example, `meta' means use the Meta_L and Meta_R keysyms.
+The default is nil, which is the same as `meta'.  */);
+  Vx_meta_keysym = Qnil;
+
+  DEFVAR_LISP ("x-super-keysym", Vx_super_keysym,
+    doc: /* Which keys Emacs uses for the super modifier.
+This should be one of the symbols `ctrl', `alt', `hyper', `meta',
+`super'.  For example, `super' means use the Super_L and Super_R
+keysyms.  The default is nil, which is the same as `super'.  */);
+  Vx_super_keysym = Qnil;
 
   /* TODO: move to common code */
   DEFVAR_LISP ("x-toolkit-scroll-bars", Vx_toolkit_scroll_bars,
