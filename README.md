@@ -76,6 +76,6 @@ Many many debugging outputs. Please ignore them.
 
 Commit messages and comments in codes are in Japanese.
 
-## Coding
+## About me
 
 masm11.
