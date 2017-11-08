@@ -10148,11 +10148,6 @@ static void gtk3wl_clear_frame_area(struct frame *f, int x, int y, int width, in
   gtk3wl_clear_area (f, x, y, width, height);
 }
 
-static void gtk3wl_draw_fringe_bitmap(struct window *w, struct glyph_row *row, struct draw_fringe_bitmap_params *p)
-{
-  fprintf(stderr, "draw_fringe_bitmap.\n");
-}
-
 static void gtk3wl_draw_window_cursor(struct window *w,
 			      struct glyph_row *glyph_row,
 			      int x, int y,
@@ -10208,6 +10203,171 @@ gtk3wl_scroll_run (struct window *w, struct run *run)
   unblock_input ();
 }
 
+/* Fringe bitmaps.  */
+
+static int max_fringe_bmp = 0;
+static cairo_pattern_t **fringe_bmp = 0;
+
+static void
+gtk3wl_define_fringe_bitmap (int which, unsigned short *bits, int h, int wd)
+{
+  int i, stride;
+  cairo_surface_t *surface;
+  unsigned char *data;
+  cairo_pattern_t *pattern;
+
+  if (which >= max_fringe_bmp)
+    {
+      i = max_fringe_bmp;
+      max_fringe_bmp = which + 20;
+      fringe_bmp = (cairo_pattern_t **) xrealloc (fringe_bmp, max_fringe_bmp * sizeof (cairo_pattern_t *));
+      while (i < max_fringe_bmp)
+	fringe_bmp[i++] = 0;
+    }
+
+  block_input ();
+
+  surface = cairo_image_surface_create (CAIRO_FORMAT_A1, wd, h);
+  stride = cairo_image_surface_get_stride (surface);
+  data = cairo_image_surface_get_data (surface);
+
+  for (i = 0; i < h; i++)
+    {
+      *((unsigned short *) data) = bits[i];
+      data += stride;
+    }
+
+  cairo_surface_mark_dirty (surface);
+  pattern = cairo_pattern_create_for_surface (surface);
+  cairo_surface_destroy (surface);
+
+  unblock_input ();
+
+  fringe_bmp[which] = pattern;
+}
+
+static void
+gtk3wl_destroy_fringe_bitmap (int which)
+{
+  if (which >= max_fringe_bmp)
+    return;
+
+  if (fringe_bmp[which])
+    {
+      block_input ();
+      cairo_pattern_destroy (fringe_bmp[which]);
+      unblock_input ();
+    }
+  fringe_bmp[which] = 0;
+}
+
+static void
+gtk3wl_clip_to_row (struct window *w, struct glyph_row *row,
+		    enum glyph_row_area area, cairo_t *cr)
+{
+  struct frame *f = XFRAME (WINDOW_FRAME (w));
+  int window_x, window_y, window_width;
+  cairo_rectangle_int_t rect;
+
+  window_box (w, area, &window_x, &window_y, &window_width, 0);
+
+  rect.x = window_x;
+  rect.y = WINDOW_TO_FRAME_PIXEL_Y (w, max (0, row->y));
+  rect.y = max (rect.y, window_y);
+  rect.width = window_width;
+  rect.height = row->visible_height;
+
+  cairo_rectangle(cr, rect.x, rect.y, rect.width, rect.height);
+  cairo_clip(cr);
+}
+
+static void
+gtk3wl_cr_draw_image (struct frame *f, GC gc, cairo_pattern_t *image,
+		 int src_x, int src_y, int width, int height,
+		 int dest_x, int dest_y, bool overlay_p)
+{
+  cairo_t *cr;
+  cairo_matrix_t matrix;
+  cairo_surface_t *surface;
+  cairo_format_t format;
+
+  cr = gtk3wl_begin_cr_clip (f, gc);
+  if (overlay_p)
+    cairo_rectangle (cr, dest_x, dest_y, width, height);
+  else
+    {
+      gtk3wl_set_cr_source_with_gc_background (f, gc);
+      cairo_rectangle (cr, dest_x, dest_y, width, height);
+      cairo_fill_preserve (cr);
+    }
+  cairo_clip (cr);
+  cairo_matrix_init_translate (&matrix, src_x - dest_x, src_y - dest_y);
+  cairo_pattern_set_matrix (image, &matrix);
+  cairo_pattern_get_surface (image, &surface);
+  format = cairo_image_surface_get_format (surface);
+  if (format != CAIRO_FORMAT_A8 && format != CAIRO_FORMAT_A1)
+    {
+      cairo_set_source (cr, image);
+      cairo_fill (cr);
+    }
+  else
+    {
+      gtk3wl_set_cr_source_with_gc_foreground (f, gc);
+      cairo_mask (cr, image);
+    }
+  gtk3wl_end_cr_clip (f);
+}
+
+static void
+gtk3wl_draw_fringe_bitmap (struct window *w, struct glyph_row *row, struct draw_fringe_bitmap_params *p)
+{
+  fprintf(stderr, "draw_fringe_bitmap *********************************************************.\n");
+  abort();
+
+  struct frame *f = XFRAME (WINDOW_FRAME (w));
+  struct face *face = p->face;
+
+  cairo_t *cr = gtk3wl_begin_cr_clip(f, NULL);
+  cairo_save(cr);
+
+  /* Must clip because of partially visible lines.  */
+  gtk3wl_clip_to_row (w, row, ANY_AREA, cr);
+
+  if (p->bx >= 0 && !p->overlay_p)
+    {
+      /* In case the same realized face is used for fringes and
+	 for something displayed in the text (e.g. face `region' on
+	 mono-displays, the fill style may have been changed to
+	 FillSolid in x_draw_glyph_string_background.  */
+#if 0
+      if (face->stipple)
+	XSetFillStyle (display, face->gc, FillOpaqueStippled);
+      else
+#endif
+	gtk3wl_set_cr_source_with_color(f, face->background);
+
+      cairo_rectangle(f, p->bx, p->by, p->nx, p->ny);
+      cairo_fill(cr);
+    }
+
+  if (p->which && p->which < max_fringe_bmp)
+    {
+      XGCValues gcv;
+
+      gcv.foreground = (p->cursor_p
+		       ? (p->overlay_p ? face->background
+			  : f->output_data.gtk3wl->cursor_color)
+		       : face->foreground);
+      gcv.background = face->background;
+      gtk3wl_cr_draw_image (f, &gcv, fringe_bmp[p->which], 0, p->dh,
+		       p->wd, p->h, p->x, p->y, p->overlay_p);
+    }
+
+  cairo_restore(cr);
+}
+
+
+
 extern frame_parm_handler gtk3wl_frame_parm_handlers[];
 
 static struct redisplay_interface gtk3wl_redisplay_interface =
@@ -10226,8 +10386,8 @@ static struct redisplay_interface gtk3wl_redisplay_interface =
   x_get_glyph_overhangs,
   x_fix_overlapping_area,
   gtk3wl_draw_fringe_bitmap,
-  0, /* define_fringe_bitmap */ /* FIXME: simplify gtk3wl_draw_fringe_bitmap */
-  0, /* destroy_fringe_bitmap */
+  gtk3wl_define_fringe_bitmap,
+  gtk3wl_destroy_fringe_bitmap,
   NULL, // gtk3wl_compute_glyph_string_overhangs,
   gtk3wl_draw_glyph_string,
   NULL, // gtk3wl_define_frame_cursor,

@@ -59,9 +59,6 @@ Many many debugging outputs. Please ignore them.
 - other features
   - so many features not supported.
 
-- bugs
-  - when scrolling, segv occurs.
-
 ## My Environment
 
 - archlinux
