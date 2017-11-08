@@ -10162,6 +10162,52 @@ static void gtk3wl_draw_window_cursor(struct window *w,
   fprintf(stderr, "draw_window_cursor.\n");
 }
 
+/* Scroll part of the display as described by RUN.  */
+
+static void
+gtk3wl_scroll_run (struct window *w, struct run *run)
+{
+  struct frame *f = XFRAME (w->frame);
+  int x, y, width, height, from_y, to_y, bottom_y;
+
+  /* Get frame-relative bounding box of the text display area of W,
+     without mode lines.  Include in this box the left and right
+     fringe of W.  */
+  window_box (w, ANY_AREA, &x, &y, &width, &height);
+
+  from_y = WINDOW_TO_FRAME_PIXEL_Y (w, run->current_y);
+  to_y = WINDOW_TO_FRAME_PIXEL_Y (w, run->desired_y);
+  bottom_y = y + height;
+
+  if (to_y < from_y)
+    {
+      /* Scrolling up.  Make sure we don't copy part of the mode
+	 line at the bottom.  */
+      if (from_y + run->height > bottom_y)
+	height = bottom_y - from_y;
+      else
+	height = run->height;
+    }
+  else
+    {
+      /* Scrolling down.  Make sure we don't copy over the mode line.
+	 at the bottom.  */
+      if (to_y + run->height > bottom_y)
+	height = bottom_y - to_y;
+      else
+	height = run->height;
+    }
+
+  block_input ();
+
+  /* Cursor off.  Will be switched on again in x_update_window_end.  */
+  // x_clear_cursor (w);
+
+  SET_FRAME_GARBAGED (f);
+
+  unblock_input ();
+}
+
 extern frame_parm_handler gtk3wl_frame_parm_handlers[];
 
 static struct redisplay_interface gtk3wl_redisplay_interface =
@@ -10171,7 +10217,7 @@ static struct redisplay_interface gtk3wl_redisplay_interface =
   x_write_glyphs,
   x_insert_glyphs,
   x_clear_end_of_line,
-  NULL, // gtk3wl_scroll_run,
+  gtk3wl_scroll_run,
   gtk3wl_after_update_window_line,
   gtk3wl_update_window_begin_hook,
   gtk3wl_update_window_end_hook,
