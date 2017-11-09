@@ -9794,16 +9794,6 @@ gtk3wl_initialize_display_info (struct gtk3wl_display_info *dpyinfo)
     reset_mouse_highlight (&dpyinfo->mouse_highlight);
 }
 
-static void gtk3wl_update_window_begin_hook(struct window *w)
-{
-  fprintf(stderr, "update_window_begin_hook.\n");
-}
-
-static void gtk3wl_update_window_end_hook(struct window *w)
-{
-  fprintf(stderr, "update_window_end_hook.\n");
-}
-
 static void gtk3wl_draw_glyph_string(struct glyph_string *s)
 {
   fprintf(stderr, "draw_glyph_string.\n");
@@ -10203,6 +10193,236 @@ gtk3wl_scroll_run (struct window *w, struct run *run)
   unblock_input ();
 }
 
+/***********************************************************************
+		    Starting and ending an update
+ ***********************************************************************/
+
+/* Start an update of frame F.  This function is installed as a hook
+   for update_begin, i.e. it is called when update_begin is called.
+   This function is called prior to calls to x_update_window_begin for
+   each window being updated.  Currently, there is nothing to do here
+   because all interesting stuff is done on a window basis.  */
+
+static void
+gtk3wl_update_begin (struct frame *f)
+{
+  if (! NILP (tip_frame) && XFRAME (tip_frame) == f
+      && ! FRAME_VISIBLE_P (f))
+    return;
+
+  if (! FRAME_CR_SURFACE (f))
+    {
+      int width, height;
+      if (FRAME_GTK_WIDGET (f))
+        {
+          GdkWindow *w = gtk_widget_get_window (FRAME_GTK_WIDGET (f));
+          width = gdk_window_get_width (w);
+          height = gdk_window_get_height (w);
+        }
+      else
+        {
+          width = FRAME_PIXEL_WIDTH (f);
+          height = FRAME_PIXEL_HEIGHT (f);
+          if (! FRAME_EXTERNAL_TOOL_BAR (f))
+            height += FRAME_TOOL_BAR_HEIGHT (f);
+          if (! FRAME_EXTERNAL_MENU_BAR (f))
+            height += FRAME_MENU_BAR_HEIGHT (f);
+        }
+
+      if (width > 0 && height > 0)
+        {
+          block_input();
+          FRAME_CR_SURFACE (f) = cairo_image_surface_create
+            (CAIRO_FORMAT_ARGB32, width, height);
+          unblock_input();
+        }
+    }
+}
+
+/* Start update of window W.  */
+
+static void
+gtk3wl_update_window_begin (struct window *w)
+{
+  struct frame *f = XFRAME (WINDOW_FRAME (w));
+#if 0
+  Mouse_HLInfo *hlinfo = MOUSE_HL_INFO (f);
+#endif
+
+  w->output_cursor = w->cursor;
+
+  block_input ();
+
+#if 0
+  if (f == hlinfo->mouse_face_mouse_frame)
+    {
+      /* Don't do highlighting for mouse motion during the update.  */
+      hlinfo->mouse_face_defer = true;
+
+      /* If F needs to be redrawn, simply forget about any prior mouse
+	 highlighting.  */
+      if (FRAME_GARBAGED_P (f))
+	hlinfo->mouse_face_window = Qnil;
+    }
+#endif
+
+  unblock_input ();
+}
+
+
+/* Draw a vertical window border from (x,y0) to (x,y1)  */
+
+static void
+gtk3wl_draw_vertical_window_border (struct window *w, int x, int y0, int y1)
+{
+  struct frame *f = XFRAME (WINDOW_FRAME (w));
+  struct face *face;
+  cairo_t *cr;
+
+  cr = gtk3wl_begin_cr_clip (f, NULL);
+
+  face = FACE_FROM_ID_OR_NULL (f, VERTICAL_BORDER_FACE_ID);
+  if (face)
+    gtk3wl_set_cr_source_with_color (f, face->foreground);
+
+  cairo_fill_rectangle (cr, x, y0, 1, y1 - y0);
+
+  gtk3wl_end_cr_clip (f);
+}
+
+/* Draw a window divider from (x0,y0) to (x1,y1)  */
+
+static void
+gtk3wl_draw_window_divider (struct window *w, int x0, int x1, int y0, int y1)
+{
+  struct frame *f = XFRAME (WINDOW_FRAME (w));
+  struct face *face = FACE_FROM_ID_OR_NULL (f, WINDOW_DIVIDER_FACE_ID);
+  struct face *face_first
+    = FACE_FROM_ID_OR_NULL (f, WINDOW_DIVIDER_FIRST_PIXEL_FACE_ID);
+  struct face *face_last
+    = FACE_FROM_ID_OR_NULL (f, WINDOW_DIVIDER_LAST_PIXEL_FACE_ID);
+  unsigned long color = face ? face->foreground : FRAME_FOREGROUND_PIXEL (f);
+  unsigned long color_first = (face_first
+			       ? face_first->foreground
+			       : FRAME_FOREGROUND_PIXEL (f));
+  unsigned long color_last = (face_last
+			      ? face_last->foreground
+			      : FRAME_FOREGROUND_PIXEL (f));
+  cairo_t *cr = gtk3wl_begin_cr_clip (f, NULL);
+
+  if (y1 - y0 > x1 - x0 && x1 - x0 > 2)
+    /* Vertical.  */
+    {
+      gtk3wl_set_cr_source_with_color (f, color_first);
+      cairo_rectangle (cr, x0, y0, 1, y1 - y0);
+      cairo_fill(cr);
+      gtk3wl_set_cr_source_with_color (f, color);
+      cairo_rectangle (cr, x0 + 1, y0, x1 - x0 - 2, y1 - y0);
+      cairo_fill(cr);
+      gtk3wl_set_cr_source_with_color (f, color_last);
+      cairo_rectangle (cr, x1 - 1, y0, 1, y1 - y0);
+      cairo_fill(cr);
+    }
+  else if (x1 - x0 > y1 - y0 && y1 - y0 > 3)
+    /* Horizontal.  */
+    {
+      gtk3wl_set_cr_source_with_color (f, color_first);
+      cairo_rectangle (cr, x0, y0, x1 - x0, 1);
+      cairo_fill(cr);
+      gtk3wl_set_cr_source_with_color (f, color);
+      cairo_rectangle (cr, x0, y0 + 1, x1 - x0, y1 - y0 - 2);
+      cairo_fill(cr);
+      gtk3wl_set_cr_source_with_color (f, color_last);
+      cairo_rectangle (cr, x0, y1 - 1, x1 - x0, 1);
+      cairo_fill(cr);
+    }
+  else
+    {
+      gtk3wl_set_cr_source_with_color (f, color);
+      cairo_rectangle (cr, x0, y0, x1 - x0, y1 - y0);
+      cairo_fill(cr);
+    }
+
+  gtk3wl_end_cr_clip (f);
+}
+
+/* End update of window W.
+
+   Draw vertical borders between horizontally adjacent windows, and
+   display W's cursor if CURSOR_ON_P is non-zero.
+
+   MOUSE_FACE_OVERWRITTEN_P non-zero means that some row containing
+   glyphs in mouse-face were overwritten.  In that case we have to
+   make sure that the mouse-highlight is properly redrawn.
+
+   W may be a menu bar pseudo-window in case we don't have X toolkit
+   support.  Such windows don't have a cursor, so don't display it
+   here.  */
+
+static void
+gtk3wl_update_window_end (struct window *w, bool cursor_on_p,
+		     bool mouse_face_overwritten_p)
+{
+  if (!w->pseudo_window_p)
+    {
+      block_input ();
+
+      if (cursor_on_p)
+	display_and_set_cursor (w, true,
+				w->output_cursor.hpos, w->output_cursor.vpos,
+				w->output_cursor.x, w->output_cursor.y);
+
+      if (draw_window_fringes (w, true))
+	{
+	  if (WINDOW_RIGHT_DIVIDER_WIDTH (w))
+	    x_draw_right_divider (w);
+	  else
+	    x_draw_vertical_border (w);
+	}
+
+      unblock_input ();
+    }
+
+#if 0
+  /* If a row with mouse-face was overwritten, arrange for
+     XTframe_up_to_date to redisplay the mouse highlight.  */
+  if (mouse_face_overwritten_p)
+    {
+      Mouse_HLInfo *hlinfo = MOUSE_HL_INFO (XFRAME (w->frame));
+
+      hlinfo->mouse_face_beg_row = hlinfo->mouse_face_beg_col = -1;
+      hlinfo->mouse_face_end_row = hlinfo->mouse_face_end_col = -1;
+      hlinfo->mouse_face_window = Qnil;
+    }
+#endif
+}
+
+/* End update of frame F.  This function is installed as a hook in
+   update_end.  */
+
+static void
+gtk3wl_update_end (struct frame *f)
+{
+#if 0
+  /* Mouse highlight may be displayed again.  */
+  MOUSE_HL_INFO (f)->mouse_face_defer = false;
+#endif
+
+  if (FRAME_CR_SURFACE (f))
+    {
+      block_input();
+      cairo_t *cr = gtk3wl_begin_cr_clip(f, NULL);
+      cairo_set_source_surface (cr, FRAME_CR_SURFACE (f), 0, 0);
+      cairo_paint (cr);
+      gtk3wl_end_cr_clip(f);
+      unblock_input ();
+    }
+
+  block_input ();
+  gdk_flush();
+  unblock_input ();
+}
+
 /* Fringe bitmaps.  */
 
 static int max_fringe_bmp = 0;
@@ -10291,6 +10511,7 @@ gtk3wl_cr_draw_image (struct frame *f, GC gc, cairo_pattern_t *image,
   cairo_surface_t *surface;
   cairo_format_t format;
 
+  fprintf(stderr, "gtk3wl_cr_draw_image: 0: %d,%d,%d,%d,%d,%d,%d.\n", src_x, src_y, width, height, dest_x, dest_y, overlay_p);
   cr = gtk3wl_begin_cr_clip (f, gc);
   if (overlay_p)
     cairo_rectangle (cr, dest_x, dest_y, width, height);
@@ -10316,13 +10537,13 @@ gtk3wl_cr_draw_image (struct frame *f, GC gc, cairo_pattern_t *image,
       cairo_mask (cr, image);
     }
   gtk3wl_end_cr_clip (f);
+  fprintf(stderr, "gtk3wl_cr_draw_image: 9.\n");
 }
 
 static void
 gtk3wl_draw_fringe_bitmap (struct window *w, struct glyph_row *row, struct draw_fringe_bitmap_params *p)
 {
-  fprintf(stderr, "draw_fringe_bitmap *********************************************************.\n");
-  abort();
+  fprintf(stderr, "draw_fringe_bitmap.\n");
 
   struct frame *f = XFRAME (WINDOW_FRAME (w));
   struct face *face = p->face;
@@ -10350,14 +10571,19 @@ gtk3wl_draw_fringe_bitmap (struct window *w, struct glyph_row *row, struct draw_
       cairo_fill(cr);
     }
 
+  fprintf(stderr, "which: %d, max_fringe_bmp: %d.\n", p->which, max_fringe_bmp);
   if (p->which && p->which < max_fringe_bmp)
     {
       XGCValues gcv;
 
+#if 1
       gcv.foreground = (p->cursor_p
 		       ? (p->overlay_p ? face->background
 			  : f->output_data.gtk3wl->cursor_color)
 		       : face->foreground);
+#else
+      gcv.foreground = 0xffffffff;
+#endif
       gcv.background = face->background;
       gtk3wl_cr_draw_image (f, &gcv, fringe_bmp[p->which], 0, p->dh,
 		       p->wd, p->h, p->x, p->y, p->overlay_p);
@@ -10379,8 +10605,8 @@ static struct redisplay_interface gtk3wl_redisplay_interface =
   x_clear_end_of_line,
   gtk3wl_scroll_run,
   gtk3wl_after_update_window_line,
-  gtk3wl_update_window_begin_hook,
-  gtk3wl_update_window_end_hook,
+  gtk3wl_update_window_begin,
+  gtk3wl_update_window_end,
   0, /* flush_display */
   x_clear_window_mouse_face,
   x_get_glyph_overhangs,
@@ -10542,8 +10768,8 @@ gtk3wl_create_terminal (struct gtk3wl_display_info *dpyinfo)
 
   terminal->clear_frame_hook = gtk3wl_clear_frame;
   // terminal->ring_bell_hook = gtk3wl_ring_bell;
-  // terminal->update_begin_hook = gtk3wl_update_begin;
-  // terminal->update_end_hook = gtk3wl_update_end;
+  terminal->update_begin_hook = gtk3wl_update_begin;
+  terminal->update_end_hook = gtk3wl_update_end;
   terminal->read_socket_hook = gtk3wl_read_socket;
   // terminal->frame_up_to_date_hook = gtk3wl_frame_up_to_date;
   // terminal->mouse_position_hook = gtk3wl_mouse_position;
@@ -12607,6 +12833,8 @@ gtk3wl_term_init (Lisp_Object display_name)
   if (gtk3wl_initialized) return x_display_list;
   gtk3wl_initialized = 1;
 
+  x_cr_init_fringe(&gtk3wl_redisplay_interface);
+
   {
 #define NUM_ARGV 10
     int argc;
@@ -13041,7 +13269,7 @@ gtk3wl_end_cr_clip (struct frame *f)
 void
 gtk3wl_set_cr_source_with_gc_foreground (struct frame *f, XGCValues *gc)
 {
-  fprintf(stderr, "gtk3wl_set_cr_source_with_gc_foreground\n");
+  fprintf(stderr, "gtk3wl_set_cr_source_with_gc_foreground: %08x\n", gc->foreground);
   gtk3wl_set_cr_source_with_color(f, gc->foreground);
 }
 
