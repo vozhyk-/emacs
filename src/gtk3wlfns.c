@@ -2321,12 +2321,8 @@ DEFUN ("xw-color-defined-p", Fxw_color_defined_p, Sxw_color_defined_p, 1, 2, 0,
 \(Note that the Nextstep version of this function ignores FRAME.)  */)
      (Lisp_Object color, Lisp_Object frame)
 {
-#if 0
-  NSColor * col;
-  check_window_system (NULL);
+  XColor col;
   return gtk3wl_lisp_to_color (color, &col) ? Qnil : Qt;
-#endif
-  return Qnil;
 }
 
 
@@ -2334,27 +2330,21 @@ DEFUN ("xw-color-values", Fxw_color_values, Sxw_color_values, 1, 2, 0,
        doc: /* Internal function called by `color-values', which see.  */)
      (Lisp_Object color, Lisp_Object frame)
 {
-#if 0
-  NSColor * col;
-  EmacsCGFloat red, green, blue, alpha;
+  XColor col;
 
-  check_window_system (NULL);
   CHECK_STRING (color);
 
   block_input ();
+
   if (gtk3wl_lisp_to_color (color, &col))
     {
       unblock_input ();
       return Qnil;
     }
 
-  [[col colorUsingDefaultColorSpace]
-        getRed: &red green: &green blue: &blue alpha: &alpha];
   unblock_input ();
-  return list3i (lrint (red * 65280), lrint (green * 65280),
-		 lrint (blue * 65280));
-#endif
-  return Qnil;
+
+  return list3i (col.red, col.green, col.blue);
 }
 
 
@@ -2374,7 +2364,7 @@ DEFUN ("xw-display-color-p", Fxw_display_color_p, Sxw_display_color_p, 0, 1, 0,
          || [colorSpace isEqualToString: NSCalibratedWhiteColorSpace]
       ? Qnil : Qt;
 #endif
-  return Qnil;
+  return Qt;
 }
 
 
@@ -2387,14 +2377,6 @@ TERMINAL should be a terminal object, a frame or a display name (a string).
 If omitted or nil, that stands for the selected frame's display.  */)
   (Lisp_Object terminal)
 {
-#if 0
-  GTK3WLWindowDepth depth;
-
-  check_gtk3wl_display_info (terminal);
-  depth = [[[NSScreen screens] objectAtIndex:0] depth];
-
-  return NSBitsPerPixelFromDepth (depth) > 1 ? Qt : Qnil;
-#endif
   return Qnil;
 }
 
