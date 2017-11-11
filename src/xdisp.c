@@ -11483,8 +11483,12 @@ clear_garbaged_frames (void)
 	      else
 		clear_current_matrices (f);
 
-#if defined (HAVE_WINDOW_SYSTEM) && !defined (HAVE_NS) && !defined(HAVE_GTK3WL)
+#if defined (HAVE_WINDOW_SYSTEM) && !defined (HAVE_NS)
+#ifndef HAVE_GTK3WL
 	      x_clear_under_internal_border (f);
+#else
+	      gtk3wl_clear_under_internal_border (f);
+#endif
 #endif /* HAVE_WINDOW_SYSTEM && !HAVE_NS */
 
 	      fset_redisplay (f);
@@ -11553,8 +11557,12 @@ echo_area_display (bool update_frame_p)
 	    {
 	      n = redisplay_mode_lines (FRAME_ROOT_WINDOW (f), false);
 
-#if defined (HAVE_WINDOW_SYSTEM) && !defined (HAVE_NS) && !defined(HAVE_GTK3WL)
+#if defined (HAVE_WINDOW_SYSTEM) && !defined (HAVE_NS)
+#ifndef HAVE_GTK3WL
 	      x_clear_under_internal_border (f);
+#else
+	      gtk3wl_clear_under_internal_border (f);
+#endif
 #endif /* HAVE_WINDOW_SYSTEM && !HAVE_NS */
 
 	    }
@@ -14348,8 +14356,12 @@ redisplay_internal (void)
 		      && garbaged_frame_retries++ < MAX_GARBAGED_FRAME_RETRIES)
                     goto retry;
 
-#if defined (HAVE_WINDOW_SYSTEM) && !defined (HAVE_NS) && !defined(HAVE_GTK3WL)
+#if defined (HAVE_WINDOW_SYSTEM) && !defined (HAVE_NS)
+#ifndef HAVE_GTK3WL
 		  x_clear_under_internal_border (f);
+#else
+		  gtk3wl_clear_under_internal_border (f);
+#endif
 #endif /* HAVE_WINDOW_SYSTEM && !HAVE_NS */
 
 		  /* Prevent various kinds of signals during display

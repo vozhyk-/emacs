@@ -10142,6 +10142,7 @@ static void gtk3wl_after_update_window_line(struct window *w, struct glyph_row *
   if (!desired_row->mode_line_p && !w->pseudo_window_p)
     desired_row->redraw_fringe_bitmaps_p = 1;
 
+#if 0
   /* When a window has disappeared, make sure that no rest of
      full-width rows stays visible in the internal border.  */
   if (windows_or_buffers_changed
@@ -10161,6 +10162,7 @@ static void gtk3wl_after_update_window_line(struct window *w, struct glyph_row *
 			       y, width, height);
       unblock_input ();
     }
+#endif
 }
 
 static void gtk3wl_clear_frame_area(struct frame *f, int x, int y, int width, int height)
@@ -13110,7 +13112,7 @@ int gtk3wl_parse_color (const char *color_name, XColor *color)
     color->green = rgba.green * 65535;
     color->blue = rgba.blue * 65535;
     color->pixel =
-      0xff << 24 |
+      (unsigned long) 0xff << 24 |
       (color->red >> 8) << 16 |
       (color->green >> 8) << 8 |
       (color->blue >> 8) << 0;
@@ -13165,13 +13167,17 @@ gtk3wl_query_color (struct frame *f, XColor *color)
 void
 gtk3wl_clear_area (struct frame *f, int x, int y, int width, int height)
 {
-  GTK3WL_TRACE("gtk3wl_clear_area");
+  GTK3WL_TRACE("gtk3wl_clear_area: %dx%d+%d+%d.", width, height, x, y);
   cairo_t *cr;
 
   eassert (width > 0 && height > 0);
 
   cr = gtk3wl_begin_cr_clip (f, NULL);
   GTK3WL_TRACE("back color %08lx.", (unsigned long) f->output_data.gtk3wl->background_color);
+#if 0
+  if (f->output_data.gtk3wl->background_color == (unsigned long) 0xff262829)
+    abort();
+#endif
   gtk3wl_set_cr_source_with_color (f, f->output_data.gtk3wl->background_color);
   cairo_rectangle (cr, x, y, width, height);
   cairo_fill (cr);
@@ -13318,31 +13324,27 @@ gtk3wl_end_cr_clip (struct frame *f)
   cairo_restore (FRAME_CR_CONTEXT (f));
 
   GtkWidget *widget = FRAME_GTK_WIDGET(f);
-  GdkWindow *win = gtk_widget_get_window(widget);
-  if (win != NULL) {
-    cairo_region_t *region = gdk_window_get_clip_region(win);
-    gdk_window_invalidate_region(win, region, FALSE);
-  }
+  gtk_widget_queue_draw(widget);
 }
 
 void
 gtk3wl_set_cr_source_with_gc_foreground (struct frame *f, XGCValues *gc)
 {
-  GTK3WL_TRACE("gtk3wl_set_cr_source_with_gc_foreground: %08x", gc->foreground);
+  GTK3WL_TRACE("gtk3wl_set_cr_source_with_gc_foreground: %08lx", gc->foreground);
   gtk3wl_set_cr_source_with_color(f, gc->foreground);
 }
 
 void
 gtk3wl_set_cr_source_with_gc_background (struct frame *f, XGCValues *gc)
 {
-  GTK3WL_TRACE("gtk3wl_set_cr_source_with_gc_background: %08x", gc->background);
+  GTK3WL_TRACE("gtk3wl_set_cr_source_with_gc_background: %08lx", gc->background);
   gtk3wl_set_cr_source_with_color(f, gc->background);
 }
 
 void
 gtk3wl_set_cr_source_with_color (struct frame *f, unsigned long color)
 {
-  GTK3WL_TRACE("gtk3wl_set_cr_source_with_color");
+  GTK3WL_TRACE("gtk3wl_set_cr_source_with_color: %08lx.", color);
   XColor col;
   col.pixel = color;
   gtk3wl_query_color(f, &col);

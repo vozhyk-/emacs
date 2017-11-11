@@ -281,11 +281,17 @@ x_set_background_color (struct frame *f, Lisp_Object arg, Lisp_Object oldval)
   if (FRAME_VISIBLE_P (f))
     gtk3wl_clear_frame (f);
 
+  GTK3WL_TRACE("x_set_background_color: col.pixel=%08lx.", col.pixel);
   f->output_data.gtk3wl->background_color = col.pixel;
+#if 0
+  if (col.pixel == (unsigned long) 0xff262829)
+    abort();
+#endif
 
   xg_set_background_color(f, col.pixel);
   update_face_from_frame_parameter (f, Qbackground_color, arg);
 
+  GTK3WL_TRACE("visible_p=%d.", FRAME_VISIBLE_P(f));
   if (FRAME_VISIBLE_P (f))
     SET_FRAME_GARBAGED (f);
 

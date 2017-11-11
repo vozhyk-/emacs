@@ -989,7 +989,11 @@ xg_frame_set_char_size (struct frame *f, int width, int height)
 		       &gwidth, &gheight);
 
   /* Do this before resize, as we don't know yet if we will be resized.  */
+#ifndef HAVE_GTK3WL
   x_clear_under_internal_border (f);
+#else
+  gtk3wl_clear_under_internal_border (f);
+#endif
 
   totalheight /= xg_get_scale (f);
   totalwidth /= xg_get_scale (f);

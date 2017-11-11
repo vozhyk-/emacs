@@ -230,9 +230,9 @@ struct gtk3wl_output
 {
   void *view;
   void *miniimage;
-  void *cursor_color;
-  void *foreground_color;
-  void *background_color;
+  unsigned long cursor_color;
+  unsigned long foreground_color;
+  unsigned long background_color;
   void *toolbar;
 
   /* GTK3WLCursors init'ed in initFrameFromEmacs */
@@ -661,5 +661,8 @@ extern char gnustep_base_version[];  /* version tracking */
 #define IN_BOUND(min, x, max) (((x) < (min)) \
                                 ? (min) : (((x)>(max)) ? (max) : (x)))
 #define SCREENMAXBOUND(x) (IN_BOUND (-SCREENMAX, x, SCREENMAX))
+
+extern void
+gtk3wl_clear_under_internal_border (struct frame *f);
 
 #endif	/* HAVE_GTK3WL */
