@@ -658,6 +658,7 @@ adjust_frame_size (struct frame *f, int new_width, int new_height, int inhibit,
 
       x_set_window_size (f, 0, new_text_width, new_text_height, 1);
       f->resized_p = true;
+      GTK3WL_TRACE("resized_p = TRUE.");
 
       GTK3WL_TRACE("inhibited.");
       return;
@@ -768,6 +769,7 @@ adjust_frame_size (struct frame *f, int new_width, int new_height, int inhibit,
      X window wasn't resized at all.  */
   f->resized_p = (new_pixel_width != old_pixel_width
 		  || new_pixel_height != old_pixel_height);
+  GTK3WL_TRACE("resized_p = %d.", f->resized_p);
 
   unblock_input ();
 

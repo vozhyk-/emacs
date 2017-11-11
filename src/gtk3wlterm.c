@@ -9229,6 +9229,8 @@ static int selfds[2] = { -1, -1 };
 static pthread_mutex_t select_mutex;
 static fd_set select_readfds, select_writefds;
 
+static void gtk3wl_clear_frame_area(struct frame *f, int x, int y, int width, int height);
+
 char *
 x_get_keysym_name (int keysym)
 /* --------------------------------------------------------------------------
@@ -10130,6 +10132,35 @@ static void gtk3wl_draw_glyph_string(struct glyph_string *s)
 static void gtk3wl_after_update_window_line(struct window *w, struct glyph_row *desired_row)
 {
   GTK3WL_TRACE("after_update_window_line.");
+
+  struct frame *f;
+  int width, height;
+
+  /* begin copy from other terms */
+  eassert (w);
+
+  if (!desired_row->mode_line_p && !w->pseudo_window_p)
+    desired_row->redraw_fringe_bitmaps_p = 1;
+
+  /* When a window has disappeared, make sure that no rest of
+     full-width rows stays visible in the internal border.  */
+  if (windows_or_buffers_changed
+      && desired_row->full_width_p
+      && (f = XFRAME (w->frame),
+	  width = FRAME_INTERNAL_BORDER_WIDTH (f),
+	  width != 0)
+      && (height = desired_row->visible_height,
+	  height > 0))
+    {
+      int y = WINDOW_TO_FRAME_PIXEL_Y (w, max (0, desired_row->y));
+
+      block_input ();
+      gtk3wl_clear_frame_area (f, 0, y, width, height);
+      gtk3wl_clear_frame_area (f,
+			       FRAME_PIXEL_WIDTH (f) - width,
+			       y, width, height);
+      unblock_input ();
+    }
 }
 
 static void gtk3wl_clear_frame_area(struct frame *f, int x, int y, int width, int height)
@@ -12375,9 +12406,14 @@ gtk3wl_handle_draw(GtkWidget *widget, cairo_t *cr, gpointer *data)
     }
 #endif
 
+    GTK3WL_TRACE("  win=%p", win);
     if (win != NULL) {
       f = gtk3wl_any_window_to_frame(win);
+      GTK3WL_TRACE("  f=%p", f);
+      GTK3WL_TRACE("  surface=%p", f ? FRAME_CR_SURFACE(f) : NULL);
       if (f != NULL && FRAME_CR_SURFACE(f) != NULL) {
+	GTK3WL_TRACE("  resized_p=%d", f->resized_p);
+	GTK3WL_TRACE("  garbaged=%d", f->garbaged);
 	cairo_set_source_surface(cr, FRAME_CR_SURFACE(f), 0, 0);
 	cairo_paint(cr);
       }
@@ -12393,10 +12429,13 @@ gtk3wl_handle_draw(GtkWidget *widget, cairo_t *cr, gpointer *data)
     return TRUE;
   }
   f = gtk3wl_any_window_to_frame(win);
+  GTK3WL_TRACE(" f=%p", f);
 
   if (f)
     {
       GTK3WL_TRACE("f != NULL");
+      GTK3WL_TRACE("  resized_p=%d\n", f->resized_p);
+      GTK3WL_TRACE("  garbaged=%d\n", f->garbaged);
       if (!FRAME_VISIBLE_P (f))
 	{
 	  GTK3WL_TRACE("not visible");

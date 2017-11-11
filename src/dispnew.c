@@ -2397,6 +2397,7 @@ build_frame_matrix_from_leaf_window (struct glyph_matrix *frame_matrix, struct w
   SET_GLYPH_FROM_CHAR (right_border_glyph, 0);
 
   /* Set window_matrix to the matrix we have to add to FRAME_MATRIX.  */
+  GTK3WL_TRACE("must_be_updated_p=%d", w->must_be_updated_p);
   if (w->must_be_updated_p)
     {
       window_matrix = w->desired_matrix;
@@ -3215,6 +3216,7 @@ update_window_tree (struct window *w, bool force_p)
 
   while (w && !paused_p)
     {
+      GTK3WL_TRACE("must_be_updated_p=%d", w->must_be_updated_p);
       if (WINDOWP (w->contents))
 	paused_p |= update_window_tree (XWINDOW (w->contents), force_p);
       else if (w->must_be_updated_p)
@@ -3233,6 +3235,7 @@ update_window_tree (struct window *w, bool force_p)
 void
 update_single_window (struct window *w)
 {
+  GTK3WL_TRACE("must_be_updated_p=%d", w->must_be_updated_p);
   if (w->must_be_updated_p)
     {
       struct frame *f = XFRAME (WINDOW_FRAME (w));
@@ -3971,6 +3974,7 @@ set_window_update_flags (struct window *w, bool on_p)
       if (WINDOWP (w->contents))
 	set_window_update_flags (XWINDOW (w->contents), on_p);
       else
+	GTK3WL_TRACE("must_be_updated_p= set %d.", on_p),
 	w->must_be_updated_p = on_p;
 
       w = NILP (w->next) ? 0 : XWINDOW (w->next);

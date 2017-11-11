@@ -11471,6 +11471,7 @@ clear_garbaged_frames (void)
 
 	  if (FRAME_VISIBLE_P (f) && FRAME_GARBAGED_P (f))
 	    {
+	      GTK3WL_TRACE("resized_p = %d.", f->resized_p);
 	      if (f->resized_p
 		  /* It makes no sense to redraw a non-selected TTY
 		     frame, since that will actually clear the
@@ -11489,6 +11490,7 @@ clear_garbaged_frames (void)
 	      fset_redisplay (f);
 	      f->garbaged = false;
 	      f->resized_p = false;
+	      GTK3WL_TRACE("resized_p = FALSE.");
             }
 	}
 
