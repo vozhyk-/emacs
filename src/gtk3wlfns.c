@@ -3269,3 +3269,24 @@ When using Gtk+ tooltips, the tooltip face is not used.  */);
   DEFSYM (Qreverse_landscape, "reverse-landscape");
 #endif
 }
+
+#include <stdarg.h>
+#include <time.h>
+void gtk3wl_log(const char *file, int lineno, const char *fmt, ...)
+{
+  struct timespec ts;
+  struct tm tm;
+  char timestr[32];
+  va_list ap;
+
+  clock_gettime(CLOCK_REALTIME, &ts);
+
+  localtime_r(&ts.tv_sec, &tm);
+  strftime(timestr, sizeof timestr, "%H:%M:%S", &tm);
+
+  fprintf(stderr, "%s %.10s:%04d ", timestr, file, lineno);
+  va_start(ap, fmt);
+  vfprintf(stderr, fmt, ap);
+  va_end(ap);
+  fputc('\n', stderr);
+}

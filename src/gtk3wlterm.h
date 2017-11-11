@@ -28,6 +28,9 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 
 #include <gtk/gtk.h>
 
+extern void gtk3wl_log(const char *file, int lineno, const char *fmt, ...);
+#define GTK3WL_TRACE(fmt, ...) gtk3wl_log(__FILE__, __LINE__, fmt, ## __VA_ARGS__)
+
 /* could use list to store these, but rest of emacs has a big infrastructure
    for managing a table of bitmap "records" */
 struct gtk3wl_bitmap_record

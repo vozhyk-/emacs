@@ -941,15 +941,15 @@ xg_frame_resized (struct frame *f, int pixelwidth, int pixelheight)
 
   width = FRAME_PIXEL_TO_TEXT_WIDTH (f, pixelwidth);
   height = FRAME_PIXEL_TO_TEXT_HEIGHT (f, pixelheight);
-  fprintf(stderr, "xg_frame_resized: pixel: %dx%d, text: %dx%d\n", pixelwidth, pixelheight, width, height);
+  GTK3WL_TRACE("xg_frame_resized: pixel: %dx%d, text: %dx%d", pixelwidth, pixelheight, width, height);
 
   frame_size_history_add
     (f, Qxg_frame_resized, width, height, Qnil);
 
-  fprintf(stderr, "width: %d -> %d.\n", FRAME_TEXT_WIDTH(f), width);
-  fprintf(stderr, "height: %d -> %d.\n", FRAME_TEXT_HEIGHT(f), height);
-  fprintf(stderr, "pixelwidth: %d -> %d.\n", FRAME_PIXEL_WIDTH(f), pixelwidth);
-  fprintf(stderr, "pixelheight: %d -> %d.\n", FRAME_PIXEL_HEIGHT(f), pixelheight);
+  GTK3WL_TRACE("width: %d -> %d.", FRAME_TEXT_WIDTH(f), width);
+  GTK3WL_TRACE("height: %d -> %d.", FRAME_TEXT_HEIGHT(f), height);
+  GTK3WL_TRACE("pixelwidth: %d -> %d.", FRAME_PIXEL_WIDTH(f), pixelwidth);
+  GTK3WL_TRACE("pixelheight: %d -> %d.", FRAME_PIXEL_HEIGHT(f), pixelheight);
 
   if (width != FRAME_TEXT_WIDTH (f)
       || height != FRAME_TEXT_HEIGHT (f)
@@ -1217,7 +1217,7 @@ xg_create_frame_widgets (struct frame *f)
 #endif
   char *title = 0;
 
-  fprintf(stderr, "xg_create_frame_widgets.\n");
+  GTK3WL_TRACE("xg_create_frame_widgets.");
   block_input ();
 
 #ifndef HAVE_GTK3WL  // gtk_plug not found.

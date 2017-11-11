@@ -9236,7 +9236,7 @@ x_get_keysym_name (int keysym)
     that it be unique.
    -------------------------------------------------------------------------- */
 {
-  fprintf(stderr, "x_get_ksysym_name\n");
+  GTK3WL_TRACE("x_get_ksysym_name");
   static char value[16];
   sprintf (value, "%d", keysym);
   return value;
@@ -9248,7 +9248,7 @@ frame_set_mouse_pixel_position (struct frame *f, int pix_x, int pix_y)
      Programmatically reposition mouse pointer in pixel coordinates
    -------------------------------------------------------------------------- */
 {
-  fprintf(stderr, "frame_set_mouse_pixel_position\n");
+  GTK3WL_TRACE("frame_set_mouse_pixel_position");
 }
 
 void
@@ -9257,7 +9257,7 @@ x_set_offset (struct frame *f, int xoff, int yoff, int change_grav)
      External: Position the window
    -------------------------------------------------------------------------- */
 {
-  fprintf(stderr, "x_set_offset\n");
+  GTK3WL_TRACE("x_set_offset");
 #if 0
   NSView *view = FRAME_NS_VIEW (f);
   NSArray *screens = [NSScreen screens];
@@ -9318,13 +9318,13 @@ x_set_window_size (struct frame *f,
      internal clipping.
    -------------------------------------------------------------------------- */
 {
-  fprintf(stderr, "x_set_window_size(%dx%d, %s)\n", width, height, pixelwise ? "pixel" : "char");
+  GTK3WL_TRACE("x_set_window_size(%dx%d, %s)", width, height, pixelwise ? "pixel" : "char");
   int pixelwidth, pixelheight;
 
   block_input ();
 
   gtk_widget_get_size_request(FRAME_GTK_WIDGET(f), &pixelwidth, &pixelheight);
-  fprintf(stderr, "old: %dx%d\n", pixelwidth, pixelheight);
+  GTK3WL_TRACE("old: %dx%d", pixelwidth, pixelheight);
 
   if (pixelwise)
     {
@@ -9345,15 +9345,15 @@ x_set_window_size (struct frame *f,
 	    make_number (FRAME_GTK3WL_TITLEBAR_HEIGHT (f)),
 	    make_number (FRAME_TOOLBAR_HEIGHT (f))));
 
-  fprintf(stderr, "new: %dx%d\n", pixelwidth, pixelheight);
+  GTK3WL_TRACE("new: %dx%d", pixelwidth, pixelheight);
   for (GtkWidget *w = FRAME_GTK_WIDGET(f); w != NULL; w = gtk_widget_get_parent(w)) {
-    fprintf(stderr, "%p %s %d %d", w, G_OBJECT_TYPE_NAME(w), gtk_widget_get_mapped(w), gtk_widget_get_visible(w));
+    GTK3WL_TRACE("%p %s %d %d", w, G_OBJECT_TYPE_NAME(w), gtk_widget_get_mapped(w), gtk_widget_get_visible(w));
     gint wd, hi;
     gtk_widget_get_size_request(w, &wd, &hi);
-    fprintf(stderr, " %dx%d", wd, hi);
+    GTK3WL_TRACE(" %dx%d", wd, hi);
     GtkAllocation alloc;
     gtk_widget_get_allocation(w, &alloc);
-    fprintf(stderr, " %dx%d+%d+%d\n", alloc.width, alloc.height, alloc.x, alloc.y);
+    GTK3WL_TRACE(" %dx%d+%d+%d", alloc.width, alloc.height, alloc.x, alloc.y);
   }
 
 #if 0
@@ -9426,7 +9426,7 @@ x_iconify_frame (struct frame *f)
      External: Iconify window
    -------------------------------------------------------------------------- */
 {
-  fprintf(stderr, "x_iconify_frame\n");
+  GTK3WL_TRACE("x_iconify_frame");
 #if 0
   NSView *view;
   struct ns_display_info *dpyinfo;
@@ -9466,7 +9466,7 @@ x_make_frame_visible (struct frame *f)
      External: Show the window (X11 semantics)
    -------------------------------------------------------------------------- */
 {
-  fprintf(stderr, "x_make_frame_visible\n");
+  GTK3WL_TRACE("x_make_frame_visible");
 #if 0
   NSTRACE ("x_make_frame_visible");
   /* XXX: at some points in past this was not needed, as the only place that
@@ -9520,7 +9520,7 @@ x_make_frame_invisible (struct frame *f)
      External: Hide the window (X11 semantics)
    -------------------------------------------------------------------------- */
 {
-  fprintf(stderr, "x_make_frame_invisible\n");
+  GTK3WL_TRACE("x_make_frame_invisible");
 #if 0
   NSView *view;
   NSTRACE ("x_make_frame_invisible");
@@ -9535,7 +9535,7 @@ x_make_frame_invisible (struct frame *f)
 Lisp_Object
 x_new_font (struct frame *f, Lisp_Object font_object, int fontset)
 {
-  fprintf(stderr, "x_new_font\n");
+  GTK3WL_TRACE("x_new_font");
   struct font *font = XFONT_OBJECT (font_object);
   // EmacsView *view = FRAME_NS_VIEW (f);
   int font_ascent, font_descent;
@@ -9547,28 +9547,28 @@ x_new_font (struct frame *f, Lisp_Object font_object, int fontset)
   if (FRAME_FONT (f) == font) {
     /* This font is already set in frame F.  There's nothing more to
        do.  */
-    fprintf(stderr, "already set.\n");
+    GTK3WL_TRACE("already set.");
     return font_object;
   }
 
   FRAME_FONT (f) = font;
-  fprintf(stderr, "font:\n");
-  fprintf(stderr, "  %p\n", font);
-  fprintf(stderr, "  name: %s\n", SSDATA(font_get_name(font_object)));
-  fprintf(stderr, "  width: %d..%d\n", font->min_width, font->max_width);
-  fprintf(stderr, "  pixel_size: %d\n", font->pixel_size);
-  fprintf(stderr, "  height: %d\n", font->height);
-  fprintf(stderr, "  space_width: %d\n", font->space_width);
-  fprintf(stderr, "  average_width: %d\n", font->average_width);
-  fprintf(stderr, "  asc/desc: %d,%d\n", font->ascent, font->descent);
-  fprintf(stderr, "  ul thickness: %d\n", font->underline_thickness);
-  fprintf(stderr, "  ul position: %d\n", font->underline_position);
-  fprintf(stderr, "  vertical_centering: %d\n", font->vertical_centering);
-  fprintf(stderr, "  baseline_offset: %d\n", font->baseline_offset);
-  fprintf(stderr, "  relative_compose: %d\n", font->relative_compose);
-  fprintf(stderr, "  default_ascent: %d\n", font->default_ascent);
-  fprintf(stderr, "  encoding_charset: %d\n", font->encoding_charset);
-  fprintf(stderr, "  repertory_charset: %d\n", font->repertory_charset);
+  GTK3WL_TRACE("font:");
+  GTK3WL_TRACE("  %p", font);
+  GTK3WL_TRACE("  name: %s", SSDATA(font_get_name(font_object)));
+  GTK3WL_TRACE("  width: %d..%d", font->min_width, font->max_width);
+  GTK3WL_TRACE("  pixel_size: %d", font->pixel_size);
+  GTK3WL_TRACE("  height: %d", font->height);
+  GTK3WL_TRACE("  space_width: %d", font->space_width);
+  GTK3WL_TRACE("  average_width: %d", font->average_width);
+  GTK3WL_TRACE("  asc/desc: %d,%d", font->ascent, font->descent);
+  GTK3WL_TRACE("  ul thickness: %d", font->underline_thickness);
+  GTK3WL_TRACE("  ul position: %d", font->underline_position);
+  GTK3WL_TRACE("  vertical_centering: %d", font->vertical_centering);
+  GTK3WL_TRACE("  baseline_offset: %d", font->baseline_offset);
+  GTK3WL_TRACE("  relative_compose: %d", font->relative_compose);
+  GTK3WL_TRACE("  default_ascent: %d", font->default_ascent);
+  GTK3WL_TRACE("  encoding_charset: %d", font->encoding_charset);
+  GTK3WL_TRACE("  repertory_charset: %d", font->repertory_charset);
 
   FRAME_BASELINE_OFFSET (f) = font->baseline_offset;
   FRAME_COLUMN_WIDTH (f) = font->average_width;
@@ -9607,29 +9607,29 @@ x_new_font (struct frame *f, Lisp_Object font_object, int fontset)
 		       FRAME_LINES (f) * FRAME_LINE_HEIGHT (f), 3,
 		       false, Qfont);
 
-  fprintf(stderr, "set new.\n");
+  GTK3WL_TRACE("set new.");
   return font_object;
 }
 
 int
 x_display_pixel_height (struct gtk3wl_display_info *dpyinfo)
 {
-  fprintf(stderr, "x_display_pixel_height\n");
+  GTK3WL_TRACE("x_display_pixel_height");
 
   GdkDisplay *dpy = gdk_display_get_default();
   GdkScreen *scr = gdk_display_get_default_screen(dpy);
-  fprintf(stderr, " = %d\n", gdk_screen_get_height(scr));
+  GTK3WL_TRACE(" = %d", gdk_screen_get_height(scr));
   return gdk_screen_get_height(scr);
 }
 
 int
 x_display_pixel_width (struct gtk3wl_display_info *dpyinfo)
 {
-  fprintf(stderr, "x_display_pixel_width\n");
+  GTK3WL_TRACE("x_display_pixel_width");
 
   GdkDisplay *dpy = gdk_display_get_default();
   GdkScreen *scr = gdk_display_get_default_screen(dpy);
-  fprintf(stderr, " = %d\n", gdk_screen_get_width(scr));
+  GTK3WL_TRACE(" = %d", gdk_screen_get_width(scr));
   return gdk_screen_get_width(scr);
 }
 
@@ -9657,7 +9657,7 @@ x_set_parent_frame (struct frame *f, Lisp_Object new_value, Lisp_Object old_valu
      Some window managers may not honor this parameter.
    -------------------------------------------------------------------------- */
 {
-  fprintf(stderr, "x_set_parent_frame\n");
+  GTK3WL_TRACE("x_set_parent_frame");
 #if 0
   struct frame *p = NULL;
   NSWindow *parent, *child;
@@ -9698,7 +9698,7 @@ x_set_no_focus_on_map (struct frame *f, Lisp_Object new_value, Lisp_Object old_v
  *
  * Some window managers may not honor this parameter. */
 {
-  fprintf(stderr, "x_set_no_accept_focus_on_map\n");
+  GTK3WL_TRACE("x_set_no_accept_focus_on_map");
 #if 0
   NSTRACE ("x_set_no_focus_on_map");
 
@@ -9720,7 +9720,7 @@ x_set_no_accept_focus (struct frame *f, Lisp_Object new_value, Lisp_Object old_v
  *
  * Some window managers may not honor this parameter. */
 {
-  fprintf(stderr, "x_set_no_accept_focus\n");
+  GTK3WL_TRACE("x_set_no_accept_focus");
 #if 0
   NSTRACE ("x_set_no_accept_focus");
 
@@ -9740,7 +9740,7 @@ x_set_z_group (struct frame *f, Lisp_Object new_value, Lisp_Object old_value)
 
    Some window managers may not honor this parameter. */
 {
-  fprintf(stderr, "x_set_z_group\n");
+  GTK3WL_TRACE("x_set_z_group");
 #if 0
   EmacsView *view = (EmacsView *)FRAME_NS_VIEW (f);
   NSWindow *window = [view window];
@@ -9796,23 +9796,23 @@ gtk3wl_initialize_display_info (struct gtk3wl_display_info *dpyinfo)
 
 static void gtk3wl_draw_glyph_string(struct glyph_string *s)
 {
-  fprintf(stderr, "draw_glyph_string.\n");
+  GTK3WL_TRACE("draw_glyph_string.");
 
-  fprintf(stderr, "%s\n", SSDATA(SYMBOL_NAME(s->font->driver->type)));
-  fprintf(stderr, "type: %d\n", s->first_glyph->type);
+  GTK3WL_TRACE("%s", SSDATA(SYMBOL_NAME(s->font->driver->type)));
+  GTK3WL_TRACE("type: %d", s->first_glyph->type);
   if (s->first_glyph->type == CHAR_GLYPH) {
-    fprintf(stderr, "(%d,%d)", s->x, s->y);
+    GTK3WL_TRACE("(%d,%d)", s->x, s->y);
     for (int i = 0; i < s->nchars; i++)
-      fprintf(stderr, " %04x", s->char2b[i]);
-    fprintf(stderr, "\n");
+      GTK3WL_TRACE(" %04x", s->char2b[i]);
+    GTK3WL_TRACE("");
     s->font->driver->draw(s, 0, s->nchars, s->x, s->y + s->first_glyph->ascent, false);
   }
 
 #if 0
-  fprintf(stderr, "chars:");
+  GTK3WL_TRACE("chars:");
   for (int i = 0; i < s->nchars; i++)
-    fprintf(stderr, " %04x", s->char2b[i]);
-  fprintf(stderr, "\n");
+    GTK3WL_TRACE(" %04x", s->char2b[i]);
+  GTK3WL_TRACE("");
 
   // ftcr を使う必要がある。
   cairo_glyph_t *glyphs = malloc(sizeof *glyphs * s->nchars);
@@ -10129,12 +10129,12 @@ static void gtk3wl_draw_glyph_string(struct glyph_string *s)
 
 static void gtk3wl_after_update_window_line(struct window *w, struct glyph_row *desired_row)
 {
-  fprintf(stderr, "after_update_window_line.\n");
+  GTK3WL_TRACE("after_update_window_line.");
 }
 
 static void gtk3wl_clear_frame_area(struct frame *f, int x, int y, int width, int height)
 {
-  fprintf(stderr, "clear_frame_area.\n");
+  GTK3WL_TRACE("clear_frame_area.");
   gtk3wl_clear_area (f, x, y, width, height);
 }
 
@@ -10144,7 +10144,7 @@ static void gtk3wl_draw_window_cursor(struct window *w,
 			      enum text_cursor_kinds cursor_type,
 			      int cursor_width, bool on_p, bool active_p)
 {
-  fprintf(stderr, "draw_window_cursor.\n");
+  GTK3WL_TRACE("draw_window_cursor.");
 }
 
 /* Scroll part of the display as described by RUN.  */
@@ -10511,7 +10511,7 @@ gtk3wl_cr_draw_image (struct frame *f, GC gc, cairo_pattern_t *image,
   cairo_surface_t *surface;
   cairo_format_t format;
 
-  fprintf(stderr, "gtk3wl_cr_draw_image: 0: %d,%d,%d,%d,%d,%d,%d.\n", src_x, src_y, width, height, dest_x, dest_y, overlay_p);
+  GTK3WL_TRACE("gtk3wl_cr_draw_image: 0: %d,%d,%d,%d,%d,%d,%d.", src_x, src_y, width, height, dest_x, dest_y, overlay_p);
   cr = gtk3wl_begin_cr_clip (f, gc);
   if (overlay_p)
     cairo_rectangle (cr, dest_x, dest_y, width, height);
@@ -10528,22 +10528,41 @@ gtk3wl_cr_draw_image (struct frame *f, GC gc, cairo_pattern_t *image,
   format = cairo_image_surface_get_format (surface);
   if (format != CAIRO_FORMAT_A8 && format != CAIRO_FORMAT_A1)
     {
+      GTK3WL_TRACE("other format.");
       cairo_set_source (cr, image);
       cairo_fill (cr);
     }
   else
     {
+      if (format == CAIRO_FORMAT_A8)
+	GTK3WL_TRACE("format A8.");
+      else if (format == CAIRO_FORMAT_A1)
+	GTK3WL_TRACE("format A1.");
+      else
+	GTK3WL_TRACE("format ??.");
       gtk3wl_set_cr_source_with_gc_foreground (f, gc);
+      cairo_rectangle_list_t *rects = cairo_copy_clip_rectangle_list(cr);
+      GTK3WL_TRACE("rects:");
+      GTK3WL_TRACE(" status: %d", rects->status);
+      GTK3WL_TRACE(" rectangles:");
+      for (int i = 0; i < rects->num_rectangles; i++) {
+	GTK3WL_TRACE("  %fx%f+%f+%f",
+		rects->rectangles[i].width,
+		rects->rectangles[i].height,
+		rects->rectangles[i].x,
+		rects->rectangles[i].y);
+      }
+      cairo_rectangle_list_destroy(rects);
       cairo_mask (cr, image);
     }
   gtk3wl_end_cr_clip (f);
-  fprintf(stderr, "gtk3wl_cr_draw_image: 9.\n");
+  GTK3WL_TRACE("gtk3wl_cr_draw_image: 9.");
 }
 
 static void
 gtk3wl_draw_fringe_bitmap (struct window *w, struct glyph_row *row, struct draw_fringe_bitmap_params *p)
 {
-  fprintf(stderr, "draw_fringe_bitmap.\n");
+  GTK3WL_TRACE("draw_fringe_bitmap.");
 
   struct frame *f = XFRAME (WINDOW_FRAME (w));
   struct face *face = p->face;
@@ -10571,7 +10590,7 @@ gtk3wl_draw_fringe_bitmap (struct window *w, struct glyph_row *row, struct draw_
       cairo_fill(cr);
     }
 
-  fprintf(stderr, "which: %d, max_fringe_bmp: %d.\n", p->which, max_fringe_bmp);
+  GTK3WL_TRACE("which: %d, max_fringe_bmp: %d.", p->which, max_fringe_bmp);
   if (p->which && p->which < max_fringe_bmp)
     {
       XGCValues gcv;
@@ -10629,7 +10648,7 @@ static struct redisplay_interface gtk3wl_redisplay_interface =
 static void
 gtk3wl_redraw_scroll_bars (struct frame *f)
 {
-  fprintf(stderr, "gtk3wl_redraw_scroll_bars\n");
+  GTK3WL_TRACE("gtk3wl_redraw_scroll_bars");
 }
 
 void
@@ -10638,7 +10657,7 @@ gtk3wl_clear_frame (struct frame *f)
       External (hook): Erase the entire frame
    -------------------------------------------------------------------------- */
 {
-  fprintf(stderr, "gtk3wl_clear_frame\n");
+  GTK3WL_TRACE("gtk3wl_clear_frame");
  /* comes on initial frame because we have
     after-make-frame-functions = select-frame */
   if (!FRAME_DEFAULT_FACE (f))
@@ -10666,7 +10685,7 @@ gtk3wl_clear_frame (struct frame *f)
 static int
 gtk3wl_read_socket (struct terminal *terminal, struct input_event *hold_quit)
 {
-  // fprintf(stderr, "gtk3wl_read_socket\n");
+  // GTK3WL_TRACE("gtk3wl_read_socket");
   int count = 0;
   bool event_found = false;
   struct x_display_info *dpyinfo = terminal->display_info.x;
@@ -10691,7 +10710,7 @@ gtk3wl_read_socket (struct terminal *terminal, struct input_event *hold_quit)
      from all displays.  */
 
   static int ctr = 0;
-  // fprintf(stderr, "gtk main... %d.\n", ctr++);
+  // GTK3WL_TRACE("gtk main... %d.", ctr++);
   while (gtk_events_pending ())
     {
 #if 0
@@ -10710,7 +10729,7 @@ gtk3wl_read_socket (struct terminal *terminal, struct input_event *hold_quit)
         break;
 #endif
     }
-  // fprintf(stderr, "gtk main... end.\n");
+  // GTK3WL_TRACE("gtk main... end.");
 
 #if 0
   /* On some systems, an X bug causes Emacs to get no more events
@@ -12077,11 +12096,11 @@ gtk3wl_handle_event(GtkWidget *widget, GdkEvent *event, gpointer *data)
   inev.ie.arg = Qnil;
 
   switch (event->type) {
-  case GDK_NOTHING:               fprintf(stderr, "GDK_NOTHING\n"); break;
-  case GDK_DELETE:                fprintf(stderr, "GDK_DELETE\n"); break;
-  case GDK_DESTROY:               fprintf(stderr, "GDK_DESTROY\n"); break;
+  case GDK_NOTHING:               GTK3WL_TRACE("GDK_NOTHING"); break;
+  case GDK_DELETE:                GTK3WL_TRACE("GDK_DELETE"); break;
+  case GDK_DESTROY:               GTK3WL_TRACE("GDK_DESTROY"); break;
   case GDK_EXPOSE:
-    fprintf(stderr, "GDK_EXPOSE\n");
+    GTK3WL_TRACE("GDK_EXPOSE");
     f = gtk3wl_any_window_to_frame (event->expose.window);
 #if 0
     if (f)
@@ -12143,29 +12162,29 @@ gtk3wl_handle_event(GtkWidget *widget, GdkEvent *event, gpointer *data)
 #endif
       break;
 
-  case GDK_MOTION_NOTIFY:         fprintf(stderr, "GDK_MOTION_NOTIFY\n"); break;
-  case GDK_BUTTON_PRESS:          fprintf(stderr, "GDK_BUTTON_PRESS\n"); break;
-  case GDK_2BUTTON_PRESS:         fprintf(stderr, "GDK_2BUTTON_PRESS\n"); break;
-  case GDK_3BUTTON_PRESS:         fprintf(stderr, "GDK_3BUTTON_PRESS\n"); break;
-  case GDK_BUTTON_RELEASE:        fprintf(stderr, "GDK_BUTTON_RELEASE\n"); break;
-  case GDK_KEY_PRESS:             fprintf(stderr, "GDK_KEY_PRESS\n"); break;
-  case GDK_KEY_RELEASE:           fprintf(stderr, "GDK_KEY_RELEASE\n"); break;
-  case GDK_ENTER_NOTIFY:          fprintf(stderr, "GDK_ENTER_NOTIFY\n"); break;
-  case GDK_LEAVE_NOTIFY:          fprintf(stderr, "GDK_LEAVE_NOTIFY\n"); break;
-  case GDK_FOCUS_CHANGE:          fprintf(stderr, "GDK_FOCUS_CHANGE\n"); break;
+  case GDK_MOTION_NOTIFY:         GTK3WL_TRACE("GDK_MOTION_NOTIFY"); break;
+  case GDK_BUTTON_PRESS:          GTK3WL_TRACE("GDK_BUTTON_PRESS"); break;
+  case GDK_2BUTTON_PRESS:         GTK3WL_TRACE("GDK_2BUTTON_PRESS"); break;
+  case GDK_3BUTTON_PRESS:         GTK3WL_TRACE("GDK_3BUTTON_PRESS"); break;
+  case GDK_BUTTON_RELEASE:        GTK3WL_TRACE("GDK_BUTTON_RELEASE"); break;
+  case GDK_KEY_PRESS:             GTK3WL_TRACE("GDK_KEY_PRESS"); break;
+  case GDK_KEY_RELEASE:           GTK3WL_TRACE("GDK_KEY_RELEASE"); break;
+  case GDK_ENTER_NOTIFY:          GTK3WL_TRACE("GDK_ENTER_NOTIFY"); break;
+  case GDK_LEAVE_NOTIFY:          GTK3WL_TRACE("GDK_LEAVE_NOTIFY"); break;
+  case GDK_FOCUS_CHANGE:          GTK3WL_TRACE("GDK_FOCUS_CHANGE"); break;
   case GDK_CONFIGURE:
-    fprintf(stderr, "GDK_CONFIGURE\n");
+    GTK3WL_TRACE("GDK_CONFIGURE");
     f = gtk3wl_any_window_to_frame (event->configure.window);
     if (f) {
       gtk3wl_cr_destroy_surface (f);
 
-      fprintf(stderr, "%dx%d\n", event->configure.width, event->configure.height);
+      GTK3WL_TRACE("%dx%d", event->configure.width, event->configure.height);
       xg_frame_resized(f, event->configure.width, event->configure.height);
     }
     break;
 
   case GDK_MAP:
-    fprintf(stderr, "GDK_MAP\n");
+    GTK3WL_TRACE("GDK_MAP");
       f = gtk3wl_any_window_to_frame (event->any.window);
       if (f)
         {
@@ -12205,24 +12224,24 @@ gtk3wl_handle_event(GtkWidget *widget, GdkEvent *event, gpointer *data)
             record_asynch_buffer_change ();
         }
     break;
-  case GDK_UNMAP:                 fprintf(stderr, "GDK_UNMAP\n"); break;
-  case GDK_PROPERTY_NOTIFY:       fprintf(stderr, "GDK_PROPERTY_NOTIFY\n"); break;
-  case GDK_SELECTION_CLEAR:       fprintf(stderr, "GDK_SELECTION_CLEAR\n"); break;
-  case GDK_SELECTION_REQUEST:     fprintf(stderr, "GDK_SELECTION_REQUEST\n"); break;
-  case GDK_SELECTION_NOTIFY:      fprintf(stderr, "GDK_SELECTION_NOTIFY\n"); break;
-  case GDK_PROXIMITY_IN:          fprintf(stderr, "GDK_PROXIMITY_IN\n"); break;
-  case GDK_PROXIMITY_OUT:         fprintf(stderr, "GDK_PROXIMITY_OUT\n"); break;
-  case GDK_DRAG_ENTER:            fprintf(stderr, "GDK_DRAG_ENTER\n"); break;
-  case GDK_DRAG_LEAVE:            fprintf(stderr, "GDK_DRAG_LEAVE\n"); break;
-  case GDK_DRAG_MOTION:           fprintf(stderr, "GDK_DRAG_MOTION\n"); break;
-  case GDK_DRAG_STATUS:           fprintf(stderr, "GDK_DRAG_STATUS\n"); break;
-  case GDK_DROP_START:            fprintf(stderr, "GDK_DROP_START\n"); break;
-  case GDK_DROP_FINISHED:         fprintf(stderr, "GDK_DROP_FINISHED\n"); break;
-  case GDK_CLIENT_EVENT:          fprintf(stderr, "GDK_CLIENT_EVENT\n"); break;
-  case GDK_VISIBILITY_NOTIFY:     fprintf(stderr, "GDK_VISIBILITY_NOTIFY\n"); break;
-  case GDK_SCROLL:                fprintf(stderr, "GDK_SCROLL\n"); break;
+  case GDK_UNMAP:                 GTK3WL_TRACE("GDK_UNMAP"); break;
+  case GDK_PROPERTY_NOTIFY:       GTK3WL_TRACE("GDK_PROPERTY_NOTIFY"); break;
+  case GDK_SELECTION_CLEAR:       GTK3WL_TRACE("GDK_SELECTION_CLEAR"); break;
+  case GDK_SELECTION_REQUEST:     GTK3WL_TRACE("GDK_SELECTION_REQUEST"); break;
+  case GDK_SELECTION_NOTIFY:      GTK3WL_TRACE("GDK_SELECTION_NOTIFY"); break;
+  case GDK_PROXIMITY_IN:          GTK3WL_TRACE("GDK_PROXIMITY_IN"); break;
+  case GDK_PROXIMITY_OUT:         GTK3WL_TRACE("GDK_PROXIMITY_OUT"); break;
+  case GDK_DRAG_ENTER:            GTK3WL_TRACE("GDK_DRAG_ENTER"); break;
+  case GDK_DRAG_LEAVE:            GTK3WL_TRACE("GDK_DRAG_LEAVE"); break;
+  case GDK_DRAG_MOTION:           GTK3WL_TRACE("GDK_DRAG_MOTION"); break;
+  case GDK_DRAG_STATUS:           GTK3WL_TRACE("GDK_DRAG_STATUS"); break;
+  case GDK_DROP_START:            GTK3WL_TRACE("GDK_DROP_START"); break;
+  case GDK_DROP_FINISHED:         GTK3WL_TRACE("GDK_DROP_FINISHED"); break;
+  case GDK_CLIENT_EVENT:          GTK3WL_TRACE("GDK_CLIENT_EVENT"); break;
+  case GDK_VISIBILITY_NOTIFY:     GTK3WL_TRACE("GDK_VISIBILITY_NOTIFY"); break;
+  case GDK_SCROLL:                GTK3WL_TRACE("GDK_SCROLL"); break;
   case GDK_WINDOW_STATE:
-    fprintf(stderr, "GDK_WINDOW_STATE\n");
+    GTK3WL_TRACE("GDK_WINDOW_STATE");
     f = gtk3wl_any_window_to_frame (event->window_state.window);
     if (f && (event->window_state.changed_mask & GDK_WINDOW_STATE_ICONIFIED)) {
       if (FRAME_ICONIFIED_P (f))
@@ -12245,22 +12264,22 @@ gtk3wl_handle_event(GtkWidget *widget, GdkEvent *event, gpointer *data)
 	}
     }
     break;
-  case GDK_SETTING:               fprintf(stderr, "GDK_SETTING\n"); break;
-  case GDK_OWNER_CHANGE:          fprintf(stderr, "GDK_OWNER_CHANGE\n"); break;
-  case GDK_GRAB_BROKEN:           fprintf(stderr, "GDK_GRAB_BROKEN\n"); break;
-  case GDK_DAMAGE:                fprintf(stderr, "GDK_DAMAGE\n"); break;
-  case GDK_TOUCH_BEGIN:           fprintf(stderr, "GDK_TOUCH_BEGIN\n"); break;
-  case GDK_TOUCH_UPDATE:          fprintf(stderr, "GDK_TOUCH_UPDATE\n"); break;
-  case GDK_TOUCH_END:             fprintf(stderr, "GDK_TOUCH_END\n"); break;
-  case GDK_TOUCH_CANCEL:          fprintf(stderr, "GDK_TOUCH_CANCEL\n"); break;
-  case GDK_TOUCHPAD_SWIPE:        fprintf(stderr, "GDK_TOUCHPAD_SWIPE\n"); break;
-  case GDK_TOUCHPAD_PINCH:        fprintf(stderr, "GDK_TOUCHPAD_PINCH\n"); break;
-  case GDK_PAD_BUTTON_PRESS:      fprintf(stderr, "GDK_PAD_BUTTON_PRESS\n"); break;
-  case GDK_PAD_BUTTON_RELEASE:    fprintf(stderr, "GDK_PAD_BUTTON_RELEASE\n"); break;
-  case GDK_PAD_RING:              fprintf(stderr, "GDK_PAD_RING\n"); break;
-  case GDK_PAD_STRIP:             fprintf(stderr, "GDK_PAD_STRIP\n"); break;
-  case GDK_PAD_GROUP_MODE:        fprintf(stderr, "GDK_PAD_GROUP_MODE\n"); break;
-  default:                        fprintf(stderr, "%d\n", event->type);
+  case GDK_SETTING:               GTK3WL_TRACE("GDK_SETTING"); break;
+  case GDK_OWNER_CHANGE:          GTK3WL_TRACE("GDK_OWNER_CHANGE"); break;
+  case GDK_GRAB_BROKEN:           GTK3WL_TRACE("GDK_GRAB_BROKEN"); break;
+  case GDK_DAMAGE:                GTK3WL_TRACE("GDK_DAMAGE"); break;
+  case GDK_TOUCH_BEGIN:           GTK3WL_TRACE("GDK_TOUCH_BEGIN"); break;
+  case GDK_TOUCH_UPDATE:          GTK3WL_TRACE("GDK_TOUCH_UPDATE"); break;
+  case GDK_TOUCH_END:             GTK3WL_TRACE("GDK_TOUCH_END"); break;
+  case GDK_TOUCH_CANCEL:          GTK3WL_TRACE("GDK_TOUCH_CANCEL"); break;
+  case GDK_TOUCHPAD_SWIPE:        GTK3WL_TRACE("GDK_TOUCHPAD_SWIPE"); break;
+  case GDK_TOUCHPAD_PINCH:        GTK3WL_TRACE("GDK_TOUCHPAD_PINCH"); break;
+  case GDK_PAD_BUTTON_PRESS:      GTK3WL_TRACE("GDK_PAD_BUTTON_PRESS"); break;
+  case GDK_PAD_BUTTON_RELEASE:    GTK3WL_TRACE("GDK_PAD_BUTTON_RELEASE"); break;
+  case GDK_PAD_RING:              GTK3WL_TRACE("GDK_PAD_RING"); break;
+  case GDK_PAD_STRIP:             GTK3WL_TRACE("GDK_PAD_STRIP"); break;
+  case GDK_PAD_GROUP_MODE:        GTK3WL_TRACE("GDK_PAD_GROUP_MODE"); break;
+  default:                        GTK3WL_TRACE("%d", event->type);
   }
   return FALSE;
 }
@@ -12268,7 +12287,7 @@ gtk3wl_handle_event(GtkWidget *widget, GdkEvent *event, gpointer *data)
 static void
 gtk3wl_fill_rectangle(struct frame *f, unsigned long color, int x, int y, int width, int height)
 {
-  fprintf(stderr, "gtk3wl_fill_rectangle\n");
+  GTK3WL_TRACE("gtk3wl_fill_rectangle");
   cairo_t *cr;
   cr = gtk3wl_begin_cr_clip (f, NULL);
   gtk3wl_set_cr_source_with_color (f, color);
@@ -12280,7 +12299,7 @@ gtk3wl_fill_rectangle(struct frame *f, unsigned long color, int x, int y, int wi
 void
 gtk3wl_clear_under_internal_border (struct frame *f)
 {
-  fprintf(stderr, "gtk3wl_clear_under_internal_border\n");
+  GTK3WL_TRACE("gtk3wl_clear_under_internal_border");
   if (FRAME_INTERNAL_BORDER_WIDTH (f) > 0)
     {
       int border = FRAME_INTERNAL_BORDER_WIDTH (f);
@@ -12317,28 +12336,28 @@ gtk3wl_handle_draw(GtkWidget *widget, cairo_t *cr, gpointer *data)
 {
   struct frame *f;
 
-  fprintf(stderr, "gtk3wl_handle_draw\n");
+  GTK3WL_TRACE("gtk3wl_handle_draw");
 
   for (GtkWidget *w = widget; w != NULL; w = gtk_widget_get_parent(w)) {
-    fprintf(stderr, "%p %s %d %d", w, G_OBJECT_TYPE_NAME(w), gtk_widget_get_mapped(w), gtk_widget_get_visible(w));
+    GTK3WL_TRACE("%p %s %d %d", w, G_OBJECT_TYPE_NAME(w), gtk_widget_get_mapped(w), gtk_widget_get_visible(w));
     gint wd, hi;
     gtk_widget_get_size_request(w, &wd, &hi);
-    fprintf(stderr, " %dx%d", wd, hi);
+    GTK3WL_TRACE(" %dx%d", wd, hi);
     GtkAllocation alloc;
     gtk_widget_get_allocation(w, &alloc);
-    fprintf(stderr, " %dx%d+%d+%d\n", alloc.width, alloc.height, alloc.x, alloc.y);
+    GTK3WL_TRACE(" %dx%d+%d+%d", alloc.width, alloc.height, alloc.x, alloc.y);
   }
 
 #if 1
   {
 #if 0
-    fprintf(stderr, "widget: %s (window %s) (%p)\n", G_OBJECT_TYPE_NAME(widget), gtk_widget_get_has_window(widget) ? "yes" : "no", gtk_widget_get_window(widget));
+    GTK3WL_TRACE("widget: %s (window %s) (%p)", G_OBJECT_TYPE_NAME(widget), gtk_widget_get_has_window(widget) ? "yes" : "no", gtk_widget_get_window(widget));
     {
       GtkWidget *w = widget;
       while (w != NULL) {
 	w = gtk_widget_get_parent(w);
 	if (w != NULL)
-	  fprintf(stderr, "widget: %s (window %s) (%p)\n", G_OBJECT_TYPE_NAME(w), gtk_widget_get_has_window(w) ? "yes" : "no", gtk_widget_get_window(w));
+	  GTK3WL_TRACE("widget: %s (window %s) (%p)", G_OBJECT_TYPE_NAME(w), gtk_widget_get_has_window(w) ? "yes" : "no", gtk_widget_get_window(w));
       }
     }
 #endif
@@ -12347,11 +12366,11 @@ gtk3wl_handle_draw(GtkWidget *widget, cairo_t *cr, gpointer *data)
 #if 0
     {
       GdkWindow *w = win;
-      fprintf(stderr, "window: %s %p %s\n", G_OBJECT_TYPE_NAME(w), w, gdk_window_has_native(w) ? "native" :"");
+      GTK3WL_TRACE("window: %s %p %s", G_OBJECT_TYPE_NAME(w), w, gdk_window_has_native(w) ? "native" :"");
       while (w != NULL) {
 	w = gdk_window_get_parent(w);
 	if (w != NULL)
-	  fprintf(stderr, "window: %s %p %s\n", G_OBJECT_TYPE_NAME(w), w, gdk_window_has_native(w) ? "native" :"");
+	  GTK3WL_TRACE("window: %s %p %s", G_OBJECT_TYPE_NAME(w), w, gdk_window_has_native(w) ? "native" :"");
       }
     }
 #endif
@@ -12370,17 +12389,17 @@ gtk3wl_handle_draw(GtkWidget *widget, cairo_t *cr, gpointer *data)
 
   GdkWindow *win = gtk_widget_get_window(widget);
   if (win == NULL) {
-    fprintf(stderr, "win == NULL\n");
+    GTK3WL_TRACE("win == NULL");
     return TRUE;
   }
   f = gtk3wl_any_window_to_frame(win);
 
   if (f)
     {
-      fprintf(stderr, "f != NULL\n");
+      GTK3WL_TRACE("f != NULL");
       if (!FRAME_VISIBLE_P (f))
 	{
-	  fprintf(stderr, "not visible\n");
+	  GTK3WL_TRACE("not visible");
 	  block_input ();
 	  SET_FRAME_VISIBLE (f, 1);
 	  SET_FRAME_ICONIFIED (f, false);
@@ -12394,7 +12413,7 @@ gtk3wl_handle_draw(GtkWidget *widget, cairo_t *cr, gpointer *data)
 	}
       else if (FRAME_GARBAGED_P (f))
 	{
-	  fprintf(stderr, "garbaged.\n");
+	  GTK3WL_TRACE("garbaged.");
 	  /* Go around the back buffer and manually clear the
 	     window the first time we show it.  This way, we avoid
 	     showing users the sanity-defying horror of whatever
@@ -12408,10 +12427,10 @@ gtk3wl_handle_draw(GtkWidget *widget, cairo_t *cr, gpointer *data)
 
       if (!FRAME_GARBAGED_P (f))
 	{
-	  fprintf(stderr, "not garbaged.\n");
+	  GTK3WL_TRACE("not garbaged.");
 	  /* This seems to be needed for GTK 2.6 and later, see
 	     https://debbugs.gnu.org/cgi/bugreport.cgi?bug=15398.  */
-	  fprintf(stderr, "%dx%d.\n", FRAME_PIXEL_WIDTH(f), FRAME_PIXEL_HEIGHT(f));
+	  GTK3WL_TRACE("%dx%d.", FRAME_PIXEL_WIDTH(f), FRAME_PIXEL_HEIGHT(f));
 	  gtk3wl_clear_area(f, 0, 0, FRAME_PIXEL_WIDTH(f), FRAME_PIXEL_HEIGHT(f));
 	  expose_frame (f, 0, 0, FRAME_PIXEL_WIDTH(f), FRAME_PIXEL_HEIGHT(f));
 	  gtk3wl_clear_under_internal_border (f);
@@ -12440,13 +12459,13 @@ gtk3wl_handle_draw(GtkWidget *widget, cairo_t *cr, gpointer *data)
 
 static void size_allocate(GtkWidget *widget, GtkAllocation *alloc, gpointer *user_data)
 {
-  fprintf(stderr, "size-alloc: %dx%d+%d+%d.\n", alloc->width, alloc->height, alloc->x, alloc->y);
+  GTK3WL_TRACE("size-alloc: %dx%d+%d+%d.", alloc->width, alloc->height, alloc->x, alloc->y);
 
   struct frame *f = gtk3wl_any_window_to_frame (gtk_widget_get_window(widget));
   if (f) {
     gtk3wl_cr_destroy_surface (f);
 
-    fprintf(stderr, "%dx%d\n", alloc->width, alloc->height);
+    GTK3WL_TRACE("%dx%d", alloc->width, alloc->height);
     xg_frame_resized(f, alloc->width, alloc->height);
   }
 }
@@ -12524,7 +12543,7 @@ static gboolean key_press_event(GtkWidget *widget, GdkEvent *event, gpointer *us
 
   USE_SAFE_ALLOCA;
 
-  fprintf(stderr, "key_press_event\n");
+  GTK3WL_TRACE("key_press_event");
 
 #if 0
   /* Dispatch KeyPress events when in menu.  */
@@ -12816,7 +12835,7 @@ my_log_handler (const gchar *log_domain, GLogLevelFlags log_level,
 		const gchar *msg, gpointer user_data)
 {
   if (!strstr (msg, "g_set_prgname"))
-      fprintf (stderr, "%s-WARNING **: %s\n", log_domain, msg);
+      fprintf (stderr, "%s-WARNING **: %s", log_domain, msg);
 }
 
 struct gtk3wl_display_info *
@@ -12907,7 +12926,7 @@ gtk3wl_term_init (Lisp_Object display_name)
     {
       if (emacs_pipe (selfds) != 0)
         {
-          fprintf (stderr, "Failed to create pipe: %s\n",
+          fprintf (stderr, "Failed to create pipe: %s",
                    emacs_strerror (errno));
           emacs_abort ();
         }
@@ -12969,7 +12988,7 @@ gtk3wl_xlfd_to_fontname (const char *xlfd)
     The string returned is temporarily allocated.
    -------------------------------------------------------------------------- */
 {
-  fprintf(stderr, "gtk3wl_xlfd_to_fontname\n");
+  GTK3WL_TRACE("gtk3wl_xlfd_to_fontname");
 #if 0
   char *name = xmalloc (180);
   int i, len;
@@ -13002,7 +13021,7 @@ gtk3wl_xlfd_to_fontname (const char *xlfd)
             name[i+1] = c_toupper (name[i+1]);
         }
     }
-/*fprintf (stderr, "converted '%s' to '%s'\n",xlfd,name);  */
+/*fprintf (stderr, "converted '%s' to '%s'",xlfd,name);  */
   ret = [[NSString stringWithUTF8String: name] UTF8String];
   xfree (name);
   return ret;
@@ -13024,7 +13043,7 @@ gtk3wl_defined_color (struct frame *f,
          Return false if not found
    -------------------------------------------------------------------------- */
 {
-  // fprintf(stderr, "gtk3wl_defined_color(%s)\n", name);
+  // GTK3WL_TRACE("gtk3wl_defined_color(%s)", name);
   int r;
 
   block_input ();
@@ -13043,7 +13062,7 @@ gtk3wl_defined_color (struct frame *f,
 
 int gtk3wl_parse_color (const char *color_name, XColor *color)
 {
-  // fprintf(stderr, "gtk3wl_parse_color(%s)\n", color_name);
+  // GTK3WL_TRACE("gtk3wl_parse_color(%s)", color_name);
 
   GdkRGBA rgba;
   if (gdk_rgba_parse(&rgba, color_name)) {
@@ -13066,7 +13085,7 @@ gtk3wl_lisp_to_color (Lisp_Object color, XColor *col)
      Convert a Lisp string object to a NS color
    -------------------------------------------------------------------------- */
 {
-  fprintf(stderr, "gtk3wl_lisp_to_color\n");
+  GTK3WL_TRACE("gtk3wl_lisp_to_color");
   if (STRINGP (color))
     return !gtk3wl_parse_color (SSDATA (color), col);
   else if (SYMBOLP (color))
@@ -13080,7 +13099,7 @@ gtk3wl_lisp_to_color (Lisp_Object color, XColor *col)
 void
 gtk3wl_query_colors (struct frame *f, XColor *colors, int ncolors)
 {
-  fprintf(stderr, "gtk3wl_query_colors\n");
+  GTK3WL_TRACE("gtk3wl_query_colors");
   int i;
 
   for (i = 0; i < ncolors; i++)
@@ -13099,20 +13118,20 @@ gtk3wl_query_colors (struct frame *f, XColor *colors, int ncolors)
 void
 gtk3wl_query_color (struct frame *f, XColor *color)
 {
-  fprintf(stderr, "gtk3wl_query_color\n");
+  GTK3WL_TRACE("gtk3wl_query_color");
   gtk3wl_query_colors (f, color, 1);
 }
 
 void
 gtk3wl_clear_area (struct frame *f, int x, int y, int width, int height)
 {
-  fprintf(stderr, "gtk3wl_clear_area\n");
+  GTK3WL_TRACE("gtk3wl_clear_area");
   cairo_t *cr;
 
   eassert (width > 0 && height > 0);
 
   cr = gtk3wl_begin_cr_clip (f, NULL);
-  fprintf(stderr, "back color %08lx.\n", (unsigned long) f->output_data.gtk3wl->background_color);
+  GTK3WL_TRACE("back color %08lx.", (unsigned long) f->output_data.gtk3wl->background_color);
   gtk3wl_set_cr_source_with_color (f, f->output_data.gtk3wl->background_color);
   cairo_rectangle (cr, x, y, width, height);
   cairo_fill (cr);
@@ -13213,7 +13232,7 @@ gtk3wl_begin_cr_clip (struct frame *f, XGCValues *gc)
 {
   cairo_t *cr = FRAME_CR_CONTEXT (f);
 
-  fprintf(stderr, "gtk3wl_begin_cr_clip\n");
+  GTK3WL_TRACE("gtk3wl_begin_cr_clip");
   if (! FRAME_CR_SURFACE (f))
     {
       FRAME_CR_SURFACE(f) = gdk_window_create_similar_surface(gtk_widget_get_window (FRAME_GTK_WIDGET (f)),
@@ -13255,7 +13274,7 @@ gtk3wl_begin_cr_clip (struct frame *f, XGCValues *gc)
 void
 gtk3wl_end_cr_clip (struct frame *f)
 {
-  fprintf(stderr, "gtk3wl_end_cr_clip\n");
+  GTK3WL_TRACE("gtk3wl_end_cr_clip");
   cairo_restore (FRAME_CR_CONTEXT (f));
 
   GtkWidget *widget = FRAME_GTK_WIDGET(f);
@@ -13269,21 +13288,21 @@ gtk3wl_end_cr_clip (struct frame *f)
 void
 gtk3wl_set_cr_source_with_gc_foreground (struct frame *f, XGCValues *gc)
 {
-  fprintf(stderr, "gtk3wl_set_cr_source_with_gc_foreground: %08x\n", gc->foreground);
+  GTK3WL_TRACE("gtk3wl_set_cr_source_with_gc_foreground: %08x", gc->foreground);
   gtk3wl_set_cr_source_with_color(f, gc->foreground);
 }
 
 void
 gtk3wl_set_cr_source_with_gc_background (struct frame *f, XGCValues *gc)
 {
-  fprintf(stderr, "gtk3wl_set_cr_source_with_gc_background\n");
+  GTK3WL_TRACE("gtk3wl_set_cr_source_with_gc_background: %08x", gc->background);
   gtk3wl_set_cr_source_with_color(f, gc->background);
 }
 
 void
 gtk3wl_set_cr_source_with_color (struct frame *f, unsigned long color)
 {
-  fprintf(stderr, "gtk3wl_set_cr_source_with_color\n");
+  GTK3WL_TRACE("gtk3wl_set_cr_source_with_color");
   XColor col;
   col.pixel = color;
   gtk3wl_query_color(f, &col);
@@ -13294,7 +13313,7 @@ gtk3wl_set_cr_source_with_color (struct frame *f, unsigned long color)
 void
 gtk3wl_cr_draw_frame (cairo_t *cr, struct frame *f)
 {
-  fprintf(stderr, "gtk3wl_cr_draw_frame\n");
+  GTK3WL_TRACE("gtk3wl_cr_draw_frame");
 #if 0
   int width, height;
 
@@ -13314,7 +13333,7 @@ gtk3wl_cr_draw_frame (cairo_t *cr, struct frame *f)
 void
 gtk3wl_cr_destroy_surface(struct frame *f)
 {
-  fprintf(stderr, "gtk3wl_cr_destroy_surface\n");
+  GTK3WL_TRACE("gtk3wl_cr_destroy_surface");
   if (FRAME_CR_CONTEXT(f) != NULL) {
     cairo_destroy(FRAME_CR_CONTEXT(f));
     FRAME_CR_CONTEXT(f) = NULL;

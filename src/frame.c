@@ -616,7 +616,7 @@ adjust_frame_size (struct frame *f, int new_width, int new_height, int inhibit,
   new_windows_width = new_pixel_width - 2 * FRAME_INTERNAL_BORDER_WIDTH (f);
   new_text_width = FRAME_PIXEL_TO_TEXT_WIDTH (f, new_pixel_width);
   new_cols = new_text_width / unit_width;
-  fprintf(stderr, "new_cols: %d\n", new_cols);
+  GTK3WL_TRACE("new_cols: %d", new_cols);
 
   new_pixel_height = ((inhibit_vertical && (inhibit < 5))
 		      ? old_pixel_height
@@ -629,7 +629,7 @@ adjust_frame_size (struct frame *f, int new_width, int new_height, int inhibit,
 			- 2 * FRAME_INTERNAL_BORDER_WIDTH (f));
   new_text_height = FRAME_PIXEL_TO_TEXT_HEIGHT (f, new_pixel_height);
   new_lines = new_text_height / unit_height;
-  fprintf(stderr, "new_lines: %d\n", new_lines);
+  GTK3WL_TRACE("new_lines: %d", new_lines);
 
 #ifdef HAVE_WINDOW_SYSTEM
   if (FRAME_WINDOW_P (f)
@@ -659,7 +659,7 @@ adjust_frame_size (struct frame *f, int new_width, int new_height, int inhibit,
       x_set_window_size (f, 0, new_text_width, new_text_height, 1);
       f->resized_p = true;
 
-      fprintf(stderr, "inhibited.\n");
+      GTK3WL_TRACE("inhibited.");
       return;
     }
 #endif
@@ -677,7 +677,7 @@ adjust_frame_size (struct frame *f, int new_width, int new_height, int inhibit,
       sanitize_window_sizes (Qt);
       sanitize_window_sizes (Qnil);
 
-      fprintf(stderr, "same size.\n");
+      GTK3WL_TRACE("same size.");
       return;
     }
 
@@ -740,7 +740,7 @@ adjust_frame_size (struct frame *f, int new_width, int new_height, int inhibit,
   FRAME_TEXT_HEIGHT (f) = new_text_height;
   FRAME_PIXEL_WIDTH (f) = new_pixel_width;
   FRAME_PIXEL_HEIGHT (f) = new_pixel_height;
-  fprintf(stderr, "cols/lines: %dx%d -> %dx%d\n", FRAME_COLS(f), FRAME_LINES(f), new_cols, new_lines);
+  GTK3WL_TRACE("cols/lines: %dx%d -> %dx%d", FRAME_COLS(f), FRAME_LINES(f), new_cols, new_lines);
   SET_FRAME_COLS (f, new_cols);
   SET_FRAME_LINES (f, new_lines);
 

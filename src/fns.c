@@ -3953,31 +3953,31 @@ hash_lookup (struct Lisp_Hash_Table *h, Lisp_Object key, EMACS_UINT *hash)
   EMACS_UINT hash_code;
   ptrdiff_t start_of_bucket, i;
 
-  // fprintf(stderr, "hash_lookup: 0\n");
+  // GTK3WL_TRACE("hash_lookup: 0");
   hash_code = h->test.hashfn (&h->test, key);
-  // fprintf(stderr, "hash_lookup: 1\n");
+  // GTK3WL_TRACE("hash_lookup: 1");
   eassert ((hash_code & ~INTMASK) == 0);
   if (hash)
     *hash = hash_code;
-  // fprintf(stderr, "hash_lookup: 2\n");
+  // GTK3WL_TRACE("hash_lookup: 2");
 
-  // fprintf(stderr, "hash_lookup: 2.0: %ld\n", (long) hash_code);
-  // fprintf(stderr, "hash_lookup: 2.1: %p\n", h);
-  // fprintf(stderr, "hash_lookup: 2.2: %ld\n", (long) h->index.i);
-  // fprintf(stderr, "hash_lookup: 2.3: %ld\n", (long) ASIZE(h->index));
+  // GTK3WL_TRACE("hash_lookup: 2.0: %ld", (long) hash_code);
+  // GTK3WL_TRACE("hash_lookup: 2.1: %p", h);
+  // GTK3WL_TRACE("hash_lookup: 2.2: %ld", (long) h->index.i);
+  // GTK3WL_TRACE("hash_lookup: 2.3: %ld", (long) ASIZE(h->index));
   start_of_bucket = hash_code % ASIZE (h->index);
 
-  // fprintf(stderr, "hash_lookup: 3\n");
-  // fprintf(stderr, "hash_lookup: 3.0: %p\n", h);
-  // fprintf(stderr, "hash_lookup: 3.1: %ld\n", (long) start_of_bucket);
-  // fprintf(stderr, "hash_lookup: 3.2: %ld\n", (long) HASH_INDEX(h, start_of_bucket));
+  // GTK3WL_TRACE("hash_lookup: 3");
+  // GTK3WL_TRACE("hash_lookup: 3.0: %p", h);
+  // GTK3WL_TRACE("hash_lookup: 3.1: %ld", (long) start_of_bucket);
+  // GTK3WL_TRACE("hash_lookup: 3.2: %ld", (long) HASH_INDEX(h, start_of_bucket));
   for (i = HASH_INDEX (h, start_of_bucket); 0 <= i; i = HASH_NEXT (h, i))
     if (EQ (key, HASH_KEY (h, i))
 	|| (h->test.cmpfn
 	    && hash_code == XUINT (HASH_HASH (h, i))
 	    && h->test.cmpfn (&h->test, key, HASH_KEY (h, i))))
       break;
-  // fprintf(stderr, "hash_lookup: 4\n");
+  // GTK3WL_TRACE("hash_lookup: 4");
 
   return i;
 }
