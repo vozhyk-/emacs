@@ -10617,7 +10617,7 @@ gtk3wl_draw_fringe_bitmap (struct window *w, struct glyph_row *row, struct draw_
 #endif
 	gtk3wl_set_cr_source_with_color(f, face->background);
 
-      cairo_rectangle(f, p->bx, p->by, p->nx, p->ny);
+      cairo_rectangle(cr, p->bx, p->by, p->nx, p->ny);
       cairo_fill(cr);
     }
 
@@ -10626,14 +10626,15 @@ gtk3wl_draw_fringe_bitmap (struct window *w, struct glyph_row *row, struct draw_
     {
       XGCValues gcv;
 
-#if 1
+      GTK3WL_TRACE("cursor_p=%d.", p->cursor_p);
+      GTK3WL_TRACE("overlay_p_p=%d.", p->overlay_p);
+      GTK3WL_TRACE("background=%08x.", face->background);
+      GTK3WL_TRACE("cursor_color=%08x.", f->output_data.gtk3wl->cursor_color);
+      GTK3WL_TRACE("foreground=%08x.", face->foreground);
       gcv.foreground = (p->cursor_p
 		       ? (p->overlay_p ? face->background
 			  : f->output_data.gtk3wl->cursor_color)
 		       : face->foreground);
-#else
-      gcv.foreground = 0xffffffff;
-#endif
       gcv.background = face->background;
       gtk3wl_cr_draw_image (f, &gcv, fringe_bmp[p->which], 0, p->dh,
 		       p->wd, p->h, p->x, p->y, p->overlay_p);

@@ -1238,7 +1238,7 @@ of a global face.  Value is the new attribute value."
 	       ;; explicitly in VALID, using color approximation code
 	       ;; in tty-colors.el.
 	       (when (and (memq attribute '(:foreground :background))
-			  (not (memq (window-system frame) '(x w32 ns)))
+			  (not (memq (window-system frame) '(x w32 ns gtk3wl)))
 			  (not (member new-value
 				       '("unspecified"
 					 "unspecified-fg" "unspecified-bg"))))
@@ -1565,7 +1565,7 @@ If FRAME is nil, the current FRAME is used."
 	    match (cond ((eq req 'type)
 			 (or (memq (window-system frame) options)
 			     (and (memq 'graphic options)
-				  (memq (window-system frame) '(x w32 ns)))
+				  (memq (window-system frame) '(x w32 ns gtk3wl)))
 			     ;; FIXME: This should be revisited to use
 			     ;; display-graphic-p, provided that the
 			     ;; color selection depends on the number
