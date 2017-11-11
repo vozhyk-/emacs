@@ -13109,7 +13109,7 @@ int gtk3wl_parse_color (const char *color_name, XColor *color)
     color->green = rgba.green * 65535;
     color->blue = rgba.blue * 65535;
     color->pixel =
-      0xffff << 24 |
+      0xff << 24 |
       (color->red >> 8) << 16 |
       (color->green >> 8) << 8 |
       (color->blue >> 8) << 0;
