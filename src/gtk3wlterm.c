@@ -9231,6 +9231,8 @@ static fd_set select_readfds, select_writefds;
 
 static void gtk3wl_clear_frame_area(struct frame *f, int x, int y, int width, int height);
 static void gtk3wl_fill_rectangle(struct frame *f, unsigned long color, int x, int y, int width, int height);
+static void gtk3wl_clip_to_row (struct window *w, struct glyph_row *row,
+				enum glyph_row_area area, cairo_t *cr);
 
 char *
 x_get_keysym_name (int keysym)
@@ -9803,6 +9805,7 @@ gtk3wl_initialize_display_info (struct gtk3wl_display_info *dpyinfo)
 static void
 x_set_cursor_gc (struct glyph_string *s)
 {
+  GTK3WL_TRACE("x_set_cursor_gc.");
   if (s->font == FRAME_FONT (s->f)
       && s->face->background == FRAME_BACKGROUND_PIXEL (s->f)
       && s->face->foreground == FRAME_FOREGROUND_PIXEL (s->f)
@@ -11612,13 +11615,206 @@ static void gtk3wl_clear_frame_area(struct frame *f, int x, int y, int width, in
   gtk3wl_clear_area (f, x, y, width, height);
 }
 
-static void gtk3wl_draw_window_cursor(struct window *w,
-			      struct glyph_row *glyph_row,
-			      int x, int y,
-			      enum text_cursor_kinds cursor_type,
-			      int cursor_width, bool on_p, bool active_p)
+/* Draw a hollow box cursor on window W in glyph row ROW.  */
+
+static void
+x_draw_hollow_cursor (struct window *w, struct glyph_row *row)
+{
+  struct frame *f = XFRAME (WINDOW_FRAME (w));
+  struct x_display_info *dpyinfo = FRAME_DISPLAY_INFO (f);
+  Display *dpy = FRAME_X_DISPLAY (f);
+  int x, y, wd, h;
+  XGCValues xgcv;
+  struct glyph *cursor_glyph;
+
+  /* Get the glyph the cursor is on.  If we can't tell because
+     the current matrix is invalid or such, give up.  */
+  cursor_glyph = get_phys_cursor_glyph (w);
+  if (cursor_glyph == NULL)
+    return;
+
+  /* Compute frame-relative coordinates for phys cursor.  */
+  get_phys_cursor_geometry (w, row, cursor_glyph, &x, &y, &h);
+  wd = w->phys_cursor_width - 1;
+
+  /* The foreground of cursor_gc is typically the same as the normal
+     background color, which can cause the cursor box to be invisible.  */
+  cairo_t *cr = gtk3wl_begin_cr_clip(f, NULL);
+  gtk3wl_set_cr_source_with_color(f, f->output_data.gtk3wl->cursor_color);
+
+  /* When on R2L character, show cursor at the right edge of the
+     glyph, unless the cursor box is as wide as the glyph or wider
+     (the latter happens when x-stretch-cursor is non-nil).  */
+  if ((cursor_glyph->resolved_level & 1) != 0
+      && cursor_glyph->pixel_width > wd)
+    {
+      x += cursor_glyph->pixel_width - wd;
+      if (wd > 0)
+	wd -= 1;
+    }
+  /* Set clipping, draw the rectangle, and reset clipping again.  */
+  gtk3wl_clip_to_row (w, row, TEXT_AREA, cr);
+  gtk3wl_draw_rectangle (f, f->output_data.gtk3wl->cursor_color, x, y, wd, h - 1);
+  gtk3wl_end_cr_clip(f);
+}
+
+/* Draw a bar cursor on window W in glyph row ROW.
+
+   Implementation note: One would like to draw a bar cursor with an
+   angle equal to the one given by the font property XA_ITALIC_ANGLE.
+   Unfortunately, I didn't find a font yet that has this property set.
+   --gerd.  */
+
+static void
+x_draw_bar_cursor (struct window *w, struct glyph_row *row, int width, enum text_cursor_kinds kind)
+{
+  struct frame *f = XFRAME (w->frame);
+  struct glyph *cursor_glyph;
+
+  /* If cursor is out of bounds, don't draw garbage.  This can happen
+     in mini-buffer windows when switching between echo area glyphs
+     and mini-buffer.  */
+  cursor_glyph = get_phys_cursor_glyph (w);
+  if (cursor_glyph == NULL)
+    return;
+
+  /* Experimental avoidance of cursor on xwidget.  */
+  if (cursor_glyph->type == XWIDGET_GLYPH)
+    return;
+
+  /* If on an image, draw like a normal cursor.  That's usually better
+     visible than drawing a bar, esp. if the image is large so that
+     the bar might not be in the window.  */
+  if (cursor_glyph->type == IMAGE_GLYPH)
+    {
+      struct glyph_row *r;
+      r = MATRIX_ROW (w->current_matrix, w->phys_cursor.vpos);
+      draw_phys_cursor_glyph (w, r, DRAW_CURSOR);
+    }
+  else
+    {
+      struct face *face = FACE_FROM_ID (f, cursor_glyph->face_id);
+      unsigned long color;
+
+      cairo_t *cr = gtk3wl_begin_cr_clip(f, NULL);
+
+      /* If the glyph's background equals the color we normally draw
+	 the bars cursor in, the bar cursor in its normal color is
+	 invisible.  Use the glyph's foreground color instead in this
+	 case, on the assumption that the glyph's colors are chosen so
+	 that the glyph is legible.  */
+      if (face->background == f->output_data.gtk3wl->cursor_color)
+	color = face->foreground;
+      else
+	color = f->output_data.gtk3wl->cursor_color;
+
+      gtk3wl_clip_to_row (w, row, TEXT_AREA, cr);
+
+      if (kind == BAR_CURSOR)
+	{
+	  int x = WINDOW_TEXT_TO_FRAME_PIXEL_X (w, w->phys_cursor.x);
+
+	  if (width < 0)
+	    width = FRAME_CURSOR_WIDTH (f);
+	  width = min (cursor_glyph->pixel_width, width);
+
+	  w->phys_cursor_width = width;
+
+	  /* If the character under cursor is R2L, draw the bar cursor
+	     on the right of its glyph, rather than on the left.  */
+	  if ((cursor_glyph->resolved_level & 1) != 0)
+	    x += cursor_glyph->pixel_width - width;
+
+	  gtk3wl_fill_rectangle (f, color, x,
+				 WINDOW_TO_FRAME_PIXEL_Y (w, w->phys_cursor.y),
+				 width, row->height);
+	}
+      else /* HBAR_CURSOR */
+	{
+	  int dummy_x, dummy_y, dummy_h;
+	  int x = WINDOW_TEXT_TO_FRAME_PIXEL_X (w, w->phys_cursor.x);
+
+	  if (width < 0)
+	    width = row->height;
+
+	  width = min (row->height, width);
+
+	  get_phys_cursor_geometry (w, row, cursor_glyph, &dummy_x,
+				    &dummy_y, &dummy_h);
+
+	  if ((cursor_glyph->resolved_level & 1) != 0
+	      && cursor_glyph->pixel_width > w->phys_cursor_width - 1)
+	    x += cursor_glyph->pixel_width - w->phys_cursor_width + 1;
+	  gtk3wl_fill_rectangle (f, color, x,
+				 WINDOW_TO_FRAME_PIXEL_Y (w, w->phys_cursor.y +
+							  row->height - width),
+				 w->phys_cursor_width - 1, width);
+	}
+
+      gtk3wl_end_cr_clip(f);
+    }
+}
+
+/* RIF: Draw cursor on window W.  */
+
+static void
+gtk3wl_draw_window_cursor (struct window *w, struct glyph_row *glyph_row, int x,
+		      int y, enum text_cursor_kinds cursor_type,
+		      int cursor_width, bool on_p, bool active_p)
 {
   GTK3WL_TRACE("draw_window_cursor.");
+  struct frame *f = XFRAME (WINDOW_FRAME (w));
+
+  if (on_p)
+    {
+      w->phys_cursor_type = cursor_type;
+      w->phys_cursor_on_p = true;
+
+      if (glyph_row->exact_window_width_line_p
+	  && (glyph_row->reversed_p
+	      ? (w->phys_cursor.hpos < 0)
+	      : (w->phys_cursor.hpos >= glyph_row->used[TEXT_AREA])))
+	{
+	  glyph_row->cursor_in_fringe_p = true;
+	  draw_fringe_bitmap (w, glyph_row, glyph_row->reversed_p);
+	}
+      else
+	{
+	  switch (cursor_type)
+	    {
+	    case HOLLOW_BOX_CURSOR:
+	      x_draw_hollow_cursor (w, glyph_row);
+	      break;
+
+	    case FILLED_BOX_CURSOR:
+	      draw_phys_cursor_glyph (w, glyph_row, DRAW_CURSOR);
+	      break;
+
+	    case BAR_CURSOR:
+	      x_draw_bar_cursor (w, glyph_row, cursor_width, BAR_CURSOR);
+	      break;
+
+	    case HBAR_CURSOR:
+	      x_draw_bar_cursor (w, glyph_row, cursor_width, HBAR_CURSOR);
+	      break;
+
+	    case NO_CURSOR:
+	      w->phys_cursor_width = 0;
+	      break;
+
+	    default:
+	      emacs_abort ();
+	    }
+	}
+
+#ifdef HAVE_X_I18N
+      if (w == XWINDOW (f->selected_window))
+	if (FRAME_XIC (f) && (FRAME_XIC_STYLE (f) & XIMPreeditPosition))
+	  xic_set_preeditarea (w, x, y);
+#endif
+    }
+
+  gtk_widget_queue_draw(FRAME_GTK_WIDGET(f));
 }
 
 /* Scroll part of the display as described by RUN.  */
@@ -12185,6 +12381,7 @@ gtk3wl_read_socket (struct terminal *terminal, struct input_event *hold_quit)
      from all displays.  */
 
   static int ctr = 0;
+
   // GTK3WL_TRACE("gtk main... %d.", ctr++);
   while (gtk_events_pending ())
     {

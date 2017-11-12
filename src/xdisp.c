@@ -29389,6 +29389,7 @@ void
 display_and_set_cursor (struct window *w, bool on,
 			int hpos, int vpos, int x, int y)
 {
+  GTK3WL_TRACE("display_and_set_cursor.");
   struct frame *f = XFRAME (w->frame);
   int new_cursor_type;
   int new_cursor_width;
