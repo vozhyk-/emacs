@@ -37,8 +37,8 @@ Many many debugging outputs. Please ignore them.
   - ascii characters can be displayed.
   - Japanese characters can be displayed.
   - characters already displayed are not cleared.
-  - You need to resize the window to get correct faces.
   - mode-line is normal face...
+  - no cursor.
 
 - keyboard
   - You can type characters, and they are displayed.
