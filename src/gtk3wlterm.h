@@ -255,6 +255,8 @@ struct gtk3wl_output
   /* GTK3WL-specific */
   Cursor current_pointer;
 
+  XGCValues cursor_xgcv;
+
   /* lord knows why Emacs needs to know about our Window ids.. */
   Window window_desc, parent_desc;
   char explicit_parent;
@@ -337,6 +339,18 @@ struct gtk3wl_output
 #endif
 
   int has_been_visible;
+
+  /* Relief GCs, colors etc.  */
+  struct relief
+  {
+    XGCValues xgcv;
+    unsigned long pixel;
+  }
+  black_relief, white_relief;
+
+  /* The background for which the above relief GCs were set up.
+     They are changed only when a different background is involved.  */
+  unsigned long relief_background;
 };
 
 /* this dummy decl needed to support TTYs */

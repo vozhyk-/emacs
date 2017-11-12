@@ -237,7 +237,7 @@ ftcrfont_draw (struct glyph_string *s,
 #ifndef HAVE_GTK3WL
   cr = x_begin_cr_clip (f, s->gc);
 #else
-  cr = gtk3wl_begin_cr_clip (f, s->gc);
+  cr = gtk3wl_begin_cr_clip (f, NULL);
 #endif
 
   if (with_background)

@@ -1359,7 +1359,7 @@ struct glyph_string
   HDC hdc;
 #endif
 #if defined (HAVE_GTK3WL)
-  XGCValues *gc;
+  XGCValues xgcv;
 #endif
 
   /* A pointer to the first glyph in the string.  This glyph

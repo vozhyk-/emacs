@@ -9230,6 +9230,7 @@ static pthread_mutex_t select_mutex;
 static fd_set select_readfds, select_writefds;
 
 static void gtk3wl_clear_frame_area(struct frame *f, int x, int y, int width, int height);
+static void gtk3wl_fill_rectangle(struct frame *f, unsigned long color, int x, int y, int width, int height);
 
 char *
 x_get_keysym_name (int keysym)
@@ -9796,10 +9797,1491 @@ gtk3wl_initialize_display_info (struct gtk3wl_display_info *dpyinfo)
     reset_mouse_highlight (&dpyinfo->mouse_highlight);
 }
 
+/* Set S->gc to a suitable GC for drawing glyph string S in cursor
+   face.  */
+
+static void
+x_set_cursor_gc (struct glyph_string *s)
+{
+  if (s->font == FRAME_FONT (s->f)
+      && s->face->background == FRAME_BACKGROUND_PIXEL (s->f)
+      && s->face->foreground == FRAME_FOREGROUND_PIXEL (s->f)
+      && !s->cmp)
+    s->xgcv = s->f->output_data.gtk3wl->cursor_xgcv;
+  else
+    {
+      /* Cursor on non-default face: must merge.  */
+      XGCValues xgcv;
+
+      xgcv.background = s->f->output_data.gtk3wl->cursor_color;
+      xgcv.foreground = s->face->background;
+
+      /* If the glyph would be invisible, try a different foreground.  */
+      if (xgcv.foreground == xgcv.background)
+	xgcv.foreground = s->face->foreground;
+#if 0
+      if (xgcv.foreground == xgcv.background)
+	xgcv.foreground = s->f->output_data.gtk3wl->cursor_foreground_pixel;
+#endif
+      if (xgcv.foreground == xgcv.background)
+	xgcv.foreground = s->face->foreground;
+
+      /* Make sure the cursor is distinct from text in this face.  */
+      if (xgcv.background == s->face->background
+	  && xgcv.foreground == s->face->foreground)
+	{
+	  xgcv.background = s->face->foreground;
+	  xgcv.foreground = s->face->background;
+	}
+
+      IF_DEBUG (x_check_font (s->f, s->font));
+
+      s->xgcv = xgcv;
+    }
+}
+
+
+/* Set up S->gc of glyph string S for drawing text in mouse face.  */
+
+static void
+x_set_mouse_face_gc (struct glyph_string *s)
+{
+  int face_id;
+  struct face *face;
+
+  /* What face has to be used last for the mouse face?  */
+  face_id = MOUSE_HL_INFO (s->f)->mouse_face_face_id;
+  face = FACE_FROM_ID_OR_NULL (s->f, face_id);
+  if (face == NULL)
+    face = FACE_FROM_ID (s->f, MOUSE_FACE_ID);
+
+  if (s->first_glyph->type == CHAR_GLYPH)
+    face_id = FACE_FOR_CHAR (s->f, face, s->first_glyph->u.ch, -1, Qnil);
+  else
+    face_id = FACE_FOR_CHAR (s->f, face, 0, -1, Qnil);
+  s->face = FACE_FROM_ID (s->f, face_id);
+  prepare_face_for_display (s->f, s->face);
+
+  if (s->font == s->face->font) {
+    s->xgcv.foreground = s->face->foreground;
+    s->xgcv.background = s->face->background;
+  } else
+    {
+      /* Otherwise construct scratch_cursor_gc with values from FACE
+	 except for FONT.  */
+      XGCValues xgcv;
+
+      xgcv.background = s->face->background;
+      xgcv.foreground = s->face->foreground;
+
+      s->xgcv = xgcv;
+
+    }
+}
+
+
+/* Set S->gc of glyph string S to a GC suitable for drawing a mode line.
+   Faces to use in the mode line have already been computed when the
+   matrix was built, so there isn't much to do, here.  */
+
+static void
+x_set_mode_line_face_gc (struct glyph_string *s)
+{
+  s->xgcv.foreground = s->face->foreground;
+  s->xgcv.background = s->face->background;
+}
+
+
+/* Set S->gc of glyph string S for drawing that glyph string.  Set
+   S->stippled_p to a non-zero value if the face of S has a stipple
+   pattern.  */
+
+static void
+x_set_glyph_string_gc (struct glyph_string *s)
+{
+  prepare_face_for_display (s->f, s->face);
+
+  if (s->hl == DRAW_NORMAL_TEXT)
+    {
+      s->xgcv.foreground = s->face->foreground;
+      s->xgcv.background = s->face->background;
+      s->stippled_p = s->face->stipple != 0;
+    }
+  else if (s->hl == DRAW_INVERSE_VIDEO)
+    {
+      x_set_mode_line_face_gc (s);
+      s->stippled_p = s->face->stipple != 0;
+    }
+  else if (s->hl == DRAW_CURSOR)
+    {
+      x_set_cursor_gc (s);
+      s->stippled_p = false;
+    }
+  else if (s->hl == DRAW_MOUSE_FACE)
+    {
+      x_set_mouse_face_gc (s);
+      s->stippled_p = s->face->stipple != 0;
+    }
+  else if (s->hl == DRAW_IMAGE_RAISED
+	   || s->hl == DRAW_IMAGE_SUNKEN)
+    {
+      s->xgcv.foreground = s->face->foreground;
+      s->xgcv.background = s->face->background;
+      s->stippled_p = s->face->stipple != 0;
+    }
+  else
+    emacs_abort ();
+}
+
+
+/* Set clipping for output of glyph string S.  S may be part of a mode
+   line or menu if we don't have X toolkit support.  */
+
+static void
+x_set_glyph_string_clipping (struct glyph_string *s, cairo_t *cr)
+{
+  GTK3WLRect *r = s->clip;
+  int n = get_glyph_string_clip_rects (s, r, 2);
+
+  for (int i = 0; i < n; i++) {
+    cairo_rectangle(cr, r[i].origin.x, r[i].origin.y, r[i].size.width, r[i].size.height);
+    cairo_clip(cr);
+  }
+  s->num_clips = n;
+}
+
+
+/* Set SRC's clipping for output of glyph string DST.  This is called
+   when we are drawing DST's left_overhang or right_overhang only in
+   the area of SRC.  */
+
+static void
+x_set_glyph_string_clipping_exactly (struct glyph_string *src, struct glyph_string *dst, cairo_t *cr)
+{
+  dst->clip[0].origin.x = src->x;
+  dst->clip[0].origin.y = src->y;
+  dst->clip[0].size.width = src->width;
+  dst->clip[0].size.height = src->height;
+  dst->num_clips = 1;
+
+  cairo_rectangle(cr, src->x, src->y, src->width, src->height);
+  cairo_clip(cr);
+}
+
+
+/* RIF:
+   Compute left and right overhang of glyph string S.  */
+
+static void
+x_compute_glyph_string_overhangs (struct glyph_string *s)
+{
+  if (s->cmp == NULL
+      && (s->first_glyph->type == CHAR_GLYPH
+	  || s->first_glyph->type == COMPOSITE_GLYPH))
+    {
+      struct font_metrics metrics;
+
+      if (s->first_glyph->type == CHAR_GLYPH)
+	{
+	  unsigned *code = alloca (sizeof (unsigned) * s->nchars);
+	  struct font *font = s->font;
+	  int i;
+
+	  for (i = 0; i < s->nchars; i++)
+	    code[i] = s->char2b[i];
+	  font->driver->text_extents (font, code, s->nchars, &metrics);
+	}
+      else
+	{
+	  Lisp_Object gstring = composition_gstring_from_id (s->cmp_id);
+
+	  composition_gstring_width (gstring, s->cmp_from, s->cmp_to, &metrics);
+	}
+      s->right_overhang = (metrics.rbearing > metrics.width
+			   ? metrics.rbearing - metrics.width : 0);
+      s->left_overhang = metrics.lbearing < 0 ? - metrics.lbearing : 0;
+    }
+  else if (s->cmp)
+    {
+      s->right_overhang = s->cmp->rbearing - s->cmp->pixel_width;
+      s->left_overhang = - s->cmp->lbearing;
+    }
+}
+
+
+/* Fill rectangle X, Y, W, H with background color of glyph string S.  */
+
+static void
+x_clear_glyph_string_rect (struct glyph_string *s, int x, int y, int w, int h)
+{
+  gtk3wl_fill_rectangle(s->f, s->xgcv.background, x, y, w, h);
+}
+
+
+/* Draw the background of glyph_string S.  If S->background_filled_p
+   is non-zero don't draw it.  FORCE_P non-zero means draw the
+   background even if it wouldn't be drawn normally.  This is used
+   when a string preceding S draws into the background of S, or S
+   contains the first component of a composition.  */
+
+static void
+x_draw_glyph_string_background (struct glyph_string *s, bool force_p)
+{
+  /* Nothing to do if background has already been drawn or if it
+     shouldn't be drawn in the first place.  */
+  if (!s->background_filled_p)
+    {
+      int box_line_width = max (s->face->box_line_width, 0);
+
+#if 0
+      if (s->stippled_p)
+	{
+	  /* Fill background with a stipple pattern.  */
+	  XSetFillStyle (s->display, s->gc, FillOpaqueStippled);
+	  x_fill_rectangle (s->f, s->gc, s->x,
+			  s->y + box_line_width,
+			  s->background_width,
+			  s->height - 2 * box_line_width);
+	  XSetFillStyle (s->display, s->gc, FillSolid);
+	  s->background_filled_p = true;
+	}
+      else
+#endif
+	if (FONT_HEIGHT (s->font) < s->height - 2 * box_line_width
+	       /* When xdisp.c ignores FONT_HEIGHT, we cannot trust
+		  font dimensions, since the actual glyphs might be
+		  much smaller.  So in that case we always clear the
+		  rectangle with background color.  */
+	       || FONT_TOO_HIGH (s->font)
+	       || s->font_not_found_p
+	       || s->extends_to_end_of_line_p
+	       || force_p)
+	{
+	  x_clear_glyph_string_rect (s, s->x, s->y + box_line_width,
+				     s->background_width,
+				     s->height - 2 * box_line_width);
+	  s->background_filled_p = true;
+	}
+    }
+}
+
+
+static void
+gtk3wl_draw_rectangle (struct frame *f, unsigned long color, int x, int y, int width, int height)
+{
+  cairo_t *cr;
+
+  cr = gtk3wl_begin_cr_clip (f, NULL);
+  gtk3wl_set_cr_source_with_color (f, color);
+  cairo_rectangle (cr, x + 0.5, y + 0.5, width, height);
+  cairo_set_line_width (cr, 1);
+  cairo_stroke (cr);
+  gtk3wl_end_cr_clip (f);
+}
+
+/* Draw the foreground of glyph string S.  */
+
+static void
+x_draw_glyph_string_foreground (struct glyph_string *s)
+{
+  int i, x;
+
+  /* If first glyph of S has a left box line, start drawing the text
+     of S to the right of that box line.  */
+  if (s->face->box != FACE_NO_BOX
+      && s->first_glyph->left_box_line_p)
+    x = s->x + eabs (s->face->box_line_width);
+  else
+    x = s->x;
+
+  /* Draw characters of S as rectangles if S's font could not be
+     loaded.  */
+  if (s->font_not_found_p)
+    {
+      for (i = 0; i < s->nchars; ++i)
+	{
+	  struct glyph *g = s->first_glyph + i;
+	  gtk3wl_draw_rectangle (s->f,
+				 s->face->foreground, x, s->y, g->pixel_width - 1,
+				 s->height - 1);
+	  x += g->pixel_width;
+	}
+    }
+  else
+    {
+      struct font *font = s->font;
+      int boff = font->baseline_offset;
+      int y;
+
+      if (font->vertical_centering)
+	boff = VCENTER_BASELINE_OFFSET (font, s->f) - boff;
+
+      y = s->ybase - boff;
+      if (s->for_overlaps
+	  || (s->background_filled_p && s->hl != DRAW_CURSOR))
+	font->driver->draw (s, 0, s->nchars, x, y, false);
+      else
+	font->driver->draw (s, 0, s->nchars, x, y, true);
+      if (s->face->overstrike)
+	font->driver->draw (s, 0, s->nchars, x + 1, y, false);
+    }
+}
+
+/* Draw the foreground of composite glyph string S.  */
+
+static void
+x_draw_composite_glyph_string_foreground (struct glyph_string *s)
+{
+  int i, j, x;
+  struct font *font = s->font;
+
+  /* If first glyph of S has a left box line, start drawing the text
+     of S to the right of that box line.  */
+  if (s->face && s->face->box != FACE_NO_BOX
+      && s->first_glyph->left_box_line_p)
+    x = s->x + eabs (s->face->box_line_width);
+  else
+    x = s->x;
+
+  /* S is a glyph string for a composition.  S->cmp_from is the index
+     of the first character drawn for glyphs of this composition.
+     S->cmp_from == 0 means we are drawing the very first character of
+     this composition.  */
+
+  /* Draw a rectangle for the composition if the font for the very
+     first character of the composition could not be loaded.  */
+  if (s->font_not_found_p)
+    {
+      if (s->cmp_from == 0)
+	gtk3wl_draw_rectangle (s->f, s->face->foreground, x, s->y,
+			       s->width - 1, s->height - 1);
+    }
+  else if (! s->first_glyph->u.cmp.automatic)
+    {
+      int y = s->ybase;
+
+      for (i = 0, j = s->cmp_from; i < s->nchars; i++, j++)
+	/* TAB in a composition means display glyphs with padding
+	   space on the left or right.  */
+	if (COMPOSITION_GLYPH (s->cmp, j) != '\t')
+	  {
+	    int xx = x + s->cmp->offsets[j * 2];
+	    int yy = y - s->cmp->offsets[j * 2 + 1];
+
+	    font->driver->draw (s, j, j + 1, xx, yy, false);
+	    if (s->face->overstrike)
+	      font->driver->draw (s, j, j + 1, xx + 1, yy, false);
+	  }
+    }
+  else
+    {
+      Lisp_Object gstring = composition_gstring_from_id (s->cmp_id);
+      Lisp_Object glyph;
+      int y = s->ybase;
+      int width = 0;
+
+      for (i = j = s->cmp_from; i < s->cmp_to; i++)
+	{
+	  glyph = LGSTRING_GLYPH (gstring, i);
+	  if (NILP (LGLYPH_ADJUSTMENT (glyph)))
+	    width += LGLYPH_WIDTH (glyph);
+	  else
+	    {
+	      int xoff, yoff, wadjust;
+
+	      if (j < i)
+		{
+		  font->driver->draw (s, j, i, x, y, false);
+		  if (s->face->overstrike)
+		    font->driver->draw (s, j, i, x + 1, y, false);
+		  x += width;
+		}
+	      xoff = LGLYPH_XOFF (glyph);
+	      yoff = LGLYPH_YOFF (glyph);
+	      wadjust = LGLYPH_WADJUST (glyph);
+	      font->driver->draw (s, i, i + 1, x + xoff, y + yoff, false);
+	      if (s->face->overstrike)
+		font->driver->draw (s, i, i + 1, x + xoff + 1, y + yoff,
+				    false);
+	      x += wadjust;
+	      j = i + 1;
+	      width = 0;
+	    }
+	}
+      if (j < i)
+	{
+	  font->driver->draw (s, j, i, x, y, false);
+	  if (s->face->overstrike)
+	    font->driver->draw (s, j, i, x + 1, y, false);
+	}
+    }
+}
+
+
+/* Draw the foreground of glyph string S for glyphless characters.  */
+
+static void
+x_draw_glyphless_glyph_string_foreground (struct glyph_string *s)
+{
+  struct glyph *glyph = s->first_glyph;
+  XChar2b char2b[8];
+  int x, i, j;
+
+  /* If first glyph of S has a left box line, start drawing the text
+     of S to the right of that box line.  */
+  if (s->face && s->face->box != FACE_NO_BOX
+      && s->first_glyph->left_box_line_p)
+    x = s->x + eabs (s->face->box_line_width);
+  else
+    x = s->x;
+
+  s->char2b = char2b;
+
+  for (i = 0; i < s->nchars; i++, glyph++)
+    {
+      char buf[7], *str = NULL;
+      int len = glyph->u.glyphless.len;
+
+      if (glyph->u.glyphless.method == GLYPHLESS_DISPLAY_ACRONYM)
+	{
+	  if (len > 0
+	      && CHAR_TABLE_P (Vglyphless_char_display)
+	      && (CHAR_TABLE_EXTRA_SLOTS (XCHAR_TABLE (Vglyphless_char_display))
+		  >= 1))
+	    {
+	      Lisp_Object acronym
+		= (! glyph->u.glyphless.for_no_font
+		   ? CHAR_TABLE_REF (Vglyphless_char_display,
+				     glyph->u.glyphless.ch)
+		   : XCHAR_TABLE (Vglyphless_char_display)->extras[0]);
+	      if (STRINGP (acronym))
+		str = SSDATA (acronym);
+	    }
+	}
+      else if (glyph->u.glyphless.method == GLYPHLESS_DISPLAY_HEX_CODE)
+	{
+	  unsigned int ch = glyph->u.glyphless.ch;
+	  eassume (ch <= MAX_CHAR);
+	  sprintf (buf, "%0*X", ch < 0x10000 ? 4 : 6, ch);
+	  str = buf;
+	}
+
+      if (str)
+	{
+	  int upper_len = (len + 1) / 2;
+	  unsigned code;
+
+	  /* It is assured that all LEN characters in STR is ASCII.  */
+	  for (j = 0; j < len; j++)
+	    {
+	      code = s->font->driver->encode_char (s->font, str[j]);
+	      STORE_XCHAR2B (char2b + j, code >> 8, code & 0xFF);
+	    }
+	  s->font->driver->draw (s, 0, upper_len,
+				 x + glyph->slice.glyphless.upper_xoff,
+				 s->ybase + glyph->slice.glyphless.upper_yoff,
+				 false);
+	  s->font->driver->draw (s, upper_len, len,
+				 x + glyph->slice.glyphless.lower_xoff,
+				 s->ybase + glyph->slice.glyphless.lower_yoff,
+				 false);
+	}
+      if (glyph->u.glyphless.method != GLYPHLESS_DISPLAY_THIN_SPACE)
+	gtk3wl_draw_rectangle (s->f, s->face->foreground,
+			       x, s->ybase - glyph->ascent,
+			       glyph->pixel_width - 1,
+			       glyph->ascent + glyph->descent - 1);
+      x += glyph->pixel_width;
+   }
+}
+
+/* Brightness beyond which a color won't have its highlight brightness
+   boosted.
+
+   Nominally, highlight colors for `3d' faces are calculated by
+   brightening an object's color by a constant scale factor, but this
+   doesn't yield good results for dark colors, so for colors who's
+   brightness is less than this value (on a scale of 0-65535) have an
+   use an additional additive factor.
+
+   The value here is set so that the default menu-bar/mode-line color
+   (grey75) will not have its highlights changed at all.  */
+#define HIGHLIGHT_COLOR_DARK_BOOST_LIMIT 48000
+
+
+/* Allocate a color which is lighter or darker than *PIXEL by FACTOR
+   or DELTA.  Try a color with RGB values multiplied by FACTOR first.
+   If this produces the same color as PIXEL, try a color where all RGB
+   values have DELTA added.  Return the allocated color in *PIXEL.
+   DISPLAY is the X display, CMAP is the colormap to operate on.
+   Value is non-zero if successful.  */
+
+static bool
+x_alloc_lighter_color (struct frame *f, unsigned long *pixel, double factor, int delta)
+{
+  XColor color, new;
+  long bright;
+  bool success_p;
+
+  /* Get RGB color values.  */
+  color.pixel = *pixel;
+  gtk3wl_query_color (f, &color);
+
+  /* Change RGB values by specified FACTOR.  Avoid overflow!  */
+  eassert (factor >= 0);
+  new.red = min (0xffff, factor * color.red);
+  new.green = min (0xffff, factor * color.green);
+  new.blue = min (0xffff, factor * color.blue);
+
+  /* Calculate brightness of COLOR.  */
+  bright = (2 * color.red + 3 * color.green + color.blue) / 6;
+
+  /* We only boost colors that are darker than
+     HIGHLIGHT_COLOR_DARK_BOOST_LIMIT.  */
+  if (bright < HIGHLIGHT_COLOR_DARK_BOOST_LIMIT)
+    /* Make an additive adjustment to NEW, because it's dark enough so
+       that scaling by FACTOR alone isn't enough.  */
+    {
+      /* How far below the limit this color is (0 - 1, 1 being darker).  */
+      double dimness = 1 - (double)bright / HIGHLIGHT_COLOR_DARK_BOOST_LIMIT;
+      /* The additive adjustment.  */
+      int min_delta = delta * dimness * factor / 2;
+
+      if (factor < 1)
+	{
+	  new.red =   max (0, new.red -   min_delta);
+	  new.green = max (0, new.green - min_delta);
+	  new.blue =  max (0, new.blue -  min_delta);
+	}
+      else
+	{
+	  new.red =   min (0xffff, min_delta + new.red);
+	  new.green = min (0xffff, min_delta + new.green);
+	  new.blue =  min (0xffff, min_delta + new.blue);
+	}
+    }
+
+  /* Try to allocate the color.  */
+  new.pixel = new.red >> 8 << 16 | new.green >> 8 << 8 | new.blue >> 8;
+  success_p = true;
+  if (success_p)
+    {
+      if (new.pixel == *pixel)
+	{
+	  /* If we end up with the same color as before, try adding
+	     delta to the RGB values.  */
+	  new.red = min (0xffff, delta + color.red);
+	  new.green = min (0xffff, delta + color.green);
+	  new.blue = min (0xffff, delta + color.blue);
+	  new.pixel = new.red >> 8 << 16 | new.green >> 8 << 8 | new.blue >> 8;
+	  success_p = true;
+	}
+      else
+	success_p = true;
+      *pixel = new.pixel;
+    }
+
+  return success_p;
+}
+
+static void
+x_fill_trapezoid_for_relief (struct frame *f, unsigned long color, int x, int y,
+			     int width, int height, int top_p)
+{
+  cairo_t *cr;
+
+  cr = gtk3wl_begin_cr_clip (f, NULL);
+  gtk3wl_set_cr_source_with_color (f, color);
+  cairo_move_to (cr, top_p ? x : x + height, y);
+  cairo_line_to (cr, x, y + height);
+  cairo_line_to (cr, top_p ? x + width - height : x + width, y + height);
+  cairo_line_to (cr, x + width, y);
+  cairo_fill (cr);
+  gtk3wl_end_cr_clip (f);
+}
+
+enum corners
+  {
+    CORNER_BOTTOM_RIGHT,	/* 0 -> pi/2 */
+    CORNER_BOTTOM_LEFT,		/* pi/2 -> pi */
+    CORNER_TOP_LEFT,		/* pi -> 3pi/2 */
+    CORNER_TOP_RIGHT,		/* 3pi/2 -> 2pi */
+    CORNER_LAST
+  };
+
+static void
+x_erase_corners_for_relief (struct frame *f, unsigned long color, int x, int y,
+			    int width, int height,
+			    double radius, double margin, int corners)
+{
+  cairo_t *cr;
+  int i;
+
+  cr = gtk3wl_begin_cr_clip (f, NULL);
+  gtk3wl_set_cr_source_with_color (f, color);
+  for (i = 0; i < CORNER_LAST; i++)
+    if (corners & (1 << i))
+      {
+	double xm, ym, xc, yc;
+
+	if (i == CORNER_TOP_LEFT || i == CORNER_BOTTOM_LEFT)
+	  xm = x - margin, xc = xm + radius;
+	else
+	  xm = x + width + margin, xc = xm - radius;
+	if (i == CORNER_TOP_LEFT || i == CORNER_TOP_RIGHT)
+	  ym = y - margin, yc = ym + radius;
+	else
+	  ym = y + height + margin, yc = ym - radius;
+
+	cairo_move_to (cr, xm, ym);
+	cairo_arc (cr, xc, yc, radius, i * M_PI_2, (i + 1) * M_PI_2);
+      }
+  cairo_clip (cr);
+  cairo_rectangle (cr, x, y, width, height);
+  cairo_fill (cr);
+  gtk3wl_end_cr_clip (f);
+}
+
+/* Set up the foreground color for drawing relief lines of glyph
+   string S.  RELIEF is a pointer to a struct relief containing the GC
+   with which lines will be drawn.  Use a color that is FACTOR or
+   DELTA lighter or darker than the relief's background which is found
+   in S->f->output_data.x->relief_background.  If such a color cannot
+   be allocated, use DEFAULT_PIXEL, instead.  */
+
+static void
+x_setup_relief_color (struct frame *f, struct relief *relief, double factor,
+		      int delta, unsigned long default_pixel)
+{
+  XGCValues xgcv;
+  struct gtk3wl_output *di = f->output_data.gtk3wl;
+  unsigned long pixel;
+  unsigned long background = di->relief_background;
+  struct x_display_info *dpyinfo = FRAME_DISPLAY_INFO (f);
+  Display *dpy = FRAME_X_DISPLAY (f);
+
+  // xgcv.line_width = 1;
+
+  /* Allocate new color.  */
+  xgcv.foreground = default_pixel;
+  pixel = background;
+  if (x_alloc_lighter_color (f, &pixel, factor, delta))
+    xgcv.foreground = relief->pixel = pixel;
+
+  relief->xgcv = xgcv;
+}
+
+/* Set up colors for the relief lines around glyph string S.  */
+
+static void
+x_setup_relief_colors (struct glyph_string *s)
+{
+  struct gtk3wl_output *di = s->f->output_data.gtk3wl;
+  unsigned long color;
+
+  if (s->face->use_box_color_for_shadows_p)
+    color = s->face->box_color;
+  else if (s->first_glyph->type == IMAGE_GLYPH
+	   && s->img->pixmap
+	   && !IMAGE_BACKGROUND_TRANSPARENT (s->img, s->f, 0))
+    color = IMAGE_BACKGROUND (s->img, s->f, 0);
+  else
+    {
+      /* Get the background color of the face.  */
+      color = s->xgcv.background;
+    }
+
+  if (TRUE)
+    {
+      di->relief_background = color;
+      x_setup_relief_color (s->f, &di->white_relief, 1.2, 0x8000,
+			    WHITE_PIX_DEFAULT (s->f));
+      x_setup_relief_color (s->f, &di->black_relief, 0.6, 0x4000,
+			    BLACK_PIX_DEFAULT (s->f));
+    }
+}
+
+
+static void
+x_set_clip_rectangles (struct frame *f, cairo_t *cr, XRectangle *rectangles, int n)
+{
+  for (int i = 0; i < n; i++) {
+    cairo_rectangle(cr,
+		    rectangles[i].x,
+		    rectangles[i].y,
+		    rectangles[i].width,
+		    rectangles[i].height);
+    cairo_clip(cr);
+  }
+}
+
+/* Draw a relief on frame F inside the rectangle given by LEFT_X,
+   TOP_Y, RIGHT_X, and BOTTOM_Y.  WIDTH is the thickness of the relief
+   to draw, it must be >= 0.  RAISED_P means draw a raised
+   relief.  LEFT_P means draw a relief on the left side of
+   the rectangle.  RIGHT_P means draw a relief on the right
+   side of the rectangle.  CLIP_RECT is the clipping rectangle to use
+   when drawing.  */
+
+static void
+x_draw_relief_rect (struct frame *f,
+		    int left_x, int top_y, int right_x, int bottom_y,
+		    int width, bool raised_p, bool top_p, bool bot_p,
+		    bool left_p, bool right_p,
+		    XRectangle *clip_rect)
+{
+  unsigned long top_left_color, bottom_right_color;
+  int corners = 0;
+
+  cairo_t *cr = gtk3wl_begin_cr_clip(f, NULL);
+
+  if (raised_p)
+    {
+      top_left_color = f->output_data.gtk3wl->white_relief.xgcv.foreground;
+      bottom_right_color = f->output_data.gtk3wl->black_relief.xgcv.foreground;
+    }
+  else
+    {
+      top_left_color = f->output_data.gtk3wl->black_relief.xgcv.foreground;
+      bottom_right_color = f->output_data.gtk3wl->white_relief.xgcv.foreground;
+    }
+
+  x_set_clip_rectangles (f, cr, clip_rect, 1);
+
+  if (left_p)
+    {
+      gtk3wl_fill_rectangle (f, top_left_color, left_x, top_y,
+			     width, bottom_y + 1 - top_y);
+      if (top_p)
+	corners |= 1 << CORNER_TOP_LEFT;
+      if (bot_p)
+	corners |= 1 << CORNER_BOTTOM_LEFT;
+    }
+  if (right_p)
+    {
+      gtk3wl_fill_rectangle (f, bottom_right_color, right_x + 1 - width, top_y,
+			     width, bottom_y + 1 - top_y);
+      if (top_p)
+	corners |= 1 << CORNER_TOP_RIGHT;
+      if (bot_p)
+	corners |= 1 << CORNER_BOTTOM_RIGHT;
+    }
+  if (top_p)
+    {
+      if (!right_p)
+	gtk3wl_fill_rectangle (f, top_left_color, left_x, top_y,
+			       right_x + 1 - left_x, width);
+      else
+	x_fill_trapezoid_for_relief (f, top_left_color, left_x, top_y,
+				     right_x + 1 - left_x, width, 1);
+    }
+  if (bot_p)
+    {
+      if (!left_p)
+	gtk3wl_fill_rectangle (f, bottom_right_color, left_x, bottom_y + 1 - width,
+			       right_x + 1 - left_x, width);
+      else
+	x_fill_trapezoid_for_relief (f, bottom_right_color,
+				     left_x, bottom_y + 1 - width,
+				     right_x + 1 - left_x, width, 0);
+    }
+  if (left_p && width != 1)
+    gtk3wl_fill_rectangle (f, bottom_right_color, left_x, top_y,
+			   1, bottom_y + 1 - top_y);
+  if (top_p && width != 1)
+    gtk3wl_fill_rectangle (f, bottom_right_color, left_x, top_y,
+			   right_x + 1 - left_x, 1);
+  if (corners)
+    {
+      x_erase_corners_for_relief (f, FRAME_BACKGROUND_PIXEL (f), left_x, top_y,
+				  right_x - left_x + 1, bottom_y - top_y + 1,
+				  6, 1, corners);
+    }
+
+  gtk3wl_end_cr_clip(f);
+}
+
+/* Draw a box on frame F inside the rectangle given by LEFT_X, TOP_Y,
+   RIGHT_X, and BOTTOM_Y.  WIDTH is the thickness of the lines to
+   draw, it must be >= 0.  LEFT_P means draw a line on the
+   left side of the rectangle.  RIGHT_P means draw a line
+   on the right side of the rectangle.  CLIP_RECT is the clipping
+   rectangle to use when drawing.  */
+
+static void
+x_draw_box_rect (struct glyph_string *s,
+		 int left_x, int top_y, int right_x, int bottom_y, int width,
+		 bool left_p, bool right_p, XRectangle *clip_rect)
+{
+  unsigned long foreground_backup;
+
+  cairo_t *cr = gtk3wl_begin_cr_clip(s->f, NULL);
+
+  foreground_backup = s->xgcv.foreground;
+  s->xgcv.foreground = s->face->box_color;
+
+  x_set_clip_rectangles (s->f, cr, clip_rect, 1);
+
+  /* Top.  */
+  gtk3wl_fill_rectangle (s->f, s->xgcv.foreground,
+			 left_x, top_y, right_x - left_x + 1, width);
+
+  /* Left.  */
+  if (left_p)
+    gtk3wl_fill_rectangle (s->f, s->xgcv.foreground,
+			   left_x, top_y, width, bottom_y - top_y + 1);
+
+  /* Bottom.  */
+  gtk3wl_fill_rectangle (s->f, s->xgcv.foreground,
+			 left_x, bottom_y - width + 1, right_x - left_x + 1, width);
+
+  /* Right.  */
+  if (right_p)
+    gtk3wl_fill_rectangle (s->f, s->xgcv.foreground,
+			   right_x - width + 1, top_y, width, bottom_y - top_y + 1);
+
+  s->xgcv.foreground = foreground_backup;
+
+  gtk3wl_end_cr_clip(s->f);
+}
+
+
+/* Draw a box around glyph string S.  */
+
+static void
+x_draw_glyph_string_box (struct glyph_string *s)
+{
+  int width, left_x, right_x, top_y, bottom_y, last_x;
+  bool raised_p, left_p, right_p;
+  struct glyph *last_glyph;
+  GTK3WLRect clip_rect;
+
+  last_x = ((s->row->full_width_p && !s->w->pseudo_window_p)
+	    ? WINDOW_RIGHT_EDGE_X (s->w)
+	    : window_box_right (s->w, s->area));
+
+  /* The glyph that may have a right box line.  */
+  last_glyph = (s->cmp || s->img
+		? s->first_glyph
+		: s->first_glyph + s->nchars - 1);
+
+  width = eabs (s->face->box_line_width);
+  raised_p = s->face->box == FACE_RAISED_BOX;
+  left_x = s->x;
+  right_x = (s->row->full_width_p && s->extends_to_end_of_line_p
+	     ? last_x - 1
+	     : min (last_x, s->x + s->background_width) - 1);
+  top_y = s->y;
+  bottom_y = top_y + s->height - 1;
+
+  left_p = (s->first_glyph->left_box_line_p
+	    || (s->hl == DRAW_MOUSE_FACE
+		&& (s->prev == NULL
+		    || s->prev->hl != s->hl)));
+  right_p = (last_glyph->right_box_line_p
+	     || (s->hl == DRAW_MOUSE_FACE
+		 && (s->next == NULL
+		     || s->next->hl != s->hl)));
+
+  get_glyph_string_clip_rect (s, &clip_rect);
+  XRectangle rect;
+  rect.x = clip_rect.origin.x;
+  rect.y = clip_rect.origin.y;
+  rect.width = clip_rect.size.width;
+  rect.height = clip_rect.size.height;
+
+  if (s->face->box == FACE_SIMPLE_BOX)
+    x_draw_box_rect (s, left_x, top_y, right_x, bottom_y, width,
+		     left_p, right_p, &rect);
+  else
+    {
+      x_setup_relief_colors (s);
+      x_draw_relief_rect (s->f, left_x, top_y, right_x, bottom_y,
+			  width, raised_p, true, true, left_p, right_p,
+			  &rect);
+    }
+}
+
+static void
+x_get_scale_factor(int *scale_x, int *scale_y)
+{
+  *scale_x = *scale_y = 1;
+}
+
+static void
+x_draw_horizontal_wave (struct frame *f, unsigned long color, int x, int y,
+			int width, int height, int wave_length)
+{
+  cairo_t *cr;
+  double dx = wave_length, dy = height - 1;
+  int xoffset, n;
+
+  cr = gtk3wl_begin_cr_clip (f, NULL);
+  gtk3wl_set_cr_source_with_gc_foreground (f, NULL);
+  cairo_rectangle (cr, x, y, width, height);
+  cairo_clip (cr);
+
+  if (x >= 0)
+    {
+      xoffset = x % (wave_length * 2);
+      if (xoffset == 0)
+	xoffset = wave_length * 2;
+    }
+  else
+    xoffset = x % (wave_length * 2) + wave_length * 2;
+  n = (width + xoffset) / wave_length + 1;
+  if (xoffset > wave_length)
+    {
+      xoffset -= wave_length;
+      --n;
+      y += height - 1;
+      dy = -dy;
+    }
+
+  cairo_move_to (cr, x - xoffset + 0.5, y + 0.5);
+  while (--n >= 0)
+    {
+      cairo_rel_line_to (cr, dx, dy);
+      dy = -dy;
+    }
+  cairo_set_line_width (cr, 1);
+  cairo_stroke (cr);
+  gtk3wl_end_cr_clip (f);
+}
+
+/*
+   Draw a wavy line under S. The wave fills wave_height pixels from y0.
+
+                    x0         wave_length = 2
+                                 --
+                y0   *   *   *   *   *
+                     |* * * * * * * * *
+    wave_height = 3  | *   *   *   *
+
+*/
+static void
+x_draw_underwave (struct glyph_string *s, unsigned long color)
+{
+  /* Adjust for scale/HiDPI.  */
+  int scale_x, scale_y;
+
+  x_get_scale_factor (&scale_x, &scale_y);
+
+  int wave_height = 3 * scale_y, wave_length = 2 * scale_x, thickness = scale_y;
+
+  x_draw_horizontal_wave (s->f, color, s->x, s->ybase - wave_height + 3,
+			  s->width, wave_height, wave_length);
+}
+
+/* Draw the foreground of image glyph string S to PIXMAP.  */
+
+static void
+x_draw_image_foreground_1 (struct glyph_string *s, cairo_surface_t *surface)
+{
+  int x = 0;
+  int y = s->ybase - s->y - image_ascent (s->img, s->face, &s->slice);
+
+  /* If first glyph of S has a left box line, start drawing it to the
+     right of that line.  */
+  if (s->face->box != FACE_NO_BOX
+      && s->first_glyph->left_box_line_p
+      && s->slice.x == 0)
+    x += eabs (s->face->box_line_width);
+
+  /* If there is a margin around the image, adjust x- and y-position
+     by that margin.  */
+  if (s->slice.x == 0)
+    x += s->img->hmargin;
+  if (s->slice.y == 0)
+    y += s->img->vmargin;
+
+#if 0
+  if (s->img->pixmap)
+    {
+      if (s->img->mask)
+	{
+	  /* We can't set both a clip mask and use XSetClipRectangles
+	     because the latter also sets a clip mask.  We also can't
+	     trust on the shape extension to be available
+	     (XShapeCombineRegion).  So, compute the rectangle to draw
+	     manually.  */
+	  unsigned long mask = (GCClipMask | GCClipXOrigin | GCClipYOrigin
+				| GCFunction);
+	  XGCValues xgcv;
+
+	  xgcv.clip_mask = s->img->mask;
+	  xgcv.clip_x_origin = x - s->slice.x;
+	  xgcv.clip_y_origin = y - s->slice.y;
+	  xgcv.function = GXcopy;
+	  XChangeGC (s->display, s->gc, mask, &xgcv);
+
+	  XCopyArea (s->display, s->img->pixmap, pixmap, s->gc,
+		     s->slice.x, s->slice.y,
+		     s->slice.width, s->slice.height, x, y);
+	  XSetClipMask (s->display, s->gc, None);
+	}
+      else
+	{
+	  XCopyArea (s->display, s->img->pixmap, pixmap, s->gc,
+		     s->slice.x, s->slice.y,
+		     s->slice.width, s->slice.height, x, y);
+
+	  /* When the image has a mask, we can expect that at
+	     least part of a mouse highlight or a block cursor will
+	     be visible.  If the image doesn't have a mask, make
+	     a block cursor visible by drawing a rectangle around
+	     the image.  I believe it's looking better if we do
+	     nothing here for mouse-face.  */
+	  if (s->hl == DRAW_CURSOR)
+	    {
+	      int r = eabs (s->img->relief);
+	      x_draw_rectangle (s->f, s->gc, x - r, y - r,
+			      s->slice.width + r*2 - 1,
+			      s->slice.height + r*2 - 1);
+	    }
+	}
+    }
+  else
+#endif
+    /* Draw a rectangle if image could not be loaded.  */
+    gtk3wl_draw_rectangle (s->f, s->xgcv.foreground, x, y,
+			   s->slice.width - 1, s->slice.height - 1);
+}
+
+/* Draw a relief around the image glyph string S.  */
+
+static void
+x_draw_image_relief (struct glyph_string *s)
+{
+  int x1, y1, thick;
+  bool raised_p, top_p, bot_p, left_p, right_p;
+  int extra_x, extra_y;
+  XRectangle r;
+  int x = s->x;
+  int y = s->ybase - image_ascent (s->img, s->face, &s->slice);
+
+  /* If first glyph of S has a left box line, start drawing it to the
+     right of that line.  */
+  if (s->face->box != FACE_NO_BOX
+      && s->first_glyph->left_box_line_p
+      && s->slice.x == 0)
+    x += eabs (s->face->box_line_width);
+
+  /* If there is a margin around the image, adjust x- and y-position
+     by that margin.  */
+  if (s->slice.x == 0)
+    x += s->img->hmargin;
+  if (s->slice.y == 0)
+    y += s->img->vmargin;
+
+  if (s->hl == DRAW_IMAGE_SUNKEN
+      || s->hl == DRAW_IMAGE_RAISED)
+    {
+      thick = tool_bar_button_relief >= 0 ? tool_bar_button_relief : DEFAULT_TOOL_BAR_BUTTON_RELIEF;
+      raised_p = s->hl == DRAW_IMAGE_RAISED;
+    }
+  else
+    {
+      thick = eabs (s->img->relief);
+      raised_p = s->img->relief > 0;
+    }
+
+  x1 = x + s->slice.width - 1;
+  y1 = y + s->slice.height - 1;
+
+  extra_x = extra_y = 0;
+  if (s->face->id == TOOL_BAR_FACE_ID)
+    {
+      if (CONSP (Vtool_bar_button_margin)
+	  && INTEGERP (XCAR (Vtool_bar_button_margin))
+	  && INTEGERP (XCDR (Vtool_bar_button_margin)))
+	{
+	  extra_x = XINT (XCAR (Vtool_bar_button_margin));
+	  extra_y = XINT (XCDR (Vtool_bar_button_margin));
+	}
+      else if (INTEGERP (Vtool_bar_button_margin))
+	extra_x = extra_y = XINT (Vtool_bar_button_margin);
+    }
+
+  top_p = bot_p = left_p = right_p = false;
+
+  if (s->slice.x == 0)
+    x -= thick + extra_x, left_p = true;
+  if (s->slice.y == 0)
+    y -= thick + extra_y, top_p = true;
+  if (s->slice.x + s->slice.width == s->img->width)
+    x1 += thick + extra_x, right_p = true;
+  if (s->slice.y + s->slice.height == s->img->height)
+    y1 += thick + extra_y, bot_p = true;
+
+  x_setup_relief_colors (s);
+  get_glyph_string_clip_rect (s, &r);
+  x_draw_relief_rect (s->f, x, y, x1, y1, thick, raised_p,
+		      top_p, bot_p, left_p, right_p, &r);
+}
+
+/* Draw part of the background of glyph string S.  X, Y, W, and H
+   give the rectangle to draw.  */
+
+static void
+x_draw_glyph_string_bg_rect (struct glyph_string *s, int x, int y, int w, int h)
+{
+#if 0
+  if (s->stippled_p)
+    {
+      /* Fill background with a stipple pattern.  */
+      XSetFillStyle (s->display, s->gc, FillOpaqueStippled);
+      x_fill_rectangle (s->f, s->gc, x, y, w, h);
+      XSetFillStyle (s->display, s->gc, FillSolid);
+    }
+  else
+#endif
+    x_clear_glyph_string_rect (s, x, y, w, h);
+}
+
+/* Draw foreground of image glyph string S.  */
+
+static void
+x_draw_image_foreground (struct glyph_string *s)
+{
+  int x = s->x;
+  int y = s->ybase - image_ascent (s->img, s->face, &s->slice);
+
+  /* If first glyph of S has a left box line, start drawing it to the
+     right of that line.  */
+  if (s->face->box != FACE_NO_BOX
+      && s->first_glyph->left_box_line_p
+      && s->slice.x == 0)
+    x += eabs (s->face->box_line_width);
+
+  /* If there is a margin around the image, adjust x- and y-position
+     by that margin.  */
+  if (s->slice.x == 0)
+    x += s->img->hmargin;
+  if (s->slice.y == 0)
+    y += s->img->vmargin;
+
+#if 0
+  if (s->img->pixmap)
+    {
+      if (s->img->mask)
+	{
+	  /* We can't set both a clip mask and use XSetClipRectangles
+	     because the latter also sets a clip mask.  We also can't
+	     trust on the shape extension to be available
+	     (XShapeCombineRegion).  So, compute the rectangle to draw
+	     manually.  */
+	  unsigned long mask = (GCClipMask | GCClipXOrigin | GCClipYOrigin
+				| GCFunction);
+	  XGCValues xgcv;
+	  XRectangle clip_rect, image_rect, r;
+
+	  xgcv.clip_mask = s->img->mask;
+	  xgcv.clip_x_origin = x;
+	  xgcv.clip_y_origin = y;
+	  xgcv.function = GXcopy;
+	  XChangeGC (s->display, s->gc, mask, &xgcv);
+
+	  get_glyph_string_clip_rect (s, &clip_rect);
+	  image_rect.x = x;
+	  image_rect.y = y;
+	  image_rect.width = s->slice.width;
+	  image_rect.height = s->slice.height;
+	  if (x_intersect_rectangles (&clip_rect, &image_rect, &r))
+            XCopyArea (s->display, s->img->pixmap,
+                       FRAME_X_DRAWABLE (s->f), s->gc,
+		       s->slice.x + r.x - x, s->slice.y + r.y - y,
+		       r.width, r.height, r.x, r.y);
+	}
+      else
+	{
+	  XRectangle clip_rect, image_rect, r;
+
+	  get_glyph_string_clip_rect (s, &clip_rect);
+	  image_rect.x = x;
+	  image_rect.y = y;
+	  image_rect.width = s->slice.width;
+	  image_rect.height = s->slice.height;
+	  if (x_intersect_rectangles (&clip_rect, &image_rect, &r))
+            XCopyArea (s->display, s->img->pixmap,
+                       FRAME_X_DRAWABLE (s->f), s->gc,
+		       s->slice.x + r.x - x, s->slice.y + r.y - y,
+		       r.width, r.height, r.x, r.y);
+
+	  /* When the image has a mask, we can expect that at
+	     least part of a mouse highlight or a block cursor will
+	     be visible.  If the image doesn't have a mask, make
+	     a block cursor visible by drawing a rectangle around
+	     the image.  I believe it's looking better if we do
+	     nothing here for mouse-face.  */
+	  if (s->hl == DRAW_CURSOR)
+	    {
+	      int relief = eabs (s->img->relief);
+	      x_draw_rectangle (s->f, s->gc,
+			      x - relief, y - relief,
+			      s->slice.width + relief*2 - 1,
+			      s->slice.height + relief*2 - 1);
+	    }
+	}
+    }
+  else
+#endif
+    /* Draw a rectangle if image could not be loaded.  */
+    gtk3wl_draw_rectangle (s->f, s->xgcv.foreground, x, y,
+			   s->slice.width - 1, s->slice.height - 1);
+}
+
+/* Draw image glyph string S.
+
+            s->y
+   s->x      +-------------------------
+	     |   s->face->box
+	     |
+	     |     +-------------------------
+	     |     |  s->img->margin
+	     |     |
+	     |     |       +-------------------
+	     |     |       |  the image
+
+ */
+
+static void
+x_draw_image_glyph_string (struct glyph_string *s)
+{
+  int box_line_hwidth = eabs (s->face->box_line_width);
+  int box_line_vwidth = max (s->face->box_line_width, 0);
+  int height;
+  cairo_surface_t *surface = NULL;
+
+  height = s->height;
+  if (s->slice.y == 0)
+    height -= box_line_vwidth;
+  if (s->slice.y + s->slice.height >= s->img->height)
+    height -= box_line_vwidth;
+
+  /* Fill background with face under the image.  Do it only if row is
+     taller than image or if image has a clip mask to reduce
+     flickering.  */
+  s->stippled_p = s->face->stipple != 0;
+  if (height > s->slice.height
+      || s->img->hmargin
+      || s->img->vmargin
+      || s->img->mask
+      || s->img->pixmap == 0
+      || s->width != s->background_width)
+    {
+      if (s->img->mask)
+	{
+	  /* Create a pixmap as large as the glyph string.  Fill it
+	     with the background color.  Copy the image to it, using
+	     its mask.  Copy the temporary pixmap to the display.  */
+
+	  /* Create a pixmap as large as the glyph string.  */
+	  surface = cairo_surface_create_similar(FRAME_CR_SURFACE(s->f), CAIRO_CONTENT_COLOR_ALPHA,
+						 s->background_width,
+						 s->height);
+
+	  /* Don't clip in the following because we're working on the
+	     pixmap.  */
+	  // XSetClipMask (s->display, s->gc, None);
+
+	  /* Fill the pixmap with the background color/stipple.  */
+#if 0
+	  if (s->stippled_p)
+	    {
+	      /* Fill background with a stipple pattern.  */
+	      XSetFillStyle (s->display, s->gc, FillOpaqueStippled);
+	      XSetTSOrigin (s->display, s->gc, - s->x, - s->y);
+	      XFillRectangle (s->display, pixmap, s->gc,
+			      0, 0, s->background_width, s->height);
+	      XSetFillStyle (s->display, s->gc, FillSolid);
+	      XSetTSOrigin (s->display, s->gc, 0, 0);
+	    }
+	  else
+#endif
+	    {
+	      cairo_t *cr = cairo_create(surface);
+	      int red = (s->xgcv.background >> 16) & 0xff;
+	      int green = (s->xgcv.background >> 8) & 0xff;
+	      int blue = (s->xgcv.background >> 0) & 0xff;
+	      cairo_set_source_rgb (cr, red / 255.0, green / 255.0, blue / 255.0);
+	      cairo_rectangle(cr, 0, 0, s->background_width, s->height);
+	      cairo_fill(cr);
+	      cairo_destroy(cr);
+	    }
+	}
+      else
+	{
+	  int x = s->x;
+	  int y = s->y;
+	  int width = s->background_width;
+
+	  if (s->first_glyph->left_box_line_p
+	      && s->slice.x == 0)
+	    {
+	      x += box_line_hwidth;
+	      width -= box_line_hwidth;
+	    }
+
+	  if (s->slice.y == 0)
+	    y += box_line_vwidth;
+
+	  x_draw_glyph_string_bg_rect (s, x, y, width, height);
+	}
+
+      s->background_filled_p = true;
+    }
+
+  /* Draw the foreground.  */
+  if (s->img->cr_data)
+    {
+      cairo_t *cr = gtk3wl_begin_cr_clip (s->f, NULL);
+
+      int x = s->x + s->img->hmargin;
+      int y = s->y + s->img->vmargin;
+      int width = s->background_width;
+
+      cairo_set_source_surface (cr, s->img->cr_data,
+                                x - s->slice.x,
+                                y - s->slice.y);
+      cairo_rectangle (cr, x, y, width, height);
+      cairo_fill (cr);
+      gtk3wl_end_cr_clip (s->f);
+    }
+  else
+    if (surface != NULL)
+    {
+      cairo_t *cr = gtk3wl_begin_cr_clip(s->f, NULL);
+
+      x_draw_image_foreground_1 (s, surface);
+      x_set_glyph_string_clipping (s, cr);
+
+      cairo_set_source_surface(cr, surface, 0, 0);
+      cairo_rectangle(cr, s->x, s->y, s->background_width, s->height);
+      gtk3wl_end_cr_clip(s->f);
+    }
+  else
+    x_draw_image_foreground (s);
+
+  /* If we must draw a relief around the image, do it.  */
+  if (s->img->relief
+      || s->hl == DRAW_IMAGE_RAISED
+      || s->hl == DRAW_IMAGE_SUNKEN)
+    x_draw_image_relief (s);
+
+  if (surface != NULL)
+    cairo_surface_destroy(surface);
+}
+
+/* Draw stretch glyph string S.  */
+
+static void
+x_draw_stretch_glyph_string (struct glyph_string *s)
+{
+  eassert (s->first_glyph->type == STRETCH_GLYPH);
+
+  if (s->hl == DRAW_CURSOR
+      && !x_stretch_cursor_p)
+    {
+      /* If `x-stretch-cursor' is nil, don't draw a block cursor as
+	 wide as the stretch glyph.  */
+      int width, background_width = s->background_width;
+      int x = s->x;
+
+      if (!s->row->reversed_p)
+	{
+	  int left_x = window_box_left_offset (s->w, TEXT_AREA);
+
+	  if (x < left_x)
+	    {
+	      background_width -= left_x - x;
+	      x = left_x;
+	    }
+	}
+      else
+	{
+	  /* In R2L rows, draw the cursor on the right edge of the
+	     stretch glyph.  */
+	  int right_x = window_box_right (s->w, TEXT_AREA);
+
+	  if (x + background_width > right_x)
+	    background_width -= x - right_x;
+	  x += background_width;
+	}
+      width = min (FRAME_COLUMN_WIDTH (s->f), background_width);
+      if (s->row->reversed_p)
+	x -= width;
+
+      /* Draw cursor.  */
+      x_draw_glyph_string_bg_rect (s, x, s->y, width, s->height);
+
+      /* Clear rest using the GC of the original non-cursor face.  */
+      if (width < background_width)
+	{
+	  int y = s->y;
+	  int w = background_width - width, h = s->height;
+	  XRectangle r;
+	  unsigned long color;
+
+	  if (!s->row->reversed_p)
+	    x += width;
+	  else
+	    x = s->x;
+	  if (s->row->mouse_face_p
+	      && cursor_in_mouse_face_p (s->w))
+	    {
+	      x_set_mouse_face_gc (s);
+	      color = s->xgcv.foreground;
+	    }
+	  else
+	    color = s->face->foreground;
+
+	  cairo_t *cr = gtk3wl_begin_cr_clip(s->f, NULL);
+
+	  get_glyph_string_clip_rect (s, &r);
+	  x_set_clip_rectangles (s->f, cr, &r, 1);
+
+#if 0
+	  if (s->face->stipple)
+	    {
+	      /* Fill background with a stipple pattern.  */
+	      XSetFillStyle (s->display, gc, FillOpaqueStippled);
+	      x_fill_rectangle (s->f, gc, x, y, w, h);
+	      XSetFillStyle (s->display, gc, FillSolid);
+	    }
+	  else
+#endif
+	    {
+	      gtk3wl_fill_rectangle(s->f, color, x, y, w, h);
+	    }
+
+	  gtk3wl_end_cr_clip(s->f);
+	}
+    }
+  else if (!s->background_filled_p)
+    {
+      int background_width = s->background_width;
+      int x = s->x, left_x = window_box_left_offset (s->w, TEXT_AREA);
+
+      /* Don't draw into left margin, fringe or scrollbar area
+         except for header line and mode line.  */
+      if (x < left_x && !s->row->mode_line_p)
+	{
+	  background_width -= left_x - x;
+	  x = left_x;
+	}
+      if (background_width > 0)
+	x_draw_glyph_string_bg_rect (s, x, s->y, background_width, s->height);
+    }
+
+  s->background_filled_p = true;
+}
+
 static void gtk3wl_draw_glyph_string(struct glyph_string *s)
 {
   GTK3WL_TRACE("draw_glyph_string.");
 
+#if 0
   GTK3WL_TRACE("%s", SSDATA(SYMBOL_NAME(s->font->driver->type)));
   GTK3WL_TRACE("type: %d", s->first_glyph->type);
   if (s->first_glyph->type == CHAR_GLYPH) {
@@ -9809,30 +11291,8 @@ static void gtk3wl_draw_glyph_string(struct glyph_string *s)
     GTK3WL_TRACE("");
     s->font->driver->draw(s, 0, s->nchars, s->x, s->y + s->first_glyph->ascent, false);
   }
-
-#if 0
-  GTK3WL_TRACE("chars:");
-  for (int i = 0; i < s->nchars; i++)
-    GTK3WL_TRACE(" %04x", s->char2b[i]);
-  GTK3WL_TRACE("");
-
-  // ftcr を使う必要がある。
-  cairo_glyph_t *glyphs = malloc(sizeof *glyphs * s->nchars);
-  for (int i = 0; i < s->nchars; i++) {
-    glyphs[i].index = s->char2b[i];
-    glyphs[i].x = i * 10;
-    glyphs[i].y = 50;
-  }
-
-  cairo_t *cr = gtk3wl_begin_cr_clip(s->f, NULL);
-  cairo_select_font_face(cr, "Noto Sans Mono CJK", CAIRO_FONT_SLANT_NORMAL, CAIRO_FONT_WEIGHT_NORMAL);
-  cairo_set_font_size(cr, 12);
-  cairo_move_to(cr, 20, 50);
-  cairo_show_glyphs(cr, glyphs, s->nchars);
-  gtk3wl_end_cr_clip(s->f);
 #endif
 
-#if 0
   bool relief_drawn_p = false;
 
   /* If S draws into the background of its successors, draw the
@@ -9848,18 +11308,22 @@ static void gtk3wl_draw_glyph_string(struct glyph_string *s)
 	   width += next->width, next = next->next)
 	if (next->first_glyph->type != IMAGE_GLYPH)
 	  {
+	    cairo_t *cr = gtk3wl_begin_cr_clip(next->f, NULL);
 	    x_set_glyph_string_gc (next);
-	    x_set_glyph_string_clipping (next);
+	    x_set_glyph_string_clipping (next, cr);
 	    if (next->first_glyph->type == STRETCH_GLYPH)
 	      x_draw_stretch_glyph_string (next);
 	    else
 	      x_draw_glyph_string_background (next, true);
 	    next->num_clips = 0;
+	    gtk3wl_end_cr_clip(next->f);
 	  }
     }
 
   /* Set up S->gc, set clipping and draw S.  */
   x_set_glyph_string_gc (s);
+
+  cairo_t *cr = gtk3wl_begin_cr_clip(s->f, NULL);
 
   /* Draw relief (if any) in advance for char/composition so that the
      glyph string can be drawn over it.  */
@@ -9869,10 +11333,10 @@ static void gtk3wl_draw_glyph_string(struct glyph_string *s)
 	  || s->first_glyph->type == COMPOSITE_GLYPH))
 
     {
-      x_set_glyph_string_clipping (s);
+      x_set_glyph_string_clipping (s, cr);
       x_draw_glyph_string_background (s, true);
       x_draw_glyph_string_box (s);
-      x_set_glyph_string_clipping (s);
+      x_set_glyph_string_clipping (s, cr);
       relief_drawn_p = true;
     }
   else if (!s->clip_head /* draw_glyphs didn't specify a clip mask. */
@@ -9882,22 +11346,22 @@ static void gtk3wl_draw_glyph_string(struct glyph_string *s)
     /* We must clip just this glyph.  left_overhang part has already
        drawn when s->prev was drawn, and right_overhang part will be
        drawn later when s->next is drawn. */
-    x_set_glyph_string_clipping_exactly (s, s);
+    x_set_glyph_string_clipping_exactly (s, s, cr);
   else
-    x_set_glyph_string_clipping (s);
+    x_set_glyph_string_clipping (s, cr);
 
   switch (s->first_glyph->type)
     {
     case IMAGE_GLYPH:
-      // x_draw_image_glyph_string (s);
+      x_draw_image_glyph_string (s);
       break;
 
     case XWIDGET_GLYPH:
-      // x_draw_xwidget_glyph_string (s);
+      x_draw_xwidget_glyph_string (s);
       break;
 
     case STRETCH_GLYPH:
-      // x_draw_stretch_glyph_string (s);
+      x_draw_stretch_glyph_string (s);
       break;
 
     case CHAR_GLYPH:
@@ -9909,32 +11373,26 @@ static void gtk3wl_draw_glyph_string(struct glyph_string *s)
       break;
 
     case COMPOSITE_GLYPH:
-#if 0
       if (s->for_overlaps || (s->cmp_from > 0
 			      && ! s->first_glyph->u.cmp.automatic))
 	s->background_filled_p = true;
       else
 	x_draw_glyph_string_background (s, true);
       x_draw_composite_glyph_string_foreground (s);
-#endif
       break;
 
     case GLYPHLESS_GLYPH:
-#if 0
       if (s->for_overlaps)
 	s->background_filled_p = true;
       else
 	x_draw_glyph_string_background (s, true);
       x_draw_glyphless_glyph_string_foreground (s);
-#endif
       break;
 
     default:
       emacs_abort ();
     }
-#endif
 
-#if 0
   if (!s->for_overlaps)
     {
       /* Draw underline.  */
@@ -9943,14 +11401,10 @@ static void gtk3wl_draw_glyph_string(struct glyph_string *s)
           if (s->face->underline_type == FACE_UNDER_WAVE)
             {
               if (s->face->underline_defaulted_p)
-                x_draw_underwave (s);
+                x_draw_underwave (s, s->xgcv.foreground);
               else
                 {
-                  XGCValues xgcv;
-                  XGetGCValues (s->display, s->gc, GCForeground, &xgcv);
-                  XSetForeground (s->display, s->gc, s->face->underline_color);
-                  x_draw_underwave (s);
-                  XSetForeground (s->display, s->gc, xgcv.foreground);
+                  x_draw_underwave (s, s->face->underline_color);
                 }
             }
           else if (s->face->underline_type == FACE_UNDER_LINE)
@@ -10006,16 +11460,12 @@ static void gtk3wl_draw_glyph_string(struct glyph_string *s)
               s->underline_position = position;
               y = s->ybase + position;
               if (s->face->underline_defaulted_p)
-                x_fill_rectangle (s->f, s->gc,
-                                s->x, y, s->width, thickness);
+                gtk3wl_fill_rectangle (s->f, s->xgcv.foreground,
+				       s->x, y, s->width, thickness);
               else
                 {
-                  XGCValues xgcv;
-                  XGetGCValues (s->display, s->gc, GCForeground, &xgcv);
-                  XSetForeground (s->display, s->gc, s->face->underline_color);
-                  x_fill_rectangle (s->f, s->gc,
-                                  s->x, y, s->width, thickness);
-                  XSetForeground (s->display, s->gc, xgcv.foreground);
+                  gtk3wl_fill_rectangle (s->f, s->face->underline_color,
+					 s->x, y, s->width, thickness);
                 }
             }
         }
@@ -10025,16 +11475,12 @@ static void gtk3wl_draw_glyph_string(struct glyph_string *s)
 	  unsigned long dy = 0, h = 1;
 
 	  if (s->face->overline_color_defaulted_p)
-	    x_fill_rectangle (s->f, s->gc, s->x, s->y + dy,
-			    s->width, h);
+	    gtk3wl_fill_rectangle (s->f, s->xgcv.foreground, s->x, s->y + dy,
+				   s->width, h);
 	  else
 	    {
-	      XGCValues xgcv;
-	      XGetGCValues (s->display, s->gc, GCForeground, &xgcv);
-	      XSetForeground (s->display, s->gc, s->face->overline_color);
-	      x_fill_rectangle (s->f, s->gc, s->x, s->y + dy,
-			      s->width, h);
-	      XSetForeground (s->display, s->gc, xgcv.foreground);
+	      gtk3wl_fill_rectangle (s->f, s->face->overline_color, s->x, s->y + dy,
+				     s->width, h);
 	    }
 	}
 
@@ -10054,16 +11500,12 @@ static void gtk3wl_draw_glyph_string(struct glyph_string *s)
           unsigned long dy = (glyph_height - h) / 2;
 
 	  if (s->face->strike_through_color_defaulted_p)
-	    x_fill_rectangle (s->f, s->gc, s->x, glyph_y + dy,
-			    s->width, h);
+	    gtk3wl_fill_rectangle (s->f, s->xgcv.foreground, s->x, glyph_y + dy,
+				   s->width, h);
 	  else
 	    {
-	      XGCValues xgcv;
-	      XGetGCValues (s->display, s->gc, GCForeground, &xgcv);
-	      XSetForeground (s->display, s->gc, s->face->strike_through_color);
-	      x_fill_rectangle (s->f, s->gc, s->x, glyph_y + dy,
-			      s->width, h);
-	      XSetForeground (s->display, s->gc, xgcv.foreground);
+	      gtk3wl_fill_rectangle (s->f, s->face->strike_through_color, s->x, glyph_y + dy,
+				     s->width, h);
 	    }
 	}
 
@@ -10085,14 +11527,15 @@ static void gtk3wl_draw_glyph_string(struct glyph_string *s)
 
 		prev->hl = s->hl;
 		x_set_glyph_string_gc (prev);
-		x_set_glyph_string_clipping_exactly (s, prev);
+		cairo_save(cr);
+		x_set_glyph_string_clipping_exactly (s, prev, cr);
 		if (prev->first_glyph->type == CHAR_GLYPH)
 		  x_draw_glyph_string_foreground (prev);
 		else
 		  x_draw_composite_glyph_string_foreground (prev);
-		x_reset_clip_rectangles (prev->f, prev->gc);
 		prev->hl = save;
 		prev->num_clips = 0;
+		cairo_restore(cr);
 	      }
 	}
 
@@ -10110,12 +11553,13 @@ static void gtk3wl_draw_glyph_string(struct glyph_string *s)
 
 		next->hl = s->hl;
 		x_set_glyph_string_gc (next);
-		x_set_glyph_string_clipping_exactly (s, next);
+		cairo_save(cr);
+		x_set_glyph_string_clipping_exactly (s, next, cr);
 		if (next->first_glyph->type == CHAR_GLYPH)
 		  x_draw_glyph_string_foreground (next);
 		else
 		  x_draw_composite_glyph_string_foreground (next);
-		x_reset_clip_rectangles (next->f, next->gc);
+		cairo_restore(cr);
 		next->hl = save;
 		next->num_clips = 0;
 		next->clip_head = s->next;
@@ -10124,9 +11568,8 @@ static void gtk3wl_draw_glyph_string(struct glyph_string *s)
     }
 
   /* Reset clipping.  */
-  x_reset_clip_rectangles (s->f, s->gc);
+  gtk3wl_end_cr_clip(s->f);
   s->num_clips = 0;
-#endif
 }
 
 static void gtk3wl_after_update_window_line(struct window *w, struct glyph_row *desired_row)
@@ -10142,7 +11585,6 @@ static void gtk3wl_after_update_window_line(struct window *w, struct glyph_row *
   if (!desired_row->mode_line_p && !w->pseudo_window_p)
     desired_row->redraw_fringe_bitmaps_p = 1;
 
-#if 0
   /* When a window has disappeared, make sure that no rest of
      full-width rows stays visible in the internal border.  */
   if (windows_or_buffers_changed
@@ -10162,7 +11604,6 @@ static void gtk3wl_after_update_window_line(struct window *w, struct glyph_row *
 			       y, width, height);
       unblock_input ();
     }
-#endif
 }
 
 static void gtk3wl_clear_frame_area(struct frame *f, int x, int y, int width, int height)
