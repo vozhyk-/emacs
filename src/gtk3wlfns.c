@@ -302,8 +302,7 @@ x_set_background_color (struct frame *f, Lisp_Object arg, Lisp_Object oldval)
 static void
 x_set_cursor_color (struct frame *f, Lisp_Object arg, Lisp_Object oldval)
 {
-#if 0
-  NSColor *col;
+  XColor col;
 
   block_input ();
   if (gtk3wl_lisp_to_color (arg, &col))
@@ -313,8 +312,7 @@ x_set_cursor_color (struct frame *f, Lisp_Object arg, Lisp_Object oldval)
       error ("Unknown color");
     }
 
-  [FRAME_CURSOR_COLOR (f) release];
-  FRAME_CURSOR_COLOR (f) = [col retain];
+  FRAME_CURSOR_COLOR (f) = col.pixel;
 
   if (FRAME_VISIBLE_P (f))
     {
@@ -323,7 +321,6 @@ x_set_cursor_color (struct frame *f, Lisp_Object arg, Lisp_Object oldval)
     }
   update_face_from_frame_parameter (f, Qcursor_color, arg);
   unblock_input ();
-#endif
 }
 
 
@@ -854,9 +851,7 @@ x_set_icon_type (struct frame *f, Lisp_Object arg, Lisp_Object oldval)
 static void
 x_set_cursor_type (struct frame *f, Lisp_Object arg, Lisp_Object oldval)
 {
-#if 0
   set_frame_cursor_types (f, arg);
-#endif
 }
 
 /* called to set mouse pointer color, but all other terms use it to
