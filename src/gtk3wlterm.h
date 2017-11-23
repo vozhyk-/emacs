@@ -68,7 +68,7 @@ struct gtk3wl_color_table
 struct scroll_bar
 {
   /* These fields are shared by all vectors.  */
-  struct vectorlike_header header;
+  union vectorlike_header header;
 
   /* The window we're a scroll bar for.  */
   Lisp_Object window;
