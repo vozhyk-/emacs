@@ -43,6 +43,7 @@ Many many debugging outputs. Please ignore them.
 - sometimes cursor are left at the end of a line.
 - fullscreen not supported.
 - C-x 5 0 doesn't work.
+- sometimes segmentation fault.
 - maybe doesn't work on pure gtk+-3 with X11.
 - so many features not supported.
 
