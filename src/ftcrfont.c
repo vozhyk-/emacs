@@ -242,10 +242,11 @@ ftcrfont_draw (struct glyph_string *s,
 
   if (with_background)
     {
+      GTK3WL_TRACE("with background.");
 #ifndef HAVE_GTK3WL
       x_set_cr_source_with_gc_background (f, s->gc);
 #else
-      gtk3wl_set_cr_source_with_color (f, FRAME_BACKGROUND_COLOR(f));
+      gtk3wl_set_cr_source_with_color (f, s->xgcv.background);
 #endif
       cairo_rectangle (cr, x, y - FONT_BASE (face->font),
 		       s->width, FONT_HEIGHT (face->font));
@@ -267,7 +268,7 @@ ftcrfont_draw (struct glyph_string *s,
 #ifndef HAVE_GTK3WL
   x_set_cr_source_with_gc_foreground (f, s->gc);
 #else
-  gtk3wl_set_cr_source_with_color (f, FRAME_FOREGROUND_COLOR(f));
+  gtk3wl_set_cr_source_with_color (f, s->xgcv.foreground);
 #endif
   cairo_set_font_face (cr, ftcrfont_info->cr_font_face);
   cairo_set_font_size (cr, s->font->pixel_size);

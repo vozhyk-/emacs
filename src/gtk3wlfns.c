@@ -251,7 +251,7 @@ x_set_foreground_color (struct frame *f, Lisp_Object arg, Lisp_Object oldval)
 
   FRAME_FOREGROUND_PIXEL (f) = col.pixel;
 
-  if (FRAME_GTK3WL_VIEW (f))
+  if (FRAME_GTK_WIDGET (f))
     {
       update_face_from_frame_parameter (f, Qforeground_color, arg);
       /*recompute_basic_faces (f); */

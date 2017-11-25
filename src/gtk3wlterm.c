@@ -9810,24 +9810,29 @@ x_set_cursor_gc (struct glyph_string *s)
       && s->face->background == FRAME_BACKGROUND_PIXEL (s->f)
       && s->face->foreground == FRAME_FOREGROUND_PIXEL (s->f)
       && !s->cmp)
+    GTK3WL_TRACE("x_set_cursor_gc: 1."),
     s->xgcv = s->f->output_data.gtk3wl->cursor_xgcv;
   else
     {
       /* Cursor on non-default face: must merge.  */
       XGCValues xgcv;
 
+      GTK3WL_TRACE("x_set_cursor_gc: 2.");
       xgcv.background = s->f->output_data.gtk3wl->cursor_color;
       xgcv.foreground = s->face->background;
+      GTK3WL_TRACE("x_set_cursor_gc: 3. %08lx, %08lx.", xgcv.background, xgcv.foreground);
 
       /* If the glyph would be invisible, try a different foreground.  */
       if (xgcv.foreground == xgcv.background)
 	xgcv.foreground = s->face->foreground;
+      GTK3WL_TRACE("x_set_cursor_gc: 4. %08lx, %08lx.", xgcv.background, xgcv.foreground);
 #if 0
       if (xgcv.foreground == xgcv.background)
 	xgcv.foreground = s->f->output_data.gtk3wl->cursor_foreground_pixel;
 #endif
       if (xgcv.foreground == xgcv.background)
 	xgcv.foreground = s->face->foreground;
+      GTK3WL_TRACE("x_set_cursor_gc: 5. %08lx, %08lx.", xgcv.background, xgcv.foreground);
 
       /* Make sure the cursor is distinct from text in this face.  */
       if (xgcv.background == s->face->background
@@ -9836,6 +9841,7 @@ x_set_cursor_gc (struct glyph_string *s)
 	  xgcv.background = s->face->foreground;
 	  xgcv.foreground = s->face->background;
 	}
+      GTK3WL_TRACE("x_set_cursor_gc: 6. %08lx, %08lx.", xgcv.background, xgcv.foreground);
 
       IF_DEBUG (x_check_font (s->f, s->font));
 
@@ -9902,28 +9908,35 @@ x_set_mode_line_face_gc (struct glyph_string *s)
 static void
 x_set_glyph_string_gc (struct glyph_string *s)
 {
+  GTK3WL_TRACE("x_set_glyph_string_gc: s->f:    %08lx, %08lx", s->f->background_pixel, s->f->foreground_pixel);
+  GTK3WL_TRACE("x_set_glyph_string_gc: s->face: %08lx, %08lx", s->face->background, s->face->foreground);
   prepare_face_for_display (s->f, s->face);
+  GTK3WL_TRACE("x_set_glyph_string_gc: s->face: %08lx, %08lx", s->face->background, s->face->foreground);
 
   if (s->hl == DRAW_NORMAL_TEXT)
     {
       s->xgcv.foreground = s->face->foreground;
       s->xgcv.background = s->face->background;
       s->stippled_p = s->face->stipple != 0;
+      GTK3WL_TRACE("x_set_glyph_string_gc: %08lx, %08lx", s->xgcv.background, s->xgcv.foreground);
     }
   else if (s->hl == DRAW_INVERSE_VIDEO)
     {
       x_set_mode_line_face_gc (s);
       s->stippled_p = s->face->stipple != 0;
+      GTK3WL_TRACE("x_set_glyph_string_gc: %08lx, %08lx", s->xgcv.background, s->xgcv.foreground);
     }
   else if (s->hl == DRAW_CURSOR)
     {
       x_set_cursor_gc (s);
       s->stippled_p = false;
+      GTK3WL_TRACE("x_set_glyph_string_gc: %08lx, %08lx", s->xgcv.background, s->xgcv.foreground);
     }
   else if (s->hl == DRAW_MOUSE_FACE)
     {
       x_set_mouse_face_gc (s);
       s->stippled_p = s->face->stipple != 0;
+      GTK3WL_TRACE("x_set_glyph_string_gc: %08lx, %08lx", s->xgcv.background, s->xgcv.foreground);
     }
   else if (s->hl == DRAW_IMAGE_RAISED
 	   || s->hl == DRAW_IMAGE_SUNKEN)
@@ -9931,6 +9944,7 @@ x_set_glyph_string_gc (struct glyph_string *s)
       s->xgcv.foreground = s->face->foreground;
       s->xgcv.background = s->face->background;
       s->stippled_p = s->face->stipple != 0;
+      GTK3WL_TRACE("x_set_glyph_string_gc: %08lx, %08lx", s->xgcv.background, s->xgcv.foreground);
     }
   else
     emacs_abort ();
@@ -10030,12 +10044,20 @@ x_clear_glyph_string_rect (struct glyph_string *s, int x, int y, int w, int h)
 static void
 x_draw_glyph_string_background (struct glyph_string *s, bool force_p)
 {
+  GTK3WL_TRACE("x_draw_glyph_string_background: 0.");
   /* Nothing to do if background has already been drawn or if it
      shouldn't be drawn in the first place.  */
   if (!s->background_filled_p)
     {
+      GTK3WL_TRACE("x_draw_glyph_string_background: 1.");
       int box_line_width = max (s->face->box_line_width, 0);
 
+      GTK3WL_TRACE("x_draw_glyph_string_background: 2. %d, %d.",
+		   FONT_HEIGHT (s->font), s->height - 2 * box_line_width);
+      GTK3WL_TRACE("x_draw_glyph_string_background: 2. %d.", FONT_TOO_HIGH(s->font));
+      GTK3WL_TRACE("x_draw_glyph_string_background: 2. %d.", s->font_not_found_p);
+      GTK3WL_TRACE("x_draw_glyph_string_background: 2. %d.", s->extends_to_end_of_line_p);
+      GTK3WL_TRACE("x_draw_glyph_string_background: 2. %d.", force_p);
 #if 0
       if (s->stippled_p)
 	{
@@ -10060,6 +10082,7 @@ x_draw_glyph_string_background (struct glyph_string *s, bool force_p)
 	       || s->extends_to_end_of_line_p
 	       || force_p)
 	{
+	  GTK3WL_TRACE("x_draw_glyph_string_background: 3.");
 	  x_clear_glyph_string_rect (s, s->x, s->y + box_line_width,
 				     s->background_width,
 				     s->height - 2 * box_line_width);
@@ -11283,18 +11306,7 @@ x_draw_stretch_glyph_string (struct glyph_string *s)
 static void gtk3wl_draw_glyph_string(struct glyph_string *s)
 {
   GTK3WL_TRACE("draw_glyph_string.");
-
-#if 0
-  GTK3WL_TRACE("%s", SSDATA(SYMBOL_NAME(s->font->driver->type)));
-  GTK3WL_TRACE("type: %d", s->first_glyph->type);
-  if (s->first_glyph->type == CHAR_GLYPH) {
-    GTK3WL_TRACE("(%d,%d)", s->x, s->y);
-    for (int i = 0; i < s->nchars; i++)
-      GTK3WL_TRACE(" %04x", s->char2b[i]);
-    GTK3WL_TRACE("");
-    s->font->driver->draw(s, 0, s->nchars, s->x, s->y + s->first_glyph->ascent, false);
-  }
-#endif
+  GTK3WL_TRACE("draw_glyph_string: face_id=%d.", s->face->id);
 
   bool relief_drawn_p = false;
 
@@ -11312,6 +11324,7 @@ static void gtk3wl_draw_glyph_string(struct glyph_string *s)
 	if (next->first_glyph->type != IMAGE_GLYPH)
 	  {
 	    cairo_t *cr = gtk3wl_begin_cr_clip(next->f, NULL);
+	    GTK3WL_TRACE("gtk3wl_draw_glyph_string: 1.");
 	    x_set_glyph_string_gc (next);
 	    x_set_glyph_string_clipping (next, cr);
 	    if (next->first_glyph->type == STRETCH_GLYPH)
@@ -11324,6 +11337,7 @@ static void gtk3wl_draw_glyph_string(struct glyph_string *s)
     }
 
   /* Set up S->gc, set clipping and draw S.  */
+  GTK3WL_TRACE("gtk3wl_draw_glyph_string: 2.");
   x_set_glyph_string_gc (s);
 
   cairo_t *cr = gtk3wl_begin_cr_clip(s->f, NULL);
@@ -11336,6 +11350,7 @@ static void gtk3wl_draw_glyph_string(struct glyph_string *s)
 	  || s->first_glyph->type == COMPOSITE_GLYPH))
 
     {
+      GTK3WL_TRACE("gtk3wl_draw_glyph_string: 2.1.");
       x_set_glyph_string_clipping (s, cr);
       x_draw_glyph_string_background (s, true);
       x_draw_glyph_string_box (s);
@@ -11349,25 +11364,31 @@ static void gtk3wl_draw_glyph_string(struct glyph_string *s)
     /* We must clip just this glyph.  left_overhang part has already
        drawn when s->prev was drawn, and right_overhang part will be
        drawn later when s->next is drawn. */
+    GTK3WL_TRACE("gtk3wl_draw_glyph_string: 2.2."),
     x_set_glyph_string_clipping_exactly (s, s, cr);
   else
+    GTK3WL_TRACE("gtk3wl_draw_glyph_string: 2.3."),
     x_set_glyph_string_clipping (s, cr);
 
   switch (s->first_glyph->type)
     {
     case IMAGE_GLYPH:
+      GTK3WL_TRACE("gtk3wl_draw_glyph_string: 2.4.");
       x_draw_image_glyph_string (s);
       break;
 
     case XWIDGET_GLYPH:
+      GTK3WL_TRACE("gtk3wl_draw_glyph_string: 2.5.");
       x_draw_xwidget_glyph_string (s);
       break;
 
     case STRETCH_GLYPH:
+      GTK3WL_TRACE("gtk3wl_draw_glyph_string: 2.6.");
       x_draw_stretch_glyph_string (s);
       break;
 
     case CHAR_GLYPH:
+      GTK3WL_TRACE("gtk3wl_draw_glyph_string: 2.7.");
       if (s->for_overlaps)
 	s->background_filled_p = true;
       else
@@ -11376,6 +11397,7 @@ static void gtk3wl_draw_glyph_string(struct glyph_string *s)
       break;
 
     case COMPOSITE_GLYPH:
+      GTK3WL_TRACE("gtk3wl_draw_glyph_string: 2.8.");
       if (s->for_overlaps || (s->cmp_from > 0
 			      && ! s->first_glyph->u.cmp.automatic))
 	s->background_filled_p = true;
@@ -11385,6 +11407,7 @@ static void gtk3wl_draw_glyph_string(struct glyph_string *s)
       break;
 
     case GLYPHLESS_GLYPH:
+      GTK3WL_TRACE("gtk3wl_draw_glyph_string: 2.9.");
       if (s->for_overlaps)
 	s->background_filled_p = true;
       else
@@ -11529,6 +11552,7 @@ static void gtk3wl_draw_glyph_string(struct glyph_string *s)
 		enum draw_glyphs_face save = prev->hl;
 
 		prev->hl = s->hl;
+		GTK3WL_TRACE("gtk3wl_draw_glyph_string: 3.");
 		x_set_glyph_string_gc (prev);
 		cairo_save(cr);
 		x_set_glyph_string_clipping_exactly (s, prev, cr);
@@ -11555,6 +11579,7 @@ static void gtk3wl_draw_glyph_string(struct glyph_string *s)
 		enum draw_glyphs_face save = next->hl;
 
 		next->hl = s->hl;
+		GTK3WL_TRACE("gtk3wl_draw_glyph_string: 4.");
 		x_set_glyph_string_gc (next);
 		cairo_save(cr);
 		x_set_glyph_string_clipping_exactly (s, next, cr);
@@ -11762,7 +11787,8 @@ gtk3wl_draw_window_cursor (struct window *w, struct glyph_row *glyph_row, int x,
 		      int y, enum text_cursor_kinds cursor_type,
 		      int cursor_width, bool on_p, bool active_p)
 {
-  GTK3WL_TRACE("draw_window_cursor.");
+  GTK3WL_TRACE("draw_window_cursor: %d, %d, %d, %d, %d, %d.",
+	       x, y, cursor_type, cursor_width, on_p, active_p);
   struct frame *f = XFRAME (WINDOW_FRAME (w));
 
   if (on_p)
@@ -14489,15 +14515,244 @@ static gboolean key_press_event(GtkWidget *widget, GdkEvent *event, gpointer *us
   return TRUE;
 }
 
+
+
+static void
+frame_highlight (struct frame *f)
+{
+  /* We used to only do this if Vx_no_window_manager was non-nil, but
+     the ICCCM (section 4.1.6) says that the window's border pixmap
+     and border pixel are window attributes which are "private to the
+     client", so we can always change it to whatever we want.  */
+  block_input ();
+  /* I recently started to get errors in this XSetWindowBorder, depending on
+     the window-manager in use, tho something more is at play since I've been
+     using that same window-manager binary for ever.  Let's not crash just
+     because of this (bug#9310).  */
+#if 0
+  x_catch_errors (FRAME_X_DISPLAY (f));
+  XSetWindowBorder (FRAME_X_DISPLAY (f), FRAME_X_WINDOW (f),
+		    f->output_data.x->border_pixel);
+  x_uncatch_errors ();
+#endif
+  unblock_input ();
+  x_update_cursor (f, true);
+#if 0
+  x_set_frame_alpha (f);
+#endif
+}
+
+static void
+frame_unhighlight (struct frame *f)
+{
+  /* We used to only do this if Vx_no_window_manager was non-nil, but
+     the ICCCM (section 4.1.6) says that the window's border pixmap
+     and border pixel are window attributes which are "private to the
+     client", so we can always change it to whatever we want.  */
+  block_input ();
+  /* Same as above for XSetWindowBorder (bug#9310).  */
+#if 0
+  x_catch_errors (FRAME_X_DISPLAY (f));
+  XSetWindowBorderPixmap (FRAME_X_DISPLAY (f), FRAME_X_WINDOW (f),
+			  f->output_data.x->border_tile);
+  x_uncatch_errors ();
+#endif
+  unblock_input ();
+  x_update_cursor (f, true);
+#if 0
+  x_set_frame_alpha (f);
+#endif
+}
+
+
+static void
+x_frame_rehighlight (struct gtk3wl_display_info *dpyinfo)
+{
+#if 1
+  struct frame *old_highlight = dpyinfo->x_highlight_frame;
+
+  if (dpyinfo->x_focus_frame)
+    {
+      dpyinfo->x_highlight_frame
+	= ((FRAMEP (FRAME_FOCUS_FRAME (dpyinfo->x_focus_frame)))
+	   ? XFRAME (FRAME_FOCUS_FRAME (dpyinfo->x_focus_frame))
+	   : dpyinfo->x_focus_frame);
+      if (! FRAME_LIVE_P (dpyinfo->x_highlight_frame))
+	{
+	  fset_focus_frame (dpyinfo->x_focus_frame, Qnil);
+	  dpyinfo->x_highlight_frame = dpyinfo->x_focus_frame;
+	}
+    }
+  else
+    dpyinfo->x_highlight_frame = 0;
+
+  if (dpyinfo->x_highlight_frame != old_highlight)
+    {
+      if (old_highlight)
+	frame_unhighlight (old_highlight);
+      if (dpyinfo->x_highlight_frame)
+	frame_highlight (dpyinfo->x_highlight_frame);
+    }
+#endif
+}
+
+/* The focus has changed.  Update the frames as necessary to reflect
+   the new situation.  Note that we can't change the selected frame
+   here, because the Lisp code we are interrupting might become confused.
+   Each event gets marked with the frame in which it occurred, so the
+   Lisp code can tell when the switch took place by examining the events.  */
+
+static void
+x_new_focus_frame (struct gtk3wl_display_info *dpyinfo, struct frame *frame)
+{
+  struct frame *old_focus = dpyinfo->x_focus_frame;
+
+  if (frame != dpyinfo->x_focus_frame)
+    {
+      /* Set this before calling other routines, so that they see
+	 the correct value of x_focus_frame.  */
+      dpyinfo->x_focus_frame = frame;
+
+#if 0
+      if (old_focus && old_focus->auto_lower)
+	x_lower_frame (old_focus);
+#endif
+
+#if 0
+      if (dpyinfo->x_focus_frame && dpyinfo->x_focus_frame->auto_raise)
+	dpyinfo->x_pending_autoraise_frame = dpyinfo->x_focus_frame;
+      else
+	dpyinfo->x_pending_autoraise_frame = NULL;
+#endif
+    }
+
+  x_frame_rehighlight (dpyinfo);
+}
+
+/* The focus may have changed.  Figure out if it is a real focus change,
+   by checking both FocusIn/Out and Enter/LeaveNotify events.
+
+   Returns FOCUS_IN_EVENT event in *BUFP. */
+
+/* Handle FocusIn and FocusOut state changes for FRAME.
+   If FRAME has focus and there exists more than one frame, puts
+   a FOCUS_IN_EVENT into *BUFP.  */
+
+static void
+x_focus_changed (gboolean is_enter, int state, struct gtk3wl_display_info *dpyinfo, struct frame *frame, struct input_event *bufp)
+{
+  if (is_enter)
+    {
+      if (dpyinfo->x_focus_event_frame != frame)
+        {
+          x_new_focus_frame (dpyinfo, frame);
+          dpyinfo->x_focus_event_frame = frame;
+
+          /* Don't stop displaying the initial startup message
+             for a switch-frame event we don't need.  */
+          /* When run as a daemon, Vterminal_frame is always NIL.  */
+          bufp->arg = (((NILP (Vterminal_frame)
+                         || ! FRAME_X_P (XFRAME (Vterminal_frame))
+                         || EQ (Fdaemonp (), Qt))
+			&& CONSP (Vframe_list)
+			&& !NILP (XCDR (Vframe_list)))
+		       ? Qt : Qnil);
+          bufp->kind = FOCUS_IN_EVENT;
+          XSETFRAME (bufp->frame_or_window, frame);
+        }
+
+      frame->output_data.gtk3wl->focus_state |= state;
+
+    }
+  else
+    {
+      frame->output_data.gtk3wl->focus_state &= ~state;
+
+      if (dpyinfo->x_focus_event_frame == frame)
+        {
+          dpyinfo->x_focus_event_frame = 0;
+          x_new_focus_frame (dpyinfo, 0);
+
+          bufp->kind = FOCUS_OUT_EVENT;
+          XSETFRAME (bufp->frame_or_window, frame);
+        }
+
+#if 0
+      if (frame->pointer_invisible)
+        XTtoggle_invisible_pointer (frame, false);
+#endif
+    }
+}
+
+static gboolean
+enter_notify_event(GtkWidget *widget, GdkEvent *event, gpointer *user_data)
+{
+  GTK3WL_TRACE("enter_notify_event");
+  union buffered_input_event inev;
+  struct frame *focus_frame = gtk3wl_any_window_to_frame(gtk_widget_get_window(widget));
+  int focus_state
+    = focus_frame ? focus_frame->output_data.gtk3wl->focus_state : 0;
+
+  EVENT_INIT (inev.ie);
+  inev.ie.kind = NO_EVENT;
+  inev.ie.arg = Qnil;
+
+  if (!(focus_state & FOCUS_EXPLICIT))
+    x_focus_changed (TRUE,
+		     FOCUS_IMPLICIT,
+		     FRAME_DISPLAY_INFO(focus_frame), focus_frame, &inev);
+  return TRUE;
+}
+
+static gboolean
+leave_notify_event(GtkWidget *widget, GdkEvent *event, gpointer *user_data)
+{
+  GTK3WL_TRACE("leave_notify_event");
+  union buffered_input_event inev;
+  struct frame *focus_frame = gtk3wl_any_window_to_frame(gtk_widget_get_window(widget));
+  int focus_state
+    = focus_frame ? focus_frame->output_data.gtk3wl->focus_state : 0;
+
+  EVENT_INIT (inev.ie);
+  inev.ie.kind = NO_EVENT;
+  inev.ie.arg = Qnil;
+
+  if (!(focus_state & FOCUS_EXPLICIT))
+    x_focus_changed (FALSE,
+		     FOCUS_IMPLICIT,
+		     FRAME_DISPLAY_INFO(focus_frame), focus_frame, &inev);
+  return TRUE;
+}
+
 static gboolean
 focus_in_event(GtkWidget *widget, GdkEvent *event, gpointer *user_data)
 {
+  GTK3WL_TRACE("focus_in_event");
+  union buffered_input_event inev;
+  struct frame *frame = gtk3wl_any_window_to_frame(gtk_widget_get_window(widget));
+
+  EVENT_INIT (inev.ie);
+  inev.ie.kind = NO_EVENT;
+  inev.ie.arg = Qnil;
+
+  x_focus_changed (TRUE, FOCUS_IMPLICIT,
+		   FRAME_DISPLAY_INFO(frame), frame, &inev);
   return TRUE;
 }
 
 static gboolean
 focus_out_event(GtkWidget *widget, GdkEvent *event, gpointer *user_data)
 {
+  GTK3WL_TRACE("focus_out_event");
+  union buffered_input_event inev;
+  struct frame *frame = gtk3wl_any_window_to_frame(gtk_widget_get_window(widget));
+
+  EVENT_INIT (inev.ie);
+  inev.ie.kind = NO_EVENT;
+  inev.ie.arg = Qnil;
+
+  x_focus_changed (FALSE, FOCUS_IMPLICIT,
+		   FRAME_DISPLAY_INFO(frame), frame, &inev);
   return TRUE;
 }
 
@@ -14506,6 +14761,10 @@ gtk3wl_set_event_handler(struct frame *f)
 {
   g_signal_connect(G_OBJECT(FRAME_GTK_WIDGET(f)), "size-allocate", G_CALLBACK(size_allocate), NULL);
   g_signal_connect(G_OBJECT(FRAME_GTK_WIDGET(f)), "key-press-event", G_CALLBACK(key_press_event), NULL);
+  g_signal_connect(G_OBJECT(FRAME_GTK_WIDGET(f)), "focus-in-event", G_CALLBACK(focus_in_event), NULL);
+  g_signal_connect(G_OBJECT(FRAME_GTK_WIDGET(f)), "focus-out-event", G_CALLBACK(focus_out_event), NULL);
+  g_signal_connect(G_OBJECT(FRAME_GTK_WIDGET(f)), "enter-notify-event", G_CALLBACK(focus_in_event), NULL);
+  g_signal_connect(G_OBJECT(FRAME_GTK_WIDGET(f)), "leave-notify-event", G_CALLBACK(focus_out_event), NULL);
   g_signal_connect(G_OBJECT(FRAME_GTK_WIDGET(f)), "event", G_CALLBACK(gtk3wl_handle_event), NULL);
   g_signal_connect(G_OBJECT(FRAME_GTK_WIDGET(f)), "draw", G_CALLBACK(gtk3wl_handle_draw), NULL);
 }
@@ -14742,7 +15001,7 @@ gtk3wl_defined_color (struct frame *f,
 
 int gtk3wl_parse_color (const char *color_name, XColor *color)
 {
-  // GTK3WL_TRACE("gtk3wl_parse_color(%s)", color_name);
+  // GTK3WL_TRACE("gtk3wl_parse_color: %s", color_name);
 
   GdkRGBA rgba;
   if (gdk_rgba_parse(&rgba, color_name)) {
