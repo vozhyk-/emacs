@@ -22,8 +22,6 @@ Ignore many warnings.
 
 ## Running
 
-You maybe need `Noto Sans Mono CJK JP` fonts.
-
 ```
 cd src
 ./emacs  (or ./emacs -Q if you have problems.)
@@ -33,18 +31,23 @@ Many many debugging outputs. Please ignore them.
 
 ## TODO
 
+Higher:
 - face of mode-line doesn't change.
+- C-x 5 0 doesn't work.
 - no scrollbar.
+- no audible bell.
+- no mouse events.
+- clipboard not supported.
+- sometimes segmentation fault.
+- initial font.
+- initial size.
+
+Lower:
 - no toolbar.
 - no menubar.
 - no visual-bell.
-- no visible-bell.
-- no mouse events.
-- sometimes cursor are left at the end of a line.
+- sometimes cursor are left at the end of line.
 - fullscreen not supported.
-- clipboard not supported.
-- C-x 5 0 doesn't work.
-- sometimes segmentation fault.
 - maybe doesn't work on pure gtk+-3 with X11.
 - so many features not supported.
 
