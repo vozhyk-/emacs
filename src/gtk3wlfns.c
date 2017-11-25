@@ -3273,3 +3273,34 @@ void gtk3wl_log(const char *file, int lineno, const char *fmt, ...)
   va_end(ap);
   fputc('\n', stderr);
 }
+
+void gtk3wl_backtrace(const char *file, int lineno)
+{
+  Lisp_Object bt = make_uninit_vector(10);
+  for (int i = 0; i < 10; i++)
+    ASET(bt, i, Qnil);
+
+  struct timespec ts;
+  struct tm tm;
+  char timestr[32];
+  va_list ap;
+
+  clock_gettime(CLOCK_REALTIME, &ts);
+
+  localtime_r(&ts.tv_sec, &tm);
+  strftime(timestr, sizeof timestr, "%H:%M:%S", &tm);
+
+  fprintf(stderr, "%s %.10s:%04d ********\n", timestr, file, lineno);
+
+  get_backtrace(bt);
+  for (int i = 0; i < 10; i++) {
+    Lisp_Object stk = AREF(bt, i);
+    if (!NILP(stk)) {
+      Lisp_Object args[2] = { build_string("%S"), stk };
+      Lisp_Object str = Fformat(2, args);
+      fprintf(stderr, "%s %.10s:%04d %s\n", timestr, file, lineno, SSDATA(str));
+    }
+  }
+
+  fprintf(stderr, "%s %.10s:%04d ********\n", timestr, file, lineno);
+}

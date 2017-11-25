@@ -30,6 +30,8 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 
 extern void gtk3wl_log(const char *file, int lineno, const char *fmt, ...);
 #define GTK3WL_TRACE(fmt, ...) gtk3wl_log(__FILE__, __LINE__, fmt, ## __VA_ARGS__)
+extern void gtk3wl_backtrace(const char *file, int lineno);
+#define GTK3WL_BACKTRACE() gtk3wl_backtrace(__FILE__, __LINE__)
 
 /* could use list to store these, but rest of emacs has a big infrastructure
    for managing a table of bitmap "records" */
