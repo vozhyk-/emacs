@@ -14509,6 +14509,7 @@ static gboolean key_press_event(GtkWidget *widget, GdkEvent *event, gpointer *us
   if (inev.ie.kind != NO_EVENT)
     {
       kbd_buffer_store_buffered_event (&inev, NULL);
+      XSETFRAME (inev.ie.frame_or_window, f);
       // count++;
     }
 
