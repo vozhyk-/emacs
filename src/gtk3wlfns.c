@@ -2141,48 +2141,6 @@ font descriptor.  If string contains `fontset' and not
 }
 
 
-DEFUN ("gtk3wl-list-colors", Fgtk3wl_list_colors, Sgtk3wl_list_colors, 0, 1, 0,
-       doc: /* Return a list of all available colors.
-The optional argument FRAME is currently ignored.  */)
-     (Lisp_Object frame)
-{
-  Lisp_Object list = Qnil;
-#if 0
-  NSEnumerator *colorlists;
-  NSColorList *clist;
-
-  if (!NILP (frame))
-    {
-      CHECK_FRAME (frame);
-      if (! FRAME_GTK3WL_P (XFRAME (frame)))
-        error ("non-Nextstep frame used in `ns-list-colors'");
-    }
-
-  block_input ();
-
-  colorlists = [[NSColorList availableColorLists] objectEnumerator];
-  while ((clist = [colorlists nextObject]))
-    {
-      if ([[clist name] length] < 7 ||
-          [[clist name] rangeOfString: @"PANTONE"].location == 0)
-        {
-          NSEnumerator *cnames = [[clist allKeys] reverseObjectEnumerator];
-          NSString *cname;
-          while ((cname = [cnames nextObject]))
-            list = Fcons (build_string ([cname UTF8String]), list);
-/*           for (i = [[clist allKeys] count] - 1; i >= 0; i--)
-               list = Fcons (build_string ([[[clist allKeys] objectAtIndex: i]
-                                             UTF8String]), list); */
-        }
-    }
-
-  unblock_input ();
-
-#endif
-  return list;
-}
-
-
 DEFUN ("gtk3wl-list-services", Fgtk3wl_list_services, Sgtk3wl_list_services, 0, 0, 0,
        doc: /* List available Nextstep services by querying NSApp.  */)
      (void)
@@ -2356,18 +2314,7 @@ DEFUN ("xw-display-color-p", Fxw_display_color_p, Sxw_display_color_p, 0, 1, 0,
        doc: /* Internal function called by `display-color-p', which see.  */)
      (Lisp_Object terminal)
 {
-#if 0
-  GTK3WLWindowDepth depth;
-  NSString *colorSpace;
-
   check_gtk3wl_display_info (terminal);
-  depth = [[[NSScreen screens] objectAtIndex:0] depth];
-  colorSpace = NSColorSpaceFromDepth (depth);
-
-  return    [colorSpace isEqualToString: NSDeviceWhiteColorSpace]
-         || [colorSpace isEqualToString: NSCalibratedWhiteColorSpace]
-      ? Qnil : Qt;
-#endif
   return Qt;
 }
 
@@ -2576,10 +2523,6 @@ If omitted or nil, that stands for the selected frame's display.  */)
   (Lisp_Object terminal)
 {
   check_gtk3wl_display_info (terminal);
-#if 0
-  return make_number
-    (NSBitsPerPixelFromDepth ([[[NSScreen screens] objectAtIndex:0] depth]));
-#endif
   return make_number(32);
 }
 
@@ -3165,7 +3108,6 @@ be used as the image of the icon representing the frame.  */);
   defsubr (&Sxw_display_color_p); /* this and next called directly by C code */
   defsubr (&Sx_display_grayscale_p);
   defsubr (&Sgtk3wl_font_name);
-  defsubr (&Sgtk3wl_list_colors);
 #ifdef GTK3WL_IMPL_COCOA
   defsubr (&Sgtk3wl_do_applescript);
 #endif
