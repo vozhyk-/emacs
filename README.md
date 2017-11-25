@@ -40,6 +40,8 @@ Many many debugging outputs. Please ignore them.
 - no menubar.
 - no visual-bell.
 - no visible-bell.
+- no mouse events.
+- sometimes cursor are left at the end of a line.
 - fullscreen not supported.
 - C-x 5 0 doesn't work.
 - maybe doesn't work on pure gtk+-3 with X11.
