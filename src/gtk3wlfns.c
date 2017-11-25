@@ -2134,7 +2134,10 @@ font descriptor.  If string contains `fontset' and not
   if (strstr (nm, "fontset") && !strstr (nm, "fontset-startup"))
     return name;
 
-  return build_string (gtk3wl_xlfd_to_fontname (SSDATA (name)));
+  char *str = gtk3wl_xlfd_to_fontname (SSDATA (name));
+  name = build_string (str);
+  xfree(str);
+  return name;
 }
 
 

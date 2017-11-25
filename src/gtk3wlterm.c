@@ -14914,7 +14914,7 @@ gtk3wl_term_init (Lisp_Object display_name)
   return dpyinfo;
 }
 
-const char *
+char *
 gtk3wl_xlfd_to_fontname (const char *xlfd)
 /* --------------------------------------------------------------------------
     Convert an X font name (XLFD) to an NS font name.
@@ -14923,44 +14923,22 @@ gtk3wl_xlfd_to_fontname (const char *xlfd)
    -------------------------------------------------------------------------- */
 {
   GTK3WL_TRACE("gtk3wl_xlfd_to_fontname");
-#if 0
   char *name = xmalloc (180);
-  int i, len;
-  const char *ret;
 
-  if (!strncmp (xlfd, "--", 2))
-    sscanf (xlfd, "--%*[^-]-%[^-]179-", name);
-  else
-    sscanf (xlfd, "-%*[^-]-%[^-]179-", name);
+  if (!strncmp (xlfd, "--", 2)) {
+    if (sscanf (xlfd, "--%179[^-]-", name) != 1)
+      name[0] = '\0';
+  } else {
+    if (sscanf (xlfd, "-%*[^-]-%179[^-]-", name) != 1)
+      name[0] = '\0';
+  }
 
   /* stopgap for malformed XLFD input */
   if (strlen (name) == 0)
-    strcpy (name, "Monaco");
+    strcpy (name, "Monospace");
 
-  /* undo hack in ns_fontname_to_xlfd, converting '$' to '-', '_' to ' '
-     also uppercase after '-' or ' ' */
-  name[0] = c_toupper (name[0]);
-  for (len =strlen (name), i =0; i<len; i++)
-    {
-      if (name[i] == '$')
-        {
-          name[i] = '-';
-          if (i+1<len)
-            name[i+1] = c_toupper (name[i+1]);
-        }
-      else if (name[i] == '_')
-        {
-          name[i] = ' ';
-          if (i+1<len)
-            name[i+1] = c_toupper (name[i+1]);
-        }
-    }
-/*fprintf (stderr, "converted '%s' to '%s'",xlfd,name);  */
-  ret = [[NSString stringWithUTF8String: name] UTF8String];
-  xfree (name);
-  return ret;
-#endif
-  return "monospace";
+  GTK3WL_TRACE("converted '%s' to '%s'", xlfd, name);
+  return name;
 }
 
 bool

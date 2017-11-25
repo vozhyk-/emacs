@@ -543,7 +543,7 @@ extern Lisp_Object gtk3wl_list_fonts (struct frame *f, Lisp_Object pattern,
                                   int size, int maxnames);
 extern void gtk3wl_clear_frame (struct frame *f);
 
-extern const char *gtk3wl_xlfd_to_fontname (const char *xlfd);
+extern char *gtk3wl_xlfd_to_fontname (const char *xlfd);
 
 extern Lisp_Object gtk3wl_map_event_to_object (void);
 #ifdef __OBJC__
