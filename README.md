@@ -33,7 +33,6 @@ Many many debugging outputs. Please ignore them.
 
 ## TODO
 
-- cursor doesn't blink.
 - face of mode-line doesn't change.
 - no scrollbar.
 - no toolbar.
