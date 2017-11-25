@@ -41,6 +41,7 @@ Higher:
 - sometimes segmentation fault.
 - initial font.
 - initial size.
+- keyboard quit doesn't work.
 
 Lower:
 - no toolbar.
