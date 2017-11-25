@@ -31,36 +31,19 @@ cd src
 
 Many many debugging outputs. Please ignore them.
 
-## Status
+## TODO
 
-- character displaying
-  - ascii characters can be displayed.
-  - Japanese characters can be displayed.
-  - characters already displayed are not cleared.
-  - mode-line is normal face...
-  - no cursor.
-
-- keyboard
-  - You can type characters, and they are displayed.
-  - C-x C-f works.
-
-- frame
-  - resizable by dragging window borders.
-  - no scrollbar
-  - no toolbar
-  - no menubar
-  - fringes are displayed, but face is not correct.
-  - C-x 5 2 doesn't work.
-  - fullscreen not supported.
-
-- command line options
-  - `-fn`, `-bg`, and `-fg` are available.
-
-- On pure gtk+-3 with X11
-  - maybe doesn't work.
-
-- other features
-  - so many features not supported.
+- cursor doesn't blink.
+- face of mode-line doesn't change.
+- no scrollbar.
+- no toolbar.
+- no menubar.
+- no visual-bell.
+- no visible-bell.
+- fullscreen not supported.
+- C-x 5 0 doesn't work.
+- maybe doesn't work on pure gtk+-3 with X11.
+- so many features not supported.
 
 ## My Environment
 
