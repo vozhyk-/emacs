@@ -12481,7 +12481,7 @@ gtk3wl_create_terminal (struct gtk3wl_display_info *dpyinfo)
   // terminal->ring_bell_hook = gtk3wl_ring_bell;
   terminal->update_begin_hook = gtk3wl_update_begin;
   terminal->update_end_hook = gtk3wl_update_end;
-  terminal->read_socket_hook = gtk3wl_read_socket;
+  // terminal->read_socket_hook = gtk3wl_read_socket;
   // terminal->frame_up_to_date_hook = gtk3wl_frame_up_to_date;
   // terminal->mouse_position_hook = gtk3wl_mouse_position;
   // terminal->frame_rehighlight_hook = gtk3wl_frame_rehighlight;
