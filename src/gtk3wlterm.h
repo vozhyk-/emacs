@@ -219,7 +219,7 @@ struct gtk3wl_display_info
   int last_mouse_motion_y;
 
   /* Where the mouse was last time we reported a mouse position.  */
-  GTK3WLRect last_mouse_glyph;
+  XRectangle last_mouse_glyph;
 
   /* Time of last mouse movement.  */
   Time last_mouse_movement_time;

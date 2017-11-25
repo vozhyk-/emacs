@@ -86,6 +86,7 @@ typedef XImagePtr XImagePtr_or_DC;
 typedef struct gtk3wl_display_info Display_Info;
 typedef Pixmap XImagePtr;
 typedef XImagePtr XImagePtr_or_DC;
+#define NativeRectangle XRectangle
 #endif
 
 #ifdef HAVE_WINDOW_SYSTEM

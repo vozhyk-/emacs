@@ -9957,14 +9957,13 @@ x_set_glyph_string_gc (struct glyph_string *s)
 static void
 x_set_glyph_string_clipping (struct glyph_string *s, cairo_t *cr)
 {
-  GTK3WLRect *r = s->clip;
+  XRectangle r[2];
   int n = get_glyph_string_clip_rects (s, r, 2);
 
   for (int i = 0; i < n; i++) {
-    cairo_rectangle(cr, r[i].origin.x, r[i].origin.y, r[i].size.width, r[i].size.height);
+    cairo_rectangle(cr, r[i].x, r[i].y, r[i].width, r[i].height);
     cairo_clip(cr);
   }
-  s->num_clips = n;
 }
 
 
@@ -9975,10 +9974,10 @@ x_set_glyph_string_clipping (struct glyph_string *s, cairo_t *cr)
 static void
 x_set_glyph_string_clipping_exactly (struct glyph_string *src, struct glyph_string *dst, cairo_t *cr)
 {
-  dst->clip[0].origin.x = src->x;
-  dst->clip[0].origin.y = src->y;
-  dst->clip[0].size.width = src->width;
-  dst->clip[0].size.height = src->height;
+  dst->clip[0].x = src->x;
+  dst->clip[0].y = src->y;
+  dst->clip[0].width = src->width;
+  dst->clip[0].height = src->height;
   dst->num_clips = 1;
 
   cairo_rectangle(cr, src->x, src->y, src->width, src->height);
@@ -10680,7 +10679,7 @@ x_draw_glyph_string_box (struct glyph_string *s)
   int width, left_x, right_x, top_y, bottom_y, last_x;
   bool raised_p, left_p, right_p;
   struct glyph *last_glyph;
-  GTK3WLRect clip_rect;
+  XRectangle clip_rect;
 
   last_x = ((s->row->full_width_p && !s->w->pseudo_window_p)
 	    ? WINDOW_RIGHT_EDGE_X (s->w)
@@ -10710,21 +10709,16 @@ x_draw_glyph_string_box (struct glyph_string *s)
 		     || s->next->hl != s->hl)));
 
   get_glyph_string_clip_rect (s, &clip_rect);
-  XRectangle rect;
-  rect.x = clip_rect.origin.x;
-  rect.y = clip_rect.origin.y;
-  rect.width = clip_rect.size.width;
-  rect.height = clip_rect.size.height;
 
   if (s->face->box == FACE_SIMPLE_BOX)
     x_draw_box_rect (s, left_x, top_y, right_x, bottom_y, width,
-		     left_p, right_p, &rect);
+		     left_p, right_p, &clip_rect);
   else
     {
       x_setup_relief_colors (s);
       x_draw_relief_rect (s->f, left_x, top_y, right_x, bottom_y,
 			  width, raised_p, true, true, left_p, right_p,
-			  &rect);
+			  &clip_rect);
     }
 }
 
