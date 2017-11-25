@@ -1079,7 +1079,7 @@ please check its value")
   ;; only because all other settings of no-blinking-cursor are here.
   (unless (or noninteractive
 	      emacs-basic-display
-	      (and (memq window-system '(x w32 ns))
+	      (and (memq window-system '(x w32 ns gtk3wl))
 		   (not (member (x-get-resource "cursorBlink" "CursorBlink")
 				'("no" "off" "false" "0")))))
     (setq no-blinking-cursor t))
