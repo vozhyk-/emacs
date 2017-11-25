@@ -620,7 +620,7 @@ This function has been overloaded in Nextstep.")
   ;; Only some code supports this so far, so use uglier XLFD version
   ;; "-gtk3wl-*-*-*-*-*-10-*-*-*-*-*-fontset-standard,latin:Courier,han:Kai"
   (mapconcat 'identity
-             '("-*-Noto Sans Mono CJK JP-*-*-*-*-10-*-*-*-*-*-fontset-standard"
+             '("-*-Monospace-*-*-*-*-10-*-*-*-*-*-fontset-standard"
                "latin:-*-Courier-*-*-*-*-10-*-*-*-*-*-iso10646-1"
                "han:-*-Kai-*-*-*-*-10-*-*-*-*-*-iso10646-1"
                "cyrillic:-*-Trebuchet$MS-*-*-*-*-10-*-*-*-*-*-iso10646-1")
