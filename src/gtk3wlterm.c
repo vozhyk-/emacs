@@ -9233,6 +9233,7 @@ static void gtk3wl_clear_frame_area(struct frame *f, int x, int y, int width, in
 static void gtk3wl_fill_rectangle(struct frame *f, unsigned long color, int x, int y, int width, int height);
 static void gtk3wl_clip_to_row (struct window *w, struct glyph_row *row,
 				enum glyph_row_area area, cairo_t *cr);
+static void gtk3wl_cr_destroy_surface(struct frame *f);
 
 char *
 x_get_keysym_name (int keysym)
@@ -10482,7 +10483,7 @@ x_setup_relief_color (struct frame *f, struct relief *relief, double factor,
   struct gtk3wl_output *di = f->output_data.gtk3wl;
   unsigned long pixel;
   unsigned long background = di->relief_background;
-  struct x_display_info *dpyinfo = FRAME_DISPLAY_INFO (f);
+  struct gtk3wl_display_info *dpyinfo = FRAME_DISPLAY_INFO (f);
   Display *dpy = FRAME_X_DISPLAY (f);
 
   // xgcv.line_width = 1;
@@ -11300,7 +11301,8 @@ x_draw_stretch_glyph_string (struct glyph_string *s)
 static void gtk3wl_draw_glyph_string(struct glyph_string *s)
 {
   GTK3WL_TRACE("draw_glyph_string.");
-  GTK3WL_TRACE("draw_glyph_string: face_id=%d.", s->face->id);
+  GTK3WL_TRACE("draw_glyph_string: x=%d, y=%d, width=%d, height=%d.",
+	       s->x, s->y, s->width, s->height);
 
   bool relief_drawn_p = false;
 
@@ -11640,7 +11642,7 @@ static void
 x_draw_hollow_cursor (struct window *w, struct glyph_row *row)
 {
   struct frame *f = XFRAME (WINDOW_FRAME (w));
-  struct x_display_info *dpyinfo = FRAME_DISPLAY_INFO (f);
+  struct gtk3wl_display_info *dpyinfo = FRAME_DISPLAY_INFO (f);
   Display *dpy = FRAME_X_DISPLAY (f);
   int x, y, wd, h;
   XGCValues xgcv;
@@ -11975,7 +11977,8 @@ gtk3wl_draw_vertical_window_border (struct window *w, int x, int y0, int y1)
   if (face)
     gtk3wl_set_cr_source_with_color (f, face->foreground);
 
-  cairo_fill_rectangle (cr, x, y0, 1, y1 - y0);
+  cairo_rectangle (cr, x, y0, 1, y1 - y0);
+  cairo_fill (cr);
 
   gtk3wl_end_cr_clip (f);
 }
@@ -14634,7 +14637,7 @@ x_new_focus_frame (struct gtk3wl_display_info *dpyinfo, struct frame *frame)
    a FOCUS_IN_EVENT into *BUFP.  */
 
 static void
-x_focus_changed (gboolean is_enter, int state, struct gtk3wl_display_info *dpyinfo, struct frame *frame, struct input_event *bufp)
+x_focus_changed (gboolean is_enter, int state, struct gtk3wl_display_info *dpyinfo, struct frame *frame, union buffered_input_event *bufp)
 {
   if (is_enter)
     {
@@ -14646,14 +14649,14 @@ x_focus_changed (gboolean is_enter, int state, struct gtk3wl_display_info *dpyin
           /* Don't stop displaying the initial startup message
              for a switch-frame event we don't need.  */
           /* When run as a daemon, Vterminal_frame is always NIL.  */
-          bufp->arg = (((NILP (Vterminal_frame)
+          bufp->ie.arg = (((NILP (Vterminal_frame)
                          || ! FRAME_X_P (XFRAME (Vterminal_frame))
                          || EQ (Fdaemonp (), Qt))
 			&& CONSP (Vframe_list)
 			&& !NILP (XCDR (Vframe_list)))
 		       ? Qt : Qnil);
-          bufp->kind = FOCUS_IN_EVENT;
-          XSETFRAME (bufp->frame_or_window, frame);
+          bufp->ie.kind = FOCUS_IN_EVENT;
+          XSETFRAME (bufp->ie.frame_or_window, frame);
         }
 
       frame->output_data.gtk3wl->focus_state |= state;
@@ -14668,8 +14671,8 @@ x_focus_changed (gboolean is_enter, int state, struct gtk3wl_display_info *dpyin
           dpyinfo->x_focus_event_frame = 0;
           x_new_focus_frame (dpyinfo, 0);
 
-          bufp->kind = FOCUS_OUT_EVENT;
-          XSETFRAME (bufp->frame_or_window, frame);
+          bufp->ie.kind = FOCUS_OUT_EVENT;
+          XSETFRAME (bufp->ie.frame_or_window, frame);
         }
 
 #if 0
@@ -14758,8 +14761,8 @@ gtk3wl_set_event_handler(struct frame *f)
   g_signal_connect(G_OBJECT(FRAME_GTK_WIDGET(f)), "key-press-event", G_CALLBACK(key_press_event), NULL);
   g_signal_connect(G_OBJECT(FRAME_GTK_WIDGET(f)), "focus-in-event", G_CALLBACK(focus_in_event), NULL);
   g_signal_connect(G_OBJECT(FRAME_GTK_WIDGET(f)), "focus-out-event", G_CALLBACK(focus_out_event), NULL);
-  g_signal_connect(G_OBJECT(FRAME_GTK_WIDGET(f)), "enter-notify-event", G_CALLBACK(focus_in_event), NULL);
-  g_signal_connect(G_OBJECT(FRAME_GTK_WIDGET(f)), "leave-notify-event", G_CALLBACK(focus_out_event), NULL);
+  g_signal_connect(G_OBJECT(FRAME_GTK_WIDGET(f)), "enter-notify-event", G_CALLBACK(enter_notify_event), NULL);
+  g_signal_connect(G_OBJECT(FRAME_GTK_WIDGET(f)), "leave-notify-event", G_CALLBACK(leave_notify_event), NULL);
   g_signal_connect(G_OBJECT(FRAME_GTK_WIDGET(f)), "event", G_CALLBACK(gtk3wl_handle_event), NULL);
   g_signal_connect(G_OBJECT(FRAME_GTK_WIDGET(f)), "draw", G_CALLBACK(gtk3wl_handle_draw), NULL);
 }
@@ -15242,7 +15245,7 @@ gtk3wl_cr_draw_frame (cairo_t *cr, struct frame *f)
 #endif
 }
 
-void
+static void
 gtk3wl_cr_destroy_surface(struct frame *f)
 {
   GTK3WL_TRACE("gtk3wl_cr_destroy_surface");

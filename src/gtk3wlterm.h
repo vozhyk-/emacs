@@ -571,14 +571,17 @@ gtk3wl_query_colors (struct frame *f, XColor *colors, int ncolors);
 
 int gtk3wl_parse_color (const char *color_name, XColor *color);
 
+extern int gtk3wl_lisp_to_color (Lisp_Object color, XColor *col);
 #ifdef __OBJC__
-extern int gtk3wl_lisp_to_color (Lisp_Object color, GTK3WLColor **col);
 extern GTK3WLColor *gtk3wl_lookup_indexed_color (unsigned long idx, struct frame *f);
 extern unsigned long gtk3wl_index_color (GTK3WLColor *color, struct frame *f);
 extern const char *gtk3wl_get_pending_menu_title (void);
 extern void gtk3wl_check_menu_open (GTK3WLMenu *menu);
 extern void gtk3wl_check_pending_open_menu (void);
 #endif
+
+extern void gtk3wl_clear_area (struct frame *f, int x, int y, int width, int height);
+extern int gtk3wl_gtk_to_emacs_modifiers (int state);
 
 /* C access to ObjC functionality */
 extern void  gtk3wl_release_object (void *obj);

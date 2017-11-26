@@ -27,7 +27,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 
 #include "lisp.h"
 #include "blockinput.h"
-#include "gtk3wlterm.h"
+#include "gtkutil.h"
 #include "window.h"
 #include "character.h"
 #include "buffer.h"
@@ -3228,7 +3228,6 @@ void gtk3wl_backtrace(const char *file, int lineno)
   struct timespec ts;
   struct tm tm;
   char timestr[32];
-  va_list ap;
 
   clock_gettime(CLOCK_REALTIME, &ts);
 
