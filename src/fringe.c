@@ -30,6 +30,8 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include "blockinput.h"
 #include "termhooks.h"
 
+#include "gtk3wlterm.h"
+
 /* Fringe bitmaps are represented in three different ways:
 
    Logical bitmaps are used internally to denote things like
@@ -566,6 +568,7 @@ draw_fringe_bitmap_1 (struct window *w, struct glyph_row *row, int left_p, int o
   p.overlay_p = (overlay & 1) == 1;
   p.cursor_p = (overlay & 2) == 2;
 
+  GTK3WL_TRACE("which=%d.", which);
   if (which != NO_FRINGE_BITMAP)
     {
       offset = 0;
@@ -592,6 +595,7 @@ draw_fringe_bitmap_1 (struct window *w, struct glyph_row *row, int left_p, int o
 	face_id = FRINGE_FACE_ID;
     }
 
+  GTK3WL_TRACE("which=%d.", which);
   fb = get_fringe_bitmap_data (which);
 
   period = fb->period;
@@ -602,6 +606,7 @@ draw_fringe_bitmap_1 (struct window *w, struct glyph_row *row, int left_p, int o
   p.which = which;
   p.bits = fb->bits;
   p.wd = fb->width;
+  GTK3WL_TRACE("fb->width=%d.", fb->width);
 
   p.h = fb->height;
   p.dh = (period > 0 ? (p.y % period) : 0);
@@ -642,6 +647,7 @@ draw_fringe_bitmap_1 (struct window *w, struct glyph_row *row, int left_p, int o
       int x = window_box_left (w, (WINDOW_HAS_FRINGES_OUTSIDE_MARGINS (w)
 				   ? LEFT_MARGIN_AREA
 				   : TEXT_AREA));
+      GTK3WL_TRACE("LEFT_FRINGE_WIDTH=%d.", wd);
       if (p.wd > wd)
 	p.wd = wd;
       p.x = x - p.wd - (wd - p.wd) / 2;
@@ -674,6 +680,7 @@ draw_fringe_bitmap_1 (struct window *w, struct glyph_row *row, int left_p, int o
 				 ? RIGHT_MARGIN_AREA
 				 : TEXT_AREA));
       int wd = WINDOW_RIGHT_FRINGE_WIDTH (w);
+      GTK3WL_TRACE("RIGHT_FRINGE_WIDTH=%d.", wd);
       if (p.wd > wd)
 	p.wd = wd;
       p.x = x + (wd - p.wd) / 2;
@@ -686,6 +693,11 @@ draw_fringe_bitmap_1 (struct window *w, struct glyph_row *row, int left_p, int o
 	}
     }
 
+  GTK3WL_TRACE("p: x=%d, y=%d, wd=%d, h=%d, dh=%d, bx=%d, by=%d, nx=%d, ny=%d.",
+	       p.x, p.y, p.wd, p.h, p.dh, p.bx, p.by, p.nx, p.ny);
+  GTK3WL_TRACE("p.wd=%d.", p.wd);
+  GTK3WL_TRACE("LEFT_EDGE_X=%d.", WINDOW_BOX_LEFT_EDGE_X (w));
+  GTK3WL_TRACE("PIXEL_WIDTH=%d.", WINDOW_PIXEL_WIDTH (w));
   if (p.x >= WINDOW_BOX_LEFT_EDGE_X (w)
       && (p.x + p.wd) <= WINDOW_BOX_LEFT_EDGE_X (w) + WINDOW_PIXEL_WIDTH (w))
     FRAME_RIF (f)->draw_fringe_bitmap (w, row, &p);
@@ -920,6 +932,7 @@ draw_window_fringes (struct window *w, bool no_fringe_p)
     {
       if (!row->redraw_fringe_bitmaps_p)
 	continue;
+      GTK3WL_TRACE("row: x=%d,y=%d.", row->x, row->y);
       draw_row_fringe_bitmaps (w, row);
       row->redraw_fringe_bitmaps_p = 0;
       updated_p = 1;

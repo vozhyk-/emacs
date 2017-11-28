@@ -9960,8 +9960,11 @@ x_set_glyph_string_clipping (struct glyph_string *s, cairo_t *cr)
 {
   XRectangle r[2];
   int n = get_glyph_string_clip_rects (s, r, 2);
+  GTK3WL_TRACE("x_set_glyph_string_clipping: n=%d.", n);
 
   for (int i = 0; i < n; i++) {
+    GTK3WL_TRACE("x_set_glyph_string_clipping: r[%d]: %dx%d+%d+%d.",
+		 i, r[i].width, r[i].height, r[i].x, r[i].y);
     cairo_rectangle(cr, r[i].x, r[i].y, r[i].width, r[i].height);
     cairo_clip(cr);
   }
@@ -12104,16 +12107,22 @@ gtk3wl_update_end (struct frame *f)
   if (FRAME_CR_SURFACE (f))
     {
       block_input();
+#if 0
       cairo_t *cr = gtk3wl_begin_cr_clip(f, NULL);
       cairo_set_source_surface (cr, FRAME_CR_SURFACE (f), 0, 0);
       cairo_paint (cr);
       gtk3wl_end_cr_clip(f);
+#else
+      gtk_widget_queue_draw(FRAME_GTK_WIDGET(f));
+#endif
       unblock_input ();
     }
 
+#if 0
   block_input ();
   gdk_flush();
   unblock_input ();
+#endif
 }
 
 /* Fringe bitmaps.  */
@@ -15047,10 +15056,6 @@ gtk3wl_clear_area (struct frame *f, int x, int y, int width, int height)
 
   cr = gtk3wl_begin_cr_clip (f, NULL);
   GTK3WL_TRACE("back color %08lx.", (unsigned long) f->output_data.gtk3wl->background_color);
-#if 0
-  if (f->output_data.gtk3wl->background_color == (unsigned long) 0xff262829)
-    abort();
-#endif
   gtk3wl_set_cr_source_with_color (f, f->output_data.gtk3wl->background_color);
   cairo_rectangle (cr, x, y, width, height);
   cairo_fill (cr);

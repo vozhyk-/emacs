@@ -14248,6 +14248,7 @@ redisplay_internal (void)
 
     cancel:
       /* Text changed drastically or point moved off of line.  */
+      GTK3WL_TRACE("[%d].enabled_p=false.", this_line_vpos),
       SET_MATRIX_ROW_ENABLED_P (w->desired_matrix, this_line_vpos, false);
     }
 
@@ -17870,6 +17871,7 @@ try_window_reusing_current_matrix (struct window *w)
 
 	  /* Disable lines that must be updated.  */
 	  for (i = 0; i < nrows_scrolled; ++i)
+	    GTK3WL_TRACE("[%d].enabled_p=false.", i),
 	    (start_row + i)->enabled_p = false;
 
 	  /* Re-compute Y positions.  */
@@ -17900,6 +17902,7 @@ try_window_reusing_current_matrix (struct window *w)
 	  /* Disable lines in the current matrix which are now
 	     below the window.  */
 	  for (++row; row < bottom_row; ++row)
+	    GTK3WL_TRACE("[%d].enabled_p=false.", row - start_row),
 	    row->enabled_p = row->mode_line_p = false;
 	}
 
@@ -18050,6 +18053,7 @@ try_window_reusing_current_matrix (struct window *w)
 
       /* Disable rows not reused.  */
       for (row -= nrows_scrolled; row < bottom_row; ++row)
+	GTK3WL_TRACE("[%d].enabled_p=false.", row - start_row),
 	row->enabled_p = false;
 
       /* Point may have moved to a different line, so we cannot assume that
@@ -18335,6 +18339,7 @@ sync_frame_with_window_matrix_rows (struct window *w)
       /* Disable frame rows whose corresponding window rows have
 	 been disabled in try_window_id.  */
       if (!window_row->enabled_p)
+	GTK3WL_TRACE("[%d].enabled_p=false.", frame_row - f->current_matrix->rows),
 	frame_row->enabled_p = false;
 
       ++window_row, ++frame_row;
@@ -19119,6 +19124,7 @@ try_window_id (struct window *w)
 	     the current matrix?  I don't think so, so we mark rows
 	     displayed invalid in the current matrix by setting their
 	     enabled_p flag to false.  */
+	  GTK3WL_TRACE("[%d].enabled_p=false.", it.vpos),
 	  SET_MATRIX_ROW_ENABLED_P (w->current_matrix, it.vpos, false);
 	  if (display_line (&it, w->cursor.vpos))
 	    last_text_row_at_end = it.glyph_row - 1;
@@ -21249,6 +21255,7 @@ display_line (struct it *it, int cursor_vpos)
     }
 
   /* Clear the result glyph row and enable it.  */
+  GTK3WL_TRACE("display_line: [%d]", MATRIX_ROW_VPOS (row, it->w->desired_matrix));
   prepare_desired_row (it->w, row, false);
 
   row->y = it->current_y;
