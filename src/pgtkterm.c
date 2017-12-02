@@ -15028,6 +15028,10 @@ button_event(GtkWidget *widget, GdkEvent *event, gpointer *user_data)
   inev.ie.kind = NO_EVENT;
   inev.ie.arg = Qnil;
 
+  /* ignore double click and triple click. */
+  if (event->type != GDK_BUTTON_PRESS && event->type != GDK_BUTTON_RELEASE)
+    return TRUE;
+
   frame = pgtk_any_window_to_frame(gtk_widget_get_window(widget));
   dpyinfo = FRAME_DISPLAY_INFO (frame);
 
