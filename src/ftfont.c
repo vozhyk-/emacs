@@ -379,7 +379,6 @@ ftfont_lookup_cache (Lisp_Object key, enum ftfont_cache_for cache_for)
       Fputhash (key, cache, ft_face_cache);
       // GTK3WL_TRACE("ftfont_lookup_cache: 3: %ld.", key.i);
       // GTK3WL_TRACE("ftfont_lookup_cache: 4: %ld.", ft_face_cache.i);
-      Fgarbage_collect();  // test.
     }
   else
     {
