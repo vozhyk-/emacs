@@ -11643,6 +11643,19 @@ static void pgtk_draw_glyph_string(struct glyph_string *s)
   s->num_clips = 0;
 }
 
+/* RIF: Define cursor CURSOR on frame F.  */
+
+static void
+pgtk_define_frame_cursor (struct frame *f, Cursor cursor)
+{
+#if 0
+  if (!f->pointer_invisible
+      && f->output_data.x->current_cursor != cursor)
+    XDefineCursor (FRAME_X_DISPLAY (f), FRAME_X_WINDOW (f), cursor);
+  f->output_data.x->current_cursor = cursor;
+#endif
+}
+
 static void pgtk_after_update_window_line(struct window *w, struct glyph_row *desired_row)
 {
   PGTK_TRACE("after_update_window_line.");
@@ -12137,30 +12150,15 @@ pgtk_update_window_end (struct window *w, bool cursor_on_p,
 static void
 pgtk_update_end (struct frame *f)
 {
-#if 0
   /* Mouse highlight may be displayed again.  */
   MOUSE_HL_INFO (f)->mouse_face_defer = false;
-#endif
 
   if (FRAME_CR_SURFACE (f))
     {
       block_input();
-#if 0
-      cairo_t *cr = pgtk_begin_cr_clip(f, NULL);
-      cairo_set_source_surface (cr, FRAME_CR_SURFACE (f), 0, 0);
-      cairo_paint (cr);
-      pgtk_end_cr_clip(f);
-#else
       gtk_widget_queue_draw(FRAME_GTK_WIDGET(f));
-#endif
       unblock_input ();
     }
-
-#if 0
-  block_input ();
-  gdk_flush();
-  unblock_input ();
-#endif
 }
 
 /* Fringe bitmaps.  */
@@ -12376,7 +12374,7 @@ static struct redisplay_interface pgtk_redisplay_interface =
   pgtk_destroy_fringe_bitmap,
   NULL, // pgtk_compute_glyph_string_overhangs,
   pgtk_draw_glyph_string,
-  NULL, // pgtk_define_frame_cursor,
+  pgtk_define_frame_cursor,
   pgtk_clear_frame_area,
   pgtk_draw_window_cursor,
   NULL, // pgtk_draw_vertical_window_border,

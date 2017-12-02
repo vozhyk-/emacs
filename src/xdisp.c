@@ -29610,6 +29610,7 @@ show_mouse_face (Mouse_HLInfo *hlinfo, enum draw_glyphs_face draw)
   struct window *w = XWINDOW (hlinfo->mouse_face_window);
   struct frame *f = XFRAME (WINDOW_FRAME (w));
 
+  PGTK_TRACE("show_mouse_face: 1.");
   if (/* If window is in the process of being destroyed, don't bother
 	 to do anything.  */
       w->current_matrix != NULL
@@ -29622,6 +29623,7 @@ show_mouse_face (Mouse_HLInfo *hlinfo, enum draw_glyphs_face draw)
       bool phys_cursor_on_p = w->phys_cursor_on_p;
       struct glyph_row *row, *first, *last;
 
+      PGTK_TRACE("show_mouse_face: 2.");
       first = MATRIX_ROW (w->current_matrix, hlinfo->mouse_face_beg_row);
       last = MATRIX_ROW (w->current_matrix, hlinfo->mouse_face_end_row);
 
@@ -29695,6 +29697,7 @@ show_mouse_face (Mouse_HLInfo *hlinfo, enum draw_glyphs_face draw)
 	    }
 	}
 
+      PGTK_TRACE("show_mouse_face: 3.");
       /* When we've written over the cursor, arrange for it to
 	 be displayed again.  */
       if (FRAME_WINDOW_P (f)
@@ -29718,23 +29721,29 @@ show_mouse_face (Mouse_HLInfo *hlinfo, enum draw_glyphs_face draw)
 #endif	/* HAVE_WINDOW_SYSTEM */
 	}
     }
+  PGTK_TRACE("show_mouse_face: 4.");
 
 #ifdef HAVE_WINDOW_SYSTEM
   /* Change the mouse cursor.  */
   if (FRAME_WINDOW_P (f) && NILP (do_mouse_tracking))
     {
+      PGTK_TRACE("show_mouse_face: 5.");
 #if ! defined (USE_GTK) && ! defined (HAVE_NS)
       if (draw == DRAW_NORMAL_TEXT
 	  && !EQ (hlinfo->mouse_face_window, f->tool_bar_window))
+	PGTK_TRACE("show_mouse_face: 5."),
 	FRAME_RIF (f)->define_frame_cursor (f, FRAME_X_OUTPUT (f)->text_cursor);
       else
 #endif
       if (draw == DRAW_MOUSE_FACE)
+	PGTK_TRACE("show_mouse_face: 6."),
 	FRAME_RIF (f)->define_frame_cursor (f, FRAME_X_OUTPUT (f)->hand_cursor);
       else
+	PGTK_TRACE("show_mouse_face: 7."),
 	FRAME_RIF (f)->define_frame_cursor (f, FRAME_X_OUTPUT (f)->nontext_cursor);
     }
 #endif	/* HAVE_WINDOW_SYSTEM */
+  PGTK_TRACE("show_mouse_face: done.");
 }
 
 /* EXPORT:
@@ -30309,7 +30318,9 @@ mouse_face_from_buffer_pos (Lisp_Object window,
     = face_at_buffer_position (w, mouse_charpos, &ignore,
 			       mouse_charpos + 1,
 			       !hlinfo->mouse_face_hidden, -1);
+  PGTK_TRACE("enter show_mouse_face.");
   show_mouse_face (hlinfo, DRAW_MOUSE_FACE);
+  PGTK_TRACE("leave show_mouse_face.");
 }
 
 /* The following function is not used anymore (replaced with
