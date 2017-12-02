@@ -10007,7 +10007,7 @@ x_set_glyph_string_clipping (struct glyph_string *s, cairo_t *cr)
   PGTK_TRACE("x_set_glyph_string_clipping: n=%d.", n);
 
   for (int i = 0; i < n; i++) {
-    PGTK_TRACE("x_set_glyph_string_clipping: r[%d]: %dx%d+%d+%d.",
+    PGTK_TRACE("x_set_glyph_string_clipping: r[%d]: %ux%u+%d+%d.",
 		 i, r[i].width, r[i].height, r[i].x, r[i].y);
     cairo_rectangle(cr, r[i].x, r[i].y, r[i].width, r[i].height);
     cairo_clip(cr);
@@ -11984,15 +11984,12 @@ static void
 pgtk_update_window_begin (struct window *w)
 {
   struct frame *f = XFRAME (WINDOW_FRAME (w));
-#if 0
   Mouse_HLInfo *hlinfo = MOUSE_HL_INFO (f);
-#endif
 
   w->output_cursor = w->cursor;
 
   block_input ();
 
-#if 0
   if (f == hlinfo->mouse_face_mouse_frame)
     {
       /* Don't do highlighting for mouse motion during the update.  */
@@ -12003,7 +12000,6 @@ pgtk_update_window_begin (struct window *w)
       if (FRAME_GARBAGED_P (f))
 	hlinfo->mouse_face_window = Qnil;
     }
-#endif
 
   unblock_input ();
 }
@@ -12123,7 +12119,6 @@ pgtk_update_window_end (struct window *w, bool cursor_on_p,
       unblock_input ();
     }
 
-#if 0
   /* If a row with mouse-face was overwritten, arrange for
      XTframe_up_to_date to redisplay the mouse highlight.  */
   if (mouse_face_overwritten_p)
@@ -12134,7 +12129,6 @@ pgtk_update_window_end (struct window *w, bool cursor_on_p,
       hlinfo->mouse_face_end_row = hlinfo->mouse_face_end_col = -1;
       hlinfo->mouse_face_window = Qnil;
     }
-#endif
 }
 
 /* End update of frame F.  This function is installed as a hook in
@@ -12289,7 +12283,7 @@ pgtk_cr_draw_image (struct frame *f, GC gc, cairo_pattern_t *image,
       pgtk_set_cr_source_with_gc_foreground (f, gc);
       cairo_rectangle_list_t *rects = cairo_copy_clip_rectangle_list(cr);
       PGTK_TRACE("rects:");
-      PGTK_TRACE(" status: %d", rects->status);
+      PGTK_TRACE(" status: %u", rects->status);
       PGTK_TRACE(" rectangles:");
       for (int i = 0; i < rects->num_rectangles; i++) {
 	PGTK_TRACE("  %fx%f+%f+%f",
@@ -12343,9 +12337,9 @@ pgtk_draw_fringe_bitmap (struct window *w, struct glyph_row *row, struct draw_fr
 
       PGTK_TRACE("cursor_p=%d.", p->cursor_p);
       PGTK_TRACE("overlay_p_p=%d.", p->overlay_p);
-      PGTK_TRACE("background=%08x.", face->background);
-      PGTK_TRACE("cursor_color=%08x.", f->output_data.pgtk->cursor_color);
-      PGTK_TRACE("foreground=%08x.", face->foreground);
+      PGTK_TRACE("background=%08lx.", face->background);
+      PGTK_TRACE("cursor_color=%08lx.", f->output_data.pgtk->cursor_color);
+      PGTK_TRACE("foreground=%08lx.", face->foreground);
       gcv.foreground = (p->cursor_p
 		       ? (p->overlay_p ? face->background
 			  : f->output_data.pgtk->cursor_color)
@@ -13371,7 +13365,7 @@ handle_one_event (struct x_display_info *dpyinfo,
 	      {
 		static Lisp_Object last_mouse_window;
 		Lisp_Object window = window_from_coordinates
-		  (f, event->xmotion.x, event->xmotion.y, 0, false);
+		  (f, event->motion.x, event->motion.y, 0, false);
 
 		/* A window will be autoselected only when it is not
 		   selected now and the last mouse movement event was
@@ -13393,7 +13387,7 @@ handle_one_event (struct x_display_info *dpyinfo,
 		last_mouse_window = window;
 	      }
 
-            if (!note_mouse_movement (f, &event->xmotion))
+            if (!note_mouse_movement (f, &event->motion))
 	      help_echo_string = previous_help_echo_string;
           }
         else
@@ -14296,6 +14290,7 @@ static gboolean key_press_event(GtkWidget *widget, GdkEvent *event, gpointer *us
   struct coding_system coding;
   union buffered_input_event inev;
   ptrdiff_t nbytes = 0;
+  Mouse_HLInfo *hlinfo;
 
   USE_SAFE_ALLOCA;
 
@@ -14308,8 +14303,8 @@ static gboolean key_press_event(GtkWidget *widget, GdkEvent *event, gpointer *us
 #endif
 
   struct frame *f = pgtk_any_window_to_frame(gtk_widget_get_window(widget));
+  hlinfo = MOUSE_HL_INFO(f);
 
-#if 0
   /* If mouse-highlight is an integer, input clears out
      mouse highlighting.  */
   if (!hlinfo->mouse_face_hidden && INTEGERP (Vmouse_highlight))
@@ -14317,7 +14312,6 @@ static gboolean key_press_event(GtkWidget *widget, GdkEvent *event, gpointer *us
       clear_mouse_face (hlinfo);
       hlinfo->mouse_face_hidden = true;
     }
-#endif
 
   if (f != 0)
     {
@@ -14821,6 +14815,358 @@ focus_out_event(GtkWidget *widget, GdkEvent *event, gpointer *user_data)
   return TRUE;
 }
 
+/* Function to report a mouse movement to the mainstream Emacs code.
+   The input handler calls this.
+
+   We have received a mouse movement event, which is given in *event.
+   If the mouse is over a different glyph than it was last time, tell
+   the mainstream emacs code by setting mouse_moved.  If not, ask for
+   another motion event, so we can check again the next time it moves.  */
+
+static bool
+note_mouse_movement (struct frame *frame, const GdkEventMotion *event)
+{
+  XRectangle *r;
+  struct pgtk_display_info *dpyinfo;
+
+  if (!FRAME_X_OUTPUT (frame))
+    return false;
+
+  dpyinfo = FRAME_DISPLAY_INFO (frame);
+  dpyinfo->last_mouse_movement_time = event->time;
+  dpyinfo->last_mouse_motion_frame = frame;
+  dpyinfo->last_mouse_motion_x = event->x;
+  dpyinfo->last_mouse_motion_y = event->y;
+
+  if (event->window != gtk_widget_get_window(FRAME_GTK_WIDGET (frame)))
+    {
+      frame->mouse_moved = true;
+      dpyinfo->last_mouse_scroll_bar = NULL;
+      note_mouse_highlight (frame, -1, -1);
+      dpyinfo->last_mouse_glyph_frame = NULL;
+      return true;
+    }
+
+
+  /* Has the mouse moved off the glyph it was on at the last sighting?  */
+  r = &dpyinfo->last_mouse_glyph;
+  if (frame != dpyinfo->last_mouse_glyph_frame
+      || event->x < r->x || event->x >= r->x + r->width
+      || event->y < r->y || event->y >= r->y + r->height)
+    {
+      frame->mouse_moved = true;
+      dpyinfo->last_mouse_scroll_bar = NULL;
+      note_mouse_highlight (frame, event->x, event->y);
+      /* Remember which glyph we're now on.  */
+      remember_mouse_glyph (frame, event->x, event->y, r);
+      dpyinfo->last_mouse_glyph_frame = frame;
+      return true;
+    }
+
+  return false;
+}
+
+static gboolean
+motion_notify_event(GtkWidget *widget, GdkEvent *event, gpointer *user_data)
+{
+  PGTK_TRACE("motion_notify_event");
+  union buffered_input_event inev;
+  struct frame *f, *frame;
+  struct pgtk_display_info *dpyinfo;
+  Mouse_HLInfo *hlinfo;
+
+  EVENT_INIT (inev.ie);
+  inev.ie.kind = NO_EVENT;
+  inev.ie.arg = Qnil;
+
+  previous_help_echo_string = help_echo_string;
+  help_echo_string = Qnil;
+
+  frame = pgtk_any_window_to_frame(gtk_widget_get_window(widget));
+  dpyinfo = FRAME_DISPLAY_INFO (frame);
+  f = (x_mouse_grabbed (dpyinfo) ? dpyinfo->last_mouse_frame
+       : pgtk_any_window_to_frame(gtk_widget_get_window(widget)));
+  hlinfo = MOUSE_HL_INFO (f);
+
+  if (hlinfo->mouse_face_hidden)
+    {
+      hlinfo->mouse_face_hidden = false;
+      clear_mouse_face (hlinfo);
+    }
+
+#if 0
+  if (f && xg_event_is_for_scrollbar (f, event))
+    f = 0;
+#endif
+  if (f)
+    {
+      /* Maybe generate a SELECT_WINDOW_EVENT for
+	 `mouse-autoselect-window' but don't let popup menus
+	 interfere with this (Bug#1261).  */
+      if (!NILP (Vmouse_autoselect_window)
+#if 0
+	  && !popup_activated ()
+#endif
+	  /* Don't switch if we're currently in the minibuffer.
+	     This tries to work around problems where the
+	     minibuffer gets unselected unexpectedly, and where
+	     you then have to move your mouse all the way down to
+	     the minibuffer to select it.  */
+	  && !MINI_WINDOW_P (XWINDOW (selected_window))
+	  /* With `focus-follows-mouse' non-nil create an event
+	     also when the target window is on another frame.  */
+	  && (f == XFRAME (selected_frame)
+	      || !NILP (focus_follows_mouse)))
+	{
+	  static Lisp_Object last_mouse_window;
+	  Lisp_Object window = window_from_coordinates
+	    (f, event->motion.x, event->motion.y, 0, false);
+
+	  /* A window will be autoselected only when it is not
+	     selected now and the last mouse movement event was
+	     not in it.  The remainder of the code is a bit vague
+	     wrt what a "window" is.  For immediate autoselection,
+	     the window is usually the entire window but for GTK
+	     where the scroll bars don't count.  For delayed
+	     autoselection the window is usually the window's text
+	     area including the margins.  */
+	  if (WINDOWP (window)
+	      && !EQ (window, last_mouse_window)
+	      && !EQ (window, selected_window))
+	    {
+	      inev.ie.kind = SELECT_WINDOW_EVENT;
+	      inev.ie.frame_or_window = window;
+	    }
+
+	  /* Remember the last window where we saw the mouse.  */
+	  last_mouse_window = window;
+	}
+
+      if (!note_mouse_movement (f, &event->motion))
+	help_echo_string = previous_help_echo_string;
+    }
+  else
+    {
+      /* If we move outside the frame, then we're
+	 certainly no longer on any text in the frame.  */
+      clear_mouse_face (hlinfo);
+    }
+
+#if 0
+  /* If the contents of the global variable help_echo_string
+     has changed, generate a HELP_EVENT.  */
+  if (!NILP (help_echo_string)
+      || !NILP (previous_help_echo_string))
+    do_help = 1;
+#endif
+
+  if (inev.ie.kind != NO_EVENT)
+    kbd_buffer_store_buffered_event (&inev, NULL);
+  return TRUE;
+}
+
+/* Mouse clicks and mouse movement.  Rah.
+
+   Formerly, we used PointerMotionHintMask (in standard_event_mask)
+   so that we would have to call XQueryPointer after each MotionNotify
+   event to ask for another such event.  However, this made mouse tracking
+   slow, and there was a bug that made it eventually stop.
+
+   Simply asking for MotionNotify all the time seems to work better.
+
+   In order to avoid asking for motion events and then throwing most
+   of them away or busy-polling the server for mouse positions, we ask
+   the server for pointer motion hints.  This means that we get only
+   one event per group of mouse movements.  "Groups" are delimited by
+   other kinds of events (focus changes and button clicks, for
+   example), or by XQueryPointer calls; when one of these happens, we
+   get another MotionNotify event the next time the mouse moves.  This
+   is at least as efficient as getting motion events when mouse
+   tracking is on, and I suspect only negligibly worse when tracking
+   is off.  */
+
+/* Prepare a mouse-event in *RESULT for placement in the input queue.
+
+   If the event is a button press, then note that we have grabbed
+   the mouse.  */
+
+static Lisp_Object
+construct_mouse_click (struct input_event *result,
+		       const GdkEventButton *event,
+		       struct frame *f)
+{
+  /* Make the event type NO_EVENT; we'll change that when we decide
+     otherwise.  */
+  result->kind = MOUSE_CLICK_EVENT;
+  result->code = event->button - 1;
+  result->timestamp = event->time;
+  result->modifiers = (pgtk_gtk_to_emacs_modifiers (event->state)
+		       | (event->type == GDK_BUTTON_RELEASE
+			  ? up_modifier
+			  : down_modifier));
+
+  XSETINT (result->x, event->x);
+  XSETINT (result->y, event->y);
+  XSETFRAME (result->frame_or_window, f);
+  result->arg = Qnil;
+  return Qnil;
+}
+
+static gboolean
+button_event(GtkWidget *widget, GdkEvent *event, gpointer *user_data)
+{
+  PGTK_TRACE("button_event");
+  union buffered_input_event inev;
+  struct frame *f, *frame;
+  struct pgtk_display_info *dpyinfo;
+
+  /* If we decide we want to generate an event to be seen
+     by the rest of Emacs, we put it here.  */
+  bool tool_bar_p = false;
+
+  EVENT_INIT (inev.ie);
+  inev.ie.kind = NO_EVENT;
+  inev.ie.arg = Qnil;
+
+  frame = pgtk_any_window_to_frame(gtk_widget_get_window(widget));
+  dpyinfo = FRAME_DISPLAY_INFO (frame);
+
+#if 0
+  memset (&compose_status, 0, sizeof (compose_status));
+#endif
+  dpyinfo->last_mouse_glyph_frame = NULL;
+#if 0
+  x_display_set_last_user_time (dpyinfo, event->button.time);
+#endif
+
+  if (x_mouse_grabbed (dpyinfo))
+    f = dpyinfo->last_mouse_frame;
+  else
+    {
+      f = pgtk_any_window_to_frame(gtk_widget_get_window(widget));
+
+      if (f && event->button.type == GDK_BUTTON_PRESS
+#if 0
+	  && !popup_activated ()
+#endif
+#if 0
+	  && !x_window_to_scroll_bar (event->button.display,
+				      event->button.window, 2)
+#endif
+	  && !FRAME_NO_ACCEPT_FOCUS (f))
+	{
+	  /* When clicking into a child frame or when clicking
+	     into a parent frame with the child frame selected and
+	     `no-accept-focus' is not set, select the clicked
+	     frame.  */
+	  struct frame *hf = dpyinfo->x_highlight_frame;
+
+	  if (FRAME_PARENT_FRAME (f) || (hf && frame_ancestor_p (f, hf)))
+	    {
+	      block_input ();
+#if 0
+	      XSetInputFocus (FRAME_X_DISPLAY (f), FRAME_OUTER_WINDOW (f),
+			      RevertToParent, CurrentTime);
+	      if (FRAME_PARENT_FRAME (f))
+		XRaiseWindow (FRAME_X_DISPLAY (f), FRAME_OUTER_WINDOW (f));
+#endif
+	      unblock_input ();
+	    }
+	}
+    }
+
+#if 0
+  if (f && xg_event_is_for_scrollbar (f, event))
+    f = 0;
+#endif
+  if (f)
+    {
+      if (!tool_bar_p)
+#if 0
+	if (! popup_activated ())
+	  {
+	    if (ignore_next_mouse_click_timeout)
+	      {
+		if (event->type == GDK_BUTTON_PRESS
+		    && event->button.time > ignore_next_mouse_click_timeout)
+		  {
+		    ignore_next_mouse_click_timeout = 0;
+		    construct_mouse_click (&inev.ie, &event->button, f);
+		  }
+		if (event->type == GDK_BUTTON_RELEASE)
+		  ignore_next_mouse_click_timeout = 0;
+	      }
+	    else
+#endif
+	      construct_mouse_click (&inev.ie, &event->button, f);
+#if 0
+	  }
+#endif
+#if 0
+      if (FRAME_X_EMBEDDED_P (f))
+	xembed_send_message (f, event->button.time,
+			     XEMBED_REQUEST_FOCUS, 0, 0, 0);
+#endif
+    }
+  else
+    {
+#if 0
+      struct scroll_bar *bar
+	= x_window_to_scroll_bar (event->button.display,
+				  event->button.window, 2);
+
+      if (bar)
+	x_scroll_bar_handle_click (bar, event, &inev.ie);
+#endif
+    }
+
+  if (event->type == GDK_BUTTON_PRESS)
+    {
+      dpyinfo->grabbed |= (1 << event->button.button);
+      dpyinfo->last_mouse_frame = f;
+    }
+  else
+    dpyinfo->grabbed &= ~(1 << event->button.button);
+
+  /* Ignore any mouse motion that happened before this event;
+     any subsequent mouse-movement Emacs events should reflect
+     only motion after the ButtonPress/Release.  */
+  if (f != 0)
+    f->mouse_moved = false;
+
+#if 0
+  f = x_menubar_window_to_frame (dpyinfo, event);
+  /* For a down-event in the menu bar,
+     don't pass it to Xt right now.
+     Instead, save it away
+     and we will pass it to Xt from kbd_buffer_get_event.
+     That way, we can run some Lisp code first.  */
+  if (! popup_activated ()
+      /* Gtk+ menus only react to the first three buttons. */
+      && event->button.button < 3
+      && f && event->type == GDK_BUTTON_PRESS
+      /* Verify the event is really within the menu bar
+	 and not just sent to it due to grabbing.  */
+      && event->button.x >= 0
+      && event->button.x < FRAME_PIXEL_WIDTH (f)
+      && event->button.y >= 0
+      && event->button.y < FRAME_MENUBAR_HEIGHT (f)
+      && event->button.same_screen)
+    {
+      if (!f->output_data.pgtk->saved_menu_event)
+	f->output_data.pgtk->saved_menu_event = xmalloc (sizeof *event);
+      *f->output_data.pgtk->saved_menu_event = *event;
+      inev.ie.kind = MENU_BAR_ACTIVATE_EVENT;
+      XSETFRAME (inev.ie.frame_or_window, f);
+      *finish = X_EVENT_DROP;
+    }
+#endif
+
+  if (inev.ie.kind != NO_EVENT)
+    kbd_buffer_store_buffered_event (&inev, NULL);
+  return TRUE;
+}
+
 void
 pgtk_set_event_handler(struct frame *f)
 {
@@ -14830,6 +15176,9 @@ pgtk_set_event_handler(struct frame *f)
   g_signal_connect(G_OBJECT(FRAME_GTK_WIDGET(f)), "focus-out-event", G_CALLBACK(focus_out_event), NULL);
   g_signal_connect(G_OBJECT(FRAME_GTK_WIDGET(f)), "enter-notify-event", G_CALLBACK(enter_notify_event), NULL);
   g_signal_connect(G_OBJECT(FRAME_GTK_WIDGET(f)), "leave-notify-event", G_CALLBACK(leave_notify_event), NULL);
+  g_signal_connect(G_OBJECT(FRAME_GTK_WIDGET(f)), "motion-notify-event", G_CALLBACK(motion_notify_event), NULL);
+  g_signal_connect(G_OBJECT(FRAME_GTK_WIDGET(f)), "button-press-event", G_CALLBACK(button_event), NULL);
+  g_signal_connect(G_OBJECT(FRAME_GTK_WIDGET(f)), "button-release-event", G_CALLBACK(button_event), NULL);
   g_signal_connect(G_OBJECT(FRAME_GTK_WIDGET(f)), "event", G_CALLBACK(pgtk_handle_event), NULL);
   g_signal_connect(G_OBJECT(FRAME_GTK_WIDGET(f)), "draw", G_CALLBACK(pgtk_handle_draw), NULL);
 }

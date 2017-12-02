@@ -230,6 +230,10 @@ struct pgtk_display_info
 
   /* The GDK cursor for scroll bars and popup menus.  */
   GdkCursor *xg_cursor;
+
+
+  /* The frame where the mouse was last time we reported a mouse position.  */
+  struct frame *last_mouse_glyph_frame;
 };
 
 /* This is a chain of structures for all the PGTK displays currently in use.  */
