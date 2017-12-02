@@ -9257,6 +9257,50 @@ frame_set_mouse_pixel_position (struct frame *f, int pix_x, int pix_y)
   PGTK_TRACE("frame_set_mouse_pixel_position");
 }
 
+/* Free X resources of frame F.  */
+
+void
+x_free_frame_resources (struct frame *f)
+{
+  struct pgtk_display_info *dpyinfo;
+  Mouse_HLInfo *hlinfo;
+
+  PGTK_TRACE ("x_free_frame_resources");
+  check_window_system (f);
+  dpyinfo = FRAME_DISPLAY_INFO (f);
+  hlinfo = MOUSE_HL_INFO (f);
+
+  block_input ();
+
+  free_frame_menubar (f);
+  free_frame_faces (f);
+
+  if (f == dpyinfo->x_focus_frame)
+    dpyinfo->x_focus_frame = 0;
+  if (f == dpyinfo->x_highlight_frame)
+    dpyinfo->x_highlight_frame = 0;
+  if (f == hlinfo->mouse_face_mouse_frame)
+    reset_mouse_highlight (hlinfo);
+
+  gtk_widget_destroy(FRAME_GTK_OUTER_WIDGET(f));
+
+  xfree (f->output_data.pgtk);
+
+  unblock_input ();
+}
+
+void
+x_destroy_window (struct frame *f)
+/* --------------------------------------------------------------------------
+     External: Delete the window
+   -------------------------------------------------------------------------- */
+{
+  PGTK_TRACE ("x_destroy_window");
+
+  check_window_system (f);
+  x_free_frame_resources (f);
+}
+
 void
 x_set_offset (struct frame *f, int xoff, int yoff, int change_grav)
 /* --------------------------------------------------------------------------
@@ -12506,7 +12550,7 @@ pgtk_create_terminal (struct pgtk_display_info *dpyinfo)
   // terminal->condemn_scroll_bars_hook = pgtk_condemn_scroll_bars;
   // terminal->redeem_scroll_bar_hook = pgtk_redeem_scroll_bar;
   // terminal->judge_scroll_bars_hook = pgtk_judge_scroll_bars;
-  // terminal->delete_frame_hook = x_destroy_window;
+  terminal->delete_frame_hook = x_destroy_window;
   // terminal->delete_terminal_hook = pgtk_delete_terminal;
   /* Other hooks are NULL by default.  */
 
@@ -14742,6 +14786,9 @@ focus_in_event(GtkWidget *widget, GdkEvent *event, gpointer *user_data)
   union buffered_input_event inev;
   struct frame *frame = pgtk_any_window_to_frame(gtk_widget_get_window(widget));
 
+  if (frame == NULL)
+    return TRUE;
+
   EVENT_INIT (inev.ie);
   inev.ie.kind = NO_EVENT;
   inev.ie.arg = Qnil;
@@ -14759,6 +14806,9 @@ focus_out_event(GtkWidget *widget, GdkEvent *event, gpointer *user_data)
   PGTK_TRACE("focus_out_event");
   union buffered_input_event inev;
   struct frame *frame = pgtk_any_window_to_frame(gtk_widget_get_window(widget));
+
+  if (frame == NULL)
+    return TRUE;
 
   EVENT_INIT (inev.ie);
   inev.ie.kind = NO_EVENT;
