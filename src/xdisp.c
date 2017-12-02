@@ -17906,7 +17906,7 @@ try_window_reusing_current_matrix (struct window *w)
 	  /* Disable lines in the current matrix which are now
 	     below the window.  */
 	  for (++row; row < bottom_row; ++row)
-	    PGTK_TRACE("[%d].enabled_p=false.", row - start_row),
+	    PGTK_TRACE("[%ld].enabled_p=false.", row - start_row),
 	    row->enabled_p = row->mode_line_p = false;
 	}
 
@@ -18057,7 +18057,7 @@ try_window_reusing_current_matrix (struct window *w)
 
       /* Disable rows not reused.  */
       for (row -= nrows_scrolled; row < bottom_row; ++row)
-	PGTK_TRACE("[%d].enabled_p=false.", row - start_row),
+	PGTK_TRACE("[%ld].enabled_p=false.", row - start_row),
 	row->enabled_p = false;
 
       /* Point may have moved to a different line, so we cannot assume that
@@ -18343,7 +18343,7 @@ sync_frame_with_window_matrix_rows (struct window *w)
       /* Disable frame rows whose corresponding window rows have
 	 been disabled in try_window_id.  */
       if (!window_row->enabled_p)
-	PGTK_TRACE("[%d].enabled_p=false.", frame_row - f->current_matrix->rows),
+	PGTK_TRACE("[%ld].enabled_p=false.", frame_row - f->current_matrix->rows),
 	frame_row->enabled_p = false;
 
       ++window_row, ++frame_row;
@@ -21259,7 +21259,7 @@ display_line (struct it *it, int cursor_vpos)
     }
 
   /* Clear the result glyph row and enable it.  */
-  PGTK_TRACE("display_line: [%d]", MATRIX_ROW_VPOS (row, it->w->desired_matrix));
+  PGTK_TRACE("display_line: [%ld]", MATRIX_ROW_VPOS (row, it->w->desired_matrix));
   prepare_desired_row (it->w, row, false);
 
   row->y = it->current_y;
@@ -29606,6 +29606,7 @@ draw_row_with_mouse_face (struct window *w, int start_x, struct glyph_row *row,
 static void
 show_mouse_face (Mouse_HLInfo *hlinfo, enum draw_glyphs_face draw)
 {
+  PGTK_TRACE("show_mouse_face: hlinfo=%p, draw=%u.", hlinfo, draw);
   struct window *w = XWINDOW (hlinfo->mouse_face_window);
   struct frame *f = XFRAME (WINDOW_FRAME (w));
 

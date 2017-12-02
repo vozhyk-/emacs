@@ -28,7 +28,8 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 
 #include <gtk/gtk.h>
 
-extern void pgtk_log(const char *file, int lineno, const char *fmt, ...);
+extern void pgtk_log(const char *file, int lineno, const char *fmt, ...)
+  ATTRIBUTE_FORMAT_PRINTF (3, 4);
 #define PGTK_TRACE(fmt, ...) pgtk_log(__FILE__, __LINE__, fmt, ## __VA_ARGS__)
 extern void pgtk_backtrace(const char *file, int lineno);
 #define PGTK_BACKTRACE() pgtk_backtrace(__FILE__, __LINE__)

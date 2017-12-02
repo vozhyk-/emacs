@@ -2473,7 +2473,7 @@ build_frame_matrix_from_leaf_window (struct glyph_matrix *frame_matrix, struct w
 
 	  /* Only when a desired row has been displayed, we want
 	     the corresponding frame row to be updated.  */
-	  PGTK_TRACE("[%d].enabled_p=true.", frame_row - frame_matrix->rows),
+	  PGTK_TRACE("[%ld].enabled_p=true.", frame_row - frame_matrix->rows),
 	  frame_row->enabled_p = true;
 
           /* Maybe insert a vertical border between horizontally adjacent
@@ -3450,7 +3450,7 @@ update_window (struct window *w, bool force_p)
 	 update it below, after updating all of the window's lines.  */
       if (row->mode_line_p)
 	{
-	  PGTK_TRACE("is mode line.", row);
+	  PGTK_TRACE("is mode line.");
 	  header_line_row = row;
 	  ++row;
 	  lineno++;
@@ -4168,7 +4168,7 @@ scrolling_window (struct window *w, bool header_line_p)
 	  && row_equal_p (c, d, 1))
 	{
 	  assign_row (c, d);
-	  PGTK_TRACE("[%d].enabled_p=false.", i),
+	  PGTK_TRACE("[%ld].enabled_p=false.", i),
 	  d->enabled_p = false;
 	}
       else
