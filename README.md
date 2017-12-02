@@ -32,8 +32,6 @@ Many many debugging outputs. Please ignore them.
 ## TODO
 
 Higher:
-- face of mode-line doesn't change.
-- C-x 5 0 doesn't work.
 - no scrollbar.
 - no audible bell.
 - no mouse events.
