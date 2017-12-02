@@ -1800,7 +1800,7 @@ AC_PATH_X
 if test "$no_x" != yes; then
   window_system=x11
 else
-  window_system=gtk3wl
+  window_system=pgtk
 fi
 
 LD_SWITCH_X_SITE_RPATH=
@@ -2170,8 +2170,8 @@ dnl use the toolkit if we have gtk, or X11R5 or newer.
   w32 )
     term_header=w32term.h
   ;;
-  gtk3wl )
-    term_header=gtk3wlterm.h
+  pgtk )
+    term_header=pgtkterm.h
     with_gtk3=yes
     USE_X_TOOLKIT=none
   ;;
@@ -2741,15 +2741,15 @@ AC_SUBST(XWIDGETS_OBJ)
 CFLAGS=$OLD_CFLAGS
 LIBS=$OLD_LIBS
 
-GTK3WL_OBJ=
-GTK3WL_LIBS=
-if test "$window_system" = "gtk3wl"; then
-  GTK3WL_OBJ="gtk3wlfns.o gtk3wlterm.o"
-  GTK3WL_LIBS="$GTK_LIBS"
-  AC_DEFINE([HAVE_GTK3WL], 1, [Define to 1 if you have Gtk+-3 with wayland.])
+PGTK_OBJ=
+PGTK_LIBS=
+if test "$window_system" = "pgtk"; then
+  PGTK_OBJ="pgtkfns.o pgtkterm.o"
+  PGTK_LIBS="$GTK_LIBS"
+  AC_DEFINE([HAVE_PGTK], 1, [Define to 1 if you have pure Gtk+-3.])
 fi
-AC_SUBST(GTK3WL_OBJ)
-AC_SUBST(GTK3WL_LIBS)
+AC_SUBST(PGTK_OBJ)
+AC_SUBST(PGTK_LIBS)
 
 dnl D-Bus has been tested under GNU/Linux only.  Must be adapted for
 dnl other platforms.
@@ -3300,7 +3300,7 @@ if test "${HAVE_X11}" = "yes"; then
     fi
 else
 
-    if test $window_system = gtk3wl; then
+    if test $window_system = pgtk; then
       EMACS_CHECK_MODULES([FONTCONFIG], [fontconfig >= 2.2.0])
       EMACS_CHECK_MODULES([FREETYPE], [freetype2])
       if test "$HAVE_FONTCONFIG" != yes -o test "$HAVE_FREETYPE" != yes; then
@@ -3344,7 +3344,7 @@ AC_SUBST(M17N_FLT_CFLAGS)
 AC_SUBST(M17N_FLT_LIBS)
 
 HAVE_CAIRO=no
-if test "${HAVE_X11}" = "yes" -o "$window_system" = gtk3wl; then
+if test "${HAVE_X11}" = "yes" -o "$window_system" = pgtk; then
   if test "${with_cairo}" != "no"; then
     CAIRO_REQUIRED=1.12.0
     CAIRO_MODULE="cairo >= $CAIRO_REQUIRED"
@@ -3606,7 +3606,7 @@ elif test "${with_png}" != no; then
   # mingw32 loads the library dynamically.
   if test "$opsys" = mingw32; then
     AC_CHECK_HEADER([png.h], [HAVE_PNG=yes])
-  elif test "${HAVE_X11}" = "yes" || test "$window_system" = "gtk3wl" || test "${HAVE_W32}" = "yes"; then
+  elif test "${HAVE_X11}" = "yes" || test "$window_system" = "pgtk" || test "${HAVE_W32}" = "yes"; then
     AC_MSG_CHECKING([for png])
     png_cflags=`(libpng-config --cflags) 2>&AS_MESSAGE_LOG_FD` &&
     png_ldflags=`(libpng-config --ldflags) 2>&AS_MESSAGE_LOG_FD` || {
@@ -5079,7 +5079,7 @@ if test "${HAVE_X_WINDOWS}" = "yes" ; then
   fi
   AC_SUBST(FONT_OBJ)
 fi
-if test "${window_system}" = "gtk3wl"; then
+if test "${window_system}" = "pgtk"; then
    FONT_OBJ="ftfont.o ftcrfont.o"
 fi
 AC_SUBST(XMENU_OBJ)

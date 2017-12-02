@@ -80,10 +80,10 @@ typedef Pixmap XImagePtr;
 typedef XImagePtr XImagePtr_or_DC;
 #endif
 
-#ifdef HAVE_GTK3WL
-#include "gtk3wlgui.h"
+#ifdef HAVE_PGTK
+#include "pgtkgui.h"
 /* Following typedef needed to accommodate the MSDOS port, believe it or not.  */
-typedef struct gtk3wl_display_info Display_Info;
+typedef struct pgtk_display_info Display_Info;
 typedef Pixmap XImagePtr;
 typedef XImagePtr XImagePtr_or_DC;
 #define NativeRectangle XRectangle
@@ -1359,7 +1359,7 @@ struct glyph_string
   XGCValues *gc;
   HDC hdc;
 #endif
-#if defined (HAVE_GTK3WL)
+#if defined (HAVE_PGTK)
   XGCValues xgcv;
 #endif
 
@@ -3387,7 +3387,7 @@ bool valid_image_p (Lisp_Object);
 void prepare_image_for_display (struct frame *, struct image *);
 ptrdiff_t lookup_image (struct frame *, Lisp_Object);
 
-#if defined (HAVE_X_WINDOWS) ||  defined (HAVE_NS) || defined(HAVE_GTK3WL)
+#if defined (HAVE_X_WINDOWS) ||  defined (HAVE_NS) || defined(HAVE_PGTK)
 #define RGB_PIXEL_COLOR unsigned long
 #endif
 

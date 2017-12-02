@@ -30,10 +30,10 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include "blockinput.h"
 #include "termhooks.h"
 
-#include "gtk3wlterm.h"
-#ifndef GTK3WL_TRACE
-#define GTK3WL_TRACE(fmt, ...) ((void) 0)
-#define GTK3WL_BACKTRACE() ((void) 0)
+#include "pgtkterm.h"
+#ifndef PGTK_TRACE
+#define PGTK_TRACE(fmt, ...) ((void) 0)
+#define PGTK_BACKTRACE() ((void) 0)
 #endif
 
 /* Fringe bitmaps are represented in three different ways:
@@ -572,7 +572,7 @@ draw_fringe_bitmap_1 (struct window *w, struct glyph_row *row, int left_p, int o
   p.overlay_p = (overlay & 1) == 1;
   p.cursor_p = (overlay & 2) == 2;
 
-  GTK3WL_TRACE("which=%d.", which);
+  PGTK_TRACE("which=%d.", which);
   if (which != NO_FRINGE_BITMAP)
     {
       offset = 0;
@@ -599,7 +599,7 @@ draw_fringe_bitmap_1 (struct window *w, struct glyph_row *row, int left_p, int o
 	face_id = FRINGE_FACE_ID;
     }
 
-  GTK3WL_TRACE("which=%d.", which);
+  PGTK_TRACE("which=%d.", which);
   fb = get_fringe_bitmap_data (which);
 
   period = fb->period;
@@ -610,7 +610,7 @@ draw_fringe_bitmap_1 (struct window *w, struct glyph_row *row, int left_p, int o
   p.which = which;
   p.bits = fb->bits;
   p.wd = fb->width;
-  GTK3WL_TRACE("fb->width=%d.", fb->width);
+  PGTK_TRACE("fb->width=%d.", fb->width);
 
   p.h = fb->height;
   p.dh = (period > 0 ? (p.y % period) : 0);
@@ -651,7 +651,7 @@ draw_fringe_bitmap_1 (struct window *w, struct glyph_row *row, int left_p, int o
       int x = window_box_left (w, (WINDOW_HAS_FRINGES_OUTSIDE_MARGINS (w)
 				   ? LEFT_MARGIN_AREA
 				   : TEXT_AREA));
-      GTK3WL_TRACE("LEFT_FRINGE_WIDTH=%d.", wd);
+      PGTK_TRACE("LEFT_FRINGE_WIDTH=%d.", wd);
       if (p.wd > wd)
 	p.wd = wd;
       p.x = x - p.wd - (wd - p.wd) / 2;
@@ -684,7 +684,7 @@ draw_fringe_bitmap_1 (struct window *w, struct glyph_row *row, int left_p, int o
 				 ? RIGHT_MARGIN_AREA
 				 : TEXT_AREA));
       int wd = WINDOW_RIGHT_FRINGE_WIDTH (w);
-      GTK3WL_TRACE("RIGHT_FRINGE_WIDTH=%d.", wd);
+      PGTK_TRACE("RIGHT_FRINGE_WIDTH=%d.", wd);
       if (p.wd > wd)
 	p.wd = wd;
       p.x = x + (wd - p.wd) / 2;
@@ -697,11 +697,11 @@ draw_fringe_bitmap_1 (struct window *w, struct glyph_row *row, int left_p, int o
 	}
     }
 
-  GTK3WL_TRACE("p: x=%d, y=%d, wd=%d, h=%d, dh=%d, bx=%d, by=%d, nx=%d, ny=%d.",
+  PGTK_TRACE("p: x=%d, y=%d, wd=%d, h=%d, dh=%d, bx=%d, by=%d, nx=%d, ny=%d.",
 	       p.x, p.y, p.wd, p.h, p.dh, p.bx, p.by, p.nx, p.ny);
-  GTK3WL_TRACE("p.wd=%d.", p.wd);
-  GTK3WL_TRACE("LEFT_EDGE_X=%d.", WINDOW_BOX_LEFT_EDGE_X (w));
-  GTK3WL_TRACE("PIXEL_WIDTH=%d.", WINDOW_PIXEL_WIDTH (w));
+  PGTK_TRACE("p.wd=%d.", p.wd);
+  PGTK_TRACE("LEFT_EDGE_X=%d.", WINDOW_BOX_LEFT_EDGE_X (w));
+  PGTK_TRACE("PIXEL_WIDTH=%d.", WINDOW_PIXEL_WIDTH (w));
   if (p.x >= WINDOW_BOX_LEFT_EDGE_X (w)
       && (p.x + p.wd) <= WINDOW_BOX_LEFT_EDGE_X (w) + WINDOW_PIXEL_WIDTH (w))
     FRAME_RIF (f)->draw_fringe_bitmap (w, row, &p);
@@ -936,7 +936,7 @@ draw_window_fringes (struct window *w, bool no_fringe_p)
     {
       if (!row->redraw_fringe_bitmaps_p)
 	continue;
-      GTK3WL_TRACE("row: x=%d,y=%d.", row->x, row->y);
+      PGTK_TRACE("row: x=%d,y=%d.", row->x, row->y);
       draw_row_fringe_bitmaps (w, row);
       row->redraw_fringe_bitmaps_p = 0;
       updated_p = 1;
@@ -1403,7 +1403,7 @@ If BITMAP overrides a standard fringe bitmap, the original bitmap is restored.  
    On W32 and MAC (little endian), there's no need to do this.
 */
 
-#if defined (HAVE_X_WINDOWS) || defined(HAVE_GTK3WL)
+#if defined (HAVE_X_WINDOWS) || defined(HAVE_PGTK)
 static const unsigned char swap_nibble[16] = {
   0x0, 0x8, 0x4, 0xc,           /* 0000 1000 0100 1100 */
   0x2, 0xa, 0x6, 0xe,           /* 0010 1010 0110 1110 */
@@ -1466,7 +1466,7 @@ init_fringe_bitmap (int which, struct fringe_bitmap *fb, int once_p)
 #endif /* not USE_CAIRO */
 #endif /* HAVE_X_WINDOWS */
 
-#if !defined(HAVE_X_WINDOWS) && defined (HAVE_GTK3WL)
+#if !defined(HAVE_X_WINDOWS) && defined (HAVE_PGTK)
       unsigned short *bits = fb->bits;
       int j;
 
@@ -1483,7 +1483,7 @@ init_fringe_bitmap (int which, struct fringe_bitmap *fb, int once_p)
 	  *bits++ = (b >> (16 - fb->width));
 #endif
 	}
-#endif /* !HAVE_X_WINDOWS && HAVE_GTK3WL */
+#endif /* !HAVE_X_WINDOWS && HAVE_PGTK */
 
 #ifdef HAVE_NTGUI
       unsigned short *bits = fb->bits;

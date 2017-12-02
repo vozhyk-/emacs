@@ -308,13 +308,13 @@
         (load "international/mule-util")
         (load "international/ucs-normalize")
         (load "term/ns-win"))))
-(if (featurep 'gtk3wl)
+(if (featurep 'pgtk)
     (progn
       (load "term/common-win")
       ;; Don't load ucs-normalize.el unless uni-*.el files were
       ;; already produced, because it needs uni-*.el files that might
       ;; not be built early enough during bootstrap.
-      (load "term/gtk3wl-win")))
+      (load "term/pgtk-win")))
 (if (fboundp 'x-create-frame)
     ;; Do it after loading term/foo-win.el since the value of the
     ;; mouse-wheel-*-event vars depends on those files being loaded or not.

@@ -1,4 +1,4 @@
-/* Definitions and headers for communication on the Gtk+3 with wayland.
+/* Definitions and headers for communication on the pure Gtk+3.
    Copyright (C) 1995, 2005, 2008-2017 Free Software Foundation, Inc.
 
 This file is part of GNU Emacs.
@@ -16,8 +16,8 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 
-#ifndef __GTK3WLGUI_H__
-#define __GTK3WLGUI_H__
+#ifndef __PGTKGUI_H__
+#define __PGTKGUI_H__
 
 /* Emulate XCharStruct.  */
 typedef struct _XCharStruct
@@ -121,4 +121,4 @@ typedef double CGFloat;
 #define PBaseSize	(1L << 8) /* program specified base for incrementing */
 #define PWinGravity	(1L << 9) /* program specified window gravity */
 
-#endif  /* __GTK3WLGUI_H__ */
+#endif  /* __PGTKGUI_H__ */

@@ -45,9 +45,9 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #ifdef HAVE_WINDOW_SYSTEM
 #include TERM_HEADER
 #endif /* HAVE_WINDOW_SYSTEM */
-#ifndef GTK3WL_TRACE
-#define GTK3WL_TRACE(fmt, ...) ((void) 0)
-#define GTK3WL_BACKTRACE() ((void) 0)
+#ifndef PGTK_TRACE
+#define PGTK_TRACE(fmt, ...) ((void) 0)
+#define PGTK_BACKTRACE() ((void) 0)
 #endif
 
 #include <errno.h>
@@ -564,13 +564,13 @@ adjust_glyph_matrix (struct window *w, struct glyph_matrix *matrix, int x, int y
 		w->window_end_valid = 0;
 
 	      while (i < matrix->nrows)
-		GTK3WL_TRACE("[%d].enabled_p=false.", i),
+		PGTK_TRACE("[%d].enabled_p=false.", i),
 		matrix->rows[i++].enabled_p = false;
 	    }
 	  else
 	    {
 	      for (i = 0; i < matrix->nrows; ++i)
-		GTK3WL_TRACE("[%d].enabled_p=false.", i),
+		PGTK_TRACE("[%d].enabled_p=false.", i),
 		matrix->rows[i].enabled_p = false;
 	    }
 	  /* We've disabled the mode-line row, so force redrawing of
@@ -587,7 +587,7 @@ adjust_glyph_matrix (struct window *w, struct glyph_matrix *matrix, int x, int y
 	     had better be the case when we adjust matrices between
 	     redisplays.  */
 	  for (i = 0; i < matrix->nrows; ++i)
-	    GTK3WL_TRACE("[%d].enabled_p=false.", i),
+	    PGTK_TRACE("[%d].enabled_p=false.", i),
 	    matrix->rows[i].enabled_p = false;
 	}
     }
@@ -698,7 +698,7 @@ clear_glyph_matrix_rows (struct glyph_matrix *matrix, int start, int end)
   eassert (end >= 0 && end <= matrix->nrows);
 
   for (; start < end; ++start)
-    GTK3WL_TRACE("[%d].enabled_p=false.", start),
+    PGTK_TRACE("[%d].enabled_p=false.", start),
     matrix->rows[start].enabled_p = false;
 }
 
@@ -879,7 +879,7 @@ blank_row (struct window *w, struct glyph_row *row, int y)
   if (row->y + row->height > max_y)
     row->visible_height -= row->y + row->height - max_y;
 
-  GTK3WL_TRACE("[?].enabled_p=true."),
+  PGTK_TRACE("[?].enabled_p=true."),
   row->enabled_p = true;
 }
 
@@ -1081,7 +1081,7 @@ prepare_desired_row (struct window *w, struct glyph_row *row, bool mode_line_p)
       bool rp = row->reversed_p;
 
       clear_glyph_row (row);
-      GTK3WL_TRACE("[?].enabled_p=true."),
+      PGTK_TRACE("[?].enabled_p=true."),
       row->enabled_p = true;
       row->reversed_p = rp;
     }
@@ -2407,7 +2407,7 @@ build_frame_matrix_from_leaf_window (struct glyph_matrix *frame_matrix, struct w
   SET_GLYPH_FROM_CHAR (right_border_glyph, 0);
 
   /* Set window_matrix to the matrix we have to add to FRAME_MATRIX.  */
-  GTK3WL_TRACE("must_be_updated_p=%d", w->must_be_updated_p);
+  PGTK_TRACE("must_be_updated_p=%d", w->must_be_updated_p);
   if (w->must_be_updated_p)
     {
       window_matrix = w->desired_matrix;
@@ -2473,7 +2473,7 @@ build_frame_matrix_from_leaf_window (struct glyph_matrix *frame_matrix, struct w
 
 	  /* Only when a desired row has been displayed, we want
 	     the corresponding frame row to be updated.  */
-	  GTK3WL_TRACE("[%d].enabled_p=true.", frame_row - frame_matrix->rows),
+	  PGTK_TRACE("[%d].enabled_p=true.", frame_row - frame_matrix->rows),
 	  frame_row->enabled_p = true;
 
           /* Maybe insert a vertical border between horizontally adjacent
@@ -2622,7 +2622,7 @@ make_current (struct glyph_matrix *desired_matrix, struct glyph_matrix *current_
   assign_row (current_row, desired_row);
 
   /* Enable current_row to mark it as valid.  */
-  GTK3WL_TRACE("[%d].enabled_p=true.", row),
+  PGTK_TRACE("[%d].enabled_p=true.", row),
   current_row->enabled_p = true;
   current_row->mouse_face_p = mouse_face_p;
 
@@ -2665,7 +2665,7 @@ mirror_make_current (struct window *w, int frame_row)
 		assign_row (current_row, desired_row);
 	      else
 		swap_glyph_pointers (desired_row, current_row);
-	      GTK3WL_TRACE("[%d].enabled_p=true.", row),
+	      PGTK_TRACE("[%d].enabled_p=true.", row),
 	      current_row->enabled_p = true;
 
 	      /* Set the Y coordinate of the mode/header line's row.
@@ -2718,12 +2718,12 @@ mirrored_line_dance (struct glyph_matrix *matrix, int unchanged_at_top, int nlin
       eassert (i + unchanged_at_top < matrix->nrows);
       eassert (unchanged_at_top + copy_from[i] < matrix->nrows);
       new_rows[i] = old_rows[copy_from[i]];
-      GTK3WL_TRACE("[%d].enabled_p=%d.", i, enabled_before_p),
+      PGTK_TRACE("[%d].enabled_p=%d.", i, enabled_before_p),
       new_rows[i].enabled_p = enabled_before_p;
 
       /* RETAINED_P is zero for empty lines.  */
       if (!retained_p[copy_from[i]])
-	GTK3WL_TRACE("[%d].enabled_p=false.", i),
+	PGTK_TRACE("[%d].enabled_p=false.", i),
 	new_rows[i].enabled_p = false;
     }
 
@@ -2858,12 +2858,12 @@ mirror_line_dance (struct window *w, int unchanged_at_top, int nlines, int *copy
 		     that.  */
 		  bool enabled_before_p = m->rows[window_to].enabled_p;
 		  m->rows[window_to] = old_rows[window_from];
-		  GTK3WL_TRACE("[%d].enabled_p=%d.", window_to, enabled_before_p),
+		  PGTK_TRACE("[%d].enabled_p=%d.", window_to, enabled_before_p),
 		  m->rows[window_to].enabled_p = enabled_before_p;
 
 		  /* If frame line is empty, window line is empty, too.  */
 		  if (!retained_p[copy_from[i]])
-		    GTK3WL_TRACE("[%d].enabled_p=false.", window_to),
+		    PGTK_TRACE("[%d].enabled_p=false.", window_to),
 		    m->rows[window_to].enabled_p = false;
 		}
 	      else if (to_inside_window_p)
@@ -2889,7 +2889,7 @@ mirror_line_dance (struct window *w, int unchanged_at_top, int nlines, int *copy
 
 		      /* If frame line is empty, window line is empty, too.  */
 		      if (!retained_p[copy_from[i]])
-			GTK3WL_TRACE("[%d].enabled_p=false.", window_to),
+			PGTK_TRACE("[%d].enabled_p=false.", window_to),
 			m->rows[window_to].enabled_p = false;
 		    }
 		  sync_p = 1;
@@ -3075,7 +3075,7 @@ update_frame (struct frame *f, bool force_p, bool inhibit_hairy_id_p)
   bool paused_p;
   struct window *root_window = XWINDOW (f->root_window);
 
-  GTK3WL_TRACE("update_frame");
+  PGTK_TRACE("update_frame");
   if (redisplay_dont_pause)
     force_p = true;
   else if (!force_p && detect_input_pending_ignore_squeezables ())
@@ -3084,7 +3084,7 @@ update_frame (struct frame *f, bool force_p, bool inhibit_hairy_id_p)
       goto do_pause;
     }
 
-  GTK3WL_TRACE("update_frame: frame_window_p=%d.", FRAME_WINDOW_P(f));
+  PGTK_TRACE("update_frame: frame_window_p=%d.", FRAME_WINDOW_P(f));
   if (FRAME_WINDOW_P (f))
     {
       /* We are working on window matrix basis.  All windows whose
@@ -3236,7 +3236,7 @@ update_window_tree (struct window *w, bool force_p)
 
   while (w && !paused_p)
     {
-      GTK3WL_TRACE("must_be_updated_p=%d, force_p=%d.", w->must_be_updated_p, force_p);
+      PGTK_TRACE("must_be_updated_p=%d, force_p=%d.", w->must_be_updated_p, force_p);
       if (WINDOWP (w->contents))
 	paused_p |= update_window_tree (XWINDOW (w->contents), force_p);
       else if (w->must_be_updated_p)
@@ -3255,7 +3255,7 @@ update_window_tree (struct window *w, bool force_p)
 void
 update_single_window (struct window *w)
 {
-  GTK3WL_TRACE("must_be_updated_p=%d", w->must_be_updated_p);
+  PGTK_TRACE("must_be_updated_p=%d", w->must_be_updated_p);
   if (w->must_be_updated_p)
     {
       struct frame *f = XFRAME (WINDOW_FRAME (w));
@@ -3441,23 +3441,23 @@ update_window (struct window *w, bool force_p)
       end = MATRIX_MODE_LINE_ROW (desired_matrix);
 
       int lineno = 0;
-      GTK3WL_TRACE("lineno=%d.", lineno);
-      GTK3WL_TRACE("yb=%d.", yb);
-      GTK3WL_TRACE("row=%p.", row);
-      GTK3WL_TRACE("end=%p.", end);
+      PGTK_TRACE("lineno=%d.", lineno);
+      PGTK_TRACE("yb=%d.", yb);
+      PGTK_TRACE("row=%p.", row);
+      PGTK_TRACE("end=%p.", end);
 
       /* Take note of the header line, if there is one.  We will
 	 update it below, after updating all of the window's lines.  */
       if (row->mode_line_p)
 	{
-	  GTK3WL_TRACE("is mode line.", row);
+	  PGTK_TRACE("is mode line.", row);
 	  header_line_row = row;
 	  ++row;
 	  lineno++;
 	}
       else
 	header_line_row = NULL;
-      GTK3WL_TRACE("lineno=%d, row=%p.", lineno, row);
+      PGTK_TRACE("lineno=%d, row=%p.", lineno, row);
 
       /* Update the mode line, if necessary.  */
       mode_line_row = MATRIX_MODE_LINE_ROW (desired_matrix);
@@ -3475,7 +3475,7 @@ update_window (struct window *w, bool force_p)
       while (row < end && !row->enabled_p)
 	lineno++,
 	++row;
-      GTK3WL_TRACE("lineno=%d, row=%p.", lineno, row);
+      PGTK_TRACE("lineno=%d, row=%p.", lineno, row);
 
       /* Try reusing part of the display by copying.  */
       if (row < end && !desired_matrix->no_scrolling_p)
@@ -3494,7 +3494,7 @@ update_window (struct window *w, bool force_p)
 	      changed_p = 1;
 	    }
 	}
-      GTK3WL_TRACE("lineno=%d, row=%p.", lineno, row);
+      PGTK_TRACE("lineno=%d, row=%p.", lineno, row);
 
       /* Update the rest of the lines.  */
       for (; row < end && (force_p || !input_pending); lineno++, ++row)
@@ -3502,7 +3502,7 @@ update_window (struct window *w, bool force_p)
 	   reuses from current_matrix.  */
 	if (row->enabled_p)
 	  {
-	    GTK3WL_TRACE("lineno=%d, enabled.", lineno);
+	    PGTK_TRACE("lineno=%d, enabled.", lineno);
 	    int vpos = MATRIX_ROW_VPOS (row, desired_matrix);
 	    int i;
 
@@ -3514,7 +3514,7 @@ update_window (struct window *w, bool force_p)
 	      detect_input_pending_ignore_squeezables ();
 	    changed_p |= update_window_line (w, vpos,
 					     &mouse_face_overwritten_p);
-	    GTK3WL_TRACE("changed_p=%d.", changed_p);
+	    PGTK_TRACE("changed_p=%d.", changed_p);
 
 	    /* Mark all rows below the last visible one in the current
 	       matrix as invalid.  This is necessary because of
@@ -3527,7 +3527,7 @@ update_window (struct window *w, bool force_p)
 	       in the first redisplay.  */
 	    if (MATRIX_ROW_BOTTOM_Y (row) >= yb)
 	      for (i = vpos + 1; i < w->current_matrix->nrows - 1; ++i)
-		GTK3WL_TRACE("[%d].enabled_p=false.", i),
+		PGTK_TRACE("[%d].enabled_p=false.", i),
 		SET_MATRIX_ROW_ENABLED_P (w->current_matrix, i, false);
 	  }
 
@@ -3627,8 +3627,8 @@ update_text_area (struct window *w, struct glyph_row *updated_row, int vpos)
   struct redisplay_interface *rif = FRAME_RIF (XFRAME (WINDOW_FRAME (w)));
   bool changed_p = 0;
 
-  GTK3WL_TRACE("update_text_area: 0. current_row->y=%d.", current_row->y);
-  GTK3WL_TRACE("update_text_area: 0. desired_row->y=%d.", desired_row->y);
+  PGTK_TRACE("update_text_area: 0. current_row->y=%d.", current_row->y);
+  PGTK_TRACE("update_text_area: 0. desired_row->y=%d.", desired_row->y);
   /* If rows are at different X or Y, or rows have different height,
      or the current row is marked invalid, write the entire line.  */
   if (!current_row->enabled_p
@@ -3650,8 +3650,8 @@ update_text_area (struct window *w, struct glyph_row *updated_row, int vpos)
     {
       output_cursor_to (w, vpos, 0, desired_row->y, desired_row->x);
 
-      GTK3WL_TRACE("update_text_area: 1. updated_row=%p", updated_row);
-      GTK3WL_TRACE("update_text_area: 1. updated_row->y=%d.", updated_row->y);
+      PGTK_TRACE("update_text_area: 1. updated_row=%p", updated_row);
+      PGTK_TRACE("update_text_area: 1. updated_row->y=%d.", updated_row->y);
       if (desired_row->used[TEXT_AREA])
 	rif->write_glyphs (w, updated_row, desired_row->glyphs[TEXT_AREA],
 			   TEXT_AREA, desired_row->used[TEXT_AREA]);
@@ -3712,7 +3712,7 @@ update_text_area (struct window *w, struct glyph_row *updated_row, int vpos)
 	      struct glyph *glyph = &current_row->glyphs[TEXT_AREA][i - 1];
 	      int left, right;
 
-	      GTK3WL_TRACE("update_text_area: 2.");
+	      PGTK_TRACE("update_text_area: 2.");
 	      rif->get_glyph_overhangs (glyph, XFRAME (w->frame),
 					&left, &right);
 	      can_skip_p = (right == 0 && !abort_skipping);
@@ -3801,7 +3801,7 @@ update_text_area (struct window *w, struct glyph_row *updated_row, int vpos)
 	    }
 	}
 
-      GTK3WL_TRACE("update_text_area: 3.");
+      PGTK_TRACE("update_text_area: 3.");
       /* Write the rest.  */
       if (i < desired_row->used[TEXT_AREA])
 	{
@@ -3811,7 +3811,7 @@ update_text_area (struct window *w, struct glyph_row *updated_row, int vpos)
 	  changed_p = 1;
 	}
 
-      GTK3WL_TRACE("update_text_area: 4.");
+      PGTK_TRACE("update_text_area: 4.");
       /* Maybe clear to end of line.  */
       if (MATRIX_ROW_EXTENDS_FACE_P (desired_row))
 	{
@@ -3876,7 +3876,7 @@ update_window_line (struct window *w, int vpos, bool *mouse_face_overwritten_p)
   struct glyph_row *desired_row = MATRIX_ROW (w->desired_matrix, vpos);
   struct redisplay_interface *rif = FRAME_RIF (XFRAME (WINDOW_FRAME (w)));
   bool changed_p = 0;
-  GTK3WL_TRACE("vpos=%d.", vpos);
+  PGTK_TRACE("vpos=%d.", vpos);
 
   /* A row can be completely invisible in case a desired matrix was
      built with a vscroll and then make_cursor_line_fully_visible shifts
@@ -3891,7 +3891,7 @@ update_window_line (struct window *w, int vpos, bool *mouse_face_overwritten_p)
       if (!desired_row->full_width_p && w->left_margin_cols > 0)
 	{
 	  changed_p = 1;
-	  GTK3WL_TRACE("update_marginal_area...");
+	  PGTK_TRACE("update_marginal_area...");
 	  update_marginal_area (w, desired_row, LEFT_MARGIN_AREA, vpos);
 	  /* Setting this flag will ensure the vertical border, if
 	     any, between this window and the one on its left will be
@@ -3900,7 +3900,7 @@ update_window_line (struct window *w, int vpos, bool *mouse_face_overwritten_p)
 	  current_row->redraw_fringe_bitmaps_p = 1;
 	}
 
-      GTK3WL_TRACE("update_text_area...");
+      PGTK_TRACE("update_text_area...");
       /* Update the display of the text area.  */
       if (update_text_area (w, desired_row, vpos))
 	{
@@ -3913,7 +3913,7 @@ update_window_line (struct window *w, int vpos, bool *mouse_face_overwritten_p)
       if (!desired_row->full_width_p && w->right_margin_cols > 0)
 	{
 	  changed_p = 1;
-	  GTK3WL_TRACE("update_marginal_area...");
+	  PGTK_TRACE("update_marginal_area...");
 	  update_marginal_area (w, desired_row, RIGHT_MARGIN_AREA, vpos);
 	}
 
@@ -4020,7 +4020,7 @@ set_window_update_flags (struct window *w, bool on_p)
       if (WINDOWP (w->contents))
 	set_window_update_flags (XWINDOW (w->contents), on_p);
       else
-	GTK3WL_TRACE("must_be_updated_p= set %d.", on_p),
+	PGTK_TRACE("must_be_updated_p= set %d.", on_p),
 	w->must_be_updated_p = on_p;
 
       w = NILP (w->next) ? 0 : XWINDOW (w->next);
@@ -4168,7 +4168,7 @@ scrolling_window (struct window *w, bool header_line_p)
 	  && row_equal_p (c, d, 1))
 	{
 	  assign_row (c, d);
-	  GTK3WL_TRACE("[%d].enabled_p=false.", i),
+	  PGTK_TRACE("[%d].enabled_p=false.", i),
 	  d->enabled_p = false;
 	}
       else
@@ -4496,7 +4496,7 @@ scrolling_window (struct window *w, bool header_line_p)
 	       preceding for-loop, we no longer have such an overlap,
 	       and thus the assigned row should always be enabled.  */
 	    eassert (to->enabled_p);
-	    GTK3WL_TRACE("[%d].enabled_p=false.", r->desired_vpos + j),
+	    PGTK_TRACE("[%d].enabled_p=false.", r->desired_vpos + j),
 	    from->enabled_p = false;  // ここ???????????? でも違うみたい?
 	    to->overlapped_p = to_overlapped_p;
 	  }
@@ -4863,7 +4863,7 @@ update_frame_line (struct frame *f, int vpos, bool updating_menu_p)
 	  olen--;
     }
 
-  GTK3WL_TRACE("[%d].enabled_p=true.", vpos),
+  PGTK_TRACE("[%d].enabled_p=true.", vpos),
   current_row->enabled_p = true;
   current_row->used[TEXT_AREA] = desired_row->used[TEXT_AREA];
 
@@ -6121,14 +6121,14 @@ init_display (void)
     }
 #endif
 
-#ifdef HAVE_GTK3WL
+#ifdef HAVE_PGTK
   if (!inhibit_window_system
 #ifndef CANNOT_DUMP
      && initialized
 #endif
       )
     {
-      Vinitial_window_system = Qgtk3wl;
+      Vinitial_window_system = Qpgtk;
       Vwindow_system_version = make_number (1);
       return;
     }

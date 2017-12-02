@@ -320,9 +320,9 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #ifdef HAVE_WINDOW_SYSTEM
 #include TERM_HEADER
 #endif /* HAVE_WINDOW_SYSTEM */
-#ifndef GTK3WL_TRACE
-#define GTK3WL_TRACE(fmt, ...) ((void) 0)
-#define GTK3WL_BACKTRACE() ((void) 0)
+#ifndef PGTK_TRACE
+#define PGTK_TRACE(fmt, ...) ((void) 0)
+#define PGTK_BACKTRACE() ((void) 0)
 #endif
 
 #ifndef FRAME_X_OUTPUT
@@ -11475,7 +11475,7 @@ clear_garbaged_frames (void)
 
 	  if (FRAME_VISIBLE_P (f) && FRAME_GARBAGED_P (f))
 	    {
-	      GTK3WL_TRACE("resized_p = %d.", f->resized_p);
+	      PGTK_TRACE("resized_p = %d.", f->resized_p);
 	      if (f->resized_p
 		  /* It makes no sense to redraw a non-selected TTY
 		     frame, since that will actually clear the
@@ -11488,17 +11488,17 @@ clear_garbaged_frames (void)
 		clear_current_matrices (f);
 
 #if defined (HAVE_WINDOW_SYSTEM) && !defined (HAVE_NS)
-#ifndef HAVE_GTK3WL
+#ifndef HAVE_PGTK
 	      x_clear_under_internal_border (f);
 #else
-	      gtk3wl_clear_under_internal_border (f);
+	      pgtk_clear_under_internal_border (f);
 #endif
 #endif /* HAVE_WINDOW_SYSTEM && !HAVE_NS */
 
 	      fset_redisplay (f);
 	      f->garbaged = false;
 	      f->resized_p = false;
-	      GTK3WL_TRACE("resized_p = FALSE.");
+	      PGTK_TRACE("resized_p = FALSE.");
             }
 	}
 
@@ -11565,10 +11565,10 @@ echo_area_display (bool update_frame_p)
 	      n = redisplay_mode_lines (FRAME_ROOT_WINDOW (f), false);
 
 #if defined (HAVE_WINDOW_SYSTEM) && !defined (HAVE_NS)
-#ifndef HAVE_GTK3WL
+#ifndef HAVE_PGTK
 	      x_clear_under_internal_border (f);
 #else
-	      gtk3wl_clear_under_internal_border (f);
+	      pgtk_clear_under_internal_border (f);
 #endif
 #endif /* HAVE_WINDOW_SYSTEM && !HAVE_NS */
 
@@ -12168,7 +12168,7 @@ update_menu_bar (struct frame *f, bool save_match_data, bool hooks_run)
 
 	  /* Redisplay the menu bar in case we changed it.  */
 #if defined (USE_X_TOOLKIT) || defined (HAVE_NTGUI) \
-    || defined (HAVE_NS) || (defined (USE_GTK) && !defined(HAVE_GTK3WL))
+    || defined (HAVE_NS) || (defined (USE_GTK) && !defined(HAVE_PGTK))
 	  if (FRAME_WINDOW_P (f))
             {
 #if defined (HAVE_NS)
@@ -13838,7 +13838,7 @@ redisplay_internal (void)
   if (!fr->glyphs_initialized_p)
     return;
 
-#if defined (USE_X_TOOLKIT) || (defined (USE_GTK) && !defined(HAVE_GTK3WL)) || defined (HAVE_NS)
+#if defined (USE_X_TOOLKIT) || (defined (USE_GTK) && !defined(HAVE_PGTK)) || defined (HAVE_NS)
   if (popup_activated ())
     return;
 #endif
@@ -14252,7 +14252,7 @@ redisplay_internal (void)
 
     cancel:
       /* Text changed drastically or point moved off of line.  */
-      GTK3WL_TRACE("[%d].enabled_p=false.", this_line_vpos),
+      PGTK_TRACE("[%d].enabled_p=false.", this_line_vpos),
       SET_MATRIX_ROW_ENABLED_P (w->desired_matrix, this_line_vpos, false);
     }
 
@@ -14365,10 +14365,10 @@ redisplay_internal (void)
                     goto retry;
 
 #if defined (HAVE_WINDOW_SYSTEM) && !defined (HAVE_NS)
-#ifndef HAVE_GTK3WL
+#ifndef HAVE_PGTK
 		  x_clear_under_internal_border (f);
 #else
-		  gtk3wl_clear_under_internal_border (f);
+		  pgtk_clear_under_internal_border (f);
 #endif
 #endif /* HAVE_WINDOW_SYSTEM && !HAVE_NS */
 
@@ -17875,7 +17875,7 @@ try_window_reusing_current_matrix (struct window *w)
 
 	  /* Disable lines that must be updated.  */
 	  for (i = 0; i < nrows_scrolled; ++i)
-	    GTK3WL_TRACE("[%d].enabled_p=false.", i),
+	    PGTK_TRACE("[%d].enabled_p=false.", i),
 	    (start_row + i)->enabled_p = false;
 
 	  /* Re-compute Y positions.  */
@@ -17906,7 +17906,7 @@ try_window_reusing_current_matrix (struct window *w)
 	  /* Disable lines in the current matrix which are now
 	     below the window.  */
 	  for (++row; row < bottom_row; ++row)
-	    GTK3WL_TRACE("[%d].enabled_p=false.", row - start_row),
+	    PGTK_TRACE("[%d].enabled_p=false.", row - start_row),
 	    row->enabled_p = row->mode_line_p = false;
 	}
 
@@ -18057,7 +18057,7 @@ try_window_reusing_current_matrix (struct window *w)
 
       /* Disable rows not reused.  */
       for (row -= nrows_scrolled; row < bottom_row; ++row)
-	GTK3WL_TRACE("[%d].enabled_p=false.", row - start_row),
+	PGTK_TRACE("[%d].enabled_p=false.", row - start_row),
 	row->enabled_p = false;
 
       /* Point may have moved to a different line, so we cannot assume that
@@ -18343,7 +18343,7 @@ sync_frame_with_window_matrix_rows (struct window *w)
       /* Disable frame rows whose corresponding window rows have
 	 been disabled in try_window_id.  */
       if (!window_row->enabled_p)
-	GTK3WL_TRACE("[%d].enabled_p=false.", frame_row - f->current_matrix->rows),
+	PGTK_TRACE("[%d].enabled_p=false.", frame_row - f->current_matrix->rows),
 	frame_row->enabled_p = false;
 
       ++window_row, ++frame_row;
@@ -19128,7 +19128,7 @@ try_window_id (struct window *w)
 	     the current matrix?  I don't think so, so we mark rows
 	     displayed invalid in the current matrix by setting their
 	     enabled_p flag to false.  */
-	  GTK3WL_TRACE("[%d].enabled_p=false.", it.vpos),
+	  PGTK_TRACE("[%d].enabled_p=false.", it.vpos),
 	  SET_MATRIX_ROW_ENABLED_P (w->current_matrix, it.vpos, false);
 	  if (display_line (&it, w->cursor.vpos))
 	    last_text_row_at_end = it.glyph_row - 1;
@@ -21259,7 +21259,7 @@ display_line (struct it *it, int cursor_vpos)
     }
 
   /* Clear the result glyph row and enable it.  */
-  GTK3WL_TRACE("display_line: [%d]", MATRIX_ROW_VPOS (row, it->w->desired_matrix));
+  PGTK_TRACE("display_line: [%d]", MATRIX_ROW_VPOS (row, it->w->desired_matrix));
   prepare_desired_row (it->w, row, false);
 
   row->y = it->current_y;
@@ -29403,7 +29403,7 @@ void
 display_and_set_cursor (struct window *w, bool on,
 			int hpos, int vpos, int x, int y)
 {
-  GTK3WL_TRACE("display_and_set_cursor.");
+  PGTK_TRACE("display_and_set_cursor.");
   struct frame *f = XFRAME (w->frame);
   int new_cursor_type;
   int new_cursor_width;
@@ -31036,7 +31036,7 @@ note_mouse_highlight (struct frame *f, int x, int y)
   struct buffer *b;
 
   /* When a menu is active, don't highlight because this looks odd.  */
-#if defined (USE_X_TOOLKIT) || (defined (USE_GTK) && !defined(HAVE_GTK3WL)) || defined (HAVE_NS) || defined (MSDOS)
+#if defined (USE_X_TOOLKIT) || (defined (USE_GTK) && !defined(HAVE_PGTK)) || defined (HAVE_NS) || defined (MSDOS)
   if (popup_activated ())
     return;
 #endif

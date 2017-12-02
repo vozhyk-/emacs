@@ -229,7 +229,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #define GCGraphicsExposures 0
 #endif /* HAVE_NS */
 
-#ifdef HAVE_GTK3WL
+#ifdef HAVE_PGTK
 #define GCGraphicsExposures 0
 #endif /* HAVE_NS */
 #endif /* HAVE_WINDOW_SYSTEM */
@@ -564,8 +564,8 @@ x_free_gc (struct frame *f, GC gc)
 }
 #endif  /* HAVE_NS */
 
-#ifdef HAVE_GTK3WL
-/* GTK3WL emulation of GCs */
+#ifdef HAVE_PGTK
+/* PGTK emulation of GCs */
 
 static GC
 x_create_gc (struct frame *f,
@@ -977,9 +977,9 @@ defined_color (struct frame *f, const char *color_name, XColor *color_def,
   else if (FRAME_NS_P (f))
     return ns_defined_color (f, color_name, color_def, alloc, true);
 #endif
-#ifdef HAVE_GTK3WL
-  else if (FRAME_GTK3WL_P (f))
-    return gtk3wl_defined_color (f, color_name, color_def, alloc, true);
+#ifdef HAVE_PGTK
+  else if (FRAME_PGTK_P (f))
+    return pgtk_defined_color (f, color_name, color_def, alloc, true);
 #endif
   else
     emacs_abort ();

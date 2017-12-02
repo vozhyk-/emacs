@@ -103,8 +103,8 @@ typedef struct ns_bitmap_record Bitmap_Record;
   ns_defined_color (f, name, color_def, alloc, 0)
 #endif /* HAVE_NS */
 
-#ifdef HAVE_GTK3WL
-typedef struct gtk3wl_bitmap_record Bitmap_Record;
+#ifdef HAVE_PGTK
+typedef struct pgtk_bitmap_record Bitmap_Record;
 
 #define GET_PIXEL(ximg, x, y) 0
  // XGetPixel (ximg, x, y)
@@ -116,11 +116,11 @@ typedef struct gtk3wl_bitmap_record Bitmap_Record;
 #define PIX_MASK_DRAW	1
 
 #define x_defined_color(f, name, color_def, alloc) \
-  gtk3wl_defined_color (f, name, color_def, alloc, 0)
-#endif /* HAVE_GTK3WL */
+  pgtk_defined_color (f, name, color_def, alloc, 0)
+#endif /* HAVE_PGTK */
 
 #if (defined HAVE_X_WINDOWS \
-     && ! (defined HAVE_NTGUI || defined USE_CAIRO || defined HAVE_NS || defined HAVE_GTK3WL))
+     && ! (defined HAVE_NTGUI || defined USE_CAIRO || defined HAVE_NS || defined HAVE_PGTK))
 /* W32_TODO : Color tables on W32.  */
 # define COLOR_TABLE_SUPPORT 1
 #endif
@@ -316,7 +316,7 @@ x_create_bitmap_from_file (struct frame *f, Lisp_Object file)
   return id;
 #endif
 
-#ifdef HAVE_GTK3WL
+#ifdef HAVE_PGTK
   return -1;
 #endif
 
@@ -1216,7 +1216,7 @@ four_corners_best (XImagePtr_or_DC ximg, int *corners,
 #define Free_Pixmap(display, pixmap) \
   ns_release_object (pixmap)
 
-#elif defined (HAVE_GTK3WL)
+#elif defined (HAVE_PGTK)
 
 #define Free_Pixmap(display, pixmap) ((void) 0)
 //  ns_release_object (pixmap)
@@ -1302,10 +1302,10 @@ x_query_frame_background_color (struct frame *f, XColor *bgcolor)
 {
 #ifndef HAVE_NS
   bgcolor->pixel = FRAME_BACKGROUND_PIXEL (f);
-#ifndef HAVE_GTK3WL
+#ifndef HAVE_PGTK
   x_query_color (f, bgcolor);
 #else
-  gtk3wl_query_color (f, bgcolor);
+  pgtk_query_color (f, bgcolor);
 #endif
 #else
   ns_query_color (FRAME_BACKGROUND_COLOR (f), bgcolor, 1);
@@ -2126,7 +2126,7 @@ x_create_x_image_and_pixmap (struct frame *f, int width, int height, int depth,
   return 1;
 #endif
 
-#ifdef HAVE_GTK3WL
+#ifdef HAVE_PGTK
 #if 0
   *pixmap = ns_image_for_XPM (width, height, depth);
   if (*pixmap == 0)
@@ -2167,7 +2167,7 @@ x_destroy_x_image (XImagePtr ximg)
 #ifdef HAVE_NS
       ns_release_object (ximg);
 #endif /* HAVE_NS */
-#ifdef HAVE_GTK3WL
+#ifdef HAVE_PGTK
       // ns_release_object (ximg);
 #endif /* HAVE_NS */
     }
@@ -2202,7 +2202,7 @@ x_put_x_image (struct frame *f, XImagePtr ximg, Pixmap pixmap, int width, int he
   ns_retain_object (ximg);
 #endif
 
-#ifdef HAVE_GTK3WL
+#ifdef HAVE_PGTK
   eassert (ximg == pixmap);
   // ns_retain_object (ximg);
 #endif
@@ -2317,7 +2317,7 @@ image_get_x_image (struct frame *f, struct image *img, bool mask_p)
 
   ns_retain_object (pixmap);
   return pixmap;
-#elif defined (HAVE_GTK3WL)
+#elif defined (HAVE_PGTK)
   XImagePtr pixmap = !mask_p ? img->pixmap : img->mask;
 
   // ns_retain_object (pixmap);
@@ -2812,7 +2812,7 @@ Create_Pixmap_From_Bitmap_Data (struct frame *f, struct image *img, char *data,
 #elif defined (HAVE_NS)
   img->pixmap = ns_image_from_XBM (data, img->width, img->height, fg, bg);
 
-#elif defined (HAVE_GTK3WL)
+#elif defined (HAVE_PGTK)
   img->pixmap = 0;
 
 #else
@@ -5046,7 +5046,7 @@ x_disable_image (struct frame *f, struct image *img)
   if (n_planes < 2 || cross_disabled_images)
     {
 #ifndef HAVE_NTGUI
-#ifndef HAVE_GTK3WL
+#ifndef HAVE_PGTK
 #ifndef HAVE_NS  /* TODO: NS support, however this not needed for toolbars */
 
 #define MaskForeground(f)  WHITE_PIX_DEFAULT (f)
@@ -5185,7 +5185,7 @@ x_build_heuristic_mask (struct frame *f, struct image *img, Lisp_Object how)
   for (y = 0; y < img->height; ++y)
     for (x = 0; x < img->width; ++x)
 #ifndef HAVE_NS
-#ifdef HAVE_GTK3WL
+#ifdef HAVE_PGTK
       XPutPixel (mask_img, x, y, PIX_MASK_DRAW);
 #else
       XPutPixel (mask_img, x, y, (XGetPixel (ximg, x, y) != bg
@@ -5515,10 +5515,10 @@ pbm_load (struct frame *f, struct image *img)
           || ! x_defined_color (f, SSDATA (fmt[PBM_FOREGROUND].value), &xfg, 0))
         {
           xfg.pixel = fg;
-#ifndef HAVE_GTK3WL
+#ifndef HAVE_PGTK
           x_query_color (f, &xfg);
 #else
-          gtk3wl_query_color (f, &xfg);
+          pgtk_query_color (f, &xfg);
 #endif
         }
       fga32 = xcolor_to_argb32 (xfg);
@@ -5528,10 +5528,10 @@ pbm_load (struct frame *f, struct image *img)
           || ! x_defined_color (f, SSDATA (fmt[PBM_BACKGROUND].value), &xbg, 0))
 	{
           xbg.pixel = bg;
-#ifndef HAVE_GTK3WL
+#ifndef HAVE_PGTK
           x_query_color (f, &xbg);
 #else
-          gtk3wl_query_color (f, &xbg);
+          pgtk_query_color (f, &xbg);
 #endif
 	}
       bga32 = xcolor_to_argb32 (xbg);

@@ -361,8 +361,8 @@ ftfont_lookup_cache (Lisp_Object key, enum ftfont_cache_for cache_for)
   else
     entity = Qnil;
 
-  // GTK3WL_TRACE("ftfont_lookup_cache: 1: %ld.", key.i);
-  // GTK3WL_TRACE("ftfont_lookup_cache: 2: %ld.", ft_face_cache.i);
+  // PGTK_TRACE("ftfont_lookup_cache: 1: %ld.", key.i);
+  // PGTK_TRACE("ftfont_lookup_cache: 2: %ld.", ft_face_cache.i);
   if (NILP (ft_face_cache))
     cache = Qnil;
   else
@@ -377,8 +377,8 @@ ftfont_lookup_cache (Lisp_Object key, enum ftfont_cache_for cache_for)
       val = make_save_ptr_int (cache_data, 0);
       cache = Fcons (Qnil, val);
       Fputhash (key, cache, ft_face_cache);
-      // GTK3WL_TRACE("ftfont_lookup_cache: 3: %ld.", key.i);
-      // GTK3WL_TRACE("ftfont_lookup_cache: 4: %ld.", ft_face_cache.i);
+      // PGTK_TRACE("ftfont_lookup_cache: 3: %ld.", key.i);
+      // PGTK_TRACE("ftfont_lookup_cache: 4: %ld.", ft_face_cache.i);
     }
   else
     {

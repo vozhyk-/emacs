@@ -22,12 +22,12 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include <cairo-ft.h>
 
 #include "lisp.h"
-#ifndef HAVE_GTK3WL
+#ifndef HAVE_PGTK
 #include "xterm.h"
-#define GTK3WL_TRACE(fmt, ...) ((void) 0)
-#define GTK3WL_BACKTRACE() ((void) 0)
+#define PGTK_TRACE(fmt, ...) ((void) 0)
+#define PGTK_BACKTRACE() ((void) 0)
 #else
-#include "gtk3wlterm.h"
+#include "pgtkterm.h"
 #endif
 #include "blockinput.h"
 #include "font.h"
@@ -236,19 +236,19 @@ ftcrfont_draw (struct glyph_string *s,
 
   block_input ();
 
-#ifndef HAVE_GTK3WL
+#ifndef HAVE_PGTK
   cr = x_begin_cr_clip (f, s->gc);
 #else
-  cr = gtk3wl_begin_cr_clip (f, NULL);
+  cr = pgtk_begin_cr_clip (f, NULL);
 #endif
 
   if (with_background)
     {
-      GTK3WL_TRACE("with background.");
-#ifndef HAVE_GTK3WL
+      PGTK_TRACE("with background.");
+#ifndef HAVE_PGTK
       x_set_cr_source_with_gc_background (f, s->gc);
 #else
-      gtk3wl_set_cr_source_with_color (f, s->xgcv.background);
+      pgtk_set_cr_source_with_color (f, s->xgcv.background);
 #endif
       cairo_rectangle (cr, x, y - FONT_BASE (face->font),
 		       s->width, FONT_HEIGHT (face->font));
@@ -267,10 +267,10 @@ ftcrfont_draw (struct glyph_string *s,
       x += (s->padding_p ? 1 : ftcrfont_glyph_extents (s->font, code, NULL));
     }
 
-#ifndef HAVE_GTK3WL
+#ifndef HAVE_PGTK
   x_set_cr_source_with_gc_foreground (f, s->gc);
 #else
-  gtk3wl_set_cr_source_with_color (f, s->xgcv.foreground);
+  pgtk_set_cr_source_with_color (f, s->xgcv.foreground);
 #endif
   cairo_set_font_face (cr, ftcrfont_info->cr_font_face);
   cairo_set_font_size (cr, s->font->pixel_size);
@@ -288,10 +288,10 @@ ftcrfont_draw (struct glyph_string *s,
 	  || cairo_image_surface_get_format (surface) != CAIRO_FORMAT_ARGB32))
     cairo_surface_flush (surface);
 
-#ifndef HAVE_GTK3WL
+#ifndef HAVE_PGTK
   x_end_cr_clip (f);
 #else
-  gtk3wl_end_cr_clip (f);
+  pgtk_end_cr_clip (f);
 #endif
 
   unblock_input ();

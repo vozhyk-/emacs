@@ -2,8 +2,8 @@
 
 ;;; Code:
 (eval-when-compile (require 'cl-lib))
-(or (featurep 'gtk3wl)
-    (error "%s: Loading gtk3wl-win.el but not compiled for Gtk+-3 with wayland."
+(or (featurep 'pgtk)
+    (error "%s: Loading pgtk-win.el but not compiled for pure Gtk+-3."
            (invocation-name)))
 
 ;; Documentation-purposes only: actually loaded in loadup.el.
@@ -14,7 +14,7 @@
 (require 'fontset)
 (require 'dnd)
 
-(defgroup gtk3wl nil
+(defgroup pgtk nil
   "GNUstep/macOS specific features."
   :group 'environment)
 
@@ -24,22 +24,22 @@
 ;; Set in term/common-win.el; currently unused by Gtk's x-open-connection.
 (defvar x-command-line-resources)
 
-;; gtk3wlterm.c.
-(defvar gtk3wl-input-file)
+;; pgtkterm.c.
+(defvar pgtk-input-file)
 
-(defun gtk3wl-handle-nxopen (_switch &optional temp)
+(defun pgtk-handle-nxopen (_switch &optional temp)
   (setq unread-command-events (append unread-command-events
-                                      (if temp '(gtk3wl-open-temp-file)
-                                        '(gtk3wl-open-file)))
-        gtk3wl-input-file (append gtk3wl-input-file (list (pop x-invocation-args)))))
+                                      (if temp '(pgtk-open-temp-file)
+                                        '(pgtk-open-file)))
+        pgtk-input-file (append pgtk-input-file (list (pop x-invocation-args)))))
 
-(defun gtk3wl-handle-nxopentemp (switch)
-  (gtk3wl-handle-nxopen switch t))
+(defun pgtk-handle-nxopentemp (switch)
+  (pgtk-handle-nxopen switch t))
 
-(defun gtk3wl-ignore-1-arg (_switch)
+(defun pgtk-ignore-1-arg (_switch)
   (setq x-invocation-args (cdr x-invocation-args)))
 
-(defun gtk3wl-parse-geometry (geom)
+(defun pgtk-parse-geometry (geom)
   "Parse a Nextstep-style geometry string GEOM.
 Returns an alist of the form ((top . TOP), (left . LEFT) ... ).
 The properties returned may include `top', `left', `height', and `width'."
@@ -59,55 +59,55 @@ The properties returned may include `top', `left', `height', and `width'."
 
 ;;;; Keyboard mapping.
 
-(define-obsolete-variable-alias 'gtk3wl-alternatives-map 'x-alternatives-map "24.1")
+(define-obsolete-variable-alias 'pgtk-alternatives-map 'x-alternatives-map "24.1")
 
 ;; Here are some Nextstep-like bindings for command key sequences.
 (define-key global-map [?\s-,] 'customize)
 (define-key global-map [?\s-'] 'next-multiframe-window)
 (define-key global-map [?\s-`] 'other-frame)
-(define-key global-map [?\s-~] 'gtk3wl-prev-frame)
+(define-key global-map [?\s-~] 'pgtk-prev-frame)
 (define-key global-map [?\s--] 'center-line)
 (define-key global-map [?\s-:] 'ispell)
 (define-key global-map [?\s-?] 'info)
 (define-key global-map [?\s-^] 'kill-some-buffers)
 (define-key global-map [?\s-&] 'kill-current-buffer)
-(define-key global-map [?\s-C] 'gtk3wl-popup-color-panel)
+(define-key global-map [?\s-C] 'pgtk-popup-color-panel)
 (define-key global-map [?\s-D] 'dired)
 (define-key global-map [?\s-E] 'edit-abbrevs)
 (define-key global-map [?\s-L] 'shell-command)
 (define-key global-map [?\s-M] 'manual-entry)
-(define-key global-map [?\s-S] 'gtk3wl-write-file-using-panel)
+(define-key global-map [?\s-S] 'pgtk-write-file-using-panel)
 (define-key global-map [?\s-a] 'mark-whole-buffer)
-(define-key global-map [?\s-c] 'gtk3wl-copy-including-secondary)
+(define-key global-map [?\s-c] 'pgtk-copy-including-secondary)
 (define-key global-map [?\s-d] 'isearch-repeat-backward)
 (define-key global-map [?\s-e] 'isearch-yank-kill)
 (define-key global-map [?\s-f] 'isearch-forward)
 (define-key global-map [?\s-g] 'isearch-repeat-forward)
-(define-key global-map [?\s-h] 'gtk3wl-do-hide-emacs)
-(define-key global-map [?\s-H] 'gtk3wl-do-hide-others)
-(define-key global-map [?\M-\s-h] 'gtk3wl-do-hide-others)
+(define-key global-map [?\s-h] 'pgtk-do-hide-emacs)
+(define-key global-map [?\s-H] 'pgtk-do-hide-others)
+(define-key global-map [?\M-\s-h] 'pgtk-do-hide-others)
 (define-key key-translation-map [?\M-\s-\u02D9] [?\M-\s-h])
 (define-key global-map [?\s-j] 'exchange-point-and-mark)
 (define-key global-map [?\s-k] 'kill-current-buffer)
 (define-key global-map [?\s-l] 'goto-line)
 (define-key global-map [?\s-m] 'iconify-frame)
 (define-key global-map [?\s-n] 'make-frame)
-(define-key global-map [?\s-o] 'gtk3wl-open-file-using-panel)
-(define-key global-map [?\s-p] 'gtk3wl-print-buffer)
+(define-key global-map [?\s-o] 'pgtk-open-file-using-panel)
+(define-key global-map [?\s-p] 'pgtk-print-buffer)
 (define-key global-map [?\s-q] 'save-buffers-kill-emacs)
 (define-key global-map [?\s-s] 'save-buffer)
-(define-key global-map [?\s-t] 'gtk3wl-popup-font-panel)
+(define-key global-map [?\s-t] 'pgtk-popup-font-panel)
 (define-key global-map [?\s-u] 'revert-buffer)
 (define-key global-map [?\s-v] 'yank)
 (define-key global-map [?\s-w] 'delete-frame)
 (define-key global-map [?\s-x] 'kill-region)
-(define-key global-map [?\s-y] 'gtk3wl-paste-secondary)
+(define-key global-map [?\s-y] 'pgtk-paste-secondary)
 (define-key global-map [?\s-z] 'undo)
 (define-key global-map [?\s-|] 'shell-command-on-region)
 (define-key global-map [s-kp-bar] 'shell-command-on-region)
 ;; (as in Terminal.app)
-(define-key global-map [s-right] 'gtk3wl-next-frame)
-(define-key global-map [s-left] 'gtk3wl-prev-frame)
+(define-key global-map [s-right] 'pgtk-next-frame)
+(define-key global-map [s-left] 'pgtk-prev-frame)
 
 (define-key global-map [home] 'beginning-of-buffer)
 (define-key global-map [end] 'end-of-buffer)
@@ -123,41 +123,41 @@ The properties returned may include `top', `left', `height', and `width'."
 ;; Special Nextstep-generated events are converted to function keys.  Here
 ;; are the bindings for them.  Note, these keys are actually declared in
 ;; x-setup-function-keys in common-win.
-(define-key global-map [gtk3wl-power-off] 'save-buffers-kill-emacs)
-(define-key global-map [gtk3wl-open-file] 'gtk3wl-find-file)
-(define-key global-map [gtk3wl-open-temp-file] [gtk3wl-open-file])
-(define-key global-map [gtk3wl-change-font] 'gtk3wl-respond-to-change-font)
-(define-key global-map [gtk3wl-open-file-line] 'gtk3wl-open-file-select-line)
-(define-key global-map [gtk3wl-spi-service-call] 'gtk3wl-spi-service-call)
-(define-key global-map [gtk3wl-new-frame] 'make-frame)
-(define-key global-map [gtk3wl-toggle-toolbar] 'gtk3wl-toggle-toolbar)
-(define-key global-map [gtk3wl-show-prefs] 'customize)
+(define-key global-map [pgtk-power-off] 'save-buffers-kill-emacs)
+(define-key global-map [pgtk-open-file] 'pgtk-find-file)
+(define-key global-map [pgtk-open-temp-file] [pgtk-open-file])
+(define-key global-map [pgtk-change-font] 'pgtk-respond-to-change-font)
+(define-key global-map [pgtk-open-file-line] 'pgtk-open-file-select-line)
+(define-key global-map [pgtk-spi-service-call] 'pgtk-spi-service-call)
+(define-key global-map [pgtk-new-frame] 'make-frame)
+(define-key global-map [pgtk-toggle-toolbar] 'pgtk-toggle-toolbar)
+(define-key global-map [pgtk-show-prefs] 'customize)
 
 
 ;; Set up a number of aliases and other layers to pretend we're using
 ;; the Choi/Mitsuharu Carbon port.
 
-(defvaralias 'mac-allow-anti-aliasing 'gtk3wl-antialias-text)
-(defvaralias 'mac-command-modifier 'gtk3wl-command-modifier)
-(defvaralias 'mac-right-command-modifier 'gtk3wl-right-command-modifier)
-(defvaralias 'mac-control-modifier 'gtk3wl-control-modifier)
-(defvaralias 'mac-right-control-modifier 'gtk3wl-right-control-modifier)
-(defvaralias 'mac-option-modifier 'gtk3wl-option-modifier)
-(defvaralias 'mac-right-option-modifier 'gtk3wl-right-option-modifier)
-(defvaralias 'mac-function-modifier 'gtk3wl-function-modifier)
-(declare-function gtk3wl-do-applescript "gtk3wlfns.c" (script))
-(defalias 'do-applescript 'gtk3wl-do-applescript)
+(defvaralias 'mac-allow-anti-aliasing 'pgtk-antialias-text)
+(defvaralias 'mac-command-modifier 'pgtk-command-modifier)
+(defvaralias 'mac-right-command-modifier 'pgtk-right-command-modifier)
+(defvaralias 'mac-control-modifier 'pgtk-control-modifier)
+(defvaralias 'mac-right-control-modifier 'pgtk-right-control-modifier)
+(defvaralias 'mac-option-modifier 'pgtk-option-modifier)
+(defvaralias 'mac-right-option-modifier 'pgtk-right-option-modifier)
+(defvaralias 'mac-function-modifier 'pgtk-function-modifier)
+(declare-function pgtk-do-applescript "pgtkfns.c" (script))
+(defalias 'do-applescript 'pgtk-do-applescript)
 
 ;;;; Services
-(declare-function gtk3wl-perform-service "gtk3wlfns.c" (service send))
+(declare-function pgtk-perform-service "pgtkfns.c" (service send))
 
-(defun gtk3wl-define-service (path)
+(defun pgtk-define-service (path)
   (let ((mapping [menu-bar services])
 	(service (mapconcat 'identity path "/"))
 	(name (intern
                (subst-char-in-string
                 ?\s ?-
-                (mapconcat 'identity (cons "gtk3wl-service" path) "-")))))
+                (mapconcat 'identity (cons "pgtk-service" path) "-")))))
     ;; This defines the function.
     (defalias name
       (lambda (arg)
@@ -166,7 +166,7 @@ The properties returned may include `top', `left', `height', and `width'."
                 (cond ((stringp arg) arg)
                       (mark-active
                        (buffer-substring (region-beginning) (region-end)))))
-               (out-string (gtk3wl-perform-service service in-string)))
+               (out-string (pgtk-perform-service service in-string)))
           (cond
            ((stringp arg) out-string)
            ((and out-string (or (not in-string)
@@ -186,14 +186,14 @@ The properties returned may include `top', `left', `height', and `width'."
       (define-key global-map mapping (cons (car path) name))))
     name))
 
-;; gtk3wlterm.c
-(defvar gtk3wl-input-spi-name)
-(defvar gtk3wl-input-spi-arg)
+;; pgtkterm.c
+(defvar pgtk-input-spi-name)
+(defvar pgtk-input-spi-arg)
 
 (declare-function dnd-open-file "dnd" (uri action))
 
 ;; Handles multiline strings that are passed to the "open-file" service.
-(defun gtk3wl-open-file-service (filenames)
+(defun pgtk-open-file-service (filenames)
   "Open multiple files when selecting a multiline string FILENAMES."
   (let ((filelist (split-string filenames "[\n\r]+" t "[ \u00A0\t]+")))
     ;; The path strings are trimmed for spaces, nbsp and tabs.
@@ -201,22 +201,22 @@ The properties returned may include `top', `left', `height', and `width'."
       (dnd-open-file filestring nil))))
 
 
-(defun gtk3wl-spi-service-call ()
+(defun pgtk-spi-service-call ()
   "Respond to a service request."
   (interactive)
-  (cond ((string-equal gtk3wl-input-spi-name "open-selection")
+  (cond ((string-equal pgtk-input-spi-name "open-selection")
 	 (switch-to-buffer (generate-new-buffer "*untitled*"))
-	 (insert gtk3wl-input-spi-arg))
-	((string-equal gtk3wl-input-spi-name "open-file")
-	 (gtk3wl-open-file-service gtk3wl-input-spi-arg))
-	((string-equal gtk3wl-input-spi-name "mail-selection")
+	 (insert pgtk-input-spi-arg))
+	((string-equal pgtk-input-spi-name "open-file")
+	 (pgtk-open-file-service pgtk-input-spi-arg))
+	((string-equal pgtk-input-spi-name "mail-selection")
 	 (compose-mail)
 	 (rfc822-goto-eoh)
 	 (forward-line 1)
-	 (insert gtk3wl-input-spi-arg))
-	((string-equal gtk3wl-input-spi-name "mail-to")
-	 (compose-mail gtk3wl-input-spi-arg))
-	(t (error "Service %s not recognized" gtk3wl-input-spi-name))))
+	 (insert pgtk-input-spi-arg))
+	((string-equal pgtk-input-spi-name "mail-to")
+	 (compose-mail pgtk-input-spi-arg))
+	(t (error "Service %s not recognized" pgtk-input-spi-name))))
 
 
 ;; Composed key sequence handling for Nextstep system input methods.
@@ -225,20 +225,20 @@ The properties returned may include `top', `left', `height', and `width'."
 ;; entry a partial ("working") result is typically shown in the
 ;; editing window.)
 
-(defface gtk3wl-working-text-face
+(defface pgtk-working-text-face
   '((t :underline t))
   "Face used to highlight working text during compose sequence insert."
-  :group 'gtk3wl)
+  :group 'pgtk)
 
-(defvar gtk3wl-working-overlay nil
+(defvar pgtk-working-overlay nil
   "Overlay used to highlight working text during compose sequence insert.
 When text is in th echo area, this just stores the length of the working text.")
 
-(defvar gtk3wl-working-text)		; gtk3wlterm.c
+(defvar pgtk-working-text)		; pgtkterm.c
 
 ;; Test if in echo area, based on mac-win.el 2007/08/26 unicode-2.
 ;; This will fail if called from a NONASCII_KEYSTROKE event on the global map.
-(defun gtk3wl-in-echo-area ()
+(defun pgtk-in-echo-area ()
   "Whether, for purposes of inserting working composition text, the minibuffer
 is currently being used."
   (or isearch-mode
@@ -253,61 +253,61 @@ is currently being used."
 		    (eq (get-char-property (1- (point)) 'composition)
 			(get-char-property (point) 'composition)))))))
 
-;; The 'interactive' here stays for subinvocations, so the gtk3wl-in-echo-area
+;; The 'interactive' here stays for subinvocations, so the pgtk-in-echo-area
 ;; always returns nil for some reason.  If this WASN'T the case, we could
-;; map this to [gtk3wl-insert-working-text] and eliminate Fevals in gtk3wlterm.c.
+;; map this to [pgtk-insert-working-text] and eliminate Fevals in pgtkterm.c.
 ;; These functions test whether in echo area and delegate accordingly.
-(defun gtk3wl-put-working-text ()
+(defun pgtk-put-working-text ()
   (interactive)
-  (if (gtk3wl-in-echo-area) (gtk3wl-echo-working-text) (gtk3wl-insert-working-text)))
-(defun gtk3wl-unput-working-text ()
+  (if (pgtk-in-echo-area) (pgtk-echo-working-text) (pgtk-insert-working-text)))
+(defun pgtk-unput-working-text ()
   (interactive)
-  (gtk3wl-delete-working-text))
+  (pgtk-delete-working-text))
 
-(defun gtk3wl-insert-working-text ()
-  "Insert contents of `gtk3wl-working-text' as UTF-8 string and mark with
-`gtk3wl-working-overlay'.  Any previously existing working text is cleared first.
-The overlay is assigned the face `gtk3wl-working-text-face'."
+(defun pgtk-insert-working-text ()
+  "Insert contents of `pgtk-working-text' as UTF-8 string and mark with
+`pgtk-working-overlay'.  Any previously existing working text is cleared first.
+The overlay is assigned the face `pgtk-working-text-face'."
   ;; FIXME: if buffer is read-only, don't try to insert anything
   ;;  and if text is bound to a command, execute that instead (Bug#1453)
   (interactive)
-  (gtk3wl-delete-working-text)
+  (pgtk-delete-working-text)
   (let ((start (point)))
-    (insert gtk3wl-working-text)
-    (overlay-put (setq gtk3wl-working-overlay (make-overlay start (point)
+    (insert pgtk-working-text)
+    (overlay-put (setq pgtk-working-overlay (make-overlay start (point)
 							(current-buffer) nil t))
-		 'face 'gtk3wl-working-text-face)))
+		 'face 'pgtk-working-text-face)))
 
-(defun gtk3wl-echo-working-text ()
-  "Echo contents of `gtk3wl-working-text' in message display area.
-See `gtk3wl-insert-working-text'."
-  (gtk3wl-delete-working-text)
+(defun pgtk-echo-working-text ()
+  "Echo contents of `pgtk-working-text' in message display area.
+See `pgtk-insert-working-text'."
+  (pgtk-delete-working-text)
   (let* ((msg (current-message))
 	 (msglen (length msg))
 	 message-log-max)
-    (setq gtk3wl-working-overlay (length gtk3wl-working-text))
-    (setq msg (concat msg gtk3wl-working-text))
-    (put-text-property msglen (+ msglen gtk3wl-working-overlay)
-		       'face 'gtk3wl-working-text-face msg)
+    (setq pgtk-working-overlay (length pgtk-working-text))
+    (setq msg (concat msg pgtk-working-text))
+    (put-text-property msglen (+ msglen pgtk-working-overlay)
+		       'face 'pgtk-working-text-face msg)
     (message "%s" msg)))
 
-(defun gtk3wl-delete-working-text()
-  "Delete working text and clear `gtk3wl-working-overlay'."
+(defun pgtk-delete-working-text()
+  "Delete working text and clear `pgtk-working-overlay'."
   (interactive)
   (cond
-   ((and (overlayp gtk3wl-working-overlay)
+   ((and (overlayp pgtk-working-overlay)
          ;; Still alive?
-         (overlay-buffer gtk3wl-working-overlay))
-    (with-current-buffer (overlay-buffer gtk3wl-working-overlay)
-      (delete-region (overlay-start gtk3wl-working-overlay)
-                     (overlay-end gtk3wl-working-overlay))
-      (delete-overlay gtk3wl-working-overlay)))
-   ((integerp gtk3wl-working-overlay)
+         (overlay-buffer pgtk-working-overlay))
+    (with-current-buffer (overlay-buffer pgtk-working-overlay)
+      (delete-region (overlay-start pgtk-working-overlay)
+                     (overlay-end pgtk-working-overlay))
+      (delete-overlay pgtk-working-overlay)))
+   ((integerp pgtk-working-overlay)
     (let ((msg (current-message))
           message-log-max)
-      (setq msg (substring msg 0 (- (length msg) gtk3wl-working-overlay)))
+      (setq msg (substring msg 0 (- (length msg) pgtk-working-overlay)))
       (message "%s" msg))))
-  (setq gtk3wl-working-overlay nil))
+  (setq pgtk-working-overlay nil))
 
 
 ;; macOS file system Unicode UTF-8 NFD (decomposed form) support.
@@ -319,80 +319,80 @@ See `gtk3wl-insert-working-text'."
 
 ;;;; Inter-app communications support.
 
-(defun gtk3wl-insert-file ()
-  "Insert contents of file `gtk3wl-input-file' like insert-file but with less
+(defun pgtk-insert-file ()
+  "Insert contents of file `pgtk-input-file' like insert-file but with less
 prompting.  If file is a directory perform a `find-file' on it."
   (interactive)
-  (let ((f (pop gtk3wl-input-file)))
+  (let ((f (pop pgtk-input-file)))
     (if (file-directory-p f)
         (find-file f)
       (push-mark (+ (point) (cadr (insert-file-contents f)))))))
 
-(defvar gtk3wl-select-overlay nil
+(defvar pgtk-select-overlay nil
   "Overlay used to highlight areas in files requested by Nextstep apps.")
-(make-variable-buffer-local 'gtk3wl-select-overlay)
+(make-variable-buffer-local 'pgtk-select-overlay)
 
-(defvar gtk3wl-input-line) 			; gtk3wlterm.c
+(defvar pgtk-input-line) 			; pgtkterm.c
 
-(defun gtk3wl-open-file-select-line ()
-  "Open a buffer containing the file `gtk3wl-input-file'.
-Lines are highlighted according to `gtk3wl-input-line'."
+(defun pgtk-open-file-select-line ()
+  "Open a buffer containing the file `pgtk-input-file'.
+Lines are highlighted according to `pgtk-input-line'."
   (interactive)
-  (gtk3wl-find-file)
+  (pgtk-find-file)
   (cond
-   ((and gtk3wl-input-line (buffer-modified-p))
-    (if gtk3wl-select-overlay
-        (setq gtk3wl-select-overlay (delete-overlay gtk3wl-select-overlay)))
+   ((and pgtk-input-line (buffer-modified-p))
+    (if pgtk-select-overlay
+        (setq pgtk-select-overlay (delete-overlay pgtk-select-overlay)))
     (deactivate-mark)
     (goto-char (point-min))
-    (forward-line (1- (if (consp gtk3wl-input-line)
-                          (min (car gtk3wl-input-line) (cdr gtk3wl-input-line))
-                        gtk3wl-input-line))))
-   (gtk3wl-input-line
-    (if (not gtk3wl-select-overlay)
-        (overlay-put (setq gtk3wl-select-overlay (make-overlay (point-min)
+    (forward-line (1- (if (consp pgtk-input-line)
+                          (min (car pgtk-input-line) (cdr pgtk-input-line))
+                        pgtk-input-line))))
+   (pgtk-input-line
+    (if (not pgtk-select-overlay)
+        (overlay-put (setq pgtk-select-overlay (make-overlay (point-min)
                                                            (point-min)))
                      'face 'highlight))
     (let ((beg (save-excursion
                  (goto-char (point-min))
                  (line-beginning-position
-                  (if (consp gtk3wl-input-line)
-                      (min (car gtk3wl-input-line) (cdr gtk3wl-input-line))
-                    gtk3wl-input-line))))
+                  (if (consp pgtk-input-line)
+                      (min (car pgtk-input-line) (cdr pgtk-input-line))
+                    pgtk-input-line))))
           (end (save-excursion
                  (goto-char (point-min))
                  (line-beginning-position
-                  (1+ (if (consp gtk3wl-input-line)
-                          (max (car gtk3wl-input-line) (cdr gtk3wl-input-line))
-                        gtk3wl-input-line))))))
-      (move-overlay gtk3wl-select-overlay beg end)
+                  (1+ (if (consp pgtk-input-line)
+                          (max (car pgtk-input-line) (cdr pgtk-input-line))
+                        pgtk-input-line))))))
+      (move-overlay pgtk-select-overlay beg end)
       (deactivate-mark)
       (goto-char beg)))
    (t
-    (if gtk3wl-select-overlay
-        (setq gtk3wl-select-overlay (delete-overlay gtk3wl-select-overlay))))))
+    (if pgtk-select-overlay
+        (setq pgtk-select-overlay (delete-overlay pgtk-select-overlay))))))
 
-(defun gtk3wl-unselect-line ()
+(defun pgtk-unselect-line ()
   "Removes any Nextstep highlight a buffer may contain."
-  (if gtk3wl-select-overlay
-      (setq gtk3wl-select-overlay (delete-overlay gtk3wl-select-overlay))))
+  (if pgtk-select-overlay
+      (setq pgtk-select-overlay (delete-overlay pgtk-select-overlay))))
 
-(add-hook 'first-change-hook 'gtk3wl-unselect-line)
+(add-hook 'first-change-hook 'pgtk-unselect-line)
 
 ;;;; Preferences handling.
-(declare-function gtk3wl-get-resource "gtk3wlfns.c" (owner name))
+(declare-function pgtk-get-resource "pgtkfns.c" (owner name))
 
 (defun get-lisp-resource (arg1 arg2)
-  (let ((res (gtk3wl-get-resource arg1 arg2)))
+  (let ((res (pgtk-get-resource arg1 arg2)))
     (cond
      ((not res) 'unbound)
      ((string-equal (upcase res) "YES") t)
      ((string-equal (upcase res) "NO")  nil)
      (t (read res)))))
 
-;; gtk3wlterm.c
+;; pgtkterm.c
 
-(declare-function gtk3wl-read-file-name "gtk3wlfns.c"
+(declare-function pgtk-read-file-name "pgtkfns.c"
 		  (prompt &optional dir mustmatch init dir_only_p))
 
 ;;;; File handling.
@@ -403,29 +403,29 @@ Use a file selection dialog.  Select DEFAULT-FILENAME in the dialog's file
 selection box, if specified.  If MUSTMATCH is non-nil, the returned file
 or directory must exist.
 
-This function is only defined on GTK3WL, MS Windows, and X Windows with the
+This function is only defined on PGTK, MS Windows, and X Windows with the
 Motif or Gtk toolkits.  With the Motif toolkit, ONLY-DIR-P is ignored.
 Otherwise, if ONLY-DIR-P is non-nil, the user can only select directories."
-  (gtk3wl-read-file-name prompt dir mustmatch default_filename only_dir_p))
+  (pgtk-read-file-name prompt dir mustmatch default_filename only_dir_p))
 
-(defun gtk3wl-open-file-using-panel ()
+(defun pgtk-open-file-using-panel ()
   "Pop up open-file panel, and load the result in a buffer."
   (interactive)
   ;; Prompt dir defaultName isLoad initial.
-  (setq gtk3wl-input-file (gtk3wl-read-file-name "Select File to Load" nil t nil))
-  (if gtk3wl-input-file
-      (and (setq gtk3wl-input-file (list gtk3wl-input-file)) (gtk3wl-find-file))))
+  (setq pgtk-input-file (pgtk-read-file-name "Select File to Load" nil t nil))
+  (if pgtk-input-file
+      (and (setq pgtk-input-file (list pgtk-input-file)) (pgtk-find-file))))
 
-(defun gtk3wl-write-file-using-panel ()
+(defun pgtk-write-file-using-panel ()
   "Pop up save-file panel, and save buffer in resulting name."
   (interactive)
-  (let (gtk3wl-output-file)
+  (let (pgtk-output-file)
     ;; Prompt dir defaultName isLoad initial.
-    (setq gtk3wl-output-file (gtk3wl-read-file-name "Save As" nil nil nil))
-    (message gtk3wl-output-file)
-    (if gtk3wl-output-file (write-file gtk3wl-output-file))))
+    (setq pgtk-output-file (pgtk-read-file-name "Save As" nil nil nil))
+    (message pgtk-output-file)
+    (if pgtk-output-file (write-file pgtk-output-file))))
 
-(defcustom gtk3wl-pop-up-frames 'fresh
+(defcustom pgtk-pop-up-frames 'fresh
   "Non-nil means open files upon request from the Workspace in a new frame.
 If t, always do so.  Any other non-nil value means open a new frame
 unless the current buffer is a scratch buffer."
@@ -433,15 +433,15 @@ unless the current buffer is a scratch buffer."
                  (const :tag "Always" t)
                  (other :tag "Except for scratch buffer" fresh))
   :version "23.1"
-  :group 'gtk3wl)
+  :group 'pgtk)
 
-(declare-function gtk3wl-hide-emacs "gtk3wlfns.c" (on))
+(declare-function pgtk-hide-emacs "pgtkfns.c" (on))
 
-(defun gtk3wl-find-file ()
-  "Do a `find-file' with the `gtk3wl-input-file' as argument."
+(defun pgtk-find-file ()
+  "Do a `find-file' with the `pgtk-input-file' as argument."
   (interactive)
   (let* ((f (file-truename
-	     (expand-file-name (pop gtk3wl-input-file)
+	     (expand-file-name (pop pgtk-input-file)
 			       command-line-default-directory)))
          (file (find-file-noselect f))
          (bufwin1 (get-buffer-window file 'visible))
@@ -451,21 +451,21 @@ unless the current buffer is a scratch buffer."
       (select-frame (window-frame bufwin1))
       (raise-frame (window-frame bufwin1))
       (select-window bufwin1))
-     ((and (eq gtk3wl-pop-up-frames 'fresh) bufwin2)
-      (gtk3wl-hide-emacs 'activate)
+     ((and (eq pgtk-pop-up-frames 'fresh) bufwin2)
+      (pgtk-hide-emacs 'activate)
       (select-frame (window-frame bufwin2))
       (raise-frame (window-frame bufwin2))
       (select-window bufwin2)
       (find-file f))
-     (gtk3wl-pop-up-frames
-      (gtk3wl-hide-emacs 'activate)
+     (pgtk-pop-up-frames
+      (pgtk-hide-emacs 'activate)
       (let ((pop-up-frames t)) (pop-to-buffer file nil)))
      (t
-      (gtk3wl-hide-emacs 'activate)
+      (pgtk-hide-emacs 'activate)
       (find-file f)))))
 
 
-(defun gtk3wl-drag-n-drop (event &optional new-frame force-text)
+(defun pgtk-drag-n-drop (event &optional new-frame force-text)
   "Edit the files listed in the drag-n-drop EVENT.
 Switch to a buffer editing the last file dropped."
   (interactive "e")
@@ -486,62 +486,62 @@ Switch to a buffer editing the last file dropped."
       (dnd-handle-one-url window 'private url-or-string))))
 
 
-(defun gtk3wl-drag-n-drop-other-frame (event)
+(defun pgtk-drag-n-drop-other-frame (event)
   "Edit the files listed in the drag-n-drop EVENT, in other frames.
 May create new frames, or reuse existing ones.  The frame editing
 the last file dropped is selected."
   (interactive "e")
-  (gtk3wl-drag-n-drop event t))
+  (pgtk-drag-n-drop event t))
 
-(defun gtk3wl-drag-n-drop-as-text (event)
+(defun pgtk-drag-n-drop-as-text (event)
   "Drop the data in EVENT as text."
   (interactive "e")
-  (gtk3wl-drag-n-drop event nil t))
+  (pgtk-drag-n-drop event nil t))
 
-(defun gtk3wl-drag-n-drop-as-text-other-frame (event)
+(defun pgtk-drag-n-drop-as-text-other-frame (event)
   "Drop the data in EVENT as text in a new frame."
   (interactive "e")
-  (gtk3wl-drag-n-drop event t t))
+  (pgtk-drag-n-drop event t t))
 
-(global-set-key [drag-n-drop] 'gtk3wl-drag-n-drop)
-(global-set-key [C-drag-n-drop] 'gtk3wl-drag-n-drop-other-frame)
-(global-set-key [M-drag-n-drop] 'gtk3wl-drag-n-drop-as-text)
-(global-set-key [C-M-drag-n-drop] 'gtk3wl-drag-n-drop-as-text-other-frame)
+(global-set-key [drag-n-drop] 'pgtk-drag-n-drop)
+(global-set-key [C-drag-n-drop] 'pgtk-drag-n-drop-other-frame)
+(global-set-key [M-drag-n-drop] 'pgtk-drag-n-drop-as-text)
+(global-set-key [C-M-drag-n-drop] 'pgtk-drag-n-drop-as-text-other-frame)
 
 ;;;; Frame-related functions.
 
-;; gtk3wlterm.c
-(defvar gtk3wl-alternate-modifier)
-(defvar gtk3wl-right-alternate-modifier)
-(defvar gtk3wl-right-command-modifier)
-(defvar gtk3wl-right-control-modifier)
+;; pgtkterm.c
+(defvar pgtk-alternate-modifier)
+(defvar pgtk-right-alternate-modifier)
+(defvar pgtk-right-command-modifier)
+(defvar pgtk-right-control-modifier)
 
 ;; You say tomAYto, I say tomAHto..
-(defvaralias 'gtk3wl-option-modifier 'gtk3wl-alternate-modifier)
-(defvaralias 'gtk3wl-right-option-modifier 'gtk3wl-right-alternate-modifier)
+(defvaralias 'pgtk-option-modifier 'pgtk-alternate-modifier)
+(defvaralias 'pgtk-right-option-modifier 'pgtk-right-alternate-modifier)
 
-(defun gtk3wl-do-hide-emacs ()
+(defun pgtk-do-hide-emacs ()
   (interactive)
-  (gtk3wl-hide-emacs t))
+  (pgtk-hide-emacs t))
 
-(declare-function gtk3wl-hide-others "gtk3wlfns.c" ())
+(declare-function pgtk-hide-others "pgtkfns.c" ())
 
-(defun gtk3wl-do-hide-others ()
+(defun pgtk-do-hide-others ()
   (interactive)
-  (gtk3wl-hide-others))
+  (pgtk-hide-others))
 
-(declare-function gtk3wl-emacs-info-panel "gtk3wlfns.c" ())
+(declare-function pgtk-emacs-info-panel "pgtkfns.c" ())
 
-(defun gtk3wl-do-emacs-info-panel ()
+(defun pgtk-do-emacs-info-panel ()
   (interactive)
-  (gtk3wl-emacs-info-panel))
+  (pgtk-emacs-info-panel))
 
-(defun gtk3wl-next-frame ()
+(defun pgtk-next-frame ()
   "Switch to next visible frame."
   (interactive)
   (other-frame 1))
 
-(defun gtk3wl-prev-frame ()
+(defun pgtk-prev-frame ()
   "Switch to previous visible frame."
   (interactive)
   (other-frame -1))
@@ -556,7 +556,7 @@ the last file dropped is selected."
 
 ;; Based on a function by David Reitter <dreitter@inf.ed.ac.uk> ;
 ;; see https://lists.gnu.org/archive/html/emacs-devel/2005-09/msg00681.html .
-(defun gtk3wl-toggle-toolbar (&optional frame)
+(defun pgtk-toggle-toolbar (&optional frame)
   "Switches the tool bar on and off in frame FRAME.
  If FRAME is nil, the change applies to the selected frame."
   (interactive)
@@ -570,7 +570,7 @@ the last file dropped is selected."
 ;;;; Dialog-related functions.
 
 ;; Ask user for confirm before printing.  Due to Kevin Rodgers.
-(defun gtk3wl-print-buffer ()
+(defun pgtk-print-buffer ()
   "Interactive front-end to `print-buffer': asks for user confirmation first."
   (interactive)
   (if (and (called-interactively-p 'interactive)
@@ -592,33 +592,33 @@ the last file dropped is selected."
 (setq scalable-fonts-allowed t)
 
 ;; Set to use font panel instead
-(declare-function gtk3wl-popup-font-panel "gtk3wlfns.c" (&optional frame))
-(defalias 'x-select-font 'gtk3wl-popup-font-panel "Pop up the font panel.
+(declare-function pgtk-popup-font-panel "pgtkfns.c" (&optional frame))
+(defalias 'x-select-font 'pgtk-popup-font-panel "Pop up the font panel.
 This function has been overloaded in Nextstep.")
-(defalias 'mouse-set-font 'gtk3wl-popup-font-panel "Pop up the font panel.
+(defalias 'mouse-set-font 'pgtk-popup-font-panel "Pop up the font panel.
 This function has been overloaded in Nextstep.")
 
-;; gtk3wlterm.c
-(defvar gtk3wl-input-font)
-(defvar gtk3wl-input-fontsize)
+;; pgtkterm.c
+(defvar pgtk-input-font)
+(defvar pgtk-input-fontsize)
 
-(defun gtk3wl-respond-to-change-font ()
-  "Respond to changeFont: event, expecting `gtk3wl-input-font' and\n\
-`gtk3wl-input-fontsize' of new font."
+(defun pgtk-respond-to-change-font ()
+  "Respond to changeFont: event, expecting `pgtk-input-font' and\n\
+`pgtk-input-fontsize' of new font."
   (interactive)
   (modify-frame-parameters (selected-frame)
-                           (list (cons 'fontsize gtk3wl-input-fontsize)))
+                           (list (cons 'fontsize pgtk-input-fontsize)))
   (modify-frame-parameters (selected-frame)
-                           (list (cons 'font gtk3wl-input-font)))
-  (set-frame-font gtk3wl-input-font))
+                           (list (cons 'font pgtk-input-font)))
+  (set-frame-font pgtk-input-font))
 
 
 ;; Default fontset for macOS.  This is mainly here to show how a fontset
 ;; can be set up manually.  Ordinarily, fontsets are auto-created whenever
 ;; a font is chosen by
-(defvar gtk3wl-standard-fontset-spec
+(defvar pgtk-standard-fontset-spec
   ;; Only some code supports this so far, so use uglier XLFD version
-  ;; "-gtk3wl-*-*-*-*-*-10-*-*-*-*-*-fontset-standard,latin:Courier,han:Kai"
+  ;; "-pgtk-*-*-*-*-*-10-*-*-*-*-*-fontset-standard,latin:Courier,han:Kai"
   (mapconcat 'identity
              '("-*-Monospace-*-*-*-*-10-*-*-*-*-*-fontset-standard"
                "latin:-*-Courier-*-*-*-*-10-*-*-*-*-*-iso10646-1"
@@ -630,12 +630,12 @@ This defines a fontset consisting of the Courier and other fonts that
 come with macOS.
 See the documentation of `create-fontset-from-fontset-spec' for the format.")
 
-(defvar gtk3wl-reg-to-script)               ; gtk3wlfont.c
+(defvar pgtk-reg-to-script)               ; pgtkfont.c
 
-;; This maps font registries (not exposed by GTK3WL APIs for font selection) to
+;; This maps font registries (not exposed by PGTK APIs for font selection) to
 ;; Unicode scripts (which can be mapped to Unicode character ranges which are).
 ;; See ../international/fontset.el
-(setq gtk3wl-reg-to-script
+(setq pgtk-reg-to-script
       '(("iso8859-1" . latin)
 	("iso8859-2" . latin)
 	("iso8859-3" . latin)
@@ -673,16 +673,16 @@ See the documentation of `create-fontset-from-fontset-spec' for the format.")
 
 ;;;; Pasteboard support.
 
-(define-obsolete-function-alias 'gtk3wl-store-cut-buffer-internal
+(define-obsolete-function-alias 'pgtk-store-cut-buffer-internal
   'gui-set-selection "24.1")
 
 
-(defun gtk3wl-copy-including-secondary ()
+(defun pgtk-copy-including-secondary ()
   (interactive)
   (call-interactively 'kill-ring-save)
   (gui-set-selection 'SECONDARY (buffer-substring (point) (mark t))))
 
-(defun gtk3wl-paste-secondary ()
+(defun pgtk-paste-secondary ()
   (interactive)
   (insert (gui-get-selection 'SECONDARY)))
 
@@ -704,8 +704,8 @@ See the documentation of `create-fontset-from-fontset-spec' for the format.")
 ;; that keeps customize happy?
 (when (featurep 'cocoa)
   (let ((appkit-version
-         (progn (string-match "^appkit-\\([^\s-]*\\)" gtk3wl-version-string)
-                (string-to-number (match-string 1 gtk3wl-version-string)))))
+         (progn (string-match "^appkit-\\([^\s-]*\\)" pgtk-version-string)
+                (string-to-number (match-string 1 pgtk-version-string)))))
     ;; Appkit 1138 ~= macOS 10.7.
     (when (>= appkit-version 1138)
       (setq mouse-wheel-scroll-amount '(1 ((shift) . 5) ((control))))
@@ -721,7 +721,7 @@ See the documentation of `create-fontset-from-fontset-spec' for the format.")
 ;;;; Color support.
 
 ;; Functions for color panel + drag
-(defun gtk3wl-face-at-pos (pos)
+(defun pgtk-face-at-pos (pos)
   (let* ((frame (car pos))
          (frame-pos (cons (cadr pos) (cddr pos)))
          (window (window-at (car frame-pos) (cdr frame-pos) frame))
@@ -755,10 +755,10 @@ See the documentation of `create-fontset-from-fontset-spec' for the format.")
      (t
       nil))))
 
-(defun gtk3wl-suspend-error ()
-  ;; Don't allow suspending if any of the frames are GTK3WL frames.
-  (if (memq 'gtk3wl (mapcar 'window-system (frame-list)))
-      (error "Cannot suspend Emacs while an GTK3WL GUI frame exists")))
+(defun pgtk-suspend-error ()
+  ;; Don't allow suspending if any of the frames are PGTK frames.
+  (if (memq 'pgtk (mapcar 'window-system (frame-list)))
+      (error "Cannot suspend Emacs while an PGTK GUI frame exists")))
 
 
 ;; Set some options to be as Nextstep-like as possible.
@@ -766,21 +766,21 @@ See the documentation of `create-fontset-from-fontset-spec' for the format.")
       icon-title-format t)
 
 
-(defvar gtk3wl-initialized nil
+(defvar pgtk-initialized nil
   "Non-nil if Nextstep windowing has been initialized.")
 
 (declare-function x-handle-args "common-win" (args))
-(declare-function gtk3wl-list-services "gtk3wlfns.c" ())
-(declare-function x-open-connection "gtk3wlfns.c"
+(declare-function pgtk-list-services "pgtkfns.c" ())
+(declare-function x-open-connection "pgtkfns.c"
                   (display &optional xrm-string must-succeed))
-(declare-function gtk3wl-set-resource "gtk3wlfns.c" (owner name value))
+(declare-function pgtk-set-resource "pgtkfns.c" (owner name value))
 
 ;; Do the actual Nextstep Windows setup here; the above code just
 ;; defines functions and variables that we use now.
-(cl-defmethod window-system-initialization (&context (window-system gtk3wl)
+(cl-defmethod window-system-initialization (&context (window-system pgtk)
                                             &optional _display)
   "Initialize Emacs for Nextstep (Cocoa / GNUstep) windowing."
-  (cl-assert (not gtk3wl-initialized))
+  (cl-assert (not pgtk-initialized))
 
   ;; PENDING: not needed?
   (setq command-line-args (x-handle-args command-line-args))
@@ -789,7 +789,7 @@ See the documentation of `create-fontset-from-fontset-spec' for the format.")
   (create-default-fontset)
   ;; Create the standard fontset.
   (condition-case err
-      (create-fontset-from-fontset-spec gtk3wl-standard-fontset-spec t)
+      (create-fontset-from-fontset-spec pgtk-standard-fontset-spec t)
     (error (display-warning
             'initialization
             (format "Creation of the standard fontset failed: %s" err)
@@ -810,21 +810,21 @@ See the documentation of `create-fontset-from-fontset-spec' for the format.")
 	  '(menu-item "Quit" save-buffers-kill-emacs
 		      :help "Save unsaved buffers, then exit"))
 	(bindings--define-key global-map [menu-bar hide-app]
-	  '(menu-item "Hide" gtk3wl-do-hide-emacs
+	  '(menu-item "Hide" pgtk-do-hide-emacs
 		      :help "Hide Emacs"))
 	(bindings--define-key global-map [menu-bar services]
 	  (cons "Services" (make-sparse-keymap "Services")))))
 
 
-  (dolist (service (gtk3wl-list-services))
+  (dolist (service (pgtk-list-services))
       (if (eq (car service) 'undefined)
-	  (gtk3wl-define-service (cdr service))
+	  (pgtk-define-service (cdr service))
 	(define-key global-map (vector (car service))
-	  (gtk3wl-define-service (cdr service)))))
+	  (pgtk-define-service (cdr service)))))
 
   (if (and (eq (get-lisp-resource nil "NXAutoLaunch") t)
 	   (eq (get-lisp-resource nil "HideOnAutoLaunch") t))
-      (add-hook 'after-init-hook 'gtk3wl-do-hide-emacs))
+      (add-hook 'after-init-hook 'pgtk-do-hide-emacs))
 
   ;; FIXME: This will surely lead to "MODIFIED OUTSIDE CUSTOM" warnings.
   (menu-bar-mode (if (get-lisp-resource nil "Menus") 1 -1))
@@ -840,47 +840,47 @@ See the documentation of `create-fontset-from-fontset-spec' for the format.")
   ;; Mac OS X Lion introduces PressAndHold, which is unsupported by this port.
   ;; See this thread for more details:
   ;; https://lists.gnu.org/archive/html/emacs-devel/2011-06/msg00505.html
-  (gtk3wl-set-resource nil "ApplePressAndHoldEnabled" "NO")
+  (pgtk-set-resource nil "ApplePressAndHoldEnabled" "NO")
 
   (x-apply-session-resources)
 
-  ;; Don't let Emacs suspend under GTK3WL.
-  (add-hook 'suspend-hook 'gtk3wl-suspend-error)
+  ;; Don't let Emacs suspend under PGTK.
+  (add-hook 'suspend-hook 'pgtk-suspend-error)
 
-  (setq gtk3wl-initialized t))
+  (setq pgtk-initialized t))
 
 ;; Any display name is OK.
-(add-to-list 'display-format-alist '(".*" . gtk3wl))
-(cl-defmethod handle-args-function (args &context (window-system gtk3wl))
+(add-to-list 'display-format-alist '(".*" . pgtk))
+(cl-defmethod handle-args-function (args &context (window-system pgtk))
   (x-handle-args args))
 
-(cl-defmethod frame-creation-function (params &context (window-system gtk3wl))
+(cl-defmethod frame-creation-function (params &context (window-system pgtk))
   (x-create-frame-with-faces params))
 
-(declare-function gtk3wl-own-selection-internal "gtk3wlselect.c" (selection value))
-(declare-function gtk3wl-disown-selection-internal "gtk3wlselect.c" (selection))
-(declare-function gtk3wl-selection-owner-p "gtk3wlselect.c" (&optional selection))
-(declare-function gtk3wl-selection-exists-p "gtk3wlselect.c" (&optional selection))
-(declare-function gtk3wl-get-selection "gtk3wlselect.c" (selection-symbol target-type))
+(declare-function pgtk-own-selection-internal "pgtkselect.c" (selection value))
+(declare-function pgtk-disown-selection-internal "pgtkselect.c" (selection))
+(declare-function pgtk-selection-owner-p "pgtkselect.c" (&optional selection))
+(declare-function pgtk-selection-exists-p "pgtkselect.c" (&optional selection))
+(declare-function pgtk-get-selection "pgtkselect.c" (selection-symbol target-type))
 
 (cl-defmethod gui-backend-set-selection (selection value
-                                         &context (window-system gtk3wl))
-  (if value (gtk3wl-own-selection-internal selection value)
-    (gtk3wl-disown-selection-internal selection)))
+                                         &context (window-system pgtk))
+  (if value (pgtk-own-selection-internal selection value)
+    (pgtk-disown-selection-internal selection)))
 
 (cl-defmethod gui-backend-selection-owner-p (selection
-                                             &context (window-system gtk3wl))
-  (gtk3wl-selection-owner-p selection))
+                                             &context (window-system pgtk))
+  (pgtk-selection-owner-p selection))
 
 (cl-defmethod gui-backend-selection-exists-p (selection
-                                              &context (window-system gtk3wl))
-  (gtk3wl-selection-exists-p selection))
+                                              &context (window-system pgtk))
+  (pgtk-selection-exists-p selection))
 
 (cl-defmethod gui-backend-get-selection (selection-symbol target-type
-                                         &context (window-system gtk3wl))
-  (gtk3wl-get-selection selection-symbol target-type))
+                                         &context (window-system pgtk))
+  (pgtk-get-selection selection-symbol target-type))
 
-(provide 'gtk3wl-win)
-(provide 'term/gtk3wl-win)
+(provide 'pgtk-win)
+(provide 'term/pgtk-win)
 
-;;; gtk3wl-win.el ends here
+;;; pgtk-win.el ends here

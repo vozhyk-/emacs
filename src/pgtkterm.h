@@ -1,4 +1,4 @@
-/* Definitions and headers for communication with Gtk+3 with wayland.
+/* Definitions and headers for communication with pure Gtk+3.
    Copyright (C) 1989, 1993, 2005, 2008-2017 Free Software Foundation,
    Inc.
 
@@ -24,18 +24,18 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include "font.h"
 #include "sysselect.h"
 
-#ifdef HAVE_GTK3WL
+#ifdef HAVE_PGTK
 
 #include <gtk/gtk.h>
 
-extern void gtk3wl_log(const char *file, int lineno, const char *fmt, ...);
-#define GTK3WL_TRACE(fmt, ...) gtk3wl_log(__FILE__, __LINE__, fmt, ## __VA_ARGS__)
-extern void gtk3wl_backtrace(const char *file, int lineno);
-#define GTK3WL_BACKTRACE() gtk3wl_backtrace(__FILE__, __LINE__)
+extern void pgtk_log(const char *file, int lineno, const char *fmt, ...);
+#define PGTK_TRACE(fmt, ...) pgtk_log(__FILE__, __LINE__, fmt, ## __VA_ARGS__)
+extern void pgtk_backtrace(const char *file, int lineno);
+#define PGTK_BACKTRACE() pgtk_backtrace(__FILE__, __LINE__)
 
 /* could use list to store these, but rest of emacs has a big infrastructure
    for managing a table of bitmap "records" */
-struct gtk3wl_bitmap_record
+struct pgtk_bitmap_record
 {
   void *img;
   char *file;
@@ -44,14 +44,14 @@ struct gtk3wl_bitmap_record
 };
 
 /* this to map between emacs color indices and NSColor objects */
-struct gtk3wl_color_table
+struct pgtk_color_table
 {
   ptrdiff_t size;
   ptrdiff_t avail;
   void **items;
   void *availIndices;
 };
-#define GTK3WL_COLOR_CAPACITY 256
+#define PGTK_COLOR_CAPACITY 256
 
 #define RGB_TO_ULONG(r, g, b) (((r) << 16) | ((g) << 8) | (b))
 #define ARGB_TO_ULONG(a, r, g, b) (((a) << 24) | ((r) << 16) | ((g) << 8) | (b))
@@ -121,11 +121,11 @@ struct scroll_bar
 };
 
 /* this extends font backend font */
-struct gtk3wlfont_info
+struct pgtkfont_info
 {
   struct font font;
 
-  char *name;  /* PostScript name, uniquely identifies on GTK3WL systems */
+  char *name;  /* PostScript name, uniquely identifies on PGTK systems */
 
   /* The following metrics are stored as float rather than int. */
 
@@ -134,7 +134,7 @@ struct gtk3wlfont_info
   float underpos;
   float underwidth;
   float size;
-  void *gtk3wlfont;
+  void *pgtkfont;
   void *cgfont;
   char bold, ital;  /* convenience flags */
   char synthItal;
@@ -146,13 +146,13 @@ struct gtk3wlfont_info
 };
 
 
-/* init'd in gtk3wl_initialize_display_info () */
-struct gtk3wl_display_info
+/* init'd in pgtk_initialize_display_info () */
+struct pgtk_display_info
 {
-  /* Chain of all gtk3wl_display_info structures.  */
-  struct gtk3wl_display_info *next;
+  /* Chain of all pgtk_display_info structures.  */
+  struct pgtk_display_info *next;
 
-  /* The generic display parameters corresponding to this GTK3WL display. */
+  /* The generic display parameters corresponding to this PGTK display. */
   struct terminal *terminal;
 
   /* This is a cons cell of the form (NAME . FONT-LIST-CACHE).  */
@@ -167,11 +167,11 @@ struct gtk3wl_display_info
   /* Minimum font height over all fonts in font_table.  */
   int smallest_font_height;
 
-  struct gtk3wl_bitmap_record *bitmaps;
+  struct pgtk_bitmap_record *bitmaps;
   ptrdiff_t bitmaps_size;
   ptrdiff_t bitmaps_last;
 
-  struct gtk3wl_color_table *color_table;
+  struct pgtk_color_table *color_table;
 
   /* DPI resolution of this screen */
   double resx, resy;
@@ -231,10 +231,10 @@ struct gtk3wl_display_info
   GdkCursor *xg_cursor;
 };
 
-/* This is a chain of structures for all the GTK3WL displays currently in use.  */
-extern struct gtk3wl_display_info *x_display_list;
+/* This is a chain of structures for all the PGTK displays currently in use.  */
+extern struct pgtk_display_info *x_display_list;
 
-struct gtk3wl_output
+struct pgtk_output
 {
   void *view;
   void *miniimage;
@@ -243,7 +243,7 @@ struct gtk3wl_output
   unsigned long background_color;
   void *toolbar;
 
-  /* GTK3WLCursors init'ed in initFrameFromEmacs */
+  /* PGTKCursors init'ed in initFrameFromEmacs */
   Cursor text_cursor;
   Cursor nontext_cursor;
   Cursor modeline_cursor;
@@ -260,7 +260,7 @@ struct gtk3wl_output
   Cursor bottom_edge_cursor;
   Cursor bottom_left_corner_cursor;
 
-  /* GTK3WL-specific */
+  /* PGTK-specific */
   Cursor current_pointer;
 
   XGCValues cursor_xgcv;
@@ -283,14 +283,14 @@ struct gtk3wl_output
      scroll bars, in pixels.  */
   int vertical_scroll_bar_extra;
 
-  /* The height of the titlebar decoration (included in GTK3WLWindow's frame). */
+  /* The height of the titlebar decoration (included in PGTKWindow's frame). */
   int titlebar_height;
 
   /* The height of the toolbar if displayed, else 0. */
   int toolbar_height;
 
-  /* This is the Emacs structure for the GTK3WL display this frame is on.  */
-  struct gtk3wl_display_info *display_info;
+  /* This is the Emacs structure for the PGTK display this frame is on.  */
+  struct pgtk_display_info *display_info;
 
   /* Non-zero if we are zooming (maximizing) the frame.  */
   int zooming;
@@ -384,14 +384,14 @@ enum
   FOCUS_EXPLICIT = 2
 };
 
-/* This gives the gtk3wl_display_info structure for the display F is on.  */
-#define FRAME_DISPLAY_INFO(f) ((f)->output_data.gtk3wl->display_info)
-#define FRAME_X_OUTPUT(f) ((f)->output_data.gtk3wl)
-#define FRAME_GTK3WL_WINDOW(f) ((f)->output_data.gtk3wl->window_desc)
-#define FRAME_X_WINDOW(f) ((f)->output_data.gtk3wl->window_desc)
+/* This gives the pgtk_display_info structure for the display F is on.  */
+#define FRAME_DISPLAY_INFO(f) ((f)->output_data.pgtk->display_info)
+#define FRAME_X_OUTPUT(f) ((f)->output_data.pgtk)
+#define FRAME_PGTK_WINDOW(f) ((f)->output_data.pgtk->window_desc)
+#define FRAME_X_WINDOW(f) ((f)->output_data.pgtk->window_desc)
 
 /* This is the `Display *' which frame F is on.  */
-#define FRAME_GTK3WL_DISPLAY(f) (0)
+#define FRAME_PGTK_DISPLAY(f) (0)
 #define FRAME_X_DISPLAY(f) (0)
 #define FRAME_X_SCREEN(f) (0)
 #define FRAME_X_VISUAL(f) FRAME_DISPLAY_INFO(f)->visual
@@ -414,47 +414,47 @@ enum
          FRAME_X_WINDOW (f))
 #define GTK_WIDGET_TO_X_WIN(w) 0
 
-#define FRAME_FOREGROUND_COLOR(f) ((f)->output_data.gtk3wl->foreground_color)
-#define FRAME_BACKGROUND_COLOR(f) ((f)->output_data.gtk3wl->background_color)
+#define FRAME_FOREGROUND_COLOR(f) ((f)->output_data.pgtk->foreground_color)
+#define FRAME_BACKGROUND_COLOR(f) ((f)->output_data.pgtk->background_color)
 
-#define GTK3WL_FACE_FOREGROUND(f) ((f)->foreground)
-#define GTK3WL_FACE_BACKGROUND(f) ((f)->background)
+#define PGTK_FACE_FOREGROUND(f) ((f)->foreground)
+#define PGTK_FACE_BACKGROUND(f) ((f)->background)
 
 #define FRAME_DEFAULT_FACE(f) FACE_FROM_ID_OR_NULL (f, DEFAULT_FACE_ID)
 
-#define FRAME_GTK3WL_VIEW(f) ((f)->output_data.gtk3wl->view)
-#define FRAME_CURSOR_COLOR(f) ((f)->output_data.gtk3wl->cursor_color)
-#define FRAME_POINTER_TYPE(f) ((f)->output_data.gtk3wl->current_pointer)
+#define FRAME_PGTK_VIEW(f) ((f)->output_data.pgtk->view)
+#define FRAME_CURSOR_COLOR(f) ((f)->output_data.pgtk->cursor_color)
+#define FRAME_POINTER_TYPE(f) ((f)->output_data.pgtk->current_pointer)
 
-#define FRAME_FONT(f) ((f)->output_data.gtk3wl->font)
+#define FRAME_FONT(f) ((f)->output_data.pgtk->font)
 
-#define XGTK3WL_SCROLL_BAR(vec) XSAVE_POINTER (vec, 0)
+#define XPGTK_SCROLL_BAR(vec) XSAVE_POINTER (vec, 0)
 
 /* Compute pixel height of the frame's titlebar. */
-#define FRAME_GTK3WL_TITLEBAR_HEIGHT(f)                                     0
+#define FRAME_PGTK_TITLEBAR_HEIGHT(f)                                     0
 #if 0
-  (GTK3WLHeight([FRAME_GTK3WL_VIEW (f) frame]) == 0 ?                           \
+  (PGTKHeight([FRAME_PGTK_VIEW (f) frame]) == 0 ?                           \
    0                                                                    \
-   : (int)(GTK3WLHeight([FRAME_GTK3WL_VIEW (f) window].frame)                   \
-           - GTK3WLHeight([GTK3WLWindow contentRectForFrameRect:                \
-                       [[FRAME_GTK3WL_VIEW (f) window] frame]               \
-                       styleMask:[[FRAME_GTK3WL_VIEW (f) window] styleMask]])))
+   : (int)(PGTKHeight([FRAME_PGTK_VIEW (f) window].frame)                   \
+           - PGTKHeight([PGTKWindow contentRectForFrameRect:                \
+                       [[FRAME_PGTK_VIEW (f) window] frame]               \
+                       styleMask:[[FRAME_PGTK_VIEW (f) window] styleMask]])))
 #endif
 
 /* Compute pixel height of the toolbar. */
 #define FRAME_TOOLBAR_HEIGHT(f)                                         0
 #if 0
-  (([[FRAME_GTK3WL_VIEW (f) window] toolbar] == nil                         \
-    || ! [[FRAME_GTK3WL_VIEW (f) window] toolbar].isVisible) ?		\
+  (([[FRAME_PGTK_VIEW (f) window] toolbar] == nil                         \
+    || ! [[FRAME_PGTK_VIEW (f) window] toolbar].isVisible) ?		\
    0                                                                    \
-   : (int)(GTK3WLHeight([GTK3WLWindow contentRectForFrameRect:                  \
-                     [[FRAME_GTK3WL_VIEW (f) window] frame]                 \
-                     styleMask:[[FRAME_GTK3WL_VIEW (f) window] styleMask]]) \
-           - GTK3WLHeight([[[FRAME_GTK3WL_VIEW (f) window] contentView] frame])))
+   : (int)(PGTKHeight([PGTKWindow contentRectForFrameRect:                  \
+                     [[FRAME_PGTK_VIEW (f) window] frame]                 \
+                     styleMask:[[FRAME_PGTK_VIEW (f) window] styleMask]]) \
+           - PGTKHeight([[[FRAME_PGTK_VIEW (f) window] contentView] frame])))
 #endif
 
 /* Compute pixel size for vertical scroll bars */
-#define GTK3WL_SCROLL_BAR_WIDTH(f)					\
+#define PGTK_SCROLL_BAR_WIDTH(f)					\
   (FRAME_HAS_VERTICAL_SCROLL_BARS (f)					\
    ? rint (FRAME_CONFIG_SCROLL_BAR_WIDTH (f) > 0			\
 	   ? FRAME_CONFIG_SCROLL_BAR_WIDTH (f)				\
@@ -462,7 +462,7 @@ enum
    : 0)
 
 /* Compute pixel size for horizontal scroll bars */
-#define GTK3WL_SCROLL_BAR_HEIGHT(f)					\
+#define PGTK_SCROLL_BAR_HEIGHT(f)					\
   (FRAME_HAS_HORIZONTAL_SCROLL_BARS (f)					\
    ? rint (FRAME_CONFIG_SCROLL_BAR_HEIGHT (f) > 0			\
 	   ? FRAME_CONFIG_SCROLL_BAR_HEIGHT (f)				\
@@ -471,33 +471,33 @@ enum
 
 /* Difference btwn char-column-calculated and actual SB widths.
    This is only a concern for rendering when SB on left. */
-#define GTK3WL_SCROLL_BAR_ADJUST(w, f)				\
+#define PGTK_SCROLL_BAR_ADJUST(w, f)				\
   (WINDOW_HAS_VERTICAL_SCROLL_BAR_ON_LEFT (w) ?			\
    (FRAME_SCROLL_BAR_COLS (f) * FRAME_COLUMN_WIDTH (f)		\
-    - GTK3WL_SCROLL_BAR_WIDTH (f)) : 0)
+    - PGTK_SCROLL_BAR_WIDTH (f)) : 0)
 
 /* Difference btwn char-line-calculated and actual SB heights.
    This is only a concern for rendering when SB on top. */
-#define GTK3WL_SCROLL_BAR_ADJUST_HORIZONTALLY(w, f)		\
+#define PGTK_SCROLL_BAR_ADJUST_HORIZONTALLY(w, f)		\
   (WINDOW_HAS_HORIZONTAL_SCROLL_BARS (w) ?		\
    (FRAME_SCROLL_BAR_LINES (f) * FRAME_LINE_HEIGHT (f)	\
-    - GTK3WL_SCROLL_BAR_HEIGHT (f)) : 0)
+    - PGTK_SCROLL_BAR_HEIGHT (f)) : 0)
 
 #define FRAME_MENUBAR_HEIGHT(f) ((f)->output_data.wx->menubar_height)
 
 /* Calculate system coordinates of the left and top of the parent
    window or, if there is no parent window, the screen. */
-#define GTK3WL_PARENT_WINDOW_LEFT_POS(f)                                    \
+#define PGTK_PARENT_WINDOW_LEFT_POS(f)                                    \
   (FRAME_PARENT_FRAME (f) != NULL                                       \
-   ? [[FRAME_GTK3WL_VIEW (f) window] parentWindow].frame.origin.x : 0)
-#define GTK3WL_PARENT_WINDOW_TOP_POS(f)                                     \
+   ? [[FRAME_PGTK_VIEW (f) window] parentWindow].frame.origin.x : 0)
+#define PGTK_PARENT_WINDOW_TOP_POS(f)                                     \
   (FRAME_PARENT_FRAME (f) != NULL                                       \
-   ? ([[FRAME_GTK3WL_VIEW (f) window] parentWindow].frame.origin.y          \
-      + [[FRAME_GTK3WL_VIEW (f) window] parentWindow].frame.size.height     \
-      - FRAME_GTK3WL_TITLEBAR_HEIGHT (FRAME_PARENT_FRAME (f)))              \
-   : [[[GTK3WLScreen screegtk3wl] objectAtIndex: 0] frame].size.height)
+   ? ([[FRAME_PGTK_VIEW (f) window] parentWindow].frame.origin.y          \
+      + [[FRAME_PGTK_VIEW (f) window] parentWindow].frame.size.height     \
+      - FRAME_PGTK_TITLEBAR_HEIGHT (FRAME_PARENT_FRAME (f)))              \
+   : [[[PGTKScreen screepgtk] objectAtIndex: 0] frame].size.height)
 
-#define FRAME_GTK3WL_FONT_TABLE(f) (FRAME_DISPLAY_INFO (f)->font_table)
+#define FRAME_PGTK_FONT_TABLE(f) (FRAME_DISPLAY_INFO (f)->font_table)
 
 #define FRAME_TOOLBAR_TOP_HEIGHT(f) ((f)->output_data.wx->toolbar_top_height)
 #define FRAME_TOOLBAR_BOTTOM_HEIGHT(f) \
@@ -507,9 +507,9 @@ enum
 #define FRAME_TOOLBAR_WIDTH(f) \
   (FRAME_TOOLBAR_LEFT_WIDTH (f) + FRAME_TOOLBAR_RIGHT_WIDTH (f))
 
-#define FRAME_FONTSET(f) ((f)->output_data.gtk3wl->fontset)
+#define FRAME_FONTSET(f) ((f)->output_data.pgtk->fontset)
 
-#define FRAME_BASELINE_OFFSET(f) ((f)->output_data.gtk3wl->baseline_offset)
+#define FRAME_BASELINE_OFFSET(f) ((f)->output_data.pgtk->baseline_offset)
 #define BLACK_PIX_DEFAULT(f) 0x000000
 #define WHITE_PIX_DEFAULT(f) 0xFFFFFF
 
@@ -519,80 +519,80 @@ enum
   (! (FRAME_HAS_VERTICAL_SCROLL_BARS_ON_LEFT (f)) ? 0	\
    : FRAME_SCROLL_BAR_COLS (f))
 
-extern struct gtk3wl_display_info *gtk3wl_term_init (Lisp_Object display_name);
-extern void gtk3wl_term_shutdown (int sig);
+extern struct pgtk_display_info *pgtk_term_init (Lisp_Object display_name);
+extern void pgtk_term_shutdown (int sig);
 
 /* constants for text rendering */
-#define GTK3WL_DUMPGLYPH_NORMAL             0
-#define GTK3WL_DUMPGLYPH_CURSOR             1
-#define GTK3WL_DUMPGLYPH_FOREGROUND         2
-#define GTK3WL_DUMPGLYPH_MOUSEFACE          3
+#define PGTK_DUMPGLYPH_NORMAL             0
+#define PGTK_DUMPGLYPH_CURSOR             1
+#define PGTK_DUMPGLYPH_FOREGROUND         2
+#define PGTK_DUMPGLYPH_MOUSEFACE          3
 
 
 
-/* In gtk3wlfont, called from fontset.c */
-extern void gtk3wlfont_make_fontset_for_font (Lisp_Object name,
+/* In pgtkfont, called from fontset.c */
+extern void pgtkfont_make_fontset_for_font (Lisp_Object name,
                                          Lisp_Object font_object);
 
-/* In gtk3wlfont, for debugging */
+/* In pgtkfont, for debugging */
 struct glyph_string;
-void gtk3wl_dump_glyphstring (struct glyph_string *s) EXTERNALLY_VISIBLE;
+void pgtk_dump_glyphstring (struct glyph_string *s) EXTERNALLY_VISIBLE;
 
-/* Implemented in gtk3wlterm, published in or needed from gtk3wlfns. */
-extern Lisp_Object gtk3wl_list_fonts (struct frame *f, Lisp_Object pattern,
+/* Implemented in pgtkterm, published in or needed from pgtkfns. */
+extern Lisp_Object pgtk_list_fonts (struct frame *f, Lisp_Object pattern,
                                   int size, int maxnames);
-extern void gtk3wl_clear_frame (struct frame *f);
+extern void pgtk_clear_frame (struct frame *f);
 
-extern char *gtk3wl_xlfd_to_fontname (const char *xlfd);
+extern char *pgtk_xlfd_to_fontname (const char *xlfd);
 
-extern Lisp_Object gtk3wl_map_event_to_object (void);
+extern Lisp_Object pgtk_map_event_to_object (void);
 #ifdef __OBJC__
-extern Lisp_Object gtk3wl_string_from_pasteboard (id pb);
-extern void gtk3wl_string_to_pasteboard (id pb, Lisp_Object str);
+extern Lisp_Object pgtk_string_from_pasteboard (id pb);
+extern void pgtk_string_to_pasteboard (id pb, Lisp_Object str);
 #endif
-extern Lisp_Object gtk3wl_get_local_selection (Lisp_Object selection_name,
+extern Lisp_Object pgtk_get_local_selection (Lisp_Object selection_name,
                                            Lisp_Object target_type);
-extern void nxatoms_of_gtk3wlselect (void);
-extern void gtk3wl_set_doc_edited (void);
+extern void nxatoms_of_pgtkselect (void);
+extern void pgtk_set_doc_edited (void);
 
 extern bool
-gtk3wl_defined_color (struct frame *f,
+pgtk_defined_color (struct frame *f,
                   const char *name,
                   XColor *color_def, bool alloc,
                   bool makeIndex);
 #if 0
 extern void
-gtk3wl_query_color (void *col, XColor *color_def, int setPixel);
+pgtk_query_color (void *col, XColor *color_def, int setPixel);
 #endif
 void
-gtk3wl_query_color (struct frame *f, XColor *color);
+pgtk_query_color (struct frame *f, XColor *color);
 void
-gtk3wl_query_colors (struct frame *f, XColor *colors, int ncolors);
+pgtk_query_colors (struct frame *f, XColor *colors, int ncolors);
 
-int gtk3wl_parse_color (const char *color_name, XColor *color);
+int pgtk_parse_color (const char *color_name, XColor *color);
 
-extern int gtk3wl_lisp_to_color (Lisp_Object color, XColor *col);
+extern int pgtk_lisp_to_color (Lisp_Object color, XColor *col);
 #ifdef __OBJC__
-extern GTK3WLColor *gtk3wl_lookup_indexed_color (unsigned long idx, struct frame *f);
-extern unsigned long gtk3wl_index_color (GTK3WLColor *color, struct frame *f);
-extern const char *gtk3wl_get_pending_menu_title (void);
-extern void gtk3wl_check_menu_open (GTK3WLMenu *menu);
-extern void gtk3wl_check_pending_open_menu (void);
+extern PGTKColor *pgtk_lookup_indexed_color (unsigned long idx, struct frame *f);
+extern unsigned long pgtk_index_color (PGTKColor *color, struct frame *f);
+extern const char *pgtk_get_pending_menu_title (void);
+extern void pgtk_check_menu_open (PGTKMenu *menu);
+extern void pgtk_check_pending_open_menu (void);
 #endif
 
-extern void gtk3wl_clear_area (struct frame *f, int x, int y, int width, int height);
-extern int gtk3wl_gtk_to_emacs_modifiers (int state);
+extern void pgtk_clear_area (struct frame *f, int x, int y, int width, int height);
+extern int pgtk_gtk_to_emacs_modifiers (int state);
 
 /* C access to ObjC functionality */
-extern void  gtk3wl_release_object (void *obj);
-extern void  gtk3wl_retain_object (void *obj);
-extern void *gtk3wl_alloc_autorelease_pool (void);
-extern void gtk3wl_release_autorelease_pool (void *);
-extern const char *gtk3wl_get_defaults_value (const char *key);
-extern void gtk3wl_init_locale (void);
+extern void  pgtk_release_object (void *obj);
+extern void  pgtk_retain_object (void *obj);
+extern void *pgtk_alloc_autorelease_pool (void);
+extern void pgtk_release_autorelease_pool (void *);
+extern const char *pgtk_get_defaults_value (const char *key);
+extern void pgtk_init_locale (void);
 
 
-/* in gtk3wlmenu */
+/* in pgtkmenu */
 #if 0
 extern void update_frame_tool_bar (struct frame *f);
 extern void free_frame_tool_bar (struct frame *f);
@@ -600,42 +600,42 @@ extern void free_frame_tool_bar (struct frame *f);
 extern Lisp_Object find_and_return_menu_selection (struct frame *f,
                                                    bool keymaps,
                                                    void *client_data);
-extern Lisp_Object gtk3wl_popup_dialog (struct frame *, Lisp_Object header,
+extern Lisp_Object pgtk_popup_dialog (struct frame *, Lisp_Object header,
                                     Lisp_Object contents);
 
-#define GTK3WLAPP_DATA2_RUNASSCRIPT 10
-extern void gtk3wl_run_ascript (void);
+#define PGTKAPP_DATA2_RUNASSCRIPT 10
+extern void pgtk_run_ascript (void);
 
-#define GTK3WLAPP_DATA2_RUNFILEDIALOG 11
-extern void gtk3wl_run_file_dialog (void);
+#define PGTKAPP_DATA2_RUNFILEDIALOG 11
+extern void pgtk_run_file_dialog (void);
 
-extern const char *gtk3wl_etc_directory (void);
-extern const char *gtk3wl_exec_path (void);
-extern const char *gtk3wl_load_path (void);
-extern void syms_of_gtk3wlterm (void);
-extern void syms_of_gtk3wlfns (void);
-extern void syms_of_gtk3wlmenu (void);
-extern void syms_of_gtk3wlselect (void);
+extern const char *pgtk_etc_directory (void);
+extern const char *pgtk_exec_path (void);
+extern const char *pgtk_load_path (void);
+extern void syms_of_pgtkterm (void);
+extern void syms_of_pgtkfns (void);
+extern void syms_of_pgtkmenu (void);
+extern void syms_of_pgtkselect (void);
 
-/* From gtk3wlimage.m, needed in image.c */
+/* From pgtkimage.m, needed in image.c */
 struct image;
-extern void *gtk3wl_image_from_XBM (char *bits, int width, int height,
+extern void *pgtk_image_from_XBM (char *bits, int width, int height,
                                 unsigned long fg, unsigned long bg);
-extern void *gtk3wl_image_for_XPM (int width, int height, int depth);
-extern void *gtk3wl_image_from_file (Lisp_Object file);
-extern bool gtk3wl_load_image (struct frame *f, struct image *img,
+extern void *pgtk_image_for_XPM (int width, int height, int depth);
+extern void *pgtk_image_from_file (Lisp_Object file);
+extern bool pgtk_load_image (struct frame *f, struct image *img,
 			   Lisp_Object spec_file, Lisp_Object spec_data);
-extern int gtk3wl_image_width (void *img);
-extern int gtk3wl_image_height (void *img);
-extern unsigned long gtk3wl_get_pixel (void *img, int x, int y);
-extern void gtk3wl_put_pixel (void *img, int x, int y, unsigned long argb);
-extern void gtk3wl_set_alpha (void *img, int x, int y, unsigned char a);
+extern int pgtk_image_width (void *img);
+extern int pgtk_image_height (void *img);
+extern unsigned long pgtk_get_pixel (void *img, int x, int y);
+extern void pgtk_put_pixel (void *img, int x, int y, unsigned long argb);
+extern void pgtk_set_alpha (void *img, int x, int y, unsigned char a);
 
-extern int x_display_pixel_height (struct gtk3wl_display_info *);
-extern int x_display_pixel_width (struct gtk3wl_display_info *);
+extern int x_display_pixel_height (struct pgtk_display_info *);
+extern int x_display_pixel_width (struct pgtk_display_info *);
 
-/* This in gtk3wlterm.c */
-extern float gtk3wl_antialias_threshold;
+/* This in pgtkterm.c */
+extern float pgtk_antialias_threshold;
 extern void x_destroy_window (struct frame *f);
 extern void x_set_undecorated (struct frame *f, Lisp_Object new_value,
                                Lisp_Object old_value);
@@ -647,40 +647,40 @@ extern void x_set_no_accept_focus (struct frame *f, Lisp_Object new_value,
                                    Lisp_Object old_value);
 extern void x_set_z_group (struct frame *f, Lisp_Object new_value,
                            Lisp_Object old_value);
-#ifdef GTK3WL_IMPL_COCOA
-extern void gtk3wl_set_appearance (struct frame *f, Lisp_Object new_value,
+#ifdef PGTK_IMPL_COCOA
+extern void pgtk_set_appearance (struct frame *f, Lisp_Object new_value,
                                Lisp_Object old_value);
-extern void gtk3wl_set_tragtk3wlparent_titlebar (struct frame *f,
+extern void pgtk_set_trapgtkparent_titlebar (struct frame *f,
                                          Lisp_Object new_value,
                                          Lisp_Object old_value);
 #endif
-extern int gtk3wl_select (int nfds, fd_set *readfds, fd_set *writefds,
+extern int pgtk_select (int nfds, fd_set *readfds, fd_set *writefds,
 		      fd_set *exceptfds, struct timespec *timeout,
 		      sigset_t *sigmask);
 #ifdef HAVE_PTHREAD
-extern void gtk3wl_run_loop_break (void);
+extern void pgtk_run_loop_break (void);
 #endif
-extern unsigned long gtk3wl_get_rgb_color (struct frame *f,
+extern unsigned long pgtk_get_rgb_color (struct frame *f,
                                        float r, float g, float b, float a);
 
 struct input_event;
-extern void gtk3wl_init_events (struct input_event *);
-extern void gtk3wl_finish_events (void);
+extern void pgtk_init_events (struct input_event *);
+extern void pgtk_finish_events (void);
 
-extern cairo_t *gtk3wl_begin_cr_clip (struct frame *f, XGCValues *gc);
-extern void gtk3wl_end_cr_clip (struct frame *f);
-extern void gtk3wl_set_cr_source_with_gc_foreground (struct frame *f, XGCValues *gc);
-extern void gtk3wl_set_cr_source_with_gc_background (struct frame *f, XGCValues *gc);
-extern void gtk3wl_set_cr_source_with_color (struct frame *f, unsigned long color);
+extern cairo_t *pgtk_begin_cr_clip (struct frame *f, XGCValues *gc);
+extern void pgtk_end_cr_clip (struct frame *f);
+extern void pgtk_set_cr_source_with_gc_foreground (struct frame *f, XGCValues *gc);
+extern void pgtk_set_cr_source_with_gc_background (struct frame *f, XGCValues *gc);
+extern void pgtk_set_cr_source_with_color (struct frame *f, unsigned long color);
 
 #ifdef __OBJC__
-/* Needed in gtk3wlfgtk3wl.m.  */
+/* Needed in pgtkfpgtk.m.  */
 extern void
-gtk3wl_set_represented_filename (GTK3WLString *fstr, struct frame *f);
+pgtk_set_represented_filename (PGTKString *fstr, struct frame *f);
 
 #endif
 
-#ifdef GTK3WL_IMPL_GNUSTEP
+#ifdef PGTK_IMPL_GNUSTEP
 extern char gnustep_base_version[];  /* version tracking */
 #endif
 
@@ -691,11 +691,11 @@ extern char gnustep_base_version[];  /* version tracking */
  Using larger coordinates causes movewindow/placewindow to abort */
 #define SCREENMAX 16000
 
-#define GTK3WL_SCROLL_BAR_WIDTH_DEFAULT     [EmacsScroller scrollerWidth]
-#define GTK3WL_SCROLL_BAR_HEIGHT_DEFAULT    [EmacsScroller scrollerHeight]
+#define PGTK_SCROLL_BAR_WIDTH_DEFAULT     [EmacsScroller scrollerWidth]
+#define PGTK_SCROLL_BAR_HEIGHT_DEFAULT    [EmacsScroller scrollerHeight]
 /* This is to match emacs on other platforms, ugly though it is. */
-#define GTK3WL_SELECTION_BG_COLOR_DEFAULT	@"LightGoldenrod2";
-#define GTK3WL_SELECTION_FG_COLOR_DEFAULT	@"Black";
+#define PGTK_SELECTION_BG_COLOR_DEFAULT	@"LightGoldenrod2";
+#define PGTK_SELECTION_FG_COLOR_DEFAULT	@"Black";
 #define RESIZE_HANDLE_SIZE 12
 
 /* Little utility macros */
@@ -704,6 +704,6 @@ extern char gnustep_base_version[];  /* version tracking */
 #define SCREENMAXBOUND(x) (IN_BOUND (-SCREENMAX, x, SCREENMAX))
 
 extern void
-gtk3wl_clear_under_internal_border (struct frame *f);
+pgtk_clear_under_internal_border (struct frame *f);
 
-#endif	/* HAVE_GTK3WL */
+#endif	/* HAVE_PGTK */

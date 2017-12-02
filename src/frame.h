@@ -509,7 +509,7 @@ struct frame
     struct x_output *x;         /* From xterm.h.  */
     struct w32_output *w32;     /* From w32term.h.  */
     struct ns_output *ns;       /* From nsterm.h.  */
-    struct gtk3wl_output *gtk3wl; /* From gtk3wlterm.h. */
+    struct pgtk_output *pgtk; /* From pgtkterm.h. */
     intptr_t nothing;
   }
   output_data;
@@ -751,10 +751,10 @@ default_pixels_per_inch_y (void)
 #else
 #define FRAME_NS_P(f) ((f)->output_method == output_ns)
 #endif
-#ifndef HAVE_GTK3WL
-#define FRAME_GTK3WL_P(f) false
+#ifndef HAVE_PGTK
+#define FRAME_PGTK_P(f) false
 #else
-#define FRAME_GTK3WL_P(f) ((f)->output_method == output_gtk3wl)
+#define FRAME_PGTK_P(f) ((f)->output_method == output_pgtk)
 #endif
 
 /* FRAME_WINDOW_P tests whether the frame is a window, and is
@@ -769,8 +769,8 @@ default_pixels_per_inch_y (void)
 #ifdef HAVE_NS
 #define FRAME_WINDOW_P(f) FRAME_NS_P(f)
 #endif
-#ifdef HAVE_GTK3WL
-#define FRAME_WINDOW_P(f) FRAME_GTK3WL_P(f)
+#ifdef HAVE_PGTK
+#define FRAME_WINDOW_P(f) FRAME_PGTK_P(f)
 #endif
 #ifndef FRAME_WINDOW_P
 #define FRAME_WINDOW_P(f) ((void) (f), false)
@@ -1583,7 +1583,7 @@ extern void x_sync (struct frame *);
 extern void x_query_colors (struct frame *f, XColor *, int);
 extern void x_focus_frame (struct frame *, bool);
 
-#if !defined(HAVE_NS) && !defined(HAVE_GTK3WL)
+#if !defined(HAVE_NS) && !defined(HAVE_PGTK)
 
 extern bool x_bitmap_icon (struct frame *, Lisp_Object);
 

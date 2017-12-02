@@ -25,10 +25,10 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 
 #include <gtk/gtk.h>
 #include "../lwlib/lwlib-widget.h"
-#ifdef HAVE_GTK3WL
-#include "gtk3wlterm.h"
+#ifdef HAVE_PGTK
+#include "pgtkterm.h"
 #define EVENT GdkEvent
-#define wx gtk3wl
+#define wx pgtk
 #else
 #include "xterm.h"
 #define EVENT XEvent

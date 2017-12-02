@@ -1,4 +1,4 @@
-/* Functions for the Gtk+-3 with wayland.
+/* Functions for the pure Gtk+-3.
 
 Copyright (C) 1989, 1992-1994, 2005-2006, 2008-2017 Free Software
 Foundation, Inc.
@@ -37,11 +37,11 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include "font.h"
 
 
-#ifdef HAVE_GTK3WL
+#ifdef HAVE_PGTK
 
-#define wx gtk3wl
+#define wx pgtk
 
-//static EmacsTooltip *gtk3wl_tooltip = nil;
+//static EmacsTooltip *pgtk_tooltip = nil;
 
 /* Static variables to handle applescript execution.  */
 static Lisp_Object as_script, *as_result;
@@ -49,10 +49,10 @@ static int as_status;
 
 static ptrdiff_t image_cache_refcount;
 
-static struct gtk3wl_display_info *gtk3wl_display_info_for_name (Lisp_Object);
-static void gtk3wl_set_name_as_filename (struct frame *);
+static struct pgtk_display_info *pgtk_display_info_for_name (Lisp_Object);
+static void pgtk_set_name_as_filename (struct frame *);
 
-static const char *gtk3wl_app_name = "gtk3wl_app_name:Emacs";
+static const char *pgtk_app_name = "pgtk_app_name:Emacs";
 
 /* ==========================================================================
 
@@ -66,16 +66,16 @@ static const char *gtk3wl_app_name = "gtk3wl_app_name:Emacs";
    nil stands for the selected frame--or, if that is not a Nextstep frame,
    the first Nextstep display on the list.  */
 
-static struct gtk3wl_display_info *
-check_gtk3wl_display_info (Lisp_Object object)
+static struct pgtk_display_info *
+check_pgtk_display_info (Lisp_Object object)
 {
-  struct gtk3wl_display_info *dpyinfo = NULL;
+  struct pgtk_display_info *dpyinfo = NULL;
 
   if (NILP (object))
     {
       struct frame *sf = XFRAME (selected_frame);
 
-      if (FRAME_GTK3WL_P (sf) && FRAME_LIVE_P (sf))
+      if (FRAME_PGTK_P (sf) && FRAME_LIVE_P (sf))
 	dpyinfo = FRAME_DISPLAY_INFO (sf);
       else if (x_display_list != 0)
 	dpyinfo = x_display_list;
@@ -89,10 +89,10 @@ check_gtk3wl_display_info (Lisp_Object object)
       if (t->type != output_ns)
         error ("Terminal %d is not a Nextstep display", t->id);
 
-      dpyinfo = t->display_info.gtk3wl;
+      dpyinfo = t->display_info.pgtk;
     }
   else if (STRINGP (object))
-    dpyinfo = gtk3wl_display_info_for_name (object);
+    dpyinfo = pgtk_display_info_for_name (object);
   else
     {
       struct frame *f = decode_window_system_frame (object);
@@ -105,15 +105,15 @@ check_gtk3wl_display_info (Lisp_Object object)
 #if 0
 
 static id
-gtk3wl_get_window (Lisp_Object maybeFrame)
+pgtk_get_window (Lisp_Object maybeFrame)
 {
   id view =nil, window =nil;
 
-  if (!FRAMEP (maybeFrame) || !FRAME_GTK3WL_P (XFRAME (maybeFrame)))
+  if (!FRAMEP (maybeFrame) || !FRAME_PGTK_P (XFRAME (maybeFrame)))
     maybeFrame = selected_frame;/*wrong_type_argument (Qframep, maybeFrame); */
 
   if (!NILP (maybeFrame))
-    view = FRAME_GTK3WL_VIEW (XFRAME (maybeFrame));
+    view = FRAME_PGTK_VIEW (XFRAME (maybeFrame));
   if (view) window =[view window];
 
   return window;
@@ -123,10 +123,10 @@ gtk3wl_get_window (Lisp_Object maybeFrame)
 
 /* Return the X display structure for the display named NAME.
    Open a new connection if necessary.  */
-static struct gtk3wl_display_info *
-gtk3wl_display_info_for_name (Lisp_Object name)
+static struct pgtk_display_info *
+pgtk_display_info_for_name (Lisp_Object name)
 {
-  struct gtk3wl_display_info *dpyinfo;
+  struct pgtk_display_info *dpyinfo;
 
   CHECK_STRING (name);
 
@@ -148,9 +148,9 @@ gtk3wl_display_info_for_name (Lisp_Object name)
 #if 0
 
 static NSString *
-gtk3wl_filename_from_panel (NSSavePanel *panel)
+pgtk_filename_from_panel (NSSavePanel *panel)
 {
-#ifdef GTK3WL_IMPL_COCOA
+#ifdef PGTK_IMPL_COCOA
   NSURL *url = [panel URL];
   NSString *str = [url path];
   return str;
@@ -160,9 +160,9 @@ gtk3wl_filename_from_panel (NSSavePanel *panel)
 }
 
 static NSString *
-gtk3wl_directory_from_panel (NSSavePanel *panel)
+pgtk_directory_from_panel (NSSavePanel *panel)
 {
-#ifdef GTK3WL_IMPL_COCOA
+#ifdef PGTK_IMPL_COCOA
   NSURL *url = [panel directoryURL];
   NSString *str = [url path];
   return str;
@@ -171,7 +171,7 @@ gtk3wl_directory_from_panel (NSSavePanel *panel)
 #endif
 }
 
-#ifndef GTK3WL_IMPL_COCOA
+#ifndef PGTK_IMPL_COCOA
 static Lisp_Object
 interpret_services_menu (NSMenu *menu, Lisp_Object prefix, Lisp_Object old)
 /* --------------------------------------------------------------------------
@@ -236,18 +236,18 @@ x_set_foreground_color (struct frame *f, Lisp_Object arg, Lisp_Object oldval)
 {
   XColor col;
 
-  /* Must block_input, because gtk3wl_lisp_to_color does block/unblock_input
+  /* Must block_input, because pgtk_lisp_to_color does block/unblock_input
      which means that col may be deallocated in its unblock_input if there
      is user input, unless we also block_input.  */
   block_input ();
-  if (gtk3wl_lisp_to_color (arg, &col))
+  if (pgtk_lisp_to_color (arg, &col))
     {
       store_frame_param (f, Qforeground_color, oldval);
       unblock_input ();
       error ("Unknown color");
     }
 
-  f->output_data.gtk3wl->foreground_color = col.pixel;
+  f->output_data.pgtk->foreground_color = col.pixel;
 
   FRAME_FOREGROUND_PIXEL (f) = col.pixel;
 
@@ -269,7 +269,7 @@ x_set_background_color (struct frame *f, Lisp_Object arg, Lisp_Object oldval)
   struct face *face;
 
   block_input ();
-  if (gtk3wl_lisp_to_color (arg, &col))
+  if (pgtk_lisp_to_color (arg, &col))
     {
       store_frame_param (f, Qbackground_color, oldval);
       unblock_input ();
@@ -279,15 +279,15 @@ x_set_background_color (struct frame *f, Lisp_Object arg, Lisp_Object oldval)
   /* clear the frame; in some instances the NS-internal GC appears not to
      update, or it does update and cannot clear old text properly */
   if (FRAME_VISIBLE_P (f))
-    gtk3wl_clear_frame (f);
+    pgtk_clear_frame (f);
 
-  GTK3WL_TRACE("x_set_background_color: col.pixel=%08lx.", col.pixel);
-  f->output_data.gtk3wl->background_color = col.pixel;
+  PGTK_TRACE("x_set_background_color: col.pixel=%08lx.", col.pixel);
+  f->output_data.pgtk->background_color = col.pixel;
 
   xg_set_background_color(f, col.pixel);
   update_face_from_frame_parameter (f, Qbackground_color, arg);
 
-  GTK3WL_TRACE("visible_p=%d.", FRAME_VISIBLE_P(f));
+  PGTK_TRACE("visible_p=%d.", FRAME_VISIBLE_P(f));
   if (FRAME_VISIBLE_P (f))
     SET_FRAME_GARBAGED (f);
 
@@ -301,7 +301,7 @@ x_set_cursor_color (struct frame *f, Lisp_Object arg, Lisp_Object oldval)
   XColor col;
 
   block_input ();
-  if (gtk3wl_lisp_to_color (arg, &col))
+  if (pgtk_lisp_to_color (arg, &col))
     {
       store_frame_param (f, Qcursor_color, oldval);
       unblock_input ();
@@ -324,7 +324,7 @@ static void
 x_set_icon_name (struct frame *f, Lisp_Object arg, Lisp_Object oldval)
 {
 #if 0
-  NSView *view = FRAME_GTK3WL_VIEW (f);
+  NSView *view = FRAME_PGTK_VIEW (f);
   NSTRACE ("x_set_icon_name");
 
   /* see if it's changed */
@@ -368,12 +368,12 @@ x_set_icon_name (struct frame *f, Lisp_Object arg, Lisp_Object oldval)
 }
 
 static void
-gtk3wl_set_name_internal (struct frame *f, Lisp_Object name)
+pgtk_set_name_internal (struct frame *f, Lisp_Object name)
 {
 #if 0
   Lisp_Object encoded_name, encoded_icon_name;
   NSString *str;
-  NSView *view = FRAME_GTK3WL_VIEW (f);
+  NSView *view = FRAME_PGTK_VIEW (f);
 
 
   encoded_name = ENCODE_UTF_8 (name);
@@ -400,10 +400,10 @@ gtk3wl_set_name_internal (struct frame *f, Lisp_Object name)
 }
 
 static void
-gtk3wl_set_name (struct frame *f, Lisp_Object name, int explicit)
+pgtk_set_name (struct frame *f, Lisp_Object name, int explicit)
 {
 #if 0
-  NSTRACE ("gtk3wl_set_name");
+  NSTRACE ("pgtk_set_name");
 
   /* Make sure that requests from lisp code override requests from
      Emacs redisplay code.  */
@@ -420,7 +420,7 @@ gtk3wl_set_name (struct frame *f, Lisp_Object name, int explicit)
     return;
 
   if (NILP (name))
-    name = build_string (gtk3wl_app_name);
+    name = build_string (pgtk_app_name);
   else
     CHECK_STRING (name);
 
@@ -434,7 +434,7 @@ gtk3wl_set_name (struct frame *f, Lisp_Object name, int explicit)
   if (! NILP (f->title))
     name = f->title;
 
-  gtk3wl_set_name_internal (f, name);
+  pgtk_set_name_internal (f, name);
 #endif
 }
 
@@ -447,7 +447,7 @@ x_explicitly_set_name (struct frame *f, Lisp_Object arg, Lisp_Object oldval)
 {
 #if 0
   NSTRACE ("x_explicitly_set_name");
-  gtk3wl_set_name (f, arg, 1);
+  pgtk_set_name (f, arg, 1);
 #endif
 }
 
@@ -467,11 +467,11 @@ x_implicitly_set_name (struct frame *f, Lisp_Object arg, Lisp_Object oldval)
     (Qicon_title_format, XWINDOW (f->selected_window)->contents);
 
   /* Deal with NS specific format t.  */
-  if (FRAME_GTK3WL_P (f) && ((FRAME_ICONIFIED_P (f) && EQ (icon_title, Qt))
+  if (FRAME_PGTK_P (f) && ((FRAME_ICONIFIED_P (f) && EQ (icon_title, Qt))
                          || EQ (frame_title, Qt)))
-    gtk3wl_set_name_as_filename (f);
+    pgtk_set_name_as_filename (f);
   else
-    gtk3wl_set_name (f, arg, 0);
+    pgtk_set_name (f, arg, 0);
 #endif
 }
 
@@ -497,13 +497,13 @@ x_set_title (struct frame *f, Lisp_Object name, Lisp_Object old_name)
   else
     CHECK_STRING (name);
 
-  gtk3wl_set_name_internal (f, name);
+  pgtk_set_name_internal (f, name);
 #endif
 }
 
 
 static void
-gtk3wl_set_name_as_filename (struct frame *f)
+pgtk_set_name_as_filename (struct frame *f)
 {
 #if 0
   NSView *view;
@@ -513,7 +513,7 @@ gtk3wl_set_name_as_filename (struct frame *f)
   NSAutoreleasePool *pool;
   Lisp_Object encoded_name, encoded_filename;
   NSString *str;
-  NSTRACE ("gtk3wl_set_name_as_filename");
+  NSTRACE ("pgtk_set_name_as_filename");
 
   if (f->explicit_name || ! NILP (f->title))
     return;
@@ -528,12 +528,12 @@ gtk3wl_set_name_as_filename (struct frame *f)
       if (! NILP (filename))
         name = Ffile_name_nondirectory (filename);
       else
-        name = build_string (gtk3wl_app_name);
+        name = build_string (pgtk_app_name);
     }
 
   encoded_name = ENCODE_UTF_8 (name);
 
-  view = FRAME_GTK3WL_VIEW (f);
+  view = FRAME_PGTK_VIEW (f);
 
   title = FRAME_ICONIFIED_P (f) ? [[[view window] miniwindowTitle] UTF8String]
                                 : [[[view window] title] UTF8String];
@@ -564,7 +564,7 @@ gtk3wl_set_name_as_filename (struct frame *f)
       else
         fstr = @"";
 
-      gtk3wl_set_represented_filename (fstr, f);
+      pgtk_set_represented_filename (fstr, f);
       [[view window] setTitle: str];
       fset_name (f, name);
     }
@@ -576,7 +576,7 @@ gtk3wl_set_name_as_filename (struct frame *f)
 
 
 void
-gtk3wl_set_doc_edited (void)
+pgtk_set_doc_edited (void)
 {
 #if 0
   NSAutoreleasePool *pool;
@@ -590,9 +590,9 @@ gtk3wl_set_doc_edited (void)
       struct window *w;
       NSView *view;
 
-      if (! FRAME_GTK3WL_P (f)) continue;
+      if (! FRAME_PGTK_P (f)) continue;
       w = XWINDOW (FRAME_SELECTED_WINDOW (f));
-      view = FRAME_GTK3WL_VIEW (f);
+      view = FRAME_PGTK_VIEW (f);
       if (!MINI_WINDOW_P (w))
         edited = ! NILP (Fbuffer_modified_p (w->contents)) &&
           ! NILP (Fbuffer_file_name (w->contents));
@@ -671,7 +671,7 @@ x_set_tool_bar_lines (struct frame *f, Lisp_Object value, Lisp_Object oldval)
           FRAME_EXTERNAL_TOOL_BAR (f) = 0;
 
           {
-            EmacsView *view = FRAME_GTK3WL_VIEW (f);
+            EmacsView *view = FRAME_PGTK_VIEW (f);
             int fs_state = [view fullscreenState];
 
             if (fs_state == FULLSCREEN_MAXIMIZED)
@@ -730,23 +730,23 @@ x_set_internal_border_width (struct frame *f, Lisp_Object arg, Lisp_Object oldva
 
 
 static void
-gtk3wl_implicitly_set_icon_type (struct frame *f)
+pgtk_implicitly_set_icon_type (struct frame *f)
 {
 #if 0
   Lisp_Object tem;
-  EmacsView *view = FRAME_GTK3WL_VIEW (f);
+  EmacsView *view = FRAME_PGTK_VIEW (f);
   id image = nil;
   Lisp_Object chain, elt;
   NSAutoreleasePool *pool;
   BOOL setMini = YES;
 
-  NSTRACE ("gtk3wl_implicitly_set_icon_type");
+  NSTRACE ("pgtk_implicitly_set_icon_type");
 
   block_input ();
   pool = [[NSAutoreleasePool alloc] init];
-  if (f->output_data.gtk3wl->miniimage
+  if (f->output_data.pgtk->miniimage
       && [[NSString stringWithUTF8String: SSDATA (f->name)]
-               isEqualToString: [(NSImage *)f->output_data.gtk3wl->miniimage name]])
+               isEqualToString: [(NSImage *)f->output_data.pgtk->miniimage name]])
     {
       [pool release];
       unblock_input ();
@@ -761,7 +761,7 @@ gtk3wl_implicitly_set_icon_type (struct frame *f)
       return;
     }
 
-  for (chain = Vgtk3wl_icon_type_alist;
+  for (chain = Vpgtk_icon_type_alist;
        image == nil && CONSP (chain);
        chain = XCDR (chain))
     {
@@ -793,8 +793,8 @@ gtk3wl_implicitly_set_icon_type (struct frame *f)
       setMini = NO;
     }
 
-  [f->output_data.gtk3wl->miniimage release];
-  f->output_data.gtk3wl->miniimage = image;
+  [f->output_data.pgtk->miniimage release];
+  f->output_data.pgtk->miniimage = image;
   [view setMiniwindowImage: setMini];
   [pool release];
   unblock_input ();
@@ -806,7 +806,7 @@ static void
 x_set_icon_type (struct frame *f, Lisp_Object arg, Lisp_Object oldval)
 {
 #if 0
-  EmacsView *view = FRAME_GTK3WL_VIEW (f);
+  EmacsView *view = FRAME_PGTK_VIEW (f);
   id image = nil;
   BOOL setMini = YES;
 
@@ -821,7 +821,7 @@ x_set_icon_type (struct frame *f, Lisp_Object arg, Lisp_Object oldval)
   /* do it the implicit way */
   if (NILP (arg))
     {
-      gtk3wl_implicitly_set_icon_type (f);
+      pgtk_implicitly_set_icon_type (f);
       return;
     }
 
@@ -838,7 +838,7 @@ x_set_icon_type (struct frame *f, Lisp_Object arg, Lisp_Object oldval)
       setMini = NO;
     }
 
-  f->output_data.gtk3wl->miniimage = image;
+  f->output_data.pgtk->miniimage = image;
   [view setMiniwindowImage: setMini];
 #endif
 }
@@ -865,14 +865,14 @@ x_set_mouse_color (struct frame *f, Lisp_Object arg, Lisp_Object oldval)
 #define Xstr(x) Str(x)
 
 static Lisp_Object
-gtk3wl_appkit_version_str (void)
+pgtk_appkit_version_str (void)
 {
 #if 0
   char tmp[256];
 
-#ifdef GTK3WL_IMPL_GNUSTEP
+#ifdef PGTK_IMPL_GNUSTEP
   sprintf(tmp, "gnustep-gui-%s", Xstr(GNUSTEP_GUI_VERSION));
-#elif defined (GTK3WL_IMPL_COCOA)
+#elif defined (PGTK_IMPL_COCOA)
   NSString *osversion
     = [[NSProcessInfo processInfo] operatingSystemVersionString];
   sprintf(tmp, "appkit-%.2f %s",
@@ -890,14 +890,14 @@ gtk3wl_appkit_version_str (void)
 
 /* This is for use by x-server-version and collapses all version info we
    have into a single int.  For a better picture of the implementation
-   running, use gtk3wl_appkit_version_str.*/
+   running, use pgtk_appkit_version_str.*/
 static int
-gtk3wl_appkit_version_int (void)
+pgtk_appkit_version_int (void)
 {
 #if 0
-#ifdef GTK3WL_IMPL_GNUSTEP
+#ifdef PGTK_IMPL_GNUSTEP
   return GNUSTEP_GUI_MAJOR_VERSION * 100 + GNUSTEP_GUI_MINOR_VERSION;
-#elif defined (GTK3WL_IMPL_COCOA)
+#elif defined (PGTK_IMPL_COCOA)
   return (int)NSAppKitVersionNumber;
 #endif
 #endif
@@ -916,10 +916,10 @@ x_icon (struct frame *f, Lisp_Object parms)
 {
 #if 0
   Lisp_Object icon_x, icon_y;
-  struct gtk3wl_display_info *dpyinfo = check_gtk3wl_display_info (Qnil);
+  struct pgtk_display_info *dpyinfo = check_pgtk_display_info (Qnil);
 
-  f->output_data.gtk3wl->icon_top = -1;
-  f->output_data.gtk3wl->icon_left = -1;
+  f->output_data.pgtk->icon_top = -1;
+  f->output_data.pgtk->icon_left = -1;
 
   /* Set the position of the icon.  */
   icon_x = x_get_arg (dpyinfo, parms, Qicon_left, 0, 0, RES_TYPE_NUMBER);
@@ -928,8 +928,8 @@ x_icon (struct frame *f, Lisp_Object parms)
     {
       CHECK_NUMBER (icon_x);
       CHECK_NUMBER (icon_y);
-      f->output_data.gtk3wl->icon_top = XINT (icon_y);
-      f->output_data.gtk3wl->icon_left = XINT (icon_x);
+      f->output_data.pgtk->icon_top = XINT (icon_y);
+      f->output_data.pgtk->icon_left = XINT (icon_x);
     }
   else if (!EQ (icon_x, Qunbound) || !EQ (icon_y, Qunbound))
     error ("Both left and top icon corners of icon must be specified");
@@ -938,7 +938,7 @@ x_icon (struct frame *f, Lisp_Object parms)
 
 
 /* Note: see frame.c for template, also where generic functions are impl */
-frame_parm_handler gtk3wl_frame_parm_handlers[] =
+frame_parm_handler pgtk_frame_parm_handlers[] =
 {
   x_set_autoraise, /* generic OK */
   x_set_autolower, /* generic OK */
@@ -978,7 +978,7 @@ frame_parm_handler gtk3wl_frame_parm_handlers[] =
   0, /* x_set_sticky */
   0, /* x_set_tool_bar_position */
   0, /* x_set_inhibit_double_buffering */
-#ifdef GTK3WL_IMPL_COCOA
+#ifdef PGTK_IMPL_COCOA
   x_set_undecorated,
 #else
   0, /*x_set_undecorated */
@@ -990,9 +990,9 @@ frame_parm_handler gtk3wl_frame_parm_handlers[] =
   x_set_z_group, /* x_set_z_group */
   0, /* x_set_override_redirect */
   x_set_no_special_glyphs,
-#ifdef GTK3WL_IMPL_COCOA
-  gtk3wl_set_appearance,
-  gtk3wl_set_transparent_titlebar,
+#ifdef PGTK_IMPL_COCOA
+  pgtk_set_appearance,
+  pgtk_set_transparent_titlebar,
 #endif
 };
 
@@ -1016,7 +1016,7 @@ unwind_create_frame (Lisp_Object frame)
   if (NILP (Fmemq (frame, Vframe_list)))
     {
 #if defined GLYPH_DEBUG && defined ENABLE_CHECKING
-      struct gtk3wl_display_info *dpyinfo = FRAME_DISPLAY_INFO (f);
+      struct pgtk_display_info *dpyinfo = FRAME_DISPLAY_INFO (f);
 #endif
 
       /* If the frame's image cache refcount is still the same as our
@@ -1047,7 +1047,7 @@ unwind_create_frame (Lisp_Object frame)
  */
 
 static Lisp_Object
-get_geometry_from_preferences (struct gtk3wl_display_info *dpyinfo,
+get_geometry_from_preferences (struct pgtk_display_info *dpyinfo,
                                Lisp_Object parms)
 {
 #if 0
@@ -1107,7 +1107,7 @@ This function is an internal primitive--use `make-frame' instead.  */)
   long window_prompting = 0;
   ptrdiff_t count = specpdl_ptr - specpdl;
   Lisp_Object display;
-  struct gtk3wl_display_info *dpyinfo = NULL;
+  struct pgtk_display_info *dpyinfo = NULL;
   Lisp_Object parent, parent_frame;
   struct kboard *kb;
   static int desc_ctr = 1;
@@ -1123,7 +1123,7 @@ This function is an internal primitive--use `make-frame' instead.  */)
   display = x_get_arg (dpyinfo, parms, Qterminal, 0, 0, RES_TYPE_STRING);
   if (EQ (display, Qunbound))
     display = Qnil;
-  dpyinfo = check_gtk3wl_display_info (display);
+  dpyinfo = check_pgtk_display_info (display);
   kb = dpyinfo->terminal->kboard;
 
   if (!dpyinfo->terminal->name)
@@ -1166,8 +1166,8 @@ This function is an internal primitive--use `make-frame' instead.  */)
 
   f->terminal = dpyinfo->terminal;
 
-  f->output_method = output_gtk3wl;
-  f->output_data.gtk3wl = xzalloc (sizeof *f->output_data.gtk3wl);
+  f->output_method = output_pgtk;
+  f->output_data.pgtk = xzalloc (sizeof *f->output_data.pgtk);
 
   FRAME_FONTSET (f) = -1;
 
@@ -1182,23 +1182,23 @@ This function is an internal primitive--use `make-frame' instead.  */)
   /* With FRAME_DISPLAY_INFO set up, this unwind-protect is safe.  */
   record_unwind_protect (unwind_create_frame, frame);
 
-  f->output_data.gtk3wl->window_desc = desc_ctr++;
+  f->output_data.pgtk->window_desc = desc_ctr++;
   if (TYPE_RANGED_INTEGERP (Window, parent))
     {
-      f->output_data.gtk3wl->parent_desc = XFASTINT (parent);
-      f->output_data.gtk3wl->explicit_parent = 1;
+      f->output_data.pgtk->parent_desc = XFASTINT (parent);
+      f->output_data.pgtk->explicit_parent = 1;
     }
   else
     {
-      f->output_data.gtk3wl->parent_desc = FRAME_DISPLAY_INFO (f)->root_window;
-      f->output_data.gtk3wl->explicit_parent = 0;
+      f->output_data.pgtk->parent_desc = FRAME_DISPLAY_INFO (f)->root_window;
+      f->output_data.pgtk->explicit_parent = 0;
     }
 
   /* Set the name; the functions to which we pass f expect the name to
      be set.  */
   if (EQ (name, Qunbound) || NILP (name) || ! STRINGP (name))
     {
-      fset_name (f, build_string (gtk3wl_app_name));
+      fset_name (f, build_string (pgtk_app_name));
       f->explicit_name = 0;
     }
   else
@@ -1251,7 +1251,7 @@ This function is an internal primitive--use `make-frame' instead.  */)
   /* default vertical scrollbars on right on Mac */
   {
       Lisp_Object spos
-#ifdef GTK3WL_IMPL_GNUSTEP
+#ifdef PGTK_IMPL_GNUSTEP
           = Qt;
 #else
           = Qright;
@@ -1294,16 +1294,16 @@ This function is an internal primitive--use `make-frame' instead.  */)
   FRAME_UNDECORATED (f) = !NILP (tem) && !EQ (tem, Qunbound);
   store_frame_param (f, Qundecorated, FRAME_UNDECORATED (f) ? Qt : Qnil);
 
-#ifdef GTK3WL_IMPL_COCOA
-  tem = x_get_arg (dpyinfo, parms, Qgtk3wl_appearance, NULL, NULL, RES_TYPE_SYMBOL);
-  FRAME_GTK3WL_APPEARANCE (f) = EQ (tem, Qdark)
-    ? gtk3wl_appearance_vibrant_dark : gtk3wl_appearance_aqua;
-  store_frame_param (f, Qgtk3wl_appearance, tem);
+#ifdef PGTK_IMPL_COCOA
+  tem = x_get_arg (dpyinfo, parms, Qpgtk_appearance, NULL, NULL, RES_TYPE_SYMBOL);
+  FRAME_PGTK_APPEARANCE (f) = EQ (tem, Qdark)
+    ? pgtk_appearance_vibrant_dark : pgtk_appearance_aqua;
+  store_frame_param (f, Qpgtk_appearance, tem);
 
-  tem = x_get_arg (dpyinfo, parms, Qgtk3wl_transparent_titlebar,
+  tem = x_get_arg (dpyinfo, parms, Qpgtk_transparent_titlebar,
                    NULL, NULL, RES_TYPE_BOOLEAN);
-  FRAME_GTK3WL_TRANSPARENT_TITLEBAR (f) = !NILP (tem) && !EQ (tem, Qunbound);
-  store_frame_param (f, Qgtk3wl_transparent_titlebar, tem);
+  FRAME_PGTK_TRANSPARENT_TITLEBAR (f) = !NILP (tem) && !EQ (tem, Qunbound);
+  store_frame_param (f, Qpgtk_transparent_titlebar, tem);
 #endif
 
   parent_frame = x_get_arg (dpyinfo, parms, Qparent_frame, NULL, NULL,
@@ -1351,38 +1351,38 @@ This function is an internal primitive--use `make-frame' instead.  */)
 #if 0
   /* NOTE: on other terms, this is done in set_mouse_color, however this
      was not getting called under Nextstep */
-  f->output_data.gtk3wl->text_cursor = [NSCursor IBeamCursor];
-  f->output_data.gtk3wl->nontext_cursor = [NSCursor arrowCursor];
-  f->output_data.gtk3wl->modeline_cursor = [NSCursor pointingHandCursor];
-  f->output_data.gtk3wl->hand_cursor = [NSCursor pointingHandCursor];
-  f->output_data.gtk3wl->hourglass_cursor = [NSCursor disappearingItemCursor];
-  f->output_data.gtk3wl->horizontal_drag_cursor = [NSCursor resizeLeftRightCursor];
-  f->output_data.gtk3wl->vertical_drag_cursor = [NSCursor resizeUpDownCursor];
-  f->output_data.gtk3wl->left_edge_cursor = [NSCursor resizeLeftRightCursor];
-  f->output_data.gtk3wl->top_left_corner_cursor = [NSCursor arrowCursor];
-  f->output_data.gtk3wl->top_edge_cursor = [NSCursor resizeUpDownCursor];
-  f->output_data.gtk3wl->top_right_corner_cursor = [NSCursor arrowCursor];
-  f->output_data.gtk3wl->right_edge_cursor = [NSCursor resizeLeftRightCursor];
-  f->output_data.gtk3wl->bottom_right_corner_cursor = [NSCursor arrowCursor];
-  f->output_data.gtk3wl->bottom_edge_cursor = [NSCursor resizeUpDownCursor];
-  f->output_data.gtk3wl->bottom_left_corner_cursor = [NSCursor arrowCursor];
+  f->output_data.pgtk->text_cursor = [NSCursor IBeamCursor];
+  f->output_data.pgtk->nontext_cursor = [NSCursor arrowCursor];
+  f->output_data.pgtk->modeline_cursor = [NSCursor pointingHandCursor];
+  f->output_data.pgtk->hand_cursor = [NSCursor pointingHandCursor];
+  f->output_data.pgtk->hourglass_cursor = [NSCursor disappearingItemCursor];
+  f->output_data.pgtk->horizontal_drag_cursor = [NSCursor resizeLeftRightCursor];
+  f->output_data.pgtk->vertical_drag_cursor = [NSCursor resizeUpDownCursor];
+  f->output_data.pgtk->left_edge_cursor = [NSCursor resizeLeftRightCursor];
+  f->output_data.pgtk->top_left_corner_cursor = [NSCursor arrowCursor];
+  f->output_data.pgtk->top_edge_cursor = [NSCursor resizeUpDownCursor];
+  f->output_data.pgtk->top_right_corner_cursor = [NSCursor arrowCursor];
+  f->output_data.pgtk->right_edge_cursor = [NSCursor resizeLeftRightCursor];
+  f->output_data.pgtk->bottom_right_corner_cursor = [NSCursor arrowCursor];
+  f->output_data.pgtk->bottom_edge_cursor = [NSCursor resizeUpDownCursor];
+  f->output_data.pgtk->bottom_left_corner_cursor = [NSCursor arrowCursor];
 
   FRAME_DISPLAY_INFO (f)->vertical_scroll_bar_cursor
      = [NSCursor arrowCursor];
   FRAME_DISPLAY_INFO (f)->horizontal_scroll_bar_cursor
      = [NSCursor arrowCursor];
 #endif
-  f->output_data.gtk3wl->current_pointer = f->output_data.gtk3wl->text_cursor;
+  f->output_data.pgtk->current_pointer = f->output_data.pgtk->text_cursor;
 
-  // f->output_data.gtk3wl->in_animation = NO;
+  // f->output_data.pgtk->in_animation = NO;
 
   // [[EmacsView alloc] initFrameFromEmacs: f];
   xg_create_frame_widgets(f);
-  gtk3wl_set_event_handler(f);
+  pgtk_set_event_handler(f);
 
   x_icon (f, parms);
 
-  /* gtk3wl_display_info does not have a reference_count.  */
+  /* pgtk_display_info does not have a reference_count.  */
   f->terminal->reference_count++;
 
   /* It is now ok to make the frame official even if we get an error below.
@@ -1420,7 +1420,7 @@ This function is an internal primitive--use `make-frame' instead.  */)
   adjust_frame_size (f, FRAME_TEXT_WIDTH (f), FRAME_TEXT_HEIGHT (f), 0, 1,
 		     Qx_create_frame_2);
 
-  if (! f->output_data.gtk3wl->explicit_parent)
+  if (! f->output_data.pgtk->explicit_parent)
     {
       Lisp_Object visibility;
 
@@ -1434,7 +1434,7 @@ This function is an internal primitive--use `make-frame' instead.  */)
       else if (! NILP (visibility))
 	{
 	  x_make_frame_visible (f);
-	  // [[FRAME_GTK3WL_VIEW (f) window] makeKeyWindow];
+	  // [[FRAME_PGTK_VIEW (f) window] makeKeyWindow];
 	}
       else
         {
@@ -1466,12 +1466,12 @@ This function is an internal primitive--use `make-frame' instead.  */)
 void
 x_focus_frame (struct frame *f, bool noactivate)
 {
-  struct gtk3wl_display_info *dpyinfo = FRAME_DISPLAY_INFO (f);
+  struct pgtk_display_info *dpyinfo = FRAME_DISPLAY_INFO (f);
 
 #if 0
   if (dpyinfo->x_focus_frame != f)
     {
-      EmacsView *view = FRAME_GTK3WL_VIEW (f);
+      EmacsView *view = FRAME_PGTK_VIEW (f);
       block_input ();
       [NSApp activateIgnoringOtherApps: YES];
       [[view window] makeKeyAndOrderFront: view];
@@ -1482,7 +1482,7 @@ x_focus_frame (struct frame *f, bool noactivate)
 
 #if 0
 static int
-gtk3wl_window_is_ancestor (GTK3WLWindow *win, GTK3WLWindow *candidate)
+pgtk_window_is_ancestor (PGTKWindow *win, PGTKWindow *candidate)
 /* Test whether CANDIDATE is an ancestor window of WIN. */
 {
   if (candidate == NULL)
@@ -1490,12 +1490,12 @@ gtk3wl_window_is_ancestor (GTK3WLWindow *win, GTK3WLWindow *candidate)
   else if (win == candidate)
     return 1;
   else
-    return gtk3wl_window_is_ancestor(win, [candidate parentWindow]);
+    return pgtk_window_is_ancestor(win, [candidate parentWindow]);
 }
 #endif
 
-DEFUN ("gtk3wl-frame-list-z-order", Fgtk3wl_frame_list_z_order,
-       Sgtk3wl_frame_list_z_order, 0, 1, 0,
+DEFUN ("pgtk-frame-list-z-order", Fpgtk_frame_list_z_order,
+       Spgtk_frame_list_z_order, 0, 1, 0,
        doc: /* Return list of Emacs' frames, in Z (stacking) order.
 If TERMINAL is non-nil and specifies a live frame, return the child
 frames of that frame in Z (stacking) order.
@@ -1505,17 +1505,17 @@ Frames are listed from topmost (first) to bottommost (last).  */)
 {
   Lisp_Object frames = Qnil;
 #if 0
-  GTK3WLWindow *parent = nil;
+  PGTKWindow *parent = nil;
 
   if (FRAMEP (terminal) && FRAME_LIVE_P (XFRAME (terminal)))
-    parent = [FRAME_GTK3WL_VIEW (XFRAME (terminal)) window];
+    parent = [FRAME_PGTK_VIEW (XFRAME (terminal)) window];
 
-  for (GTK3WLWindow *win in [[NSApp orderedWindows] reverseObjectEnumerator])
+  for (PGTKWindow *win in [[NSApp orderedWindows] reverseObjectEnumerator])
     {
       Lisp_Object frame;
 
       /* Check against [win parentWindow] so that it doesn't match itself. */
-      if (parent == nil || gtk3wl_window_is_ancestor (parent, [win parentWindow]))
+      if (parent == nil || pgtk_window_is_ancestor (parent, [win parentWindow]))
         {
           XSETFRAME (frame, ((EmacsView *)[win delegate])->emacsframe);
           frames = Fcons(frame, frames);
@@ -1526,7 +1526,7 @@ Frames are listed from topmost (first) to bottommost (last).  */)
   return frames;
 }
 
-DEFUN ("gtk3wl-frame-restack", Fgtk3wl_frame_restack, Sgtk3wl_frame_restack, 2, 3, 0,
+DEFUN ("pgtk-frame-restack", Fpgtk_frame_restack, Spgtk_frame_restack, 2, 3, 0,
        doc: /* Restack FRAME1 below FRAME2.
 This means that if both frames are visible and the display areas of
 these frames overlap, FRAME2 (partially) obscures FRAME1.  If optional
@@ -1540,12 +1540,12 @@ Some window managers may refuse to restack windows.  */)
   struct frame *f1 = decode_live_frame (frame1);
   struct frame *f2 = decode_live_frame (frame2);
 
-  if (FRAME_GTK3WL_VIEW (f1) && FRAME_GTK3WL_VIEW (f2))
+  if (FRAME_PGTK_VIEW (f1) && FRAME_PGTK_VIEW (f2))
     {
 #if 0
-      GTK3WLWindow *window = [FRAME_GTK3WL_VIEW (f1) window];
-      NSInteger window2 = [[FRAME_GTK3WL_VIEW (f2) window] windowNumber];
-      GTK3WLWindowOrderingMode flag = NILP (above) ? GTK3WLWindowBelow : GTK3WLWindowAbove;
+      PGTKWindow *window = [FRAME_PGTK_VIEW (f1) window];
+      NSInteger window2 = [[FRAME_PGTK_VIEW (f2) window] windowNumber];
+      PGTKWindowOrderingMode flag = NILP (above) ? PGTKWindowBelow : PGTKWindowAbove;
 
       [window orderWindow: flag
                relativeTo: window2];
@@ -1561,19 +1561,19 @@ Some window managers may refuse to restack windows.  */)
 }
 
 #if 0
-DEFUN ("gtk3wl-popup-font-panel", Fgtk3wl_popup_font_panel, Sgtk3wl_popup_font_panel,
+DEFUN ("pgtk-popup-font-panel", Fpgtk_popup_font_panel, Spgtk_popup_font_panel,
        0, 1, "",
        doc: /* Pop up the font panel. */)
      (Lisp_Object frame)
 {
   struct frame *f = decode_window_system_frame (frame);
   id fm = [NSFontManager sharedFontManager];
-  struct font *font = f->output_data.gtk3wl->font;
+  struct font *font = f->output_data.pgtk->font;
   NSFont *nsfont;
-#ifdef GTK3WL_IMPL_GNUSTEP
+#ifdef PGTK_IMPL_GNUSTEP
   nsfont = ((struct nsfont_info *)font)->nsfont;
 #endif
-#ifdef GTK3WL_IMPL_COCOA
+#ifdef PGTK_IMPL_COCOA
   nsfont = (NSFont *) macfont_get_nsctfont (font);
 #endif
   [fm setSelectedFont: nsfont isMultiple: NO];
@@ -1584,7 +1584,7 @@ DEFUN ("gtk3wl-popup-font-panel", Fgtk3wl_popup_font_panel, Sgtk3wl_popup_font_p
 
 
 #if 0
-DEFUN ("gtk3wl-popup-color-panel", Fgtk3wl_popup_color_panel, Sgtk3wl_popup_color_panel,
+DEFUN ("pgtk-popup-color-panel", Fpgtk_popup_color_panel, Spgtk_popup_color_panel,
        0, 1, "",
        doc: /* Pop up the color panel.  */)
      (Lisp_Object frame)
@@ -1600,42 +1600,42 @@ static struct
 {
   id panel;
   BOOL ret;
-#ifdef GTK3WL_IMPL_GNUSTEP
+#ifdef PGTK_IMPL_GNUSTEP
   NSString *dirS, *initS;
   BOOL no_types;
 #endif
-} gtk3wl_fd_data;
+} pgtk_fd_data;
 #endif
 
 void
-gtk3wl_run_file_dialog (void)
+pgtk_run_file_dialog (void)
 {
 #if 0
-  if (gtk3wl_fd_data.panel == nil) return;
-#ifdef GTK3WL_IMPL_COCOA
-  gtk3wl_fd_data.ret = [gtk3wl_fd_data.panel runModal];
+  if (pgtk_fd_data.panel == nil) return;
+#ifdef PGTK_IMPL_COCOA
+  pgtk_fd_data.ret = [pgtk_fd_data.panel runModal];
 #else
-  if (gtk3wl_fd_data.no_types)
+  if (pgtk_fd_data.no_types)
     {
-      gtk3wl_fd_data.ret = [gtk3wl_fd_data.panel
-                           runModalForDirectory: gtk3wl_fd_data.dirS
-                           file: gtk3wl_fd_data.initS];
+      pgtk_fd_data.ret = [pgtk_fd_data.panel
+                           runModalForDirectory: pgtk_fd_data.dirS
+                           file: pgtk_fd_data.initS];
     }
   else
     {
-      gtk3wl_fd_data.ret = [gtk3wl_fd_data.panel
-                           runModalForDirectory: gtk3wl_fd_data.dirS
-                           file: gtk3wl_fd_data.initS
+      pgtk_fd_data.ret = [pgtk_fd_data.panel
+                           runModalForDirectory: pgtk_fd_data.dirS
+                           file: pgtk_fd_data.initS
                            types: nil];
     }
 #endif
-  gtk3wl_fd_data.panel = nil;
+  pgtk_fd_data.panel = nil;
 #endif
 }
 
 #if 0
 
-#ifdef GTK3WL_IMPL_COCOA
+#ifdef PGTK_IMPL_COCOA
 #if MAC_OS_X_VERSION_MAX_ALLOWED > 1090
 #define MODAL_OK_RESPONSE NSModalResponseOK
 #endif
@@ -1644,7 +1644,7 @@ gtk3wl_run_file_dialog (void)
 #define MODAL_OK_RESPONSE NSOKButton
 #endif
 
-DEFUN ("gtk3wl-read-file-name", Fgtk3wl_read_file_name, Sgtk3wl_read_file_name, 1, 5, 0,
+DEFUN ("pgtk-read-file-name", Fpgtk_read_file_name, Spgtk_read_file_name, 1, 5, 0,
        doc: /* Use a graphical panel to read a file name, using prompt PROMPT.
 Optional arg DIR, if non-nil, supplies a default directory.
 Optional arg MUSTMATCH, if non-nil, means the returned file or
@@ -1701,9 +1701,9 @@ Optional arg DIR_ONLY_P, if non-nil, means choose only directories.  */)
     }
 
   block_input ();
-  gtk3wl_fd_data.panel = panel;
-  gtk3wl_fd_data.ret = NO;
-#ifdef GTK3WL_IMPL_COCOA
+  pgtk_fd_data.panel = panel;
+  pgtk_fd_data.ret = NO;
+#ifdef PGTK_IMPL_COCOA
   if (! NILP (mustmatch) || ! NILP (dir_only_p))
     [panel setAllowedFileTypes: nil];
   if (dirS) [panel setDirectoryURL: [NSURL fileURLWithPath: dirS]];
@@ -1713,9 +1713,9 @@ Optional arg DIR_ONLY_P, if non-nil, means choose only directories.  */)
     [panel setNameFieldStringValue: @""];
 
 #else
-  gtk3wl_fd_data.no_types = NILP (mustmatch) && NILP (dir_only_p);
-  gtk3wl_fd_data.dirS = dirS;
-  gtk3wl_fd_data.initS = initS;
+  pgtk_fd_data.no_types = NILP (mustmatch) && NILP (dir_only_p);
+  pgtk_fd_data.dirS = dirS;
+  pgtk_fd_data.initS = initS;
 #endif
 
   /* runModalForDirectory/runModal restarts the main event loop when done,
@@ -1734,17 +1734,17 @@ Optional arg DIR_ONLY_P, if non-nil, means choose only directories.  */)
                                data2: NSAPP_DATA2_RUNFILEDIALOG];
 
   [NSApp postEvent: nxev atStart: NO];
-  while (gtk3wl_fd_data.panel != nil)
+  while (pgtk_fd_data.panel != nil)
     [NSApp run];
 
-  if (gtk3wl_fd_data.ret == MODAL_OK_RESPONSE)
+  if (pgtk_fd_data.ret == MODAL_OK_RESPONSE)
     {
-      NSString *str = gtk3wl_filename_from_panel (panel);
-      if (! str) str = gtk3wl_directory_from_panel (panel);
+      NSString *str = pgtk_filename_from_panel (panel);
+      if (! str) str = pgtk_directory_from_panel (panel);
       if (str) fname = build_string ([str UTF8String]);
     }
 
-  [[FRAME_GTK3WL_VIEW (SELECTED_FRAME ()) window] makeKeyWindow];
+  [[FRAME_PGTK_VIEW (SELECTED_FRAME ()) window] makeKeyWindow];
   unblock_input ();
 
   return fname;
@@ -1753,7 +1753,7 @@ Optional arg DIR_ONLY_P, if non-nil, means choose only directories.  */)
 #endif
 
 const char *
-gtk3wl_get_defaults_value (const char *key)
+pgtk_get_defaults_value (const char *key)
 {
 #if 0
   NSObject *obj = [[NSUserDefaults standardUserDefaults]
@@ -1767,7 +1767,7 @@ gtk3wl_get_defaults_value (const char *key)
 }
 
 
-DEFUN ("gtk3wl-get-resource", Fgtk3wl_get_resource, Sgtk3wl_get_resource, 2, 2, 0,
+DEFUN ("pgtk-get-resource", Fpgtk_get_resource, Spgtk_get_resource, 2, 2, 0,
        doc: /* Return the value of the property NAME of OWNER from the defaults database.
 If OWNER is nil, Emacs is assumed.  */)
      (Lisp_Object owner, Lisp_Object name)
@@ -1776,10 +1776,10 @@ If OWNER is nil, Emacs is assumed.  */)
 
   check_window_system (NULL);
   if (NILP (owner))
-    owner = build_string(gtk3wl_app_name);
+    owner = build_string(pgtk_app_name);
   CHECK_STRING (name);
 
-  value = gtk3wl_get_defaults_value (SSDATA (name));
+  value = pgtk_get_defaults_value (SSDATA (name));
 
   if (value)
     return build_string (value);
@@ -1787,7 +1787,7 @@ If OWNER is nil, Emacs is assumed.  */)
 }
 
 
-DEFUN ("gtk3wl-set-resource", Fgtk3wl_set_resource, Sgtk3wl_set_resource, 3, 3, 0,
+DEFUN ("pgtk-set-resource", Fpgtk_set_resource, Spgtk_set_resource, 3, 3, 0,
        doc: /* Set property NAME of OWNER to VALUE, from the defaults database.
 If OWNER is nil, Emacs is assumed.
 If VALUE is nil, the default is removed.  */)
@@ -1795,7 +1795,7 @@ If VALUE is nil, the default is removed.  */)
 {
   check_window_system (NULL);
   if (NILP (owner))
-    owner = build_string (gtk3wl_app_name);
+    owner = build_string (pgtk_app_name);
   CHECK_STRING (name);
 #if 0
   if (NILP (value))
@@ -1823,7 +1823,7 @@ DEFUN ("x-server-max-request-size", Fx_server_max_request_size,
        doc: /* This function is a no-op.  It is only present for completeness.  */)
      (Lisp_Object terminal)
 {
-  check_gtk3wl_display_info (terminal);
+  check_pgtk_display_info (terminal);
   /* This function has no real equivalent under NeXTstep.  Return nil to
      indicate this. */
   return Qnil;
@@ -1839,8 +1839,8 @@ TERMINAL should be a terminal object, a frame or a display name (a string).
 If omitted or nil, that stands for the selected frame's display.  */)
   (Lisp_Object terminal)
 {
-  check_gtk3wl_display_info (terminal);
-#ifdef GTK3WL_IMPL_GNUSTEP
+  check_pgtk_display_info (terminal);
+#ifdef PGTK_IMPL_GNUSTEP
   return build_string ("GNU");
 #else
   return build_string ("Apple");
@@ -1859,14 +1859,14 @@ TERMINAL should be a terminal object, a frame or a display name (a string).
 If omitted or nil, that stands for the selected frame's display.  */)
   (Lisp_Object terminal)
 {
-  check_gtk3wl_display_info (terminal);
+  check_pgtk_display_info (terminal);
   /*NOTE: it is unclear what would best correspond with "protocol";
           we return 10.3, meaning Panther, since this is roughly the
           level that GNUstep's APIs correspond to.
           The last number is where we distinguish between the Apple
           and GNUstep implementations ("distributor-specific release
           number") and give int'ized versions of major.minor. */
-  return list3i (10, 3, gtk3wl_appkit_version_int ());
+  return list3i (10, 3, pgtk_appkit_version_int ());
 }
 
 
@@ -1881,7 +1881,7 @@ the number of physical monitors, use `(length
 \(display-monitor-attributes-list TERMINAL))' instead.  */)
   (Lisp_Object terminal)
 {
-  check_gtk3wl_display_info (terminal);
+  check_pgtk_display_info (terminal);
   return make_number (1);
 }
 
@@ -1897,7 +1897,7 @@ all physical monitors associated with TERMINAL.  To get information
 for each physical monitor, use `display-monitor-attributes-list'.  */)
   (Lisp_Object terminal)
 {
-  struct gtk3wl_display_info *dpyinfo = check_gtk3wl_display_info (terminal);
+  struct pgtk_display_info *dpyinfo = check_pgtk_display_info (terminal);
 
   return make_number (x_display_pixel_height (dpyinfo) / (92.0/25.4));
 }
@@ -1914,7 +1914,7 @@ all physical monitors associated with TERMINAL.  To get information
 for each physical monitor, use `display-monitor-attributes-list'.  */)
   (Lisp_Object terminal)
 {
-  struct gtk3wl_display_info *dpyinfo = check_gtk3wl_display_info (terminal);
+  struct pgtk_display_info *dpyinfo = check_pgtk_display_info (terminal);
 
   return make_number (x_display_pixel_width (dpyinfo) / (92.0/25.4));
 }
@@ -1929,9 +1929,9 @@ TERMINAL should be a terminal object, a frame or a display name (a string).
 If omitted or nil, that stands for the selected frame's display.  */)
   (Lisp_Object terminal)
 {
-  check_gtk3wl_display_info (terminal);
+  check_pgtk_display_info (terminal);
 #if 0
-  switch ([gtk3wl_get_window (terminal) backingType])
+  switch ([pgtk_get_window (terminal) backingType])
     {
     case NSBackingStoreBuffered:
       return intern ("buffered");
@@ -1959,9 +1959,9 @@ If omitted or nil, that stands for the selected frame's display.  */)
   (Lisp_Object terminal)
 {
 #if 0
-  GTK3WLWindowDepth depth;
+  PGTKWindowDepth depth;
 
-  check_gtk3wl_display_info (terminal);
+  check_pgtk_display_info (terminal);
   depth = [[[NSScreen screens] objectAtIndex:0] depth];
 
   if ( depth == NSBestDepth (NSCalibratedWhiteColorSpace, 2, 2, YES, NULL))
@@ -1990,9 +1990,9 @@ TERMINAL should be a terminal object, a frame or a display name (a string).
 If omitted or nil, that stands for the selected frame's display.  */)
   (Lisp_Object terminal)
 {
-  check_gtk3wl_display_info (terminal);
+  check_pgtk_display_info (terminal);
 #if 0
-  switch ([gtk3wl_get_window (terminal) backingType])
+  switch ([pgtk_get_window (terminal) backingType])
     {
     case NSBackingStoreBuffered:
       return Qt;
@@ -2019,12 +2019,12 @@ terminate Emacs if we can't open the connection.
 \(In the Nextstep version, the last two arguments are currently ignored.)  */)
      (Lisp_Object display, Lisp_Object resource_string, Lisp_Object must_succeed)
 {
-  struct gtk3wl_display_info *dpyinfo;
+  struct pgtk_display_info *dpyinfo;
 
   CHECK_STRING (display);
 
-  // nxatoms_of_gtk3wlselect ();
-  dpyinfo = gtk3wl_term_init (display);
+  // nxatoms_of_pgtkselect ();
+  dpyinfo = pgtk_term_init (display);
   if (dpyinfo == 0)
     {
       if (!NILP (must_succeed))
@@ -2047,7 +2047,7 @@ string).  If TERMINAL is nil, that stands for the selected frame's
 terminal.  */)
      (Lisp_Object terminal)
 {
-  check_gtk3wl_display_info (terminal);
+  check_pgtk_display_info (terminal);
   // [NSApp terminate: NSApp];
   return Qnil;
 }
@@ -2058,7 +2058,7 @@ DEFUN ("x-display-list", Fx_display_list, Sx_display_list, 0, 0, 0,
      (void)
 {
   Lisp_Object result = Qnil;
-  struct gtk3wl_display_info *ndi;
+  struct pgtk_display_info *ndi;
 
   for (ndi = x_display_list; ndi; ndi = ndi->next)
     result = Fcons (XCAR (ndi->name_list_element), result);
@@ -2067,7 +2067,7 @@ DEFUN ("x-display-list", Fx_display_list, Sx_display_list, 0, 0, 0,
 }
 
 
-DEFUN ("gtk3wl-hide-others", Fgtk3wl_hide_others, Sgtk3wl_hide_others,
+DEFUN ("pgtk-hide-others", Fpgtk_hide_others, Spgtk_hide_others,
        0, 0, 0,
        doc: /* Hides all applications other than Emacs.  */)
      (void)
@@ -2077,7 +2077,7 @@ DEFUN ("gtk3wl-hide-others", Fgtk3wl_hide_others, Sgtk3wl_hide_others,
   return Qnil;
 }
 
-DEFUN ("gtk3wl-hide-emacs", Fgtk3wl_hide_emacs, Sgtk3wl_hide_emacs,
+DEFUN ("pgtk-hide-emacs", Fpgtk_hide_emacs, Spgtk_hide_emacs,
        1, 1, 0,
        doc: /* If ON is non-nil, the entire Emacs application is hidden.
 Otherwise if Emacs is hidden, it is unhidden.
@@ -2101,7 +2101,7 @@ the active application.  */)
 }
 
 
-DEFUN ("gtk3wl-emacs-info-panel", Fgtk3wl_emacs_info_panel, Sgtk3wl_emacs_info_panel,
+DEFUN ("pgtk-emacs-info-panel", Fpgtk_emacs_info_panel, Spgtk_emacs_info_panel,
        0, 0, 0,
        doc: /* Shows the 'Info' or 'About' panel for Emacs.  */)
      (void)
@@ -2114,7 +2114,7 @@ DEFUN ("gtk3wl-emacs-info-panel", Fgtk3wl_emacs_info_panel, Sgtk3wl_emacs_info_p
 }
 
 
-DEFUN ("gtk3wl-font-name", Fgtk3wl_font_name, Sgtk3wl_font_name, 1, 1, 0,
+DEFUN ("pgtk-font-name", Fpgtk_font_name, Spgtk_font_name, 1, 1, 0,
        doc: /* Determine font PostScript or family name for font NAME.
 NAME should be a string containing either the font name or an XLFD
 font descriptor.  If string contains `fontset' and not
@@ -2130,18 +2130,18 @@ font descriptor.  If string contains `fontset' and not
   if (strstr (nm, "fontset") && !strstr (nm, "fontset-startup"))
     return name;
 
-  char *str = gtk3wl_xlfd_to_fontname (SSDATA (name));
+  char *str = pgtk_xlfd_to_fontname (SSDATA (name));
   name = build_string (str);
   xfree(str);
   return name;
 }
 
 
-DEFUN ("gtk3wl-list-services", Fgtk3wl_list_services, Sgtk3wl_list_services, 0, 0, 0,
+DEFUN ("pgtk-list-services", Fpgtk_list_services, Spgtk_list_services, 0, 0, 0,
        doc: /* List available Nextstep services by querying NSApp.  */)
      (void)
 {
-#ifdef GTK3WL_IMPL_COCOA
+#ifdef PGTK_IMPL_COCOA
   /* You can't get services like this in 10.6+.  */
   return Qnil;
 #else
@@ -2152,8 +2152,8 @@ DEFUN ("gtk3wl-list-services", Fgtk3wl_list_services, Sgtk3wl_list_services, 0, 
   check_window_system (NULL);
   svcs = [[NSMenu alloc] initWithTitle: @"Services"];
   [NSApp setServicesMenu: svcs];
-  [NSApp registerServicesMenuSendTypes: gtk3wl_send_types
-                           returnTypes: gtk3wl_return_types];
+  [NSApp registerServicesMenuSendTypes: pgtk_send_types
+                           returnTypes: pgtk_return_types];
 
   [svcs setAutoenablesItems: NO];
 
@@ -2164,7 +2164,7 @@ DEFUN ("gtk3wl-list-services", Fgtk3wl_list_services, Sgtk3wl_list_services, 0, 
 }
 
 
-DEFUN ("gtk3wl-perform-service", Fgtk3wl_perform_service, Sgtk3wl_perform_service,
+DEFUN ("pgtk-perform-service", Fpgtk_perform_service, Spgtk_perform_service,
        2, 2, 0,
        doc: /* Perform Nextstep SERVICE on SEND.
 SEND should be either a string or nil.
@@ -2184,14 +2184,14 @@ there was no result.  */)
   svcName = [NSString stringWithUTF8String: utfStr];
 
   pb =[NSPasteboard pasteboardWithUniqueName];
-  gtk3wl_string_to_pasteboard (pb, send);
+  pgtk_string_to_pasteboard (pb, send);
 
   if (NSPerformService (svcName, pb) == NO)
     Fsignal (Qquit, list1 (build_string ("service not available")));
 
   if ([[pb types] count] == 0)
     return build_string ("");
-  return gtk3wl_string_from_pasteboard (pb);
+  return pgtk_string_from_pasteboard (pb);
 #endif
   return build_string ("");
 }
@@ -2204,10 +2204,10 @@ there was no result.  */)
    ========================================================================== */
 
 /* called from frame.c */
-struct gtk3wl_display_info *
+struct pgtk_display_info *
 check_x_display_info (Lisp_Object frame)
 {
-  return check_gtk3wl_display_info (frame);
+  return check_pgtk_display_info (frame);
 }
 
 
@@ -2216,7 +2216,7 @@ x_set_scroll_bar_default_width (struct frame *f)
 {
 #if 0
   int wid = FRAME_COLUMN_WIDTH (f);
-  FRAME_CONFIG_SCROLL_BAR_WIDTH (f) = GTK3WL_SCROLL_BAR_WIDTH_DEFAULT;
+  FRAME_CONFIG_SCROLL_BAR_WIDTH (f) = PGTK_SCROLL_BAR_WIDTH_DEFAULT;
   FRAME_CONFIG_SCROLL_BAR_COLS (f) = (FRAME_CONFIG_SCROLL_BAR_WIDTH (f) +
                                       wid - 1) / wid;
 #endif
@@ -2227,7 +2227,7 @@ x_set_scroll_bar_default_height (struct frame *f)
 {
 #if 0
   int height = FRAME_LINE_HEIGHT (f);
-  FRAME_CONFIG_SCROLL_BAR_HEIGHT (f) = GTK3WL_SCROLL_BAR_WIDTH_DEFAULT;
+  FRAME_CONFIG_SCROLL_BAR_HEIGHT (f) = PGTK_SCROLL_BAR_WIDTH_DEFAULT;
   FRAME_CONFIG_SCROLL_BAR_LINES (f) = (FRAME_CONFIG_SCROLL_BAR_HEIGHT (f) +
 				       height - 1) / height;
 #endif
@@ -2246,7 +2246,7 @@ x_get_string_resource (XrmDatabase rdb, const char *name, const char *class)
     /* --quick was passed, so this is a no-op.  */
     return NULL;
 
-  res = gtk3wl_get_defaults_value (toCheck);
+  res = pgtk_get_defaults_value (toCheck);
   return (char *) (!res ? NULL
 		   : !c_strncasecmp (res, "YES", 3) ? "true"
 		   : !c_strncasecmp (res, "NO", 2) ? "false"
@@ -2257,7 +2257,7 @@ x_get_string_resource (XrmDatabase rdb, const char *name, const char *class)
 Lisp_Object
 x_get_focus_frame (struct frame *frame)
 {
-  struct gtk3wl_display_info *dpyinfo = FRAME_DISPLAY_INFO (frame);
+  struct pgtk_display_info *dpyinfo = FRAME_DISPLAY_INFO (frame);
   Lisp_Object nsfocus;
 
   if (!dpyinfo->x_focus_frame)
@@ -2280,7 +2280,7 @@ DEFUN ("xw-color-defined-p", Fxw_color_defined_p, Sxw_color_defined_p, 1, 2, 0,
      (Lisp_Object color, Lisp_Object frame)
 {
   XColor col;
-  return gtk3wl_lisp_to_color (color, &col) ? Qnil : Qt;
+  return pgtk_lisp_to_color (color, &col) ? Qnil : Qt;
 }
 
 
@@ -2294,7 +2294,7 @@ DEFUN ("xw-color-values", Fxw_color_values, Sxw_color_values, 1, 2, 0,
 
   block_input ();
 
-  if (gtk3wl_lisp_to_color (color, &col))
+  if (pgtk_lisp_to_color (color, &col))
     {
       unblock_input ();
       return Qnil;
@@ -2310,7 +2310,7 @@ DEFUN ("xw-display-color-p", Fxw_display_color_p, Sxw_display_color_p, 0, 1, 0,
        doc: /* Internal function called by `display-color-p', which see.  */)
      (Lisp_Object terminal)
 {
-  check_gtk3wl_display_info (terminal);
+  check_pgtk_display_info (terminal);
   return Qt;
 }
 
@@ -2340,7 +2340,7 @@ physical monitors associated with TERMINAL.  To get information for
 each physical monitor, use `display-monitor-attributes-list'.  */)
   (Lisp_Object terminal)
 {
-  struct gtk3wl_display_info *dpyinfo = check_gtk3wl_display_info (terminal);
+  struct pgtk_display_info *dpyinfo = check_pgtk_display_info (terminal);
 
   return make_number (x_display_pixel_width (dpyinfo));
 }
@@ -2358,13 +2358,13 @@ physical monitors associated with TERMINAL.  To get information for
 each physical monitor, use `display-monitor-attributes-list'.  */)
   (Lisp_Object terminal)
 {
-  struct gtk3wl_display_info *dpyinfo = check_gtk3wl_display_info (terminal);
+  struct pgtk_display_info *dpyinfo = check_pgtk_display_info (terminal);
 
   return make_number (x_display_pixel_height (dpyinfo));
 }
 
 static Lisp_Object
-gtk3wl_make_monitor_attribute_list (struct MonitorInfo *monitors,
+pgtk_make_monitor_attribute_list (struct MonitorInfo *monitors,
                                 int n_monitors,
                                 int primary_monitor,
                                 const char *source)
@@ -2379,9 +2379,9 @@ gtk3wl_make_monitor_attribute_list (struct MonitorInfo *monitors,
     {
       struct frame *f = XFRAME (frame);
 
-      if (FRAME_GTK3WL_P (f))
+      if (FRAME_PGTK_P (f))
 	{
-          NSView *view = FRAME_GTK3WL_VIEW (f);
+          NSView *view = FRAME_PGTK_VIEW (f);
           NSScreen *screen = [[view window] screen];
           NSUInteger k;
 
@@ -2403,9 +2403,9 @@ gtk3wl_make_monitor_attribute_list (struct MonitorInfo *monitors,
   return Qnil;
 }
 
-DEFUN ("gtk3wl-display-monitor-attributes-list",
-       Fgtk3wl_display_monitor_attributes_list,
-       Sgtk3wl_display_monitor_attributes_list,
+DEFUN ("pgtk-display-monitor-attributes-list",
+       Fpgtk_display_monitor_attributes_list,
+       Spgtk_display_monitor_attributes_list,
        0, 1, 0,
        doc: /* Return a list of physical monitor attributes on the X display TERMINAL.
 
@@ -2449,7 +2449,7 @@ Internal use only, use `display-monitor-attributes-list' instead.  */)
       NSRect vfr = [s visibleFrame];
       short y, vy;
 
-#ifdef GTK3WL_IMPL_COCOA
+#ifdef PGTK_IMPL_COCOA
       NSDictionary *dict = [s deviceDescription];
       NSNumber *nid = [dict objectForKey:@"NSScreenNumber"];
       CGDirectDisplayID did = [nid unsignedIntValue];
@@ -2483,8 +2483,8 @@ Internal use only, use `display-monitor-attributes-list' instead.  */)
       m->work.width = (unsigned short) vfr.size.width;
       m->work.height = (unsigned short) vfr.size.height;
 
-#ifdef GTK3WL_IMPL_COCOA
-      m->name = gtk3wl_screen_name (did);
+#ifdef PGTK_IMPL_COCOA
+      m->name = pgtk_screen_name (did);
 
       {
         CGSize mms = CGDisplayScreenSize (did);
@@ -2500,7 +2500,7 @@ Internal use only, use `display-monitor-attributes-list' instead.  */)
     }
 
   // Primary monitor is always first for NS.
-  attributes_list = gtk3wl_make_monitor_attribute_list (monitors, n_monitors,
+  attributes_list = pgtk_make_monitor_attribute_list (monitors, n_monitors,
                                                     0, "NS");
 
   free_monitors (monitors, n_monitors);
@@ -2518,7 +2518,7 @@ TERMINAL should be a terminal object, a frame or a display name (a string).
 If omitted or nil, that stands for the selected frame's display.  */)
   (Lisp_Object terminal)
 {
-  check_gtk3wl_display_info (terminal);
+  check_pgtk_display_info (terminal);
   return make_number(32);
 }
 
@@ -2531,7 +2531,7 @@ TERMINAL should be a terminal object, a frame or a display name (a string).
 If omitted or nil, that stands for the selected frame's display.  */)
   (Lisp_Object terminal)
 {
-  struct gtk3wl_display_info *dpyinfo = check_gtk3wl_display_info (terminal);
+  struct pgtk_display_info *dpyinfo = check_pgtk_display_info (terminal);
   /* We force 24+ bit depths to 24-bit to prevent an overflow.  */
   return make_number (1 << min (dpyinfo->n_planes, 24));
 }
@@ -2681,20 +2681,20 @@ Text larger than the specified size is clipped.  */)
     CHECK_NUMBER (dy);
 
   block_input ();
-  if (gtk3wl_tooltip == nil)
-    gtk3wl_tooltip = [[EmacsTooltip alloc] init];
+  if (pgtk_tooltip == nil)
+    pgtk_tooltip = [[EmacsTooltip alloc] init];
   else
     Fx_hide_tip ();
 
-  [gtk3wl_tooltip setText: str];
-  size = [gtk3wl_tooltip frame].size;
+  [pgtk_tooltip setText: str];
+  size = [pgtk_tooltip frame].size;
 
   /* Move the tooltip window where the mouse pointer is.  Resize and
      show it.  */
   compute_tip_xy (f, parms, dx, dy, (int)size.width, (int)size.height,
 		  &root_x, &root_y);
 
-  [gtk3wl_tooltip showAtX: root_x Y: root_y for: XINT (timeout)];
+  [pgtk_tooltip showAtX: root_x Y: root_y for: XINT (timeout)];
   unblock_input ();
 
   return unbind_to (count, Qnil);
@@ -2709,9 +2709,9 @@ Value is t if tooltip was open, nil otherwise.  */)
      (void)
 {
 #if 0
-  if (gtk3wl_tooltip == nil || ![gtk3wl_tooltip isActive])
+  if (pgtk_tooltip == nil || ![pgtk_tooltip isActive])
     return Qnil;
-  [gtk3wl_tooltip hide];
+  [pgtk_tooltip hide];
   return Qt;
 #endif
   return Qnil;
@@ -2731,7 +2731,7 @@ frame_geometry (Lisp_Object frame, Lisp_Object attribute)
 		     || EQ (fullscreen_symbol, Qfullscreen));
   int border = fullscreen ? 0 : f->border_width;
 #if 0
-  int title_height = fullscreen ? 0 : FRAME_GTK3WL_TITLEBAR_HEIGHT (f);
+  int title_height = fullscreen ? 0 : FRAME_PGTK_TITLEBAR_HEIGHT (f);
 #else
   int title_height = 0;
 #endif
@@ -2795,7 +2795,7 @@ frame_geometry (Lisp_Object frame, Lisp_Object attribute)
 		    make_number (internal_border_width)));
 }
 
-DEFUN ("gtk3wl-frame-geometry", Fgtk3wl_frame_geometry, Sgtk3wl_frame_geometry, 0, 1, 0,
+DEFUN ("pgtk-frame-geometry", Fpgtk_frame_geometry, Spgtk_frame_geometry, 0, 1, 0,
        doc: /* Return geometric attributes of FRAME.
 FRAME must be a live frame and defaults to the selected one.  The return
 value is an association list of the attributes listed below.  All height
@@ -2839,7 +2839,7 @@ and width values are in pixels.
   return frame_geometry (frame, Qnil);
 }
 
-DEFUN ("gtk3wl-frame-edges", Fgtk3wl_frame_edges, Sgtk3wl_frame_edges, 0, 2, 0,
+DEFUN ("pgtk-frame-edges", Fpgtk_frame_edges, Spgtk_frame_edges, 0, 2, 0,
        doc: /* Return edge coordinates of FRAME.
 FRAME must be a live frame and defaults to the selected one.  The return
 value is a list of the form (LEFT, TOP, RIGHT, BOTTOM).  All values are
@@ -2863,19 +2863,19 @@ menu bar or tool bar of FRAME.  */)
 				 : Qnative_edges));
 }
 
-DEFUN ("gtk3wl-set-mouse-absolute-pixel-position",
-       Fgtk3wl_set_mouse_absolute_pixel_position,
-       Sgtk3wl_set_mouse_absolute_pixel_position, 2, 2, 0,
+DEFUN ("pgtk-set-mouse-absolute-pixel-position",
+       Fpgtk_set_mouse_absolute_pixel_position,
+       Spgtk_set_mouse_absolute_pixel_position, 2, 2, 0,
        doc: /* Move mouse pointer to absolute pixel position (X, Y).
 The coordinates X and Y are interpreted in pixels relative to a position
 \(0, 0) of the selected frame's display.  */)
        (Lisp_Object x, Lisp_Object y)
 {
-#ifdef GTK3WL_IMPL_COCOA
+#ifdef PGTK_IMPL_COCOA
   /* GNUstep doesn't support CGWarpMouseCursorPosition, so none of
      this will work. */
   struct frame *f = SELECTED_FRAME ();
-  EmacsView *view = FRAME_GTK3WL_VIEW (f);
+  EmacsView *view = FRAME_PGTK_VIEW (f);
   NSScreen *screen = [[view window] screen];
   NSRect screen_frame = [screen frame];
   int mouse_x, mouse_y;
@@ -2884,7 +2884,7 @@ The coordinates X and Y are interpreted in pixels relative to a position
   NSRect primary_screen_frame = [primary_screen frame];
   CGFloat primary_screen_height = primary_screen_frame.size.height;
 
-  if (FRAME_INITIAL_P (f) || !FRAME_GTK3WL_P (f))
+  if (FRAME_INITIAL_P (f) || !FRAME_PGTK_P (f))
     return Qnil;
 
   CHECK_TYPE_RANGED_INTEGER (int, x);
@@ -2900,14 +2900,14 @@ The coordinates X and Y are interpreted in pixels relative to a position
 
   CGPoint mouse_pos = CGPointMake(mouse_x, mouse_y);
   CGWarpMouseCursorPosition (mouse_pos);
-#endif /* GTK3WL_IMPL_COCOA */
+#endif /* PGTK_IMPL_COCOA */
 
   return Qnil;
 }
 
-DEFUN ("gtk3wl-mouse-absolute-pixel-position",
-       Fgtk3wl_mouse_absolute_pixel_position,
-       Sgtk3wl_mouse_absolute_pixel_position, 0, 0, 0,
+DEFUN ("pgtk-mouse-absolute-pixel-position",
+       Fpgtk_mouse_absolute_pixel_position,
+       Spgtk_mouse_absolute_pixel_position, 0, 0, 0,
        doc: /* Return absolute position of mouse cursor in pixels.
 The position is returned as a cons cell (X . Y) of the
 coordinates of the mouse cursor position in pixels relative to a
@@ -2916,7 +2916,7 @@ position (0, 0) of the selected frame's terminal. */)
 {
   struct frame *f = SELECTED_FRAME ();
 #if 0
-  EmacsView *view = FRAME_GTK3WL_VIEW (f);
+  EmacsView *view = FRAME_PGTK_VIEW (f);
   NSScreen *screen = [[view window] screen];
   NSPoint pt = [NSEvent mouseLocation];
 
@@ -3064,14 +3064,14 @@ handlePanelKeys (NSSavePanel *panel, NSEvent *theEvent)
 
 
 void
-syms_of_gtk3wlfns (void)
+syms_of_pgtkfns (void)
 {
   DEFSYM (Qfontsize, "fontsize");
   DEFSYM (Qframe_title_format, "frame-title-format");
   DEFSYM (Qicon_title_format, "icon-title-format");
   DEFSYM (Qdark, "dark");
 
-  DEFVAR_LISP ("gtk3wl-icon-type-alist", Vgtk3wl_icon_type_alist,
+  DEFVAR_LISP ("pgtk-icon-type-alist", Vpgtk_icon_type_alist,
                doc: /* Alist of elements (REGEXP . IMAGE) for images of icons associated to frames.
 If the title of a frame matches REGEXP, then IMAGE.tiff is
 selected as the image of the icon representing the frame when it's
@@ -3090,22 +3090,22 @@ Example: Install an icon Gnus.tiff and execute the following code
 
 When you miniaturize a Group, Summary or Article frame, Gnus.tiff will
 be used as the image of the icon representing the frame.  */);
-  Vgtk3wl_icon_type_alist = list1 (Qt);
+  Vpgtk_icon_type_alist = list1 (Qt);
 
-  DEFVAR_LISP ("gtk3wl-version-string", Vgtk3wl_version_string,
+  DEFVAR_LISP ("pgtk-version-string", Vpgtk_version_string,
                doc: /* Toolkit version for NS Windowing.  */);
-  Vgtk3wl_version_string = gtk3wl_appkit_version_str ();
+  Vpgtk_version_string = pgtk_appkit_version_str ();
 
 #if 0
-  defsubr (&Sgtk3wl_read_file_name);
+  defsubr (&Spgtk_read_file_name);
 #endif
-  defsubr (&Sgtk3wl_get_resource);
-  defsubr (&Sgtk3wl_set_resource);
+  defsubr (&Spgtk_get_resource);
+  defsubr (&Spgtk_set_resource);
   defsubr (&Sxw_display_color_p); /* this and next called directly by C code */
   defsubr (&Sx_display_grayscale_p);
-  defsubr (&Sgtk3wl_font_name);
-#ifdef GTK3WL_IMPL_COCOA
-  defsubr (&Sgtk3wl_do_applescript);
+  defsubr (&Spgtk_font_name);
+#ifdef PGTK_IMPL_COCOA
+  defsubr (&Spgtk_do_applescript);
 #endif
   defsubr (&Sxw_color_defined_p);
   defsubr (&Sxw_color_values);
@@ -3114,13 +3114,13 @@ be used as the image of the icon representing the frame.  */);
   defsubr (&Sx_server_version);
   defsubr (&Sx_display_pixel_width);
   defsubr (&Sx_display_pixel_height);
-  defsubr (&Sgtk3wl_display_monitor_attributes_list);
-  defsubr (&Sgtk3wl_frame_geometry);
-  defsubr (&Sgtk3wl_frame_edges);
-  defsubr (&Sgtk3wl_frame_list_z_order);
-  defsubr (&Sgtk3wl_frame_restack);
-  defsubr (&Sgtk3wl_set_mouse_absolute_pixel_position);
-  defsubr (&Sgtk3wl_mouse_absolute_pixel_position);
+  defsubr (&Spgtk_display_monitor_attributes_list);
+  defsubr (&Spgtk_frame_geometry);
+  defsubr (&Spgtk_frame_edges);
+  defsubr (&Spgtk_frame_list_z_order);
+  defsubr (&Spgtk_frame_restack);
+  defsubr (&Spgtk_set_mouse_absolute_pixel_position);
+  defsubr (&Spgtk_mouse_absolute_pixel_position);
   defsubr (&Sx_display_mm_width);
   defsubr (&Sx_display_mm_height);
   defsubr (&Sx_display_screens);
@@ -3134,14 +3134,14 @@ be used as the image of the icon representing the frame.  */);
   defsubr (&Sx_close_connection);
   defsubr (&Sx_display_list);
 
-  defsubr (&Sgtk3wl_hide_others);
-  defsubr (&Sgtk3wl_hide_emacs);
-  defsubr (&Sgtk3wl_emacs_info_panel);
-  defsubr (&Sgtk3wl_list_services);
-  defsubr (&Sgtk3wl_perform_service);
+  defsubr (&Spgtk_hide_others);
+  defsubr (&Spgtk_hide_emacs);
+  defsubr (&Spgtk_emacs_info_panel);
+  defsubr (&Spgtk_list_services);
+  defsubr (&Spgtk_perform_service);
 #if 0
-  defsubr (&Sgtk3wl_popup_font_panel);
-  defsubr (&Sgtk3wl_popup_color_panel);
+  defsubr (&Spgtk_popup_font_panel);
+  defsubr (&Spgtk_popup_color_panel);
 #endif
 
   defsubr (&Sx_show_tip);
@@ -3196,7 +3196,7 @@ When using Gtk+ tooltips, the tooltip face is not used.  */);
 
 #include <stdarg.h>
 #include <time.h>
-void gtk3wl_log(const char *file, int lineno, const char *fmt, ...)
+void pgtk_log(const char *file, int lineno, const char *fmt, ...)
 {
   struct timespec ts;
   struct tm tm;
@@ -3215,7 +3215,7 @@ void gtk3wl_log(const char *file, int lineno, const char *fmt, ...)
   fputc('\n', stderr);
 }
 
-void gtk3wl_backtrace(const char *file, int lineno)
+void pgtk_backtrace(const char *file, int lineno)
 {
   Lisp_Object bt = make_uninit_vector(10);
   for (int i = 0; i < 10; i++)

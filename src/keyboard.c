@@ -3947,7 +3947,7 @@ kbd_buffer_get_event (KBOARD **kbp,
 	  kbd_fetch_ptr = event + 1;
 	}
 #if defined (USE_X_TOOLKIT) || defined (HAVE_NTGUI) \
-    || defined (HAVE_NS) || (defined (USE_GTK) && !defined(HAVE_GTK3WL))
+    || defined (HAVE_NS) || (defined (USE_GTK) && !defined(HAVE_PGTK))
       else if (event->kind == MENU_BAR_ACTIVATE_EVENT)
 	{
 	  kbd_fetch_ptr = event + 1;

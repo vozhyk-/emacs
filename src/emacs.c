@@ -1579,9 +1579,9 @@ Using an Emacs configured with --with-x-toolkit=lucid does not have this problem
       syms_of_nsselect ();
       syms_of_fontset ();
 #endif /* HAVE_NS */
-#ifdef HAVE_GTK3WL
-      syms_of_gtk3wlterm();
-      syms_of_gtk3wlfns();
+#ifdef HAVE_PGTK
+      syms_of_pgtkterm();
+      syms_of_pgtkfns();
       syms_of_fontset ();
 #endif
 
@@ -1646,7 +1646,7 @@ Using an Emacs configured with --with-x-toolkit=lucid does not have this problem
   init_dbusbind ();
 #endif
 #if defined(USE_GTK)
-#ifndef HAVE_GTK3WL
+#ifndef HAVE_PGTK
   init_xterm ();
 #endif
 #endif
