@@ -1055,7 +1055,7 @@ Also see `tramp-file-name-structure'.")
        "\\(-\\|[^/|:]\\{2,\\}\\)"
      ;; At least one character for method.
      "[^/|:]+")
-   ":\\'")
+   ":")
   "Regular expression matching file names handled by Tramp autoload.
 It must match the initial `tramp-syntax' settings.  It should not
 match file names at root of the underlying local file system,
@@ -2323,8 +2323,7 @@ Falls back to normal file name handler if no Tramp file name handler exists."
 		     'tramp-autoload-file-name-handler))
   (put 'tramp-autoload-file-name-handler 'safe-magic t)))
 
-;;;###autoload
-(tramp-register-autoload-file-name-handlers)
+;;;###autoload (tramp-register-autoload-file-name-handlers)
 
 (defun tramp-use-absolute-autoload-file-names ()
   "Change Tramp autoload objects to use absolute file names.
@@ -2938,14 +2937,13 @@ User is always nil."
   "Like `directory-file-name' for Tramp files."
   ;; If localname component of filename is "/", leave it unchanged.
   ;; Otherwise, remove any trailing slash from localname component.
-  ;; Method, host, etc, are unchanged.  Does it make sense to try
-  ;; to avoid parsing the filename?
-  (with-parsed-tramp-file-name directory nil
-    (if (and (not (zerop (length localname)))
-	     (eq (aref localname (1- (length localname))) ?/)
-	     (not (string= localname "/")))
-	(substring directory 0 -1)
-      directory)))
+  ;; Method, host, etc, are unchanged.
+  (while (with-parsed-tramp-file-name directory nil
+	   (and (not (zerop (length localname)))
+		(eq (aref localname (1- (length localname))) ?/)
+		(not (string= localname "/"))))
+    (setq directory (substring directory 0 -1)))
+  directory)
 
 (defun tramp-handle-directory-files (directory &optional full match nosort)
   "Like `directory-files' for Tramp files."
@@ -3172,6 +3170,11 @@ User is always nil."
 		((eq identification 'hop) hop)
 		(t (tramp-make-tramp-file-name
 		    method user domain host port "" hop)))))))))
+
+(defun tramp-handle-file-selinux-context (_filename)
+  "Like `file-selinux-context' for Tramp files."
+  ;; Return nil context.
+  '(nil nil nil nil))
 
 (defun tramp-handle-file-symlink-p (filename)
   "Like `file-symlink-p' for Tramp files."
