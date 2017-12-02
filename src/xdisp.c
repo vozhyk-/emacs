@@ -320,6 +320,10 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #ifdef HAVE_WINDOW_SYSTEM
 #include TERM_HEADER
 #endif /* HAVE_WINDOW_SYSTEM */
+#ifndef GTK3WL_TRACE
+#define GTK3WL_TRACE(fmt, ...) ((void) 0)
+#define GTK3WL_BACKTRACE() ((void) 0)
+#endif
 
 #ifndef FRAME_X_OUTPUT
 #define FRAME_X_OUTPUT(f) ((f)->output_data.x)

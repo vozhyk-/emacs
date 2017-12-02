@@ -39,6 +39,10 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include "termhooks.h"
 #include "keyboard.h"
 #include "coding.h"
+#ifndef GTK3WL_TRACE
+#define GTK3WL_TRACE(fmt, ...) ((void) 0)
+#define GTK3WL_BACKTRACE() ((void) 0)
+#endif
 
 #include <gdk/gdkkeysyms.h>
 

@@ -24,6 +24,8 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include "lisp.h"
 #ifndef HAVE_GTK3WL
 #include "xterm.h"
+#define GTK3WL_TRACE(fmt, ...) ((void) 0)
+#define GTK3WL_BACKTRACE() ((void) 0)
 #else
 #include "gtk3wlterm.h"
 #endif
