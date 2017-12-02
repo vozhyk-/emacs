@@ -57,7 +57,7 @@
                         'mouse-wheel-down-event
 			"22.1")
 (defcustom mouse-wheel-down-event
-  (if (or (featurep 'w32-win) (featurep 'ns-win))
+  (if (or (featurep 'w32-win) (featurep 'ns-win) (featurep 'pgtk))
       'wheel-up
     (intern (format "mouse-%s" mouse-wheel-down-button)))
   "Event used for scrolling down."
@@ -70,7 +70,7 @@
                         'mouse-wheel-up-event
 			"22.1")
 (defcustom mouse-wheel-up-event
-  (if (or (featurep 'w32-win) (featurep 'ns-win))
+  (if (or (featurep 'w32-win) (featurep 'ns-win) (featurep 'pgtk))
       'wheel-down
     (intern (format "mouse-%s" mouse-wheel-up-button)))
   "Event used for scrolling up."
@@ -349,13 +349,13 @@ the mode if ARG is omitted or nil."
   :version "26.1")
 
 (defvar mouse-wheel-left-event
-  (if (or (featurep 'w32-win) (featurep 'ns-win))
+  (if (or (featurep 'w32-win) (featurep 'ns-win) (featurep 'pgtk))
       'wheel-left
     (intern "mouse-6"))
   "Event used for scrolling left.")
 
 (defvar mouse-wheel-right-event
-  (if (or (featurep 'w32-win) (featurep 'ns-win))
+  (if (or (featurep 'w32-win) (featurep 'ns-win) (featurep 'pgtk))
       'wheel-right
     (intern "mouse-7"))
   "Event used for scrolling right.")

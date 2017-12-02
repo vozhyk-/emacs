@@ -15013,7 +15013,7 @@ construct_mouse_click (struct input_event *result,
 static gboolean
 button_event(GtkWidget *widget, GdkEvent *event, gpointer *user_data)
 {
-  PGTK_TRACE("button_event");
+  PGTK_TRACE("button_event: type=%d, button=%d.", event->button.type, event->button.button);
   union buffered_input_event inev;
   struct frame *f, *frame;
   struct pgtk_display_info *dpyinfo;
@@ -15169,6 +15169,76 @@ button_event(GtkWidget *widget, GdkEvent *event, gpointer *user_data)
   return TRUE;
 }
 
+static gboolean
+scroll_event(GtkWidget *widget, GdkEvent *event, gpointer *user_data)
+{
+  PGTK_TRACE("scroll_event");
+  union buffered_input_event inev;
+  struct frame *f, *frame;
+  struct pgtk_display_info *dpyinfo;
+
+  EVENT_INIT (inev.ie);
+  inev.ie.kind = NO_EVENT;
+  inev.ie.arg = Qnil;
+
+  frame = pgtk_any_window_to_frame(gtk_widget_get_window(widget));
+  dpyinfo = FRAME_DISPLAY_INFO (frame);
+
+  if (x_mouse_grabbed (dpyinfo))
+    f = dpyinfo->last_mouse_frame;
+  else
+    f = pgtk_any_window_to_frame(gtk_widget_get_window(widget));
+
+  inev.ie.kind = WHEEL_EVENT;
+  inev.ie.timestamp = event->scroll.time;
+  inev.ie.modifiers = pgtk_gtk_to_emacs_modifiers (event->scroll.state);
+  XSETINT (inev.ie.x, event->scroll.x);
+  XSETINT (inev.ie.y, event->scroll.y);
+  XSETFRAME (inev.ie.frame_or_window, f);
+  inev.ie.arg = Qnil;
+
+  switch (event->scroll.direction) {
+  case GDK_SCROLL_UP:
+    inev.ie.kind = WHEEL_EVENT;
+    inev.ie.modifiers |= up_modifier;
+    break;
+  case GDK_SCROLL_DOWN:
+    inev.ie.kind = WHEEL_EVENT;
+    inev.ie.modifiers |= down_modifier;
+    break;
+  case GDK_SCROLL_LEFT:
+    inev.ie.kind = HORIZ_WHEEL_EVENT;
+    inev.ie.modifiers |= up_modifier;
+    break;
+  case GDK_SCROLL_RIGHT:
+    inev.ie.kind = HORIZ_WHEEL_EVENT;
+    inev.ie.modifiers |= down_modifier;
+    break;
+  case GDK_SCROLL_SMOOTH:
+    if (event->scroll.delta_y >= 0.5) {
+      inev.ie.kind = WHEEL_EVENT;
+      inev.ie.modifiers |= down_modifier;
+    } else if (event->scroll.delta_y <= -0.5) {
+      inev.ie.kind = WHEEL_EVENT;
+      inev.ie.modifiers |= up_modifier;
+    } else if (event->scroll.delta_x >= 0.5) {
+      inev.ie.kind = HORIZ_WHEEL_EVENT;
+      inev.ie.modifiers |= down_modifier;
+    } else if (event->scroll.delta_x <= -0.5) {
+      inev.ie.kind = HORIZ_WHEEL_EVENT;
+      inev.ie.modifiers |= up_modifier;
+    } else
+      return TRUE;
+    break;
+  default:
+    return TRUE;
+  }
+
+  if (inev.ie.kind != NO_EVENT)
+    kbd_buffer_store_buffered_event (&inev, NULL);
+  return TRUE;
+}
+
 void
 pgtk_set_event_handler(struct frame *f)
 {
@@ -15181,6 +15251,7 @@ pgtk_set_event_handler(struct frame *f)
   g_signal_connect(G_OBJECT(FRAME_GTK_WIDGET(f)), "motion-notify-event", G_CALLBACK(motion_notify_event), NULL);
   g_signal_connect(G_OBJECT(FRAME_GTK_WIDGET(f)), "button-press-event", G_CALLBACK(button_event), NULL);
   g_signal_connect(G_OBJECT(FRAME_GTK_WIDGET(f)), "button-release-event", G_CALLBACK(button_event), NULL);
+  g_signal_connect(G_OBJECT(FRAME_GTK_WIDGET(f)), "scroll-event", G_CALLBACK(scroll_event), NULL);
   g_signal_connect(G_OBJECT(FRAME_GTK_WIDGET(f)), "event", G_CALLBACK(pgtk_handle_event), NULL);
   g_signal_connect(G_OBJECT(FRAME_GTK_WIDGET(f)), "draw", G_CALLBACK(pgtk_handle_draw), NULL);
 }

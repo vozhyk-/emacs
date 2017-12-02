@@ -1345,6 +1345,10 @@ xg_create_frame_widgets (struct frame *f)
                          | GDK_LEAVE_NOTIFY_MASK
                          | GDK_FOCUS_CHANGE_MASK
                          | GDK_STRUCTURE_MASK
+#ifdef HAVE_PGTK
+                         | GDK_SCROLL_MASK
+                         | GDK_SMOOTH_SCROLL_MASK
+#endif
                          | GDK_VISIBILITY_NOTIFY_MASK);
 
   /* Must realize the windows so the X window gets created.  It is used
