@@ -14708,6 +14708,8 @@ enter_notify_event(GtkWidget *widget, GdkEvent *event, gpointer *user_data)
     x_focus_changed (TRUE,
 		     FOCUS_IMPLICIT,
 		     FRAME_DISPLAY_INFO(focus_frame), focus_frame, &inev);
+  if (inev.ie.kind != NO_EVENT)
+    kbd_buffer_store_buffered_event (&inev, NULL);
   return TRUE;
 }
 
@@ -14728,6 +14730,8 @@ leave_notify_event(GtkWidget *widget, GdkEvent *event, gpointer *user_data)
     x_focus_changed (FALSE,
 		     FOCUS_IMPLICIT,
 		     FRAME_DISPLAY_INFO(focus_frame), focus_frame, &inev);
+  if (inev.ie.kind != NO_EVENT)
+    kbd_buffer_store_buffered_event (&inev, NULL);
   return TRUE;
 }
 
@@ -14744,6 +14748,8 @@ focus_in_event(GtkWidget *widget, GdkEvent *event, gpointer *user_data)
 
   x_focus_changed (TRUE, FOCUS_IMPLICIT,
 		   FRAME_DISPLAY_INFO(frame), frame, &inev);
+  if (inev.ie.kind != NO_EVENT)
+    kbd_buffer_store_buffered_event (&inev, NULL);
   return TRUE;
 }
 
@@ -14760,6 +14766,8 @@ focus_out_event(GtkWidget *widget, GdkEvent *event, gpointer *user_data)
 
   x_focus_changed (FALSE, FOCUS_IMPLICIT,
 		   FRAME_DISPLAY_INFO(frame), frame, &inev);
+  if (inev.ie.kind != NO_EVENT)
+    kbd_buffer_store_buffered_event (&inev, NULL);
   return TRUE;
 }
 
