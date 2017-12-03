@@ -1582,6 +1582,7 @@ Using an Emacs configured with --with-x-toolkit=lucid does not have this problem
 #ifdef HAVE_PGTK
       syms_of_pgtkterm();
       syms_of_pgtkfns();
+      syms_of_pgtkselect ();
       syms_of_fontset ();
 #endif
 

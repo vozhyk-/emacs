@@ -2023,7 +2023,7 @@ terminate Emacs if we can't open the connection.
 
   CHECK_STRING (display);
 
-  // nxatoms_of_pgtkselect ();
+  nxatoms_of_pgtkselect ();
   dpyinfo = pgtk_term_init (display);
   if (dpyinfo == 0)
     {
