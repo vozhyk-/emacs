@@ -15577,8 +15577,7 @@ pgtk_term_init (Lisp_Object display_name)
   block_input ();
 
   baud_rate = 38400;
-  /* pure gtk can't select() for Wayland and X11. Use polling with alarm for a while. */
-  Fset_input_interrupt_mode (Qnil);
+  Fset_input_interrupt_mode (Qnil);  /* see init_pgtkterm() */
 
   if (selfds[0] == -1)
     {
@@ -15977,7 +15976,9 @@ pgtk_cr_destroy_surface(struct frame *f)
 void
 init_pgtkterm (void)
 {
-  /* pure gtk can't select() for Wayland and X11.
-     Use polling with alarm for a while.  */
+  /* FD for select() is unknown on pure gtk, so I can't setup
+     SIGIO for it. I use polling, not interrupts.
+     However, alarm does not occur when timerfd is available.
+     I can't poll without alarm, so disable timerfd. */
   xputenv ("EMACS_IGNORE_TIMERFD=1");
 }
