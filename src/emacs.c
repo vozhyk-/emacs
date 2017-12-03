@@ -1587,6 +1587,7 @@ Using an Emacs configured with --with-x-toolkit=lucid does not have this problem
       syms_of_pgtkfns();
       syms_of_pgtkselect ();
       syms_of_fontset ();
+      syms_of_xsettings ();
 #endif
 
       syms_of_gnutls ();

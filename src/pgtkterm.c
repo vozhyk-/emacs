@@ -52,6 +52,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include "keyboard.h"
 #include "buffer.h"
 #include "font.h"
+#include "xsettings.h"
 
 #if 0
 
@@ -15629,6 +15630,8 @@ pgtk_term_init (Lisp_Object display_name)
       ns_antialias_threshold = NILP (tmp) ? 10.0 : extract_float (tmp);
 #endif
     }
+
+  xsettings_initialize (dpyinfo);
 
   unblock_input ();
 

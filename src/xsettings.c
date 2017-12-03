@@ -26,14 +26,23 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include <byteswap.h>
 
 #include "lisp.h"
+#ifndef HAVE_PGTK
 #include "xterm.h"
+#else
+#include "gtkutil.h"
+#endif
 #include "xsettings.h"
 #include "frame.h"
 #include "keyboard.h"
 #include "blockinput.h"
 #include "termhooks.h"
 
+#ifndef HAVE_PGTK
 #include <X11/Xproto.h>
+#else
+typedef unsigned short CARD16;
+typedef unsigned int CARD32;
+#endif
 
 #ifdef HAVE_GSETTINGS
 #include <glib-object.h>
@@ -45,12 +54,14 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #endif
 
 #ifdef HAVE_XFT
+#ifndef HAVE_PGTK
 #include <X11/Xft/Xft.h>
+#endif
 #endif
 
 static char *current_mono_font;
 static char *current_font;
-static struct x_display_info *first_dpyinfo;
+static Display_Info *first_dpyinfo;
 static Lisp_Object current_tool_bar_style;
 
 /* Store an config changed event in to the event queue.  */
@@ -68,24 +79,29 @@ store_config_changed_event (Lisp_Object arg, Lisp_Object display_name)
 
 /* Return true if DPYINFO is still valid.  */
 static bool
-dpyinfo_valid (struct x_display_info *dpyinfo)
+dpyinfo_valid (Display_Info *dpyinfo)
 {
   bool found = false;
   if (dpyinfo != NULL)
     {
-      struct x_display_info *d;
+      Display_Info *d;
       for (d = x_display_list; !found && d; d = d->next)
+#ifndef HAVE_PGTK
         found = d == dpyinfo && d->display == dpyinfo->display;
+#else
+        found = d == dpyinfo;
+#endif
     }
   return found;
 }
 
 /* Store a monospace font change event if the monospaced font changed.  */
 
-#if defined HAVE_XFT && (defined HAVE_GSETTINGS || defined HAVE_GCONF)
+#if (defined HAVE_XFT || defined USE_CAIRO) && (defined HAVE_GSETTINGS || defined HAVE_GCONF)
 static void
 store_monospaced_changed (const char *newfont)
 {
+  PGTK_TRACE("store_monospaced_changed: %s", newfont);
   if (current_mono_font != NULL && strcmp (newfont, current_mono_font) == 0)
     return; /* No change. */
 
@@ -101,10 +117,11 @@ store_monospaced_changed (const char *newfont)
 
 /* Store a font name change event if the font name changed.  */
 
-#ifdef HAVE_XFT
+#if defined(HAVE_XFT) || defined(USE_CAIRO)
 static void
 store_font_name_changed (const char *newfont)
 {
+  PGTK_TRACE("store_font_name_changed: %s", newfont);
   if (current_font != NULL && strcmp (newfont, current_font) == 0)
     return; /* No change. */
 
@@ -118,6 +135,7 @@ store_font_name_changed (const char *newfont)
 }
 #endif /* HAVE_XFT */
 
+#ifndef HAVE_PGTK
 /* Map TOOL_BAR_STYLE from a string to its corresponding Lisp value.
    Return Qnil if TOOL_BAR_STYLE is not known.  */
 
@@ -139,12 +157,14 @@ map_tool_bar_style (const char *tool_bar_style)
 
   return style;
 }
+#endif
 
+#ifndef HAVE_PGTK
 /* Store a tool bar style change event if the tool bar style changed.  */
 
 static void
 store_tool_bar_style_changed (const char *newstyle,
-                              struct x_display_info *dpyinfo)
+                              Display_Info *dpyinfo)
 {
   Lisp_Object style = map_tool_bar_style (newstyle);
   if (EQ (current_tool_bar_style, style))
@@ -155,11 +175,14 @@ store_tool_bar_style_changed (const char *newstyle,
     store_config_changed_event (Qtool_bar_style,
                                 XCAR (dpyinfo->name_list_element));
 }
+#endif
 
+#ifndef HAVE_PGTK
 #ifdef HAVE_XFT
 #define XSETTINGS_FONT_NAME       "Gtk/FontName"
 #endif
 #define XSETTINGS_TOOL_BAR_STYLE  "Gtk/ToolbarStyle"
+#endif
 
 enum {
   SEEN_AA         = 0x01,
@@ -190,7 +213,7 @@ struct xsettings
 #define GSETTINGS_SCHEMA         "org.gnome.desktop.interface"
 #define GSETTINGS_TOOL_BAR_STYLE "toolbar-style"
 
-#ifdef HAVE_XFT
+#if defined(HAVE_XFT) || defined(USE_CAIRO)
 #define GSETTINGS_MONO_FONT  "monospace-font-name"
 #define GSETTINGS_FONT_NAME  "font-name"
 #endif
@@ -217,13 +240,15 @@ something_changed_gsettingsCB (GSettings *settings,
           g_variant_ref_sink (val);
           if (g_variant_is_of_type (val, G_VARIANT_TYPE_STRING))
             {
+#ifndef HAVE_PGTK
               const gchar *newstyle = g_variant_get_string (val, NULL);
               store_tool_bar_style_changed (newstyle, first_dpyinfo);
+#endif
             }
           g_variant_unref (val);
         }
     }
-#ifdef HAVE_XFT
+#if defined(HAVE_XFT) || defined(USE_CAIRO)
   else if (strcmp (key, GSETTINGS_MONO_FONT) == 0)
     {
       val = g_settings_get_value (settings, GSETTINGS_MONO_FONT);
@@ -316,10 +341,11 @@ something_changed_gconfCB (GConfClient *client,
 
 #endif /* HAVE_XFT */
 
+#ifndef HAVE_PGTK
 /* Find the window that contains the XSETTINGS property values.  */
 
 static void
-get_prop_window (struct x_display_info *dpyinfo)
+get_prop_window (Display_Info *dpyinfo)
 {
   Display *dpy = dpyinfo->display;
 
@@ -334,6 +360,9 @@ get_prop_window (struct x_display_info *dpyinfo)
 
   XUngrabServer (dpy);
 }
+#endif
+
+#ifndef HAVE_PGTK
 
 #define PAD(nr)    (((nr) + 3) & ~3)
 
@@ -561,13 +590,15 @@ parse_settings (unsigned char *prop,
 
   return settings_seen;
 }
+#endif
 
+#ifndef HAVE_PGTK
 /* Read settings from the XSettings property window on display for DPYINFO.
    Store settings read in SETTINGS.
    Return true iff successful.  */
 
 static bool
-read_settings (struct x_display_info *dpyinfo, struct xsettings *settings)
+read_settings (Display_Info *dpyinfo, struct xsettings *settings)
 {
   Atom act_type;
   int act_form;
@@ -595,12 +626,14 @@ read_settings (struct x_display_info *dpyinfo, struct xsettings *settings)
 
   return got_settings;
 }
+#endif
 
+#ifndef HAVE_PGTK
 /* Apply Xft settings in SETTINGS to the Xft library.
    Store a Lisp event that Xft settings changed.  */
 
 static void
-apply_xft_settings (struct x_display_info *dpyinfo,
+apply_xft_settings (Display_Info *dpyinfo,
                     struct xsettings *settings)
 {
 #ifdef HAVE_XFT
@@ -726,12 +759,14 @@ apply_xft_settings (struct x_display_info *dpyinfo,
     FcPatternDestroy (pat);
 #endif /* HAVE_XFT */
 }
+#endif
 
+#ifndef HAVE_PGTK
 /* Read XSettings from the display for DPYINFO.
    If SEND_EVENT_P store a Lisp event settings that changed.  */
 
 static void
-read_and_apply_settings (struct x_display_info *dpyinfo, bool send_event_p)
+read_and_apply_settings (Display_Info *dpyinfo, bool send_event_p)
 {
   struct xsettings settings;
 
@@ -758,11 +793,13 @@ read_and_apply_settings (struct x_display_info *dpyinfo, bool send_event_p)
     }
 #endif
 }
+#endif
 
+#if 0
 /* Check if EVENT for the display in DPYINFO is XSettings related.  */
 
 void
-xft_settings_event (struct x_display_info *dpyinfo, const XEvent *event)
+xft_settings_event (Display_Info *dpyinfo, const XEvent *event)
 {
   bool check_window_p = false, apply_settings_p = false;
 
@@ -800,6 +837,7 @@ xft_settings_event (struct x_display_info *dpyinfo, const XEvent *event)
   if (apply_settings_p)
     read_and_apply_settings (dpyinfo, true);
 }
+#endif
 
 /* Initialize GSettings and read startup values.  */
 
@@ -839,6 +877,7 @@ init_gsettings (void)
   g_signal_connect (G_OBJECT (gsettings_client), "changed",
                     G_CALLBACK (something_changed_gsettingsCB), NULL);
 
+#ifndef HAVE_PGTK
   val = g_settings_get_value (gsettings_client, GSETTINGS_TOOL_BAR_STYLE);
   if (val)
     {
@@ -848,8 +887,9 @@ init_gsettings (void)
           = map_tool_bar_style (g_variant_get_string (val, NULL));
       g_variant_unref (val);
     }
+#endif
 
-#ifdef HAVE_XFT
+#if defined(HAVE_XFT) || defined(USE_CAIRO)
   val = g_settings_get_value (gsettings_client, GSETTINGS_MONO_FONT);
   if (val)
     {
@@ -895,12 +935,14 @@ init_gconf (void)
                            something_changed_gconfCB,
                            NULL, NULL, NULL);
 
+#ifndef HAVE_PGTK
   s = gconf_client_get_string (gconf_client, GCONF_TOOL_BAR_STYLE, NULL);
   if (s)
     {
       current_tool_bar_style = map_tool_bar_style (s);
       g_free (s);
     }
+#endif
 
 #ifdef HAVE_XFT
   s = gconf_client_get_string (gconf_client, GCONF_MONO_FONT, NULL);
@@ -935,10 +977,11 @@ init_gconf (void)
 #endif /* HAVE_GCONF */
 }
 
+#ifndef HAVE_PGTK
 /* Init Xsettings and read startup values.  */
 
 static void
-init_xsettings (struct x_display_info *dpyinfo)
+init_xsettings (Display_Info *dpyinfo)
 {
   Display *dpy = dpyinfo->display;
 
@@ -954,13 +997,17 @@ init_xsettings (struct x_display_info *dpyinfo)
 
   unblock_input ();
 }
+#endif
 
 void
-xsettings_initialize (struct x_display_info *dpyinfo)
+xsettings_initialize (Display_Info *dpyinfo)
 {
+  PGTK_TRACE("xsettings_initialize.");
   if (first_dpyinfo == NULL) first_dpyinfo = dpyinfo;
   init_gconf ();
+#ifndef HAVE_PGTK
   init_xsettings (dpyinfo);
+#endif
   init_gsettings ();
 }
 
@@ -1049,7 +1096,7 @@ If this variable is nil, Emacs ignores system font changes.  */);
                doc: /* Font settings applied to Xft.  */);
   Vxft_settings = empty_unibyte_string;
 
-#ifdef HAVE_XFT
+#if defined(HAVE_XFT) || defined(HAVE_CAIRO)
   Fprovide (intern_c_string ("font-render-setting"), Qnil);
 #if defined (HAVE_GCONF) || defined (HAVE_GSETTINGS)
   Fprovide (intern_c_string ("system-font-setting"), Qnil);

@@ -2746,7 +2746,7 @@ LIBS=$OLD_LIBS
 PGTK_OBJ=
 PGTK_LIBS=
 if test "$window_system" = "pgtk"; then
-  PGTK_OBJ="pgtkfns.o pgtkterm.o pgtkselect.o"
+  PGTK_OBJ="pgtkfns.o pgtkterm.o pgtkselect.o xsettings.o"
   PGTK_LIBS="$GTK_LIBS"
   AC_DEFINE([HAVE_PGTK], 1, [Define to 1 if you have pure Gtk+-3.])
 fi
@@ -2782,7 +2782,7 @@ AC_SUBST(DBUS_OBJ)
 
 dnl GSettings has been tested under GNU/Linux only.
 HAVE_GSETTINGS=no
-if test "${HAVE_X11}" = "yes" && test "${with_gsettings}" = "yes"; then
+if test "${HAVE_X11}" = "yes" -o "${window_system}" = "pgtk" && test "${with_gsettings}" = "yes"; then
    EMACS_CHECK_MODULES([GSETTINGS], [gio-2.0 >= 2.26])
    if test "$HAVE_GSETTINGS" = "yes"; then
       old_CFLAGS=$CFLAGS
@@ -2816,7 +2816,7 @@ fi
 dnl GConf has been tested under GNU/Linux only.
 dnl The version is really arbitrary, it is about the same age as Gtk+ 2.6.
 HAVE_GCONF=no
-if test "${HAVE_X11}" = "yes" && test "${with_gconf}" != "no"; then
+if test "${HAVE_X11}" = "yes" -o "${window_system}" = "pgtk" && test "${with_gconf}" != "no"; then
    EMACS_CHECK_MODULES([GCONF], [gconf-2.0 >= 2.13])
    if test "$HAVE_GCONF" = yes; then
       AC_DEFINE(HAVE_GCONF, 1, [Define to 1 if using GConf.])
@@ -3305,7 +3305,7 @@ else
     if test $window_system = pgtk; then
       EMACS_CHECK_MODULES([FONTCONFIG], [fontconfig >= 2.2.0])
       EMACS_CHECK_MODULES([FREETYPE], [freetype2])
-      if test "$HAVE_FONTCONFIG" != yes -o test "$HAVE_FREETYPE" != yes; then
+      if test "$HAVE_FONTCONFIG" != yes -o "$HAVE_FREETYPE" != yes; then
         AC_MSG_ERROR(fontconfig and freetype is required.)
       fi
       HAVE_LIBOTF=no
