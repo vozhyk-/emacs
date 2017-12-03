@@ -12657,7 +12657,7 @@ pgtk_clear_frame (struct frame *f)
 static int
 pgtk_read_socket (struct terminal *terminal, struct input_event *hold_quit)
 {
-  // PGTK_TRACE("pgtk_read_socket");
+  PGTK_TRACE("pgtk_read_socket");
   int count = 0;
   bool event_found = false;
   struct x_display_info *dpyinfo = terminal->display_info.x;
@@ -12762,7 +12762,7 @@ pgtk_create_terminal (struct pgtk_display_info *dpyinfo)
   // terminal->ring_bell_hook = pgtk_ring_bell;
   terminal->update_begin_hook = pgtk_update_begin;
   terminal->update_end_hook = pgtk_update_end;
-  // terminal->read_socket_hook = pgtk_read_socket;
+  terminal->read_socket_hook = pgtk_read_socket;
   // terminal->frame_up_to_date_hook = pgtk_frame_up_to_date;
   terminal->mouse_position_hook = pgtk_mouse_position;
   // terminal->frame_rehighlight_hook = pgtk_frame_rehighlight;
@@ -15577,6 +15577,7 @@ pgtk_term_init (Lisp_Object display_name)
   block_input ();
 
   baud_rate = 38400;
+  /* pure gtk can't select() for Wayland and X11. Use polling with alarm for a while. */
   Fset_input_interrupt_mode (Qnil);
 
   if (selfds[0] == -1)
@@ -15629,8 +15630,6 @@ pgtk_term_init (Lisp_Object display_name)
       ns_antialias_threshold = NILP (tmp) ? 10.0 : extract_float (tmp);
 #endif
     }
-
-  delete_keyboard_wait_descriptor (0);
 
   unblock_input ();
 
@@ -15973,4 +15972,12 @@ pgtk_cr_destroy_surface(struct frame *f)
     cairo_surface_destroy(FRAME_CR_SURFACE(f));
     FRAME_CR_SURFACE(f) = NULL;
   }
+}
+
+void
+init_pgtkterm (void)
+{
+  /* pure gtk can't select() for Wayland and X11.
+     Use polling with alarm for a while.  */
+  xputenv ("EMACS_IGNORE_TIMERFD=1");
 }

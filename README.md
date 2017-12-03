@@ -34,12 +34,11 @@ Many many debugging outputs. Please ignore them.
 Higher:
 - no scrollbar.
 - no audible bell.
-- no mouse events.
 - clipboard not supported.
 - sometimes segmentation fault.
 - initial font.
 - initial size.
-- keyboard quit doesn't work.
+- quit is delayed.
 
 Lower:
 - no toolbar.

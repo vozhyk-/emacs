@@ -18,6 +18,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 
 #include <config.h>
 #include <stdio.h>
+#include <stdlib.h>
 
 #include "lisp.h"
 #include "keyboard.h"
@@ -564,7 +565,7 @@ init_atimer (void)
 #ifdef HAVE_ITIMERSPEC
 # ifdef HAVE_TIMERFD
   /* Until this feature is considered stable, you can ask to not use it.  */
-  timerfd = (egetenv ("EMACS_IGNORE_TIMERFD") ? -1 :
+  timerfd = (getenv ("EMACS_IGNORE_TIMERFD") ? -1 :    /* process-environment is not setup yet, so egetenv() is not available. */
 	     timerfd_create (CLOCK_REALTIME, TFD_NONBLOCK | TFD_CLOEXEC));
 # endif
   if (timerfd < 0)

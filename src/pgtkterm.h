@@ -711,4 +711,6 @@ extern char gnustep_base_version[];  /* version tracking */
 extern void
 pgtk_clear_under_internal_border (struct frame *f);
 
+extern void init_pgtkterm (void);
+
 #endif	/* HAVE_PGTK */
