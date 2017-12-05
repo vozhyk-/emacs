@@ -36,9 +36,10 @@ Higher:
 - no audible bell.
 - clipboard not supported.
 - sometimes segmentation fault.
+- initial window(not frame) size.
 - initial font.
-- initial size.
 - quit is delayed.
+- alt vs. meta.
 
 Lower:
 - no toolbar.

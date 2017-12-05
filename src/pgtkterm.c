@@ -9415,6 +9415,11 @@ x_set_window_size (struct frame *f,
 
 #if 0
   gtk_widget_set_size_request(FRAME_GTK_WIDGET(f), pixelwidth, pixelheight);
+#else
+  // gtk_widget_set_size_request(FRAME_GTK_OUTER_WIDGET(f), pixelwidth, pixelheight);
+  PGTK_TRACE("x_set_window_size: %p: %dx%d.", f, width, height);
+  gtk_window_resize(FRAME_GTK_OUTER_WIDGET(f), pixelwidth, pixelheight);
+  x_wm_set_size_hint(f, 0, 0);
 #endif
 
   unblock_input ();
@@ -15857,6 +15862,14 @@ A value of nil means to draw the underline according to the value of the
 variable `x-use-underline-position-properties', which is usually at the
 baseline level.  The default value is nil.  */);
   x_underline_at_descent_line = 0;
+
+  DEFVAR_BOOL ("x-gtk-use-window-move", x_gtk_use_window_move,
+    doc: /* Non-nil means rely on gtk_window_move to set frame positions.
+If this variable is t (the default), the GTK build uses the function
+gtk_window_move to set or store frame positions and disables some time
+consuming frame position adjustments.  In newer versions of GTK, Emacs
+always uses gtk_window_move and ignores the value of this variable.  */);
+  x_gtk_use_window_move = true;
 
   /* Tell Emacs about this window system.  */
   Fprovide (Qpgtk, Qnil);

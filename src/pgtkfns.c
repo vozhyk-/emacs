@@ -1081,6 +1081,92 @@ get_geometry_from_preferences (struct pgtk_display_info *dpyinfo,
 #endif
 }
 
+/* Return the pixel color value for color COLOR_NAME on frame F.  If F
+   is a monochrome frame, return MONO_COLOR regardless of what ARG says.
+   Signal an error if color can't be allocated.  */
+
+static int
+x_decode_color (struct frame *f, Lisp_Object color_name, int mono_color)
+{
+  XColor cdef;
+
+  CHECK_STRING (color_name);
+
+  /* Return MONO_COLOR for monochrome frames.  */
+  if (FRAME_DISPLAY_INFO (f)->n_planes == 1)
+    return mono_color;
+
+  /* x_defined_color is responsible for coping with failures
+     by looking for a near-miss.  */
+  if (pgtk_defined_color (f, SSDATA (color_name), &cdef, true, 0))
+    return cdef.pixel;
+
+  signal_error ("Undefined color", color_name);
+}
+
+static void
+x_default_font_parameter (struct frame *f, Lisp_Object parms)
+{
+  struct pgtk_display_info *dpyinfo = FRAME_DISPLAY_INFO (f);
+  Lisp_Object font_param = x_get_arg (dpyinfo, parms, Qfont, NULL, NULL,
+                                      RES_TYPE_STRING);
+  Lisp_Object font = Qnil;
+  if (EQ (font_param, Qunbound))
+    font_param = Qnil;
+
+  if (NILP (font_param))
+    {
+      /* System font should take precedence over X resources.  We suggest this
+         regardless of font-use-system-font because .emacs may not have been
+         read yet.  */
+      const char *system_font = xsettings_get_system_font ();
+      if (system_font)
+	font = font_open_by_name (f, build_unibyte_string (system_font));
+    }
+
+  if (NILP (font))
+      font = !NILP (font_param) ? font_param
+      : x_get_arg (dpyinfo, parms, Qfont, "font", "Font", RES_TYPE_STRING);
+
+  if (! FONTP (font) && ! STRINGP (font))
+    {
+      const char *names[]
+	= {
+	    "monospace-10",
+	    "-adobe-courier-medium-r-*-*-*-120-*-*-*-*-iso8859-1",
+	    "-misc-fixed-medium-r-normal-*-*-140-*-*-c-*-iso8859-1",
+	    "-*-*-medium-r-normal-*-*-140-*-*-c-*-iso8859-1",
+	    /* This was formerly the first thing tried, but it finds
+	       too many fonts and takes too long.  */
+	    "-*-*-medium-r-*-*-*-*-*-*-c-*-iso8859-1",
+	    /* If those didn't work, look for something which will
+	       at least work.  */
+	    "-*-fixed-*-*-*-*-*-140-*-*-c-*-iso8859-1",
+	    "fixed",
+	    NULL };
+      int i;
+
+      for (i = 0; names[i]; i++)
+	{
+	  font = font_open_by_name (f, build_unibyte_string (names[i]));
+	  if (! NILP (font))
+	    break;
+	}
+      if (NILP (font))
+	error ("No suitable font was found");
+    }
+  else if (!NILP (font_param))
+    {
+      /* Remember the explicit font parameter, so we can re-apply it after
+	 we've applied the `default' face settings.  */
+      AUTO_FRAME_ARG (arg, Qfont_parameter, font_param);
+      x_set_frame_parameters (f, arg);
+    }
+
+  /* This call will make X resources override any system font setting.  */
+  x_default_parameter (f, parms, Qfont, font, "font", "Font", RES_TYPE_STRING);
+}
+
 /* ==========================================================================
 
     Lisp definitions
@@ -1089,38 +1175,38 @@ get_geometry_from_preferences (struct pgtk_display_info *dpyinfo,
 
 DEFUN ("x-create-frame", Fx_create_frame, Sx_create_frame,
        1, 1, 0,
-       doc: /* Make a new Nextstep window, called a "frame" in Emacs terms.
-Return an Emacs frame object.
-PARMS is an alist of frame parameters.
+       doc: /* Make a new X window, which is called a "frame" in Emacs terms.
+Return an Emacs frame object.  PARMS is an alist of frame parameters.
 If the parameters specify that the frame should not have a minibuffer,
-and do not specify a specific minibuffer window to use,
-then `default-minibuffer-frame' must be a frame whose minibuffer can
-be shared by the new frame.
+and do not specify a specific minibuffer window to use, then
+`default-minibuffer-frame' must be a frame whose minibuffer can be
+shared by the new frame.
 
 This function is an internal primitive--use `make-frame' instead.  */)
-     (Lisp_Object parms)
+  (Lisp_Object parms)
 {
   struct frame *f;
   Lisp_Object frame, tem;
   Lisp_Object name;
-  int minibuffer_only = 0;
+  bool minibuffer_only = false;
+  bool undecorated = false, override_redirect = false;
   long window_prompting = 0;
-  ptrdiff_t count = specpdl_ptr - specpdl;
+  ptrdiff_t count = SPECPDL_INDEX ();
   Lisp_Object display;
   struct pgtk_display_info *dpyinfo = NULL;
   Lisp_Object parent, parent_frame;
   struct kboard *kb;
-  static int desc_ctr = 1;
   int x_width = 0, x_height = 0;
 
-  /* x_get_arg modifies parms.  */
   parms = Fcopy_alist (parms);
 
   /* Use this general default value to start with
      until we know if this frame has a specified name.  */
   Vx_resource_name = Vinvocation_name;
 
-  display = x_get_arg (dpyinfo, parms, Qterminal, 0, 0, RES_TYPE_STRING);
+  display = x_get_arg (dpyinfo, parms, Qterminal, 0, 0, RES_TYPE_NUMBER);
+  if (EQ (display, Qunbound))
+    display = x_get_arg (dpyinfo, parms, Qdisplay, 0, 0, RES_TYPE_STRING);
   if (EQ (display, Qunbound))
     display = Qnil;
   dpyinfo = check_pgtk_display_info (display);
@@ -1129,7 +1215,7 @@ This function is an internal primitive--use `make-frame' instead.  */)
   if (!dpyinfo->terminal->name)
     error ("Terminal is not live, can't create new frames on it");
 
-  name = x_get_arg (dpyinfo, parms, Qname, 0, 0, RES_TYPE_STRING);
+  name = x_get_arg (dpyinfo, parms, Qname, "name", "Name", RES_TYPE_STRING);
   if (!STRINGP (name)
       && ! EQ (name, Qunbound)
       && ! NILP (name))
@@ -1138,29 +1224,57 @@ This function is an internal primitive--use `make-frame' instead.  */)
   if (STRINGP (name))
     Vx_resource_name = name;
 
-  parent = x_get_arg (dpyinfo, parms, Qparent_id, 0, 0, RES_TYPE_NUMBER);
+  /* See if parent window is specified.  */
+  parent = x_get_arg (dpyinfo, parms, Qparent_id, NULL, NULL, RES_TYPE_NUMBER);
   if (EQ (parent, Qunbound))
     parent = Qnil;
   if (! NILP (parent))
     CHECK_NUMBER (parent);
 
-  /* make_frame_without_minibuffer can run Lisp code and garbage collect.  */
-  /* No need to protect DISPLAY because that's not used after passing
-     it to make_frame_without_minibuffer.  */
   frame = Qnil;
   tem = x_get_arg (dpyinfo, parms, Qminibuffer, "minibuffer", "Minibuffer",
-                  RES_TYPE_SYMBOL);
+		   RES_TYPE_SYMBOL);
   if (EQ (tem, Qnone) || NILP (tem))
-      f = make_frame_without_minibuffer (Qnil, kb, display);
+    f = make_frame_without_minibuffer (Qnil, kb, display);
   else if (EQ (tem, Qonly))
     {
       f = make_minibuffer_frame ();
-      minibuffer_only = 1;
+      minibuffer_only = true;
     }
   else if (WINDOWP (tem))
-      f = make_frame_without_minibuffer (tem, kb, display);
+    f = make_frame_without_minibuffer (tem, kb, display);
   else
-      f = make_frame (1);
+    f = make_frame (true);
+
+  parent_frame = x_get_arg (dpyinfo, parms, Qparent_frame, NULL, NULL,
+			    RES_TYPE_SYMBOL);
+  /* Accept parent-frame iff parent-id was not specified.  */
+  if (!NILP (parent)
+      || EQ (parent_frame, Qunbound)
+      || NILP (parent_frame)
+      || !FRAMEP (parent_frame)
+      || !FRAME_LIVE_P (XFRAME (parent_frame))
+      || !FRAME_PGTK_P (XFRAME (parent_frame)))
+    parent_frame = Qnil;
+
+  fset_parent_frame (f, parent_frame);
+  store_frame_param (f, Qparent_frame, parent_frame);
+
+  if (!NILP (tem = (x_get_arg (dpyinfo, parms, Qundecorated, NULL, NULL,
+			       RES_TYPE_BOOLEAN)))
+      && !(EQ (tem, Qunbound)))
+    undecorated = true;
+
+  FRAME_UNDECORATED (f) = undecorated;
+  store_frame_param (f, Qundecorated, undecorated ? Qt : Qnil);
+
+  if (!NILP (tem = (x_get_arg (dpyinfo, parms, Qoverride_redirect, NULL, NULL,
+			       RES_TYPE_BOOLEAN)))
+      && !(EQ (tem, Qunbound)))
+    override_redirect = true;
+
+  FRAME_OVERRIDE_REDIRECT (f) = override_redirect;
+  store_frame_param (f, Qoverride_redirect, override_redirect ? Qt : Qnil);
 
   XSETFRAME (frame, f);
 
@@ -1168,12 +1282,20 @@ This function is an internal primitive--use `make-frame' instead.  */)
 
   f->output_method = output_pgtk;
   f->output_data.pgtk = xzalloc (sizeof *f->output_data.pgtk);
-
+#if 0
+  f->output_data.pgtk->icon_bitmap = -1;
+#endif
   FRAME_FONTSET (f) = -1;
+#if 0
+  f->output_data.pgtk->scroll_bar_foreground_pixel = -1;
+  f->output_data.pgtk->scroll_bar_background_pixel = -1;
+#endif
+  f->output_data.pgtk->white_relief.pixel = -1;
+  f->output_data.pgtk->black_relief.pixel = -1;
 
-  fset_icon_name (f, x_get_arg (dpyinfo, parms, Qicon_name,
-				"iconName", "Title",
-				RES_TYPE_STRING));
+  fset_icon_name (f,
+		  x_get_arg (dpyinfo, parms, Qicon_name, "iconName", "Title",
+			     RES_TYPE_STRING));
   if (! STRINGP (f->icon_name))
     fset_icon_name (f, Qnil);
 
@@ -1182,92 +1304,147 @@ This function is an internal primitive--use `make-frame' instead.  */)
   /* With FRAME_DISPLAY_INFO set up, this unwind-protect is safe.  */
   record_unwind_protect (unwind_create_frame, frame);
 
-  f->output_data.pgtk->window_desc = desc_ctr++;
-  if (TYPE_RANGED_INTEGERP (Window, parent))
+  /* These colors will be set anyway later, but it's important
+     to get the color reference counts right, so initialize them!  */
+  {
+    Lisp_Object black;
+
+    /* Function x_decode_color can signal an error.  Make
+       sure to initialize color slots so that we won't try
+       to free colors we haven't allocated.  */
+    FRAME_FOREGROUND_PIXEL (f) = -1;
+    FRAME_BACKGROUND_PIXEL (f) = -1;
+    f->output_data.pgtk->cursor_color = -1;
+#if 0
+    f->output_data.pgtk->cursor_foreground_pixel = -1;
+    f->output_data.pgtk->border_pixel = -1;
+    f->output_data.pgtk->mouse_pixel = -1;
+#endif
+
+    black = build_string ("black");
+    FRAME_FOREGROUND_PIXEL (f)
+      = x_decode_color (f, black, BLACK_PIX_DEFAULT (f));
+    FRAME_BACKGROUND_PIXEL (f)
+      = x_decode_color (f, black, BLACK_PIX_DEFAULT (f));
+    f->output_data.pgtk->cursor_color
+      = x_decode_color (f, black, BLACK_PIX_DEFAULT (f));
+#if 0
+    f->output_data.pgtk->cursor_foreground_pixel
+      = x_decode_color (f, black, BLACK_PIX_DEFAULT (f));
+    f->output_data.pgtk->border_pixel
+      = x_decode_color (f, black, BLACK_PIX_DEFAULT (f));
+    f->output_data.pgtk->mouse_pixel
+      = x_decode_color (f, black, BLACK_PIX_DEFAULT (f));
+#endif
+  }
+
+  /* Specify the parent under which to make this X window.  */
+  if (!NILP (parent))
     {
-      f->output_data.pgtk->parent_desc = XFASTINT (parent);
-      f->output_data.pgtk->explicit_parent = 1;
+      f->output_data.pgtk->parent_desc = (Window) XFASTINT (parent);
+      f->output_data.pgtk->explicit_parent = true;
     }
   else
     {
       f->output_data.pgtk->parent_desc = FRAME_DISPLAY_INFO (f)->root_window;
-      f->output_data.pgtk->explicit_parent = 0;
+      f->output_data.pgtk->explicit_parent = false;
     }
 
   /* Set the name; the functions to which we pass f expect the name to
      be set.  */
-  if (EQ (name, Qunbound) || NILP (name) || ! STRINGP (name))
+  if (EQ (name, Qunbound) || NILP (name))
     {
-      fset_name (f, build_string (pgtk_app_name));
-      f->explicit_name = 0;
+#if 0
+      fset_name (f, build_string (dpyinfo->x_id_name));
+#else
+      fset_name (f, build_string ("x_id_name"));
+#endif
+      f->explicit_name = false;
     }
   else
     {
       fset_name (f, name);
-      f->explicit_name = 1;
+      f->explicit_name = true;
+      /* Use the frame's title when getting resources for this frame.  */
       specbind (Qx_resource_name, name);
     }
-
-  block_input ();
 
   register_font_driver (&ftcrfont_driver, f);
 
   image_cache_refcount =
     FRAME_IMAGE_CACHE (f) ? FRAME_IMAGE_CACHE (f)->refcount : 0;
+#if 0
+#ifdef GLYPH_DEBUG
+  dpyinfo_refcount = dpyinfo->reference_count;
+#endif /* GLYPH_DEBUG */
+#endif
 
   x_default_parameter (f, parms, Qfont_backend, Qnil,
-			"fontBackend", "FontBackend", RES_TYPE_STRING);
+		       "fontBackend", "FontBackend", RES_TYPE_STRING);
 
+  /* Extract the window parameters from the supplied values
+     that are needed to determine window geometry.  */
+  x_default_font_parameter (f, parms);
+  if (!FRAME_FONT (f))
+    {
+      delete_frame (frame, Qnoelisp);
+      error ("Invalid frame font");
+    }
+
+  /* Frame contents get displaced if an embedded X window has a border.  */
 #if 0
-  {
-    /* use for default font name */
-    id font = [NSFont userFixedPitchFontOfSize: -1.0]; /* default */
-    x_default_parameter (f, parms, Qfontsize,
-                                    make_number (0 /*(int)[font pointSize]*/),
-                                    "fontSize", "FontSize", RES_TYPE_NUMBER);
-    // Remove ' Regular', not handled by backends.
-    char *fontname = xstrdup ([[font displayName] UTF8String]);
-    int len = strlen (fontname);
-    if (len > 8 && strcmp (fontname + len - 8, " Regular") == 0)
-      fontname[len-8] = '\0';
-    x_default_parameter (f, parms, Qfont,
-                                 build_string (fontname),
-                                 "font", "Font", RES_TYPE_STRING);
-    xfree (fontname);
-  }
-#else
-  x_default_parameter (f, parms, Qfont,
-                               build_string ("Monospace"),
-                               "font", "Font", RES_TYPE_STRING);
+  if (! FRAME_X_EMBEDDED_P (f))
 #endif
-  unblock_input ();
+    x_default_parameter (f, parms, Qborder_width, make_number (0),
+			 "borderWidth", "BorderWidth", RES_TYPE_NUMBER);
 
-  x_default_parameter (f, parms, Qborder_width, make_number (0),
-		       "borderwidth", "BorderWidth", RES_TYPE_NUMBER);
-  x_default_parameter (f, parms, Qinternal_border_width, make_number (2),
-                      "internalBorderWidth", "InternalBorderWidth",
-                      RES_TYPE_NUMBER);
+  /* This defaults to 1 in order to match xterm.  We recognize either
+     internalBorderWidth or internalBorder (which is what xterm calls
+     it).  */
+  if (NILP (Fassq (Qinternal_border_width, parms)))
+    {
+      Lisp_Object value;
 
-  /* default vertical scrollbars on right on Mac */
-  {
-      Lisp_Object spos
-#ifdef PGTK_IMPL_GNUSTEP
-          = Qt;
+      value = x_get_arg (dpyinfo, parms, Qinternal_border_width,
+			 "internalBorder", "internalBorder", RES_TYPE_NUMBER);
+      if (! EQ (value, Qunbound))
+	parms = Fcons (Fcons (Qinternal_border_width, value),
+		       parms);
+    }
+  x_default_parameter (f, parms, Qinternal_border_width,
+#ifdef USE_GTK /* We used to impose 0 in xg_create_frame_widgets.  */
+		       make_number (0),
 #else
-          = Qright;
+		       make_number (1),
 #endif
-      x_default_parameter (f, parms, Qvertical_scroll_bars, spos,
-			   "verticalScrollBars", "VerticalScrollBars",
-			   RES_TYPE_SYMBOL);
-  }
-  x_default_parameter (f, parms, Qhorizontal_scroll_bars, Qnil,
-		       "horizontalScrollBars", "HorizontalScrollBars",
+		       "internalBorderWidth", "internalBorderWidth",
+		       RES_TYPE_NUMBER);
+  x_default_parameter (f, parms, Qright_divider_width, make_number (0),
+		       NULL, NULL, RES_TYPE_NUMBER);
+  x_default_parameter (f, parms, Qbottom_divider_width, make_number (0),
+		       NULL, NULL, RES_TYPE_NUMBER);
+  x_default_parameter (f, parms, Qvertical_scroll_bars,
+#if defined (USE_GTK) && defined (USE_TOOLKIT_SCROLL_BARS)
+		       Qright,
+#else
+		       Qleft,
+#endif
+		       "verticalScrollBars", "ScrollBars",
 		       RES_TYPE_SYMBOL);
-  x_default_parameter (f, parms, Qforeground_color, build_string ("Black"),
-                      "foreground", "Foreground", RES_TYPE_STRING);
-  x_default_parameter (f, parms, Qbackground_color, build_string ("White"),
-                      "background", "Background", RES_TYPE_STRING);
-  /* FIXME: not supported yet in Nextstep */
+  x_default_parameter (f, parms, Qhorizontal_scroll_bars, Qnil,
+		       "horizontalScrollBars", "ScrollBars",
+		       RES_TYPE_SYMBOL);
+  /* Also do the stuff which must be set before the window exists.  */
+  x_default_parameter (f, parms, Qforeground_color, build_string ("black"),
+		       "foreground", "Foreground", RES_TYPE_STRING);
+  x_default_parameter (f, parms, Qbackground_color, build_string ("white"),
+		       "background", "Background", RES_TYPE_STRING);
+  x_default_parameter (f, parms, Qmouse_color, build_string ("black"),
+		       "pointerColor", "Foreground", RES_TYPE_STRING);
+  x_default_parameter (f, parms, Qborder_color, build_string ("black"),
+		       "borderColor", "BorderColor", RES_TYPE_STRING);
+  x_default_parameter (f, parms, Qscreen_gamma, Qnil,
+		       "screenGamma", "ScreenGamma", RES_TYPE_FLOAT);
   x_default_parameter (f, parms, Qline_spacing, Qnil,
 		       "lineSpacing", "LineSpacing", RES_TYPE_NUMBER);
   x_default_parameter (f, parms, Qleft_fringe, Qnil,
@@ -1277,9 +1454,32 @@ This function is an internal primitive--use `make-frame' instead.  */)
   x_default_parameter (f, parms, Qno_special_glyphs, Qnil,
 		       NULL, NULL, RES_TYPE_BOOLEAN);
 
+#if 0
+  x_default_scroll_bar_color_parameter (f, parms, Qscroll_bar_foreground,
+					"scrollBarForeground",
+					"ScrollBarForeground", true);
+  x_default_scroll_bar_color_parameter (f, parms, Qscroll_bar_background,
+					"scrollBarBackground",
+					"ScrollBarBackground", false);
+#endif
+
+  /* Init faces before x_default_parameter is called for the
+     scroll-bar-width parameter because otherwise we end up in
+     init_iterator with a null face cache, which should not happen.  */
   init_frame_faces (f);
 
-  /* Read comment about this code in corresponding place in xfns.c.  */
+  /* We have to call adjust_frame_size here since otherwise
+     x_set_tool_bar_lines will already work with the character sizes
+     installed by init_frame_faces while the frame's pixel size is still
+     calculated from a character size of 1 and we subsequently hit the
+     (height >= 0) assertion in window_box_height.
+
+     The non-pixelwise code apparently worked around this because it
+     had one frame line vs one toolbar line which left us with a zero
+     root window height which was obviously wrong as well ...
+
+     Also process `min-width' and `min-height' parameters right here
+     because `frame-windows-min-size' needs them.  */
   tem = x_get_arg (dpyinfo, parms, Qmin_width, NULL, NULL, RES_TYPE_NUMBER);
   if (NUMBERP (tem))
     store_frame_param (f, Qmin_width, tem);
@@ -1287,47 +1487,14 @@ This function is an internal primitive--use `make-frame' instead.  */)
   if (NUMBERP (tem))
     store_frame_param (f, Qmin_height, tem);
   adjust_frame_size (f, FRAME_COLS (f) * FRAME_COLUMN_WIDTH (f),
-		     FRAME_LINES (f) * FRAME_LINE_HEIGHT (f), 5, 1,
+		     FRAME_LINES (f) * FRAME_LINE_HEIGHT (f), 5, true,
 		     Qx_create_frame_1);
 
-  tem = x_get_arg (dpyinfo, parms, Qundecorated, NULL, NULL, RES_TYPE_BOOLEAN);
-  FRAME_UNDECORATED (f) = !NILP (tem) && !EQ (tem, Qunbound);
-  store_frame_param (f, Qundecorated, FRAME_UNDECORATED (f) ? Qt : Qnil);
+  /* Set the menu-bar-lines and tool-bar-lines parameters.  We don't
+     look up the X resources controlling the menu-bar and tool-bar
+     here; they are processed specially at startup, and reflected in
+     the values of the mode variables.  */
 
-#ifdef PGTK_IMPL_COCOA
-  tem = x_get_arg (dpyinfo, parms, Qpgtk_appearance, NULL, NULL, RES_TYPE_SYMBOL);
-  FRAME_PGTK_APPEARANCE (f) = EQ (tem, Qdark)
-    ? pgtk_appearance_vibrant_dark : pgtk_appearance_aqua;
-  store_frame_param (f, Qpgtk_appearance, tem);
-
-  tem = x_get_arg (dpyinfo, parms, Qpgtk_transparent_titlebar,
-                   NULL, NULL, RES_TYPE_BOOLEAN);
-  FRAME_PGTK_TRANSPARENT_TITLEBAR (f) = !NILP (tem) && !EQ (tem, Qunbound);
-  store_frame_param (f, Qpgtk_transparent_titlebar, tem);
-#endif
-
-  parent_frame = x_get_arg (dpyinfo, parms, Qparent_frame, NULL, NULL,
-			    RES_TYPE_SYMBOL);
-  /* Accept parent-frame iff parent-id was not specified.  */
-  if (!NILP (parent)
-      || EQ (parent_frame, Qunbound)
-      || NILP (parent_frame)
-      || !FRAMEP (parent_frame)
-      || !FRAME_LIVE_P (XFRAME (parent_frame)))
-    parent_frame = Qnil;
-
-  fset_parent_frame (f, parent_frame);
-  store_frame_param (f, Qparent_frame, parent_frame);
-
-  x_default_parameter (f, parms, Qz_group, Qnil, NULL, NULL, RES_TYPE_SYMBOL);
-  x_default_parameter (f, parms, Qno_focus_on_map, Qnil,
-		       NULL, NULL, RES_TYPE_BOOLEAN);
-  x_default_parameter (f, parms, Qno_accept_focus, Qnil,
-                       NULL, NULL, RES_TYPE_BOOLEAN);
-
-  /* The resources controlling the menu-bar and tool-bar are
-     processed specially at startup, and reflected in the mode
-     variables; ignore them here.  */
   x_default_parameter (f, parms, Qmenu_bar_lines,
 		       NILP (Vmenu_bar_mode)
 		       ? make_number (0) : make_number (1),
@@ -1337,79 +1504,104 @@ This function is an internal primitive--use `make-frame' instead.  */)
 		       ? make_number (0) : make_number (1),
 		       NULL, NULL, RES_TYPE_NUMBER);
 
-  x_default_parameter (f, parms, Qbuffer_predicate, Qnil, "bufferPredicate",
-                       "BufferPredicate", RES_TYPE_SYMBOL);
-  x_default_parameter (f, parms, Qtitle, Qnil, "title", "Title",
-                       RES_TYPE_STRING);
+  x_default_parameter (f, parms, Qbuffer_predicate, Qnil,
+		       "bufferPredicate", "BufferPredicate",
+		       RES_TYPE_SYMBOL);
+  x_default_parameter (f, parms, Qtitle, Qnil,
+		       "title", "Title", RES_TYPE_STRING);
+  x_default_parameter (f, parms, Qwait_for_wm, Qt,
+		       "waitForWM", "WaitForWM", RES_TYPE_BOOLEAN);
+  x_default_parameter (f, parms, Qtool_bar_position,
+                       FRAME_TOOL_BAR_POSITION (f), 0, 0, RES_TYPE_SYMBOL);
+  x_default_parameter (f, parms, Qinhibit_double_buffering, Qnil,
+                       "inhibitDoubleBuffering", "InhibitDoubleBuffering",
+                       RES_TYPE_BOOLEAN);
 
-  parms = get_geometry_from_preferences (dpyinfo, parms);
+  /* Compute the size of the X window.  */
   window_prompting = x_figure_window_size (f, parms, true, &x_width, &x_height);
 
   tem = x_get_arg (dpyinfo, parms, Qunsplittable, 0, 0, RES_TYPE_BOOLEAN);
-  f->no_split = minibuffer_only || (!EQ (tem, Qunbound) && !EQ (tem, Qnil));
+  f->no_split = minibuffer_only || EQ (tem, Qt);
 
 #if 0
-  /* NOTE: on other terms, this is done in set_mouse_color, however this
-     was not getting called under Nextstep */
-  f->output_data.pgtk->text_cursor = [NSCursor IBeamCursor];
-  f->output_data.pgtk->nontext_cursor = [NSCursor arrowCursor];
-  f->output_data.pgtk->modeline_cursor = [NSCursor pointingHandCursor];
-  f->output_data.pgtk->hand_cursor = [NSCursor pointingHandCursor];
-  f->output_data.pgtk->hourglass_cursor = [NSCursor disappearingItemCursor];
-  f->output_data.pgtk->horizontal_drag_cursor = [NSCursor resizeLeftRightCursor];
-  f->output_data.pgtk->vertical_drag_cursor = [NSCursor resizeUpDownCursor];
-  f->output_data.pgtk->left_edge_cursor = [NSCursor resizeLeftRightCursor];
-  f->output_data.pgtk->top_left_corner_cursor = [NSCursor arrowCursor];
-  f->output_data.pgtk->top_edge_cursor = [NSCursor resizeUpDownCursor];
-  f->output_data.pgtk->top_right_corner_cursor = [NSCursor arrowCursor];
-  f->output_data.pgtk->right_edge_cursor = [NSCursor resizeLeftRightCursor];
-  f->output_data.pgtk->bottom_right_corner_cursor = [NSCursor arrowCursor];
-  f->output_data.pgtk->bottom_edge_cursor = [NSCursor resizeUpDownCursor];
-  f->output_data.pgtk->bottom_left_corner_cursor = [NSCursor arrowCursor];
-
-  FRAME_DISPLAY_INFO (f)->vertical_scroll_bar_cursor
-     = [NSCursor arrowCursor];
-  FRAME_DISPLAY_INFO (f)->horizontal_scroll_bar_cursor
-     = [NSCursor arrowCursor];
+  x_icon_verify (f, parms);
 #endif
-  f->output_data.pgtk->current_pointer = f->output_data.pgtk->text_cursor;
 
-  // f->output_data.pgtk->in_animation = NO;
-
-  // [[EmacsView alloc] initFrameFromEmacs: f];
-  xg_create_frame_widgets(f);
+  /* Create the X widget or window.  */
+  // x_window (f);
+  xg_create_frame_widgets (f);
   pgtk_set_event_handler(f);
 
   x_icon (f, parms);
+#if 0
+  x_make_gc (f);
+#endif
 
-  /* pgtk_display_info does not have a reference_count.  */
+  /* Now consider the frame official.  */
   f->terminal->reference_count++;
-
-  /* It is now ok to make the frame official even if we get an error below.
-     The frame needs to be on Vframe_list or making it visible won't work. */
+#if 0
+  FRAME_DISPLAY_INFO (f)->reference_count++;
+#endif
   Vframe_list = Fcons (frame, Vframe_list);
 
-  x_default_parameter (f, parms, Qicon_type, Qnil,
-                       "bitmapIcon", "BitmapIcon", RES_TYPE_SYMBOL);
+  /* We need to do this after creating the X window, so that the
+     icon-creation functions can say whose icon they're describing.  */
+  x_default_parameter (f, parms, Qicon_type, Qt,
+		       "bitmapIcon", "BitmapIcon", RES_TYPE_BOOLEAN);
 
   x_default_parameter (f, parms, Qauto_raise, Qnil,
-                       "autoRaise", "AutoRaiseLower", RES_TYPE_BOOLEAN);
+		       "autoRaise", "AutoRaiseLower", RES_TYPE_BOOLEAN);
   x_default_parameter (f, parms, Qauto_lower, Qnil,
-                       "autoLower", "AutoLower", RES_TYPE_BOOLEAN);
+		       "autoLower", "AutoRaiseLower", RES_TYPE_BOOLEAN);
   x_default_parameter (f, parms, Qcursor_type, Qbox,
-                       "cursorType", "CursorType", RES_TYPE_SYMBOL);
+		       "cursorType", "CursorType", RES_TYPE_SYMBOL);
   x_default_parameter (f, parms, Qscroll_bar_width, Qnil,
-                       "scrollBarWidth", "ScrollBarWidth",
-                       RES_TYPE_NUMBER);
+		       "scrollBarWidth", "ScrollBarWidth",
+		       RES_TYPE_NUMBER);
   x_default_parameter (f, parms, Qscroll_bar_height, Qnil,
-                       "scrollBarHeight", "ScrollBarHeight",
-                       RES_TYPE_NUMBER);
+		       "scrollBarHeight", "ScrollBarHeight",
+		       RES_TYPE_NUMBER);
   x_default_parameter (f, parms, Qalpha, Qnil,
-                       "alpha", "Alpha", RES_TYPE_NUMBER);
-  x_default_parameter (f, parms, Qfullscreen, Qnil,
-                       "fullscreen", "Fullscreen", RES_TYPE_SYMBOL);
+		       "alpha", "Alpha", RES_TYPE_NUMBER);
 
-  /* Allow x_set_window_size, now.  */
+#if 0
+  if (!NILP (parent_frame))
+    {
+      struct frame *p = XFRAME (parent_frame);
+
+      block_input ();
+      XReparentWindow (FRAME_X_DISPLAY (f), FRAME_OUTER_WINDOW (f),
+		       FRAME_X_WINDOW (p), f->left_pos, f->top_pos);
+      unblock_input ();
+    }
+#endif
+
+  x_default_parameter (f, parms, Qno_focus_on_map, Qnil,
+		       NULL, NULL, RES_TYPE_BOOLEAN);
+  x_default_parameter (f, parms, Qno_accept_focus, Qnil,
+		       NULL, NULL, RES_TYPE_BOOLEAN);
+
+#if defined (USE_X_TOOLKIT) || defined (USE_GTK)
+  /* Create the menu bar.  */
+  if (!minibuffer_only && FRAME_EXTERNAL_MENU_BAR (f))
+    {
+#if 0
+      /* If this signals an error, we haven't set size hints for the
+	 frame and we didn't make it visible.  */
+      initialize_frame_menubar (f);
+#endif
+
+#ifndef USE_GTK
+      /* This is a no-op, except under Motif where it arranges the
+	 main window for the widgets on it.  */
+      lw_set_main_areas (f->output_data.pgtk->column_widget,
+			 f->output_data.pgtk->menubar_widget,
+			 f->output_data.pgtk->edit_widget);
+#endif /* not USE_GTK */
+    }
+#endif /* USE_X_TOOLKIT || USE_GTK */
+
+  /* Consider frame official, now.  */
   f->can_x_set_window_size = true;
 
   if (x_width > 0)
@@ -1417,31 +1609,75 @@ This function is an internal primitive--use `make-frame' instead.  */)
   if (x_height > 0)
     SET_FRAME_HEIGHT (f, x_height);
 
-  adjust_frame_size (f, FRAME_TEXT_WIDTH (f), FRAME_TEXT_HEIGHT (f), 0, 1,
-		     Qx_create_frame_2);
+  /* Tell the server what size and position, etc, we want, and how
+     badly we want them.  This should be done after we have the menu
+     bar so that its size can be taken into account.  */
+  block_input ();
+  x_wm_set_size_hint (f, window_prompting, false);
+  unblock_input ();
 
-  if (! f->output_data.pgtk->explicit_parent)
+  adjust_frame_size (f, FRAME_TEXT_WIDTH (f), FRAME_TEXT_HEIGHT (f),
+		     0, true, Qx_create_frame_2);
+
+  /* Process fullscreen parameter here in the hope that normalizing a
+     fullheight/fullwidth frame will produce the size set by the last
+     adjust_frame_size call.  */
+  x_default_parameter (f, parms, Qfullscreen, Qnil,
+		       "fullscreen", "Fullscreen", RES_TYPE_SYMBOL);
+
+  /* Make the window appear on the frame and enable display, unless
+     the caller says not to.  However, with explicit parent, Emacs
+     cannot control visibility, so don't try.  */
+  if (!f->output_data.pgtk->explicit_parent)
     {
-      Lisp_Object visibility;
-
-      visibility = x_get_arg (dpyinfo, parms, Qvisibility, 0, 0,
-                              RES_TYPE_SYMBOL);
-      if (EQ (visibility, Qunbound))
-	visibility = Qt;
+      Lisp_Object visibility
+	= x_get_arg (dpyinfo, parms, Qvisibility, 0, 0, RES_TYPE_SYMBOL);
 
       if (EQ (visibility, Qicon))
 	x_iconify_frame (f);
-      else if (! NILP (visibility))
-	{
-	  x_make_frame_visible (f);
-	  // [[FRAME_PGTK_VIEW (f) window] makeKeyWindow];
-	}
       else
-        {
-	  /* Must have been Qnil.  */
-        }
+	{
+	  if (EQ (visibility, Qunbound))
+	    visibility = Qt;
+
+	  if (!NILP (visibility))
+	    x_make_frame_visible (f);
+	}
+
+      store_frame_param (f, Qvisibility, visibility);
     }
 
+  block_input ();
+
+#if  0
+  /* Set machine name and pid for the purpose of window managers.  */
+  set_machine_and_pid_properties (f);
+#endif
+
+#if 0
+  /* Set the WM leader property.  GTK does this itself, so this is not
+     needed when using GTK.  */
+  if (dpyinfo->client_leader_window != 0)
+    {
+      XChangeProperty (FRAME_X_DISPLAY (f),
+		       FRAME_OUTER_WINDOW (f),
+		       dpyinfo->Xatom_wm_client_leader,
+		       XA_WINDOW, 32, PropModeReplace,
+		       (unsigned char *) &dpyinfo->client_leader_window, 1);
+    }
+#endif
+
+  unblock_input ();
+
+  /* Works iff frame has been already mapped.  */
+  x_default_parameter (f, parms, Qskip_taskbar, Qnil,
+		       NULL, NULL, RES_TYPE_BOOLEAN);
+  /* The `z-group' parameter works only for visible frames.  */
+  x_default_parameter (f, parms, Qz_group, Qnil,
+		       NULL, NULL, RES_TYPE_SYMBOL);
+
+  /* Initialize `default-minibuffer-frame' in case this is the first
+     frame on this terminal.  */
   if (FRAME_HAS_MINIBUF_P (f)
       && (!FRAMEP (KVAR (kb, Vdefault_minibuffer_frame))
           || !FRAME_LIVE_P (XFRAME (KVAR (kb, Vdefault_minibuffer_frame)))))
@@ -1453,14 +1689,11 @@ This function is an internal primitive--use `make-frame' instead.  */)
     if (CONSP (XCAR (tem)) && !NILP (XCAR (XCAR (tem))))
       fset_param_alist (f, Fcons (XCAR (tem), f->param_alist));
 
-  if (window_prompting & USPosition)
-    x_set_offset (f, f->left_pos, f->top_pos, 1);
-
   /* Make sure windows on this frame appear in calls to next-window
      and similar functions.  */
   Vwindow_list = Qnil;
 
-  return unbind_to (count, frame);
+ return unbind_to (count, frame);
 }
 
 void
@@ -3066,6 +3299,7 @@ handlePanelKeys (NSSavePanel *panel, NSEvent *theEvent)
 void
 syms_of_pgtkfns (void)
 {
+  DEFSYM (Qfont_parameter, "font-parameter");
   DEFSYM (Qfontsize, "fontsize");
   DEFSYM (Qframe_title_format, "frame-title-format");
   DEFSYM (Qicon_title_format, "icon-title-format");

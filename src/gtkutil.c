@@ -977,7 +977,6 @@ xg_frame_resized (struct frame *f, int pixelwidth, int pixelheight)
 void
 xg_frame_set_char_size (struct frame *f, int width, int height)
 {
-#ifndef HAVE_PGTK
   int pixelwidth = FRAME_TEXT_TO_PIXEL_WIDTH (f, width);
   int pixelheight = FRAME_TEXT_TO_PIXEL_HEIGHT (f, height);
   Lisp_Object fullscreen = get_frame_param (f, Qfullscreen);
@@ -1057,7 +1056,9 @@ xg_frame_set_char_size (struct frame *f, int width, int height)
       /* Must call this to flush out events */
       (void)gtk_events_pending ();
       gdk_flush ();
+#ifndef HAVE_PGTK
       x_wait_for_event (f, ConfigureNotify);
+#endif
 
       if (!NILP (fullscreen))
 	/* Try to restore fullscreen state.  */
@@ -1068,8 +1069,6 @@ xg_frame_set_char_size (struct frame *f, int width, int height)
     }
   else
     adjust_frame_size (f, width, height, 5, 0, Qxg_frame_set_char_size);
-
-#endif
 }
 
 /* Handle height/width changes (i.e. add/remove/move menu/toolbar).
@@ -1082,9 +1081,7 @@ xg_height_or_width_changed (struct frame *f)
                      FRAME_TOTAL_PIXEL_WIDTH (f),
                      FRAME_TOTAL_PIXEL_HEIGHT (f));
   f->output_data.wx->hint_flags = 0;
-#ifndef HAVE_PGTK
   x_wm_set_size_hint (f, 0, 0);
-#endif
 }
 
 #ifndef HAVE_PGTK
@@ -1464,7 +1461,6 @@ xg_free_frame_widgets (struct frame *f)
 void
 x_wm_set_size_hint (struct frame *f, long int flags, bool user_position)
 {
-#ifndef HAVE_PGTK
   /* Must use GTK routines here, otherwise GTK resets the size hints
      to its own defaults.  */
   GdkGeometry size_hints;
@@ -1485,6 +1481,7 @@ x_wm_set_size_hint (struct frame *f, long int flags, bool user_position)
 
   XSETFRAME (frame, f);
   fs_state = Fframe_parameter (frame, Qfullscreen);
+#ifndef HAVE_PGTK
   if ((EQ (fs_state, Qmaximized) || EQ (fs_state, Qfullboth)) &&
       (x_wm_supports (f, FRAME_DISPLAY_INFO (f)->Xatom_net_wm_state) ||
        x_wm_supports (f, FRAME_DISPLAY_INFO (f)->Xatom_net_wm_state_fullscreen)))
@@ -1494,6 +1491,7 @@ x_wm_set_size_hint (struct frame *f, long int flags, bool user_position)
       */
       return;
     }
+#endif
 
   if (flags)
     {
@@ -1582,7 +1580,6 @@ x_wm_set_size_hint (struct frame *f, long int flags, bool user_position)
       f->output_data.wx->hint_flags = hint_flags;
       unblock_input ();
     }
-#endif
 }
 
 /* Change background color of a frame.
