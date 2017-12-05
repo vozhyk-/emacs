@@ -880,6 +880,10 @@ See the documentation of `create-fontset-from-fontset-spec' for the format.")
                                          &context (window-system pgtk))
   (pgtk-get-selection selection-symbol target-type))
 
+;; If you want to use alt key as alt key:
+;;   (setq x-alt-keysym nil)
+(setq x-alt-keysym 'meta)
+
 (provide 'pgtk-win)
 (provide 'term/pgtk-win)
 
