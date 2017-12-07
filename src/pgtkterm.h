@@ -527,7 +527,7 @@ enum
   (! (FRAME_HAS_VERTICAL_SCROLL_BARS_ON_LEFT (f)) ? 0	\
    : FRAME_SCROLL_BAR_COLS (f))
 
-extern struct pgtk_display_info *pgtk_term_init (Lisp_Object display_name);
+extern struct pgtk_display_info *pgtk_term_init (Lisp_Object display_name, char *resource_name);
 extern void pgtk_term_shutdown (int sig);
 
 /* constants for text rendering */

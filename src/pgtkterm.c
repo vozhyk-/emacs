@@ -12666,7 +12666,7 @@ pgtk_read_socket (struct terminal *terminal, struct input_event *hold_quit)
   PGTK_TRACE("pgtk_read_socket");
   int count = 0;
   bool event_found = false;
-  struct x_display_info *dpyinfo = terminal->display_info.x;
+  struct pgtk_display_info *dpyinfo = terminal->display_info.pgtk;
 
   block_input ();
 
@@ -15252,7 +15252,7 @@ construct_mouse_click (struct input_event *result,
 static gboolean
 button_event(GtkWidget *widget, GdkEvent *event, gpointer *user_data)
 {
-  PGTK_TRACE("button_event: type=%d, button=%d.", event->button.type, event->button.button);
+  PGTK_TRACE("button_event: type=%d, button=%u.", event->button.type, event->button.button);
   union buffered_input_event inev;
   struct frame *f, *frame;
   struct pgtk_display_info *dpyinfo;
@@ -15501,21 +15501,33 @@ my_log_handler (const gchar *log_domain, GLogLevelFlags log_level,
       fprintf (stderr, "%s-WARNING **: %s", log_domain, msg);
 }
 
+
+/* Open a connection to X display DISPLAY_NAME, and return
+   the structure that describes the open display.
+   If we cannot contact the display, return null.  */
+
 struct pgtk_display_info *
-pgtk_term_init (Lisp_Object display_name)
-/* --------------------------------------------------------------------------
-     Start the Application and get things rolling.
-   -------------------------------------------------------------------------- */
+pgtk_term_init (Lisp_Object display_name, char *resource_name)
 {
+  Display *dpy;
   struct terminal *terminal;
   struct pgtk_display_info *dpyinfo;
-  static int pgtk_initialized = 0;
-  Lisp_Object tmp;
+  static int x_initialized = 0;
 
-  if (pgtk_initialized) return x_display_list;
-  pgtk_initialized = 1;
+  block_input ();
 
-  x_cr_init_fringe(&pgtk_redisplay_interface);
+  if (!x_initialized)
+    {
+      /* Try to not use interrupt input; start polling.  */
+      Fset_input_interrupt_mode (Qnil);
+      x_cr_init_fringe (&pgtk_redisplay_interface);
+      ++x_initialized;
+    }
+
+#if 0
+  if (! x_display_ok (SSDATA (display_name)))
+    error ("Display %s can't be opened", SSDATA (display_name));
+#endif
 
   {
 #define NUM_ARGV 10
@@ -15523,11 +15535,10 @@ pgtk_term_init (Lisp_Object display_name)
     char *argv[NUM_ARGV];
     char **argv2 = argv;
     guint id;
-    static int initialized = 0;
-    Display *dpy;
 
-    if (initialized++ > 1)
+    if (x_initialized++ > 1)
       {
+	PGTK_TRACE("...1");
         xg_display_open (SSDATA (display_name), &dpy);
       }
     else
@@ -15541,16 +15552,18 @@ pgtk_term_init (Lisp_Object display_name)
         argc = 0;
         argv[argc++] = initial_argv[0];
 
-#if 0
         if (! NILP (display_name))
           {
             argv[argc++] = display_opt;
             argv[argc++] = SSDATA (display_name);
           }
-#endif
 
         argv[argc++] = name_opt;
-        argv[argc++] = "Emacs"; // resource_name;
+        argv[argc++] = resource_name;
+
+#if 0
+        XSetLocaleModifiers ("");
+#endif
 
         /* Work around GLib bug that outputs a faulty warning. See
            https://bugzilla.gnome.org/show_bug.cgi?id=563627.  */
@@ -15564,89 +15577,235 @@ pgtk_term_init (Lisp_Object display_name)
 #endif
 
         /* gtk_init does set_locale.  Fix locale before and after.  */
-        // fixup_locale ();
-        // unrequest_sigio (); /* See comment in x_display_ok.  */
+        fixup_locale ();
+        unrequest_sigio (); /* See comment in x_display_ok.  */
         gtk_init (&argc, &argv2);
-        // request_sigio ();
-        // fixup_locale ();
+        request_sigio ();
+        fixup_locale ();
 
         g_log_remove_handler ("GLib", id);
 
         xg_initialize ();
 
         dpy = DEFAULT_GDK_DISPLAY ();
+
+#if ! GTK_CHECK_VERSION (2, 90, 0)
+        /* Load our own gtkrc if it exists.  */
+        {
+          const char *file = "~/.emacs.d/gtkrc";
+          Lisp_Object s, abs_file;
+
+          s = build_string (file);
+          abs_file = Fexpand_file_name (s, Qnil);
+
+          if (! NILP (abs_file) && !NILP (Ffile_readable_p (abs_file)))
+            gtk_rc_parse (SSDATA (abs_file));
+        }
+#endif
+
+#if 0
+        XSetErrorHandler (x_error_handler);
+        XSetIOErrorHandler (x_io_error_quitter);
+#endif
       }
   }
 
-  block_input ();
-
-  block_input ();
-
-  baud_rate = 38400;
-  Fset_input_interrupt_mode (Qnil);  /* see init_pgtkterm() */
-
-  if (selfds[0] == -1)
+  /* Detect failure.  */
+  if (dpy == 0)
     {
-      if (emacs_pipe (selfds) != 0)
-        {
-          fprintf (stderr, "Failed to create pipe: %s",
-                   emacs_strerror (errno));
-          emacs_abort ();
-        }
-
-      fcntl (selfds[0], F_SETFL, O_NONBLOCK|fcntl (selfds[0], F_GETFL));
-      FD_ZERO (&select_readfds);
-      FD_ZERO (&select_writefds);
-      pthread_mutex_init (&select_mutex, NULL);
+      unblock_input ();
+      return 0;
     }
 
-  dpyinfo = xzalloc (sizeof *dpyinfo);
+  /* We have definitely succeeded.  Record the new connection.  */
 
+  dpyinfo = xzalloc (sizeof *dpyinfo);
   pgtk_initialize_display_info (dpyinfo);
   terminal = pgtk_create_terminal (dpyinfo);
 
+  {
+#if 0
+    struct pgtk_display_info *share;
 
-  terminal->kboard = allocate_kboard (Qpgtk);
-  /* Don't let the initial kboard remain current longer than necessary.
-     That would cause problems if a file loaded on startup tries to
-     prompt in the mini-buffer.  */
-  if (current_kboard == initial_kboard)
-    current_kboard = terminal->kboard;
-  terminal->kboard->reference_count++;
+    for (share = x_display_list; share; share = share->next)
+      if (same_x_server (SSDATA (XCAR (share->name_list_element)),
+			 SSDATA (display_name)))
+	break;
+    if (share)
+      terminal->kboard = share->terminal->kboard;
+    else
+#endif
+      {
+	terminal->kboard = allocate_kboard (Qpgtk);
 
+#if 0
+	if (!EQ (XSYMBOL (Qvendor_specific_keysyms)->u.s.function, Qunbound))
+	  {
+	    char *vendor = ServerVendor (dpy);
+
+	    /* Temporarily hide the partially initialized terminal.  */
+	    terminal_list = terminal->next_terminal;
+	    unblock_input ();
+	    kset_system_key_alist
+	      (terminal->kboard,
+	       call1 (Qvendor_specific_keysyms,
+		      vendor ? build_string (vendor) : empty_unibyte_string));
+	    block_input ();
+	    terminal->next_terminal = terminal_list;
+	    terminal_list = terminal;
+	  }
+#endif
+
+	/* Don't let the initial kboard remain current longer than necessary.
+	   That would cause problems if a file loaded on startup tries to
+	   prompt in the mini-buffer.  */
+	if (current_kboard == initial_kboard)
+	  current_kboard = terminal->kboard;
+      }
+    terminal->kboard->reference_count++;
+  }
+
+  /* Put this display on the chain.  */
   dpyinfo->next = x_display_list;
   x_display_list = dpyinfo;
 
   dpyinfo->name_list_element = Fcons (display_name, Qnil);
+#if 0
+  dpyinfo->display = dpy;
+  dpyinfo->connection = ConnectionNumber (dpyinfo->display);
+#endif
 
+  /* https://lists.gnu.org/r/emacs-devel/2015-11/msg00194.html  */
+  dpyinfo->smallest_font_height = 1;
+  dpyinfo->smallest_char_width = 1;
+
+  /* Set the name of the terminal. */
   terminal->name = xlispstrdup (display_name);
-
-  unblock_input ();
 
   Lisp_Object system_name = Fsystem_name ();
   ptrdiff_t nbytes;
   if (INT_ADD_WRAPV (SBYTES (Vinvocation_name), SBYTES (system_name) + 2,
 		     &nbytes))
     memory_full (SIZE_MAX);
+#if 0
+  dpyinfo->x_id = ++x_display_id;
+#endif
   dpyinfo->x_id_name = xmalloc (nbytes);
   char *nametail = lispstpcpy (dpyinfo->x_id_name, Vinvocation_name);
   *nametail++ = '@';
   lispstpcpy (nametail, system_name);
 
-  if (!inhibit_x_resources)
-    {
 #if 0
-      ns_default ("GSFontAntiAlias", &ns_antialias_text,
-                 Qt, Qnil, NO, NO);
-      tmp = Qnil;
-      /* this is a standard variable */
-      ns_default ("AppleAntiAliasingThreshold", &tmp,
-                 make_float (10.0), make_float (6.0), YES, NO);
-      ns_antialias_threshold = NILP (tmp) ? 10.0 : extract_float (tmp);
+  /* Figure out which modifier bits mean what.  */
+  x_find_modifier_meanings (dpyinfo);
 #endif
+
+  /* Get the scroll bar cursor.  */
+  /* We must create a GTK cursor, it is required for GTK widgets.  */
+#if 0
+  dpyinfo->xg_cursor = xg_create_default_cursor (dpyinfo->display);
+#else
+  dpyinfo->xg_cursor = xg_create_default_cursor (NULL);
+#endif
+
+#if 0
+  dpyinfo->vertical_scroll_bar_cursor
+    = XCreateFontCursor (dpyinfo->display, XC_sb_v_double_arrow);
+
+  dpyinfo->horizontal_scroll_bar_cursor
+    = XCreateFontCursor (dpyinfo->display, XC_sb_h_double_arrow);
+#endif
+
+#if 0
+  xrdb = x_load_resources (dpyinfo->display, xrm_option,
+			   resource_name, EMACS_CLASS);
+  dpyinfo->display->db = xrdb;
+  /* Put the rdb where we can find it in a way that works on
+     all versions.  */
+  dpyinfo->xrdb = xrdb;
+#endif
+
+#if 0
+  dpyinfo->screen = ScreenOfDisplay (dpyinfo->display,
+				     DefaultScreen (dpyinfo->display));
+  select_visual (dpyinfo);
+  dpyinfo->cmap = DefaultColormapOfScreen (dpyinfo->screen);
+  dpyinfo->root_window = RootWindowOfScreen (dpyinfo->screen);
+  dpyinfo->icon_bitmap_id = -1;
+  dpyinfo->wm_type = X_WMTYPE_UNKNOWN;
+#endif
+
+  reset_mouse_highlight (&dpyinfo->mouse_highlight);
+
+#if 0
+  /* See if we can construct pixel values from RGB values.  */
+  if (dpyinfo->visual->class == TrueColor)
+    {
+      get_bits_and_offset (dpyinfo->visual->red_mask,
+                           &dpyinfo->red_bits, &dpyinfo->red_offset);
+      get_bits_and_offset (dpyinfo->visual->blue_mask,
+                           &dpyinfo->blue_bits, &dpyinfo->blue_offset);
+      get_bits_and_offset (dpyinfo->visual->green_mask,
+                           &dpyinfo->green_bits, &dpyinfo->green_offset);
     }
+#endif
+
+#if 0
+  /* See if a private colormap is requested.  */
+  if (dpyinfo->visual == DefaultVisualOfScreen (dpyinfo->screen))
+    {
+      if (dpyinfo->visual->class == PseudoColor)
+	{
+	  AUTO_STRING (privateColormap, "privateColormap");
+	  AUTO_STRING (PrivateColormap, "PrivateColormap");
+	  Lisp_Object value
+	    = display_x_get_resource (dpyinfo, privateColormap,
+				      PrivateColormap, Qnil, Qnil);
+	  if (STRINGP (value)
+	      && (!strcmp (SSDATA (value), "true")
+		  || !strcmp (SSDATA (value), "on")))
+	    dpyinfo->cmap = XCopyColormapAndFree (dpyinfo->display, dpyinfo->cmap);
+	}
+    }
+  else
+    dpyinfo->cmap = XCreateColormap (dpyinfo->display, dpyinfo->root_window,
+                                     dpyinfo->visual, AllocNone);
+#endif
+
+  // fixme: get dpi from somewhere.
+  dpyinfo->resx = 96;
+  dpyinfo->resy = 96;
+
+#if 0
+  dpyinfo->x_dnd_atoms_size = 8;
+  dpyinfo->x_dnd_atoms = xmalloc (sizeof *dpyinfo->x_dnd_atoms
+                                  * dpyinfo->x_dnd_atoms_size);
+#endif
+#if 0
+  dpyinfo->gray
+    = XCreatePixmapFromBitmapData (dpyinfo->display, dpyinfo->root_window,
+				   gray_bits, gray_width, gray_height,
+				   1, 0, 1);
+#endif
+
+#if 0
+  x_setup_pointer_blanking (dpyinfo);
+#endif
 
   xsettings_initialize (dpyinfo);
+
+#if 0
+  /* This is only needed for distinguishing keyboard and process input.  */
+  if (dpyinfo->connection != 0)
+    add_keyboard_wait_descriptor (dpyinfo->connection);
+
+#ifdef F_SETOWN
+  fcntl (dpyinfo->connection, F_SETOWN, getpid ());
+#endif /* ! defined (F_SETOWN) */
+
+  if (interrupt_input)
+    init_sigio (dpyinfo->connection);
+#endif
 
   unblock_input ();
 

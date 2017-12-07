@@ -785,6 +785,16 @@ See the documentation of `create-fontset-from-fontset-spec' for the format.")
   ;; PENDING: not needed?
   (setq command-line-args (x-handle-args command-line-args))
 
+  ;; Make sure we have a valid resource name.
+  (or (stringp x-resource-name)
+      (let (i)
+	(setq x-resource-name (invocation-name))
+
+	;; Change any . or * characters in x-resource-name to hyphens,
+	;; so as not to choke when we use it in X resource queries.
+	(while (setq i (string-match "[.*]" x-resource-name))
+	  (aset x-resource-name i ?-))))
+
   ;; Setup the default fontset.
   (create-default-fontset)
   ;; Create the standard fontset.
@@ -795,7 +805,8 @@ See the documentation of `create-fontset-from-fontset-spec' for the format.")
             (format "Creation of the standard fontset failed: %s" err)
             :error)))
 
-  (x-open-connection (system-name) x-command-line-resources t)
+  ; (x-open-connection (system-name) x-command-line-resources t)
+  (x-open-connection (getenv "WAYLAND_DISPLAY") x-command-line-resources t)
 
   ;; Add GNUstep menu items Services, Hide and Quit.  Rename Help to Info
   ;; and put it first (i.e. omit from menu-bar-final-items.
