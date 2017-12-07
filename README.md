@@ -36,8 +36,6 @@ Higher:
 - no audible bell.
 - clipboard not supported.
 - sometimes segmentation fault.
-- initial window(not frame) size when -Q.
-- initial font.
 - quit is delayed.
 
 Lower:
