@@ -1354,11 +1354,7 @@ This function is an internal primitive--use `make-frame' instead.  */)
      be set.  */
   if (EQ (name, Qunbound) || NILP (name))
     {
-#if 0
       fset_name (f, build_string (dpyinfo->x_id_name));
-#else
-      fset_name (f, build_string ("x_id_name"));
-#endif
       f->explicit_name = false;
     }
   else

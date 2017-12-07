@@ -15623,6 +15623,16 @@ pgtk_term_init (Lisp_Object display_name)
 
   unblock_input ();
 
+  Lisp_Object system_name = Fsystem_name ();
+  ptrdiff_t nbytes;
+  if (INT_ADD_WRAPV (SBYTES (Vinvocation_name), SBYTES (system_name) + 2,
+		     &nbytes))
+    memory_full (SIZE_MAX);
+  dpyinfo->x_id_name = xmalloc (nbytes);
+  char *nametail = lispstpcpy (dpyinfo->x_id_name, Vinvocation_name);
+  *nametail++ = '@';
+  lispstpcpy (nametail, system_name);
+
   if (!inhibit_x_resources)
     {
 #if 0
