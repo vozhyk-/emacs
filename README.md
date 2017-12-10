@@ -24,7 +24,7 @@ Ignore many warnings.
 
 ```
 cd src
-./emacs  (or ./emacs -Q if you have problems.)
+GDK_BACKEND=wayland ./emacs  (or ./emacs -Q if you have problems.)
 ```
 
 Many many debugging outputs. Please ignore them.
@@ -37,6 +37,7 @@ Higher:
 - clipboard not supported.
 - sometimes segmentation fault.
 - quit is delayed.
+- images not supported.
 
 Lower:
 - no toolbar.
