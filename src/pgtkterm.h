@@ -716,4 +716,7 @@ pgtk_clear_under_internal_border (struct frame *f);
 
 extern void init_pgtkterm (void);
 
+extern void pgtk_cr_draw_frame (cairo_t *cr, struct frame *f);
+extern void pgtk_set_event_handler(struct frame *f);
+
 #endif	/* HAVE_PGTK */
