@@ -14064,7 +14064,7 @@ event_handler_gdk (GdkXEvent *gxev, GdkEvent *ev, gpointer data)
 
  */
 
-gboolean
+static gboolean
 pgtk_handle_event(GtkWidget *widget, GdkEvent *event, gpointer *data)
 {
   struct frame *f;
@@ -14310,7 +14310,7 @@ pgtk_clear_under_internal_border (struct frame *f)
     }
 }
 
-gboolean
+static gboolean
 pgtk_handle_draw(GtkWidget *widget, cairo_t *cr, gpointer *data)
 {
   struct frame *f;
