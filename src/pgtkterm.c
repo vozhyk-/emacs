@@ -14794,7 +14794,6 @@ static gboolean key_press_event(GtkWidget *widget, GdkEvent *event, gpointer *us
       // count++;
     }
 
-  pgtk_debug();
   SAFE_FREE();
 
   return TRUE;
