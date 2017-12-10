@@ -14852,7 +14852,6 @@ frame_unhighlight (struct frame *f)
 static void
 x_frame_rehighlight (struct pgtk_display_info *dpyinfo)
 {
-#if 1
   struct frame *old_highlight = dpyinfo->x_highlight_frame;
 
   if (dpyinfo->x_focus_frame)
@@ -14877,7 +14876,6 @@ x_frame_rehighlight (struct pgtk_display_info *dpyinfo)
       if (dpyinfo->x_highlight_frame)
 	frame_highlight (dpyinfo->x_highlight_frame);
     }
-#endif
 }
 
 /* The focus has changed.  Update the frames as necessary to reflect
