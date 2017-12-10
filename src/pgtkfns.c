@@ -35,6 +35,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include "termhooks.h"
 #include "fontset.h"
 #include "font.h"
+#include "xsettings.h"
 
 
 #ifdef HAVE_PGTK
