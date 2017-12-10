@@ -36,7 +36,7 @@ Higher:
 - no audible bell.
 - clipboard not supported.
 - sometimes segmentation fault.
-- quit is delayed.
+- quit not working.
 - images not supported.
 
 Lower:
