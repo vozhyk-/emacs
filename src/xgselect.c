@@ -23,6 +23,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 
 #ifdef HAVE_GLIB
 
+#include <stdio.h>
 #include <glib.h>
 #include <errno.h>
 #include "lisp.h"
@@ -154,12 +155,19 @@ xg_select (int fds_lim, fd_set *rfds, fd_set *wfds, fd_set *efds,
   if (need_to_dispatch && context_acquired)
     {
       int pselect_errno = errno;
+      fprintf(stderr, "retval=%d.\n", retval);
+      fprintf(stderr, "need_to_dispatch=%d.\n", need_to_dispatch);
+      fprintf(stderr, "context_acquired=%d.\n", context_acquired);
+      fprintf(stderr, "pselect_errno=%d.\n", pselect_errno);
       /* Prevent g_main_dispatch recursion, that would occur without
          block_input wrapper, because event handlers call
          unblock_input.  Event loop recursion was causing Bug#15801.  */
       block_input ();
-      while (g_main_context_pending (context))
+      while (g_main_context_pending (context)) {
+	fprintf(stderr, "dispatch...\n");
         g_main_context_dispatch (context);
+	fprintf(stderr, "dispatch... done.\n");
+      }
       unblock_input ();
       errno = pselect_errno;
     }

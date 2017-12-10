@@ -11434,7 +11434,9 @@ static void pgtk_draw_glyph_string(struct glyph_string *s)
 
     case XWIDGET_GLYPH:
       PGTK_TRACE("pgtk_draw_glyph_string: 2.5.");
+#if 0
       x_draw_xwidget_glyph_string (s);
+#endif
       break;
 
     case STRETCH_GLYPH:
@@ -12668,7 +12670,11 @@ pgtk_read_socket (struct terminal *terminal, struct input_event *hold_quit)
   bool event_found = false;
   struct pgtk_display_info *dpyinfo = terminal->display_info.pgtk;
 
-  block_input ();
+  PGTK_TRACE("pgtk_read_socket: 1: errno=%d.", errno);
+  if (input_blocked_p ()) {
+    PGTK_TRACE("pgtk_read_socket: 2: errno=%d.", errno);
+    block_input ();
+    PGTK_TRACE("pgtk_read_socket: 3: errno=%d.", errno);
 
 #if 0
   /* For debugging, this gives a way to fake an I/O error.  */
@@ -12744,8 +12750,12 @@ pgtk_read_socket (struct terminal *terminal, struct input_event *hold_quit)
     }
 #endif
 
-  unblock_input ();
+    PGTK_TRACE("pgtk_read_socket: 7: errno=%d.", errno);
+    unblock_input ();
+  }
+  PGTK_TRACE("pgtk_read_socket: 8: errno=%d.", errno);
 
+  PGTK_TRACE("pgtk_read_socket: 9: errno=%d.", errno);
   return count;
 }
 
