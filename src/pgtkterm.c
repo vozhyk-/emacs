@@ -14782,7 +14782,7 @@ static gboolean key_press_event(GtkWidget *widget, GdkEvent *event, gpointer *us
 	inev.ie.kind = NO_EVENT;  /* Already stored above.  */
 
 	if (keysym == GDK_KEY_VoidSymbol)
-	  return TRUE;
+	  goto done;
       }
     }
 
@@ -14793,6 +14793,9 @@ static gboolean key_press_event(GtkWidget *widget, GdkEvent *event, gpointer *us
       XSETFRAME (inev.ie.frame_or_window, f);
       // count++;
     }
+
+  pgtk_debug();
+  SAFE_FREE();
 
   return TRUE;
 }
