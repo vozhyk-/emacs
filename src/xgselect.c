@@ -59,6 +59,7 @@ xg_select (int fds_lim, fd_set *rfds, fd_set *wfds, fd_set *efds,
   int i, nfds, tmo_in_millisec, must_free = 0;
   bool need_to_dispatch;
 
+  fprintf(stderr, "xg_select: enter.\n");
   context = g_main_context_default ();
   context_acquired = g_main_context_acquire (context);
   /* FIXME: If we couldn't acquire the context, we just silently proceed
@@ -182,6 +183,7 @@ xg_select (int fds_lim, fd_set *rfds, fd_set *wfds, fd_set *efds,
       errno = EINTR;
     }
 
+  fprintf(stderr, "xg_select: leave.\n");
   return retval;
 }
 #endif /* HAVE_GLIB */

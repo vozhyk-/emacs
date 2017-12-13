@@ -754,7 +754,9 @@ static int old_fcntl_flags[FD_SETSIZE];
 void
 init_sigio (int fd)
 {
+  fprintf(stderr, "init_sigio(%d):\n", fd);
 #ifdef USABLE_SIGIO
+  fprintf(stderr, "init_sigio(%d): usable.\n", fd);
   old_fcntl_flags[fd] = fcntl (fd, F_GETFL, 0) & ~FASYNC;
   fcntl (fd, F_SETFL, old_fcntl_flags[fd] | FASYNC);
   interrupts_deferred = 0;
@@ -765,7 +767,9 @@ init_sigio (int fd)
 static void
 reset_sigio (int fd)
 {
+  fprintf(stderr, "reset_sigio(%d):\n", fd);
 #ifdef USABLE_SIGIO
+  fprintf(stderr, "reset_sigio(%d): usable.\n", fd);
   fcntl (fd, F_SETFL, old_fcntl_flags[fd]);
 #endif
 }
@@ -774,7 +778,9 @@ reset_sigio (int fd)
 void
 request_sigio (void)
 {
+  fprintf(stderr, "request_sigio:\n");
 #ifdef USABLE_SIGIO
+  fprintf(stderr, "request_sigio: usable.\n");
   sigset_t unblocked;
 
   if (noninteractive)
@@ -794,7 +800,9 @@ request_sigio (void)
 void
 unrequest_sigio (void)
 {
+  fprintf(stderr, "unrequest_sigio:\n");
 #ifdef USABLE_SIGIO
+  fprintf(stderr, "unrequest_sigio: usable.\n");
   sigset_t blocked;
 
   if (noninteractive)
@@ -1693,10 +1701,12 @@ deliver_process_signal (int sig, signal_handler_t handler)
      might change errno.  Races can occur even in single-threaded hosts.  */
   int old_errno = errno;
 
+  fprintf(stderr, "deliver_process_signal(%d):\n", sig);
   bool on_main_thread = true;
 #ifdef FORWARD_SIGNAL_TO_MAIN_THREAD
   if (! pthread_equal (pthread_self (), main_thread_id))
     {
+      fprintf(stderr, "deliver_process_signal(%d): different thread.\n", sig);
       sigset_t blocked;
       sigemptyset (&blocked);
       sigaddset (&blocked, sig);

@@ -156,6 +156,9 @@ struct pgtk_display_info
   /* The generic display parameters corresponding to this PGTK display. */
   struct terminal *terminal;
 
+  /* A connection number (file descriptor) for the display.  */
+  int connection;
+
   /* This is a cons cell of the form (NAME . FONT-LIST-CACHE).  */
   Lisp_Object name_list_element;
 

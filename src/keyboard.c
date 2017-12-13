@@ -7214,16 +7214,20 @@ totally_unblock_input (void)
 void
 handle_input_available_signal (int sig)
 {
+  fprintf(stderr, "handle_input_available_signal(%d):\n", sig);
   pending_signals = true;
 
   if (input_available_clear_time)
     *input_available_clear_time = make_timespec (0, 0);
+  fprintf(stderr, "handle_input_available_signal(%d): done.\n", sig);
 }
 
 static void
 deliver_input_available_signal (int sig)
 {
+  fprintf(stderr, "deliver_input_available_signal(%d):\n", sig);
   deliver_process_signal (sig, handle_input_available_signal);
+  fprintf(stderr, "deliver_input_available_signal(%d): done.\n", sig);
 }
 #endif /* USABLE_SIGIO */
 
@@ -10528,7 +10532,7 @@ handle_interrupt (bool in_signal_handler)
          to ns_select there (needed because otherwise events aren't picked up
          outside of polling since we don't get SIGIO like X and we don't have a
          separate event loop thread like W32.  */
-#if !defined(HAVE_NS) && !defined(HAVE_PGTK)
+#if !defined(HAVE_NS)
 #ifdef THREADS_ENABLED
   /* If we were called from a signal handler, we must be in the main
      thread, see deliver_process_signal.  So we must make sure the

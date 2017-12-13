@@ -46,6 +46,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include "ccl.h"
 
 #include "termhooks.h"
+#include "termopts.h"
 #include "termchar.h"
 #include "menu.h"
 #include "window.h"
@@ -63,6 +64,12 @@ struct pgtk_display_info *x_display_list; /* Chain of existing displays */
 static int selfds[2] = { -1, -1 };
 static pthread_mutex_t select_mutex;
 static fd_set select_readfds, select_writefds;
+static struct input_event *current_hold_quit;
+
+static struct event_queue_t {
+  struct input_event *q;
+  int nr, cap;
+} event_q;
 
 /* Non-zero timeout value means ignore next mouse click if it arrives
    before that timeout elapses (i.e. as part of the same sequence of
@@ -75,6 +82,32 @@ static void pgtk_fill_rectangle(struct frame *f, unsigned long color, int x, int
 static void pgtk_clip_to_row (struct window *w, struct glyph_row *row,
 				enum glyph_row_area area, cairo_t *cr);
 static void pgtk_cr_destroy_surface(struct frame *f);
+
+static void evq_enqueue(struct input_event *ev)
+{
+  struct event_queue_t *evq = &event_q;
+  if (evq->cap == 0) {
+    evq->cap = 4;
+    evq->q = xmalloc(sizeof *evq->q * evq->cap);
+  }
+
+  if (evq->nr >= evq->cap) {
+    evq->cap += evq->cap / 2;
+    evq->q = xrealloc(evq->q, sizeof *evq->q * evq->cap);
+  }
+
+  evq->q[evq->nr++] = *ev;
+}
+
+static int evq_flush(struct input_event *hold_quit)
+{
+  struct event_queue_t *evq = &event_q;
+  int i, n = evq->nr;
+  for (i = 0; i < n; i++)
+    kbd_buffer_store_buffered_event (&evq->q[i], hold_quit);
+  evq->nr = 0;
+  return n;
+}
 
 char *
 x_get_keysym_name (int keysym)
@@ -3500,97 +3533,29 @@ static int
 pgtk_read_socket (struct terminal *terminal, struct input_event *hold_quit)
 {
   PGTK_TRACE("pgtk_read_socket");
-  int count = 0;
-  bool event_found = false;
   struct pgtk_display_info *dpyinfo = terminal->display_info.pgtk;
+  int count;
 
-  PGTK_TRACE("pgtk_read_socket: 1: errno=%d.", errno);
-  if (input_blocked_p ()) {
-    PGTK_TRACE("pgtk_read_socket: 2: errno=%d.", errno);
-    block_input ();
-    PGTK_TRACE("pgtk_read_socket: 3: errno=%d.", errno);
+  count = evq_flush(hold_quit);
+  if (count > 0)
+    return count;
 
-#if 0
-  /* For debugging, this gives a way to fake an I/O error.  */
-  if (dpyinfo == XTread_socket_fake_io_error)
-    {
-      XTread_socket_fake_io_error = 0;
-      x_io_error_quitter (dpyinfo->display);
-    }
-#endif
+  block_input ();
+  PGTK_TRACE("pgtk_read_socket: 3: errno=%d.", errno);
 
-  /* For GTK we must use the GTK event loop.  But XEvents gets passed
-     to our filter function above, and then to the big event switch.
-     We use a bunch of globals to communicate with our filter function,
-     that is kind of ugly, but it works.
-
-     There is no way to do one display at the time, GTK just does events
-     from all displays.  */
-
-  static int ctr = 0;
-
-  // PGTK_TRACE("gtk main... %d.", ctr++);
   while (gtk_events_pending ())
-    {
-#if 0
-      current_count = count;
-      current_hold_quit = hold_quit;
-#endif
+    gtk_main_iteration ();
 
-      gtk_main_iteration ();
-
-#if 0
-      count = current_count;
-      current_count = -1;
-      current_hold_quit = 0;
-
-      if (current_finish == X_EVENT_GOTO_OUT)
-        break;
-#endif
-    }
   // PGTK_TRACE("gtk main... end.");
 
-#if 0
-  /* On some systems, an X bug causes Emacs to get no more events
-     when the window is destroyed.  Detect that.  (1994.)  */
-  if (! event_found)
-    {
-      /* Emacs and the X Server eats up CPU time if XNoOp is done every time.
-	 One XNOOP in 100 loops will make Emacs terminate.
-	 B. Bretthauer, 1994 */
-      x_noop_count++;
-      if (x_noop_count >= 100)
-	{
-	  x_noop_count=0;
+  PGTK_TRACE("pgtk_read_socket: 7: errno=%d.", errno);
+  unblock_input ();
 
-	  if (next_noop_dpyinfo == 0)
-	    next_noop_dpyinfo = x_display_list;
+  count = evq_flush(hold_quit);
+  if (count > 0)
+    return count;
 
-	  XNoOp (next_noop_dpyinfo->display);
-
-	  /* Each time we get here, cycle through the displays now open.  */
-	  next_noop_dpyinfo = next_noop_dpyinfo->next;
-	}
-    }
-#endif
-
-#if 0
-  /* If the focus was just given to an auto-raising frame,
-     raise it now.  FIXME: handle more than one such frame.  */
-  if (dpyinfo->x_pending_autoraise_frame)
-    {
-      x_raise_frame (dpyinfo->x_pending_autoraise_frame);
-      dpyinfo->x_pending_autoraise_frame = NULL;
-    }
-#endif
-
-    PGTK_TRACE("pgtk_read_socket: 7: errno=%d.", errno);
-    unblock_input ();
-  }
-  PGTK_TRACE("pgtk_read_socket: 8: errno=%d.", errno);
-
-  PGTK_TRACE("pgtk_read_socket: 9: errno=%d.", errno);
-  return count;
+  return 0;
 }
 
 
@@ -4384,11 +4349,7 @@ static gboolean key_press_event(GtkWidget *widget, GdkEvent *event, gpointer *us
 			    ? ASCII_KEYSTROKE_EVENT
 			    : MULTIBYTE_CHAR_KEYSTROKE_EVENT);
 	    inev.ie.code = ch;
-#if 0
-	    kbd_buffer_store_buffered_event (&inev, hold_quit);
-#else
-	    kbd_buffer_store_buffered_event (&inev, NULL);
-#endif
+	    evq_enqueue (&inev);
 	  }
 
 	// count += nchars;
@@ -4403,7 +4364,7 @@ static gboolean key_press_event(GtkWidget *widget, GdkEvent *event, gpointer *us
  done:
   if (inev.ie.kind != NO_EVENT)
     {
-      kbd_buffer_store_buffered_event (&inev, NULL);
+      evq_enqueue (&inev);
       XSETFRAME (inev.ie.frame_or_window, f);
       // count++;
     }
@@ -4598,7 +4559,7 @@ enter_notify_event(GtkWidget *widget, GdkEvent *event, gpointer *user_data)
 		     FOCUS_IMPLICIT,
 		     FRAME_DISPLAY_INFO(focus_frame), focus_frame, &inev);
   if (inev.ie.kind != NO_EVENT)
-    kbd_buffer_store_buffered_event (&inev, NULL);
+    evq_enqueue (&inev);
   return TRUE;
 }
 
@@ -4620,7 +4581,7 @@ leave_notify_event(GtkWidget *widget, GdkEvent *event, gpointer *user_data)
 		     FOCUS_IMPLICIT,
 		     FRAME_DISPLAY_INFO(focus_frame), focus_frame, &inev);
   if (inev.ie.kind != NO_EVENT)
-    kbd_buffer_store_buffered_event (&inev, NULL);
+    evq_enqueue (&inev);
   return TRUE;
 }
 
@@ -4641,7 +4602,7 @@ focus_in_event(GtkWidget *widget, GdkEvent *event, gpointer *user_data)
   x_focus_changed (TRUE, FOCUS_IMPLICIT,
 		   FRAME_DISPLAY_INFO(frame), frame, &inev);
   if (inev.ie.kind != NO_EVENT)
-    kbd_buffer_store_buffered_event (&inev, NULL);
+    evq_enqueue (&inev);
   return TRUE;
 }
 
@@ -4662,7 +4623,7 @@ focus_out_event(GtkWidget *widget, GdkEvent *event, gpointer *user_data)
   x_focus_changed (FALSE, FOCUS_IMPLICIT,
 		   FRAME_DISPLAY_INFO(frame), frame, &inev);
   if (inev.ie.kind != NO_EVENT)
-    kbd_buffer_store_buffered_event (&inev, NULL);
+    evq_enqueue(&inev);
   return TRUE;
 }
 
@@ -4812,7 +4773,7 @@ motion_notify_event(GtkWidget *widget, GdkEvent *event, gpointer *user_data)
 #endif
 
   if (inev.ie.kind != NO_EVENT)
-    kbd_buffer_store_buffered_event (&inev, NULL);
+    evq_enqueue (&inev);
   return TRUE;
 }
 
@@ -5016,7 +4977,7 @@ button_event(GtkWidget *widget, GdkEvent *event, gpointer *user_data)
 #endif
 
   if (inev.ie.kind != NO_EVENT)
-    kbd_buffer_store_buffered_event (&inev, NULL);
+    evq_enqueue (&inev);
   return TRUE;
 }
 
@@ -5086,7 +5047,7 @@ scroll_event(GtkWidget *widget, GdkEvent *event, gpointer *user_data)
   }
 
   if (inev.ie.kind != NO_EVENT)
-    kbd_buffer_store_buffered_event (&inev, NULL);
+    evq_enqueue (&inev);
   return TRUE;
 }
 
@@ -5115,6 +5076,21 @@ my_log_handler (const gchar *log_domain, GLogLevelFlags log_level,
       fprintf (stderr, "%s-WARNING **: %s", log_domain, msg);
 }
 
+static int pgtk_detect_connection(int n_orig, GPollFD *fds_orig, int n_new, GPollFD *fds_new)
+{
+  int i_new, i_orig;
+  int conn = -1;
+  for (i_new = 0; i_new < n_new; i_new++) {
+    bool exist = false;
+    for (i_orig = 0; i_orig < n_orig; i_orig++) {
+      if (fds_orig[i_orig].fd == fds_new[i_new].fd)
+	exist = true;
+    }
+    if (!exist)
+      conn = fds_new[i_new].fd;
+  }
+  return conn;
+}
 
 /* Open a connection to X display DISPLAY_NAME, and return
    the structure that describes the open display.
@@ -5127,13 +5103,18 @@ pgtk_term_init (Lisp_Object display_name, char *resource_name)
   struct terminal *terminal;
   struct pgtk_display_info *dpyinfo;
   static int x_initialized = 0;
+  GMainContext *context;
+  bool context_acquired;
+  GPollFD gfds_orig[128], gfds_new[128];
+  int n_gfds_orig, n_gfds_new;
+  int conn_fd;
 
   block_input ();
 
   if (!x_initialized)
     {
       /* Try to not use interrupt input; start polling.  */
-      Fset_input_interrupt_mode (Qnil);
+      Fset_input_interrupt_mode (Qt);
       x_cr_init_fringe (&pgtk_redisplay_interface);
       ++x_initialized;
     }
@@ -5142,6 +5123,15 @@ pgtk_term_init (Lisp_Object display_name, char *resource_name)
   if (! x_display_ok (SSDATA (display_name)))
     error ("Display %s can't be opened", SSDATA (display_name));
 #endif
+
+  context = g_main_context_default ();
+  context_acquired = g_main_context_acquire (context);
+
+  n_gfds_orig = -1;
+  if (context_acquired) {
+    gint timeout;
+    n_gfds_orig = g_main_context_query (context, G_PRIORITY_LOW, &timeout, gfds_orig, ARRAYELTS(gfds_orig));
+  }
 
   {
 #define NUM_ARGV 10
@@ -5224,6 +5214,21 @@ pgtk_term_init (Lisp_Object display_name, char *resource_name)
       }
   }
 
+  n_gfds_new = -1;
+  if (context_acquired) {
+    gint timeout;
+    n_gfds_new = g_main_context_query (context, G_PRIORITY_LOW, &timeout, gfds_new, ARRAYELTS(gfds_new));
+  }
+
+  conn_fd = -1;
+  if (n_gfds_orig >= 0 && n_gfds_new >= 0) {
+    conn_fd = pgtk_detect_connection(n_gfds_orig, gfds_orig, n_gfds_new, gfds_new);
+    PGTK_TRACE("conn_fd=%d.", conn_fd);
+  }
+
+  if (context_acquired)
+    g_main_context_release (context);
+
   /* Detect failure.  */
   if (dpy == 0)
     {
@@ -5286,8 +5291,8 @@ pgtk_term_init (Lisp_Object display_name, char *resource_name)
   dpyinfo->name_list_element = Fcons (display_name, Qnil);
 #if 0
   dpyinfo->display = dpy;
-  dpyinfo->connection = ConnectionNumber (dpyinfo->display);
 #endif
+  dpyinfo->connection = conn_fd;
 
   /* https://lists.gnu.org/r/emacs-devel/2015-11/msg00194.html  */
   dpyinfo->smallest_font_height = 1;
@@ -5408,7 +5413,6 @@ pgtk_term_init (Lisp_Object display_name, char *resource_name)
 
   xsettings_initialize (dpyinfo);
 
-#if 0
   /* This is only needed for distinguishing keyboard and process input.  */
   if (dpyinfo->connection != 0)
     add_keyboard_wait_descriptor (dpyinfo->connection);
@@ -5419,7 +5423,6 @@ pgtk_term_init (Lisp_Object display_name, char *resource_name)
 
   if (interrupt_input)
     init_sigio (dpyinfo->connection);
-#endif
 
   unblock_input ();
 
