@@ -2748,7 +2748,7 @@ PGTK_OBJ=
 PGTK_LIBS=
 if test "$window_system" = "pgtk"; then
   PGTK_OBJ="pgtkfns.o pgtkterm.o pgtkselect.o xsettings.o"
-  PGTK_LIBS="$GTK_LIBS"
+  PGTK_LIBS="$GTK_LIBS -ldl"
   AC_DEFINE([HAVE_PGTK], 1, [Define to 1 if you have pure Gtk+-3.])
 fi
 AC_SUBST(PGTK_OBJ)
