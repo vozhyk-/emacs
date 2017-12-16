@@ -36,7 +36,6 @@ Higher:
 - no audible bell.
 - clipboard not supported.
 - sometimes segmentation fault.
-- quit not working.
 - images not supported.
 
 Lower:
@@ -45,7 +44,7 @@ Lower:
 - no visual-bell.
 - sometimes cursor are left at the end of line.
 - fullscreen not supported.
-- maybe doesn't work on pure gtk+-3 with X11.
+- does not work on pure gtk+-3 with X11.
 - so many features not supported.
 
 ## My Environment
