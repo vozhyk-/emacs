@@ -30,6 +30,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include <signal.h>
 #include <unistd.h>
 #include <errno.h>
+#include <dlfcn.h>
 
 #include <c-ctype.h>
 #include <c-strcase.h>
@@ -61,15 +62,13 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #define FRAME_CR_SURFACE(f)	((f)->output_data.pgtk->cr_surface)
 
 struct pgtk_display_info *x_display_list; /* Chain of existing displays */
-static int selfds[2] = { -1, -1 };
-static pthread_mutex_t select_mutex;
-static fd_set select_readfds, select_writefds;
-static struct input_event *current_hold_quit;
 
 static struct event_queue_t {
   struct input_event *q;
   int nr, cap;
-} event_q;
+} event_q = {
+  NULL, 0, 0,
+};
 
 /* Non-zero timeout value means ignore next mouse click if it arrives
    before that timeout elapses (i.e. as part of the same sequence of
@@ -97,6 +96,7 @@ static void evq_enqueue(struct input_event *ev)
   }
 
   evq->q[evq->nr++] = *ev;
+  raise(SIGIO);
 }
 
 static int evq_flush(struct input_event *hold_quit)
@@ -3532,33 +3532,197 @@ pgtk_clear_frame (struct frame *f)
 static int
 pgtk_read_socket (struct terminal *terminal, struct input_event *hold_quit)
 {
-  PGTK_TRACE("pgtk_read_socket");
+  PGTK_TRACE("pgtk_read_socket: enter.");
   struct pgtk_display_info *dpyinfo = terminal->display_info.pgtk;
+  GMainContext *context;
+  bool context_acquired = false;
   int count;
 
   count = evq_flush(hold_quit);
-  if (count > 0)
+  if (count > 0) {
+    PGTK_TRACE("pgtk_read_socket: leave(1).");
     return count;
+  }
+
+  context = g_main_context_default ();
+  context_acquired = g_main_context_acquire (context);
 
   block_input ();
   PGTK_TRACE("pgtk_read_socket: 3: errno=%d.", errno);
 
-  while (gtk_events_pending ())
-    gtk_main_iteration ();
-
-  // PGTK_TRACE("gtk main... end.");
+  if (context_acquired) {
+    while (g_main_context_pending (context)) {
+      PGTK_TRACE("pgtk_read_socket: 4: dispatch...");
+      g_main_context_dispatch (context);
+      PGTK_TRACE("pgtk_read_socket: 5: dispatch... done.");
+    }
+  }
 
   PGTK_TRACE("pgtk_read_socket: 7: errno=%d.", errno);
   unblock_input ();
 
-  count = evq_flush(hold_quit);
-  if (count > 0)
-    return count;
+  if (context_acquired)
+    g_main_context_release (context);
 
+  count = evq_flush(hold_quit);
+  if (count > 0) {
+    PGTK_TRACE("pgtk_read_socket: leave(2).");
+    return count;
+  }
+
+  PGTK_TRACE("pgtk_read_socket: leave(3).");
   return 0;
 }
 
+int
+pgtk_select (int fds_lim, fd_set *rfds, fd_set *wfds, fd_set *efds,
+	     struct timespec *timeout, sigset_t *sigmask)
+{
+  fd_set all_rfds, all_wfds;
+  struct timespec tmo;
+  struct timespec *tmop = timeout;
 
+  GMainContext *context;
+  bool have_wfds = wfds != NULL;
+  GPollFD gfds_buf[128];
+  GPollFD *gfds = gfds_buf;
+  int gfds_size = ARRAYELTS (gfds_buf);
+  int n_gfds, retval = 0, our_fds = 0, max_fds = fds_lim - 1;
+  bool context_acquired = false;
+  int i, nfds, tmo_in_millisec, must_free = 0;
+  bool need_to_dispatch;
+
+  fprintf(stderr, "pgtk_select: enter.\n");
+
+  if (event_q.nr >= 1) {
+    fprintf(stderr, "pgtk_select: raise.\n");
+    raise(SIGIO);
+    errno = EINTR;
+    return -1;
+  }
+
+  context = g_main_context_default ();
+  context_acquired = g_main_context_acquire (context);
+  /* FIXME: If we couldn't acquire the context, we just silently proceed
+     because this function handles more than just glib file descriptors.
+     Note that, as implemented, this failure is completely silent: there is
+     no feedback to the caller.  */
+
+  if (rfds) all_rfds = *rfds;
+  else FD_ZERO (&all_rfds);
+  if (wfds) all_wfds = *wfds;
+  else FD_ZERO (&all_wfds);
+
+  n_gfds = (context_acquired
+	    ? g_main_context_query (context, G_PRIORITY_LOW, &tmo_in_millisec,
+				    gfds, gfds_size)
+	    : -1);
+
+  if (gfds_size < n_gfds)
+    {
+      /* Avoid using SAFE_NALLOCA, as that implicitly refers to the
+	 current thread.  Using xnmalloc avoids thread-switching
+	 problems here.  */
+      gfds = xnmalloc (n_gfds, sizeof *gfds);
+      must_free = 1;
+      gfds_size = n_gfds;
+      n_gfds = g_main_context_query (context, G_PRIORITY_LOW, &tmo_in_millisec,
+				     gfds, gfds_size);
+    }
+
+  for (i = 0; i < n_gfds; ++i)
+    {
+      if (gfds[i].events & G_IO_IN)
+        {
+          FD_SET (gfds[i].fd, &all_rfds);
+          if (gfds[i].fd > max_fds) max_fds = gfds[i].fd;
+        }
+      if (gfds[i].events & G_IO_OUT)
+        {
+          FD_SET (gfds[i].fd, &all_wfds);
+          if (gfds[i].fd > max_fds) max_fds = gfds[i].fd;
+          have_wfds = true;
+        }
+    }
+
+  if (must_free)
+    xfree (gfds);
+
+  if (n_gfds >= 0 && tmo_in_millisec >= 0)
+    {
+      tmo = make_timespec (tmo_in_millisec / 1000,
+			   1000 * 1000 * (tmo_in_millisec % 1000));
+      if (!timeout || timespec_cmp (tmo, *timeout) < 0)
+	tmop = &tmo;
+    }
+
+  fds_lim = max_fds + 1;
+  nfds = thread_select (pselect, fds_lim,
+			&all_rfds, have_wfds ? &all_wfds : NULL, efds,
+			tmop, sigmask);
+  if (nfds < 0)
+    retval = nfds;
+  else if (nfds > 0)
+    {
+      for (i = 0; i < fds_lim; ++i)
+        {
+          if (FD_ISSET (i, &all_rfds))
+            {
+              if (rfds && FD_ISSET (i, rfds)) ++retval;
+              else ++our_fds;
+            }
+          else if (rfds)
+            FD_CLR (i, rfds);
+
+          if (have_wfds && FD_ISSET (i, &all_wfds))
+            {
+              if (wfds && FD_ISSET (i, wfds)) ++retval;
+              else ++our_fds;
+            }
+          else if (wfds)
+            FD_CLR (i, wfds);
+
+          if (efds && FD_ISSET (i, efds))
+            ++retval;
+        }
+    }
+
+  /* If Gtk+ is in use eventually gtk_main_iteration will be called,
+     unless retval is zero.  */
+  need_to_dispatch = retval == 0;
+  if (need_to_dispatch && context_acquired)
+    {
+      int pselect_errno = errno;
+      fprintf(stderr, "retval=%d.\n", retval);
+      fprintf(stderr, "need_to_dispatch=%d.\n", need_to_dispatch);
+      fprintf(stderr, "context_acquired=%d.\n", context_acquired);
+      fprintf(stderr, "pselect_errno=%d.\n", pselect_errno);
+      /* Prevent g_main_dispatch recursion, that would occur without
+         block_input wrapper, because event handlers call
+         unblock_input.  Event loop recursion was causing Bug#15801.  */
+      block_input ();
+      while (g_main_context_pending (context)) {
+	fprintf(stderr, "dispatch...\n");
+        g_main_context_dispatch (context);
+	fprintf(stderr, "dispatch... done.\n");
+      }
+      unblock_input ();
+      errno = pselect_errno;
+    }
+
+  if (context_acquired)
+    g_main_context_release (context);
+
+  /* To not have to recalculate timeout, return like this.  */
+  if ((our_fds > 0 || (nfds == 0 && tmop == &tmo)) && (retval == 0))
+    {
+      retval = -1;
+      errno = EINTR;
+    }
+
+  fprintf(stderr, "pgtk_select: leave.\n");
+  return retval;
+}
 
 static struct terminal *
 pgtk_create_terminal (struct pgtk_display_info *dpyinfo)
@@ -4374,7 +4538,11 @@ static gboolean key_press_event(GtkWidget *widget, GdkEvent *event, gpointer *us
   return TRUE;
 }
 
-
+static gboolean key_release_event(GtkWidget *widget, GdkEvent *event, gpointer *user_data)
+{
+  PGTK_TRACE("key_release_event");
+  return TRUE;
+}
 
 static void
 frame_highlight (struct frame *f)
@@ -5056,6 +5224,7 @@ pgtk_set_event_handler(struct frame *f)
 {
   g_signal_connect(G_OBJECT(FRAME_GTK_WIDGET(f)), "size-allocate", G_CALLBACK(size_allocate), NULL);
   g_signal_connect(G_OBJECT(FRAME_GTK_WIDGET(f)), "key-press-event", G_CALLBACK(key_press_event), NULL);
+  g_signal_connect(G_OBJECT(FRAME_GTK_WIDGET(f)), "key-release-event", G_CALLBACK(key_release_event), NULL);
   g_signal_connect(G_OBJECT(FRAME_GTK_WIDGET(f)), "focus-in-event", G_CALLBACK(focus_in_event), NULL);
   g_signal_connect(G_OBJECT(FRAME_GTK_WIDGET(f)), "focus-out-event", G_CALLBACK(focus_out_event), NULL);
   g_signal_connect(G_OBJECT(FRAME_GTK_WIDGET(f)), "enter-notify-event", G_CALLBACK(enter_notify_event), NULL);
@@ -5076,20 +5245,70 @@ my_log_handler (const gchar *log_domain, GLogLevelFlags log_level,
       fprintf (stderr, "%s-WARNING **: %s", log_domain, msg);
 }
 
-static int pgtk_detect_connection(int n_orig, GPollFD *fds_orig, int n_new, GPollFD *fds_new)
+/***
+    Detect socket to display server.
+    Don't assume existence of X11 or Wayland specific functions.
+***/
+
+static GType get_type(void *h, const char *funcname)
 {
-  int i_new, i_orig;
-  int conn = -1;
-  for (i_new = 0; i_new < n_new; i_new++) {
-    bool exist = false;
-    for (i_orig = 0; i_orig < n_orig; i_orig++) {
-      if (fds_orig[i_orig].fd == fds_new[i_new].fd)
-	exist = true;
-    }
-    if (!exist)
-      conn = fds_new[i_new].fd;
+  void *fn;
+  if ((fn = dlsym(h, funcname)) == NULL)
+    return G_TYPE_INVALID;
+  return ((GType (*)(void)) fn)();
+}
+
+static int pgtk_detect_wayland_connection(void *h, GdkDisplay *gdpy)
+{
+  GType wldpy_type;
+  void *(*fn1)(void *);
+  int (*fn2)(void *);
+  if ((wldpy_type = get_type(h, "gdk_wayland_display_get_type")) == G_TYPE_INVALID)
+    return -1;
+  if (!g_type_check_instance_is_a(gdpy, wldpy_type))
+    return -1;
+  fn1 = dlsym(h, "gdk_wayland_display_get_wl_display");
+  fn2 = dlsym(h, "wl_display_get_fd");
+  if (!fn1 || !fn2)
+    return -1;
+  return fn2(fn1(gdpy));
+}
+
+static int pgtk_detect_x11_connection(void *h, GdkDisplay *gdpy)
+{
+  GType xdpy_type;
+  void *(*fn1)(void *);
+  int (*fn2)(void *);
+  if ((xdpy_type = get_type(h, "gdk_x11_display_get_type")) == G_TYPE_INVALID)
+    return -1;
+  if (!g_type_check_instance_is_a(gdpy, xdpy_type))
+    return -1;
+  fn1 = dlsym(h, "gdk_x11_display_get_xdisplay");
+  fn2 = dlsym(h, "XConnectionNumber");
+  if (!fn1 || !fn2)
+    return -1;
+  return fn2(fn1(gdpy));
+}
+
+static int pgtk_detect_connection(GdkDisplay *gdpy)
+{
+  void *h;
+  int fd;
+  if ((h = dlopen(NULL, RTLD_NOW)) == NULL) {
+    error("dlopen failed.");
+    return -1;
   }
-  return conn;
+  if ((fd = pgtk_detect_x11_connection(h, gdpy)) != -1) {
+    dlclose(h);
+    return fd;
+  }
+  if ((fd = pgtk_detect_wayland_connection(h, gdpy)) != -1) {
+    dlclose(h);
+    return fd;
+  }
+  dlclose(h);
+  error("socket detection failed.");
+  return -1;
 }
 
 /* Open a connection to X display DISPLAY_NAME, and return
@@ -5103,10 +5322,6 @@ pgtk_term_init (Lisp_Object display_name, char *resource_name)
   struct terminal *terminal;
   struct pgtk_display_info *dpyinfo;
   static int x_initialized = 0;
-  GMainContext *context;
-  bool context_acquired;
-  GPollFD gfds_orig[128], gfds_new[128];
-  int n_gfds_orig, n_gfds_new;
   int conn_fd;
 
   block_input ();
@@ -5123,15 +5338,6 @@ pgtk_term_init (Lisp_Object display_name, char *resource_name)
   if (! x_display_ok (SSDATA (display_name)))
     error ("Display %s can't be opened", SSDATA (display_name));
 #endif
-
-  context = g_main_context_default ();
-  context_acquired = g_main_context_acquire (context);
-
-  n_gfds_orig = -1;
-  if (context_acquired) {
-    gint timeout;
-    n_gfds_orig = g_main_context_query (context, G_PRIORITY_LOW, &timeout, gfds_orig, ARRAYELTS(gfds_orig));
-  }
 
   {
 #define NUM_ARGV 10
@@ -5214,20 +5420,11 @@ pgtk_term_init (Lisp_Object display_name, char *resource_name)
       }
   }
 
-  n_gfds_new = -1;
-  if (context_acquired) {
-    gint timeout;
-    n_gfds_new = g_main_context_query (context, G_PRIORITY_LOW, &timeout, gfds_new, ARRAYELTS(gfds_new));
+  conn_fd = pgtk_detect_connection(DEFAULT_GDK_DISPLAY());
+  if (conn_fd < 0) {
+    unblock_input();
+    return 0;
   }
-
-  conn_fd = -1;
-  if (n_gfds_orig >= 0 && n_gfds_new >= 0) {
-    conn_fd = pgtk_detect_connection(n_gfds_orig, gfds_orig, n_gfds_new, gfds_new);
-    PGTK_TRACE("conn_fd=%d.", conn_fd);
-  }
-
-  if (context_acquired)
-    g_main_context_release (context);
 
   /* Detect failure.  */
   if (dpy == 0)
@@ -5778,9 +5975,4 @@ pgtk_cr_destroy_surface(struct frame *f)
 void
 init_pgtkterm (void)
 {
-  /* FD for select() is unknown on pure gtk, so I can't setup
-     SIGIO for it. I use polling, not interrupts.
-     However, alarm does not occur when timerfd is available.
-     I can't poll without alarm, so disable timerfd. */
-  xputenv ("EMACS_IGNORE_TIMERFD=1");
 }

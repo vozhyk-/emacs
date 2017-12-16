@@ -7214,20 +7214,16 @@ totally_unblock_input (void)
 void
 handle_input_available_signal (int sig)
 {
-  fprintf(stderr, "handle_input_available_signal(%d):\n", sig);
   pending_signals = true;
 
   if (input_available_clear_time)
     *input_available_clear_time = make_timespec (0, 0);
-  fprintf(stderr, "handle_input_available_signal(%d): done.\n", sig);
 }
 
 static void
 deliver_input_available_signal (int sig)
 {
-  fprintf(stderr, "deliver_input_available_signal(%d):\n", sig);
   deliver_process_signal (sig, handle_input_available_signal);
-  fprintf(stderr, "deliver_input_available_signal(%d): done.\n", sig);
 }
 #endif /* USABLE_SIGIO */
 

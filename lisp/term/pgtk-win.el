@@ -806,7 +806,7 @@ See the documentation of `create-fontset-from-fontset-spec' for the format.")
             :error)))
 
   ; (x-open-connection (system-name) x-command-line-resources t)
-  (x-open-connection (getenv "WAYLAND_DISPLAY") x-command-line-resources t)
+  (x-open-connection (or (getenv "WAYLAND_DISPLAY") (getenv "DISPLAY")) x-command-line-resources t)
 
   ;; Add GNUstep menu items Services, Hide and Quit.  Rename Help to Info
   ;; and put it first (i.e. omit from menu-bar-final-items.
