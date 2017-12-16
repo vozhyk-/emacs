@@ -1876,8 +1876,15 @@ running their FOO-mode-hook."
 	(push hook delayed-mode-hooks))
     ;; Normal case, just run the hook as before plus any delayed hooks.
     (setq hooks (nconc (nreverse delayed-mode-hooks) hooks))
+    (and syntax-propertize-function
+         (not (local-variable-p 'parse-sexp-lookup-properties))
+         ;; `syntax-propertize' sets `parse-sexp-lookup-properties' for us, but
+         ;; in order for the sexp primitives to automatically call
+         ;; `syntax-propertize' we need `parse-sexp-lookup-properties' to be
+         ;; set first.
+         (setq-local parse-sexp-lookup-properties t))
     (setq delayed-mode-hooks nil)
-    (apply 'run-hooks (cons 'change-major-mode-after-body-hook hooks))
+    (apply #'run-hooks (cons 'change-major-mode-after-body-hook hooks))
     (if (buffer-file-name)
         (with-demoted-errors "File local-variables error: %s"
           (hack-local-variables 'no-mode)))
@@ -4529,10 +4536,10 @@ EVALD, FUNC, ARGS, FLAGS are as in `mapbacktrace'."
   (princ (if (plist-get flags :debug-on-exit) "* " "  "))
   (cond
    ((and evald (not debugger-stack-frame-as-list))
-    (prin1 func)
-    (if args (prin1 args) (princ "()")))
+    (cl-prin1 func)
+    (if args (cl-prin1 args) (princ "()")))
    (t
-    (prin1 (cons func args))))
+    (cl-prin1 (cons func args))))
   (princ "\n"))
 
 (defun backtrace ()
