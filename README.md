@@ -36,7 +36,6 @@ Higher:
 - no audible bell.
 - clipboard not supported.
 - sometimes segmentation fault.
-- images not supported.
 
 Lower:
 - no toolbar.
@@ -46,6 +45,26 @@ Lower:
 - fullscreen not supported.
 - does not work on pure gtk+-3 with X11.
 - so many features not supported.
+
+## ImageMagick
+
+Emacs doesn't support ImageMagick 7.
+
+I wrote this code in configure.ac:
+
+```sh
+    if test $HAVE_IMAGEMAGICK != yes; then
+      IMAGEMAGICK_MODULE="MagickWand-6.Q16HDRI >= 6.3.5 MagickWand-6.Q16HDRI != 6.8.2 MagickWand-6.Q16HDRI < 7 MagickCore-6.Q16HDRI >= 6.9.9 MagickCore-6.Q16HDRI < 7"
+      EMACS_CHECK_MODULES([IMAGEMAGICK], [$IMAGEMAGICK_MODULE])
+    fi
+```
+
+However, MagickWand-6.Q16HDRI requires MagickCore, which may be ImageMagick 7.
+So, you may fix `Requires:` in `/usr/lib/pkgconfig/MagickWand-6.Q16HDRI.pc`:
+
+```
+Requires: MagickCore-6.Q16HDRI
+```
 
 ## My Environment
 
