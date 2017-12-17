@@ -59,6 +59,10 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include TERM_HEADER
 #endif /* HAVE_WINDOW_SYSTEM */
 
+#ifdef HAVE_PGTK
+#include <pgtkimage.h>
+#endif
+
 /* Work around GCC bug 54561.  */
 #if GNUC_PREREQ (4, 3, 0)
 # pragma GCC diagnostic ignored "-Wclobbered"
@@ -106,11 +110,8 @@ typedef struct ns_bitmap_record Bitmap_Record;
 #ifdef HAVE_PGTK
 typedef struct pgtk_bitmap_record Bitmap_Record;
 
-#define GET_PIXEL(ximg, x, y) 0
- // XGetPixel (ximg, x, y)
+#define GET_PIXEL(ximg, x, y) XGetPixel (ximg, x, y)
 #define NO_PIXMAP 0
-
-#define PIX_MASK_RETAIN	0
 
 #define PIX_MASK_RETAIN	0
 #define PIX_MASK_DRAW	1
@@ -163,6 +164,22 @@ XPutPixel (XImagePtr ximage, int x, int y, unsigned long pixel)
   ns_put_pixel (ximage, x, y, pixel);
 }
 #endif /* HAVE_NS */
+
+#ifdef HAVE_PGTK
+/* Use with pgtk_image.  */
+static unsigned long
+XGetPixel (XImagePtr ximage, int x, int y)
+{
+  return pgtk_image_get_pixel (ximage, x, y);
+}
+
+/* Use with pgtk_image.  */
+static void
+XPutPixel (XImagePtr ximage, int x, int y, unsigned long pixel)
+{
+  pgtk_image_put_pixel (ximage, x, y, pixel);
+}
+#endif /* HAVE_PGTK */
 
 
 /* Functions to access the contents of a bitmap, given an id.  */
@@ -260,9 +277,20 @@ x_create_bitmap_from_data (struct frame *f, char *bits, unsigned int width, unsi
       return -1;
 #endif
 
+#ifdef HAVE_PGTK
+  void *bitmap = pgtk_image_create_from_xbm (bits, width, height, 0xffffffff, 0xff000000);
+  if (!bitmap)
+      return -1;
+#endif
+
   id = x_allocate_bitmap_record (f);
 
 #ifdef HAVE_NS
+  dpyinfo->bitmaps[id - 1].img = bitmap;
+  dpyinfo->bitmaps[id - 1].depth = 1;
+#endif
+
+#ifdef HAVE_PGTK
   dpyinfo->bitmaps[id - 1].img = bitmap;
   dpyinfo->bitmaps[id - 1].depth = 1;
 #endif
@@ -317,7 +345,7 @@ x_create_bitmap_from_file (struct frame *f, Lisp_Object file)
 #endif
 
 #ifdef HAVE_PGTK
-  return -1;
+  return -1;   // fixme:
 #endif
 
 #ifdef HAVE_X_WINDOWS
@@ -383,6 +411,10 @@ free_bitmap_record (Display_Info *dpyinfo, Bitmap_Record *bm)
 
 #ifdef HAVE_NS
   ns_release_object (bm->img);
+#endif
+
+#ifdef HAVE_NS
+  pgtk_image_destroy (bm->img);
 #endif
 
   if (bm->file)
@@ -1129,8 +1161,13 @@ get_spec_bg_or_alpha_as_argb (struct image *img,
   XColor xbgcolor;
   Lisp_Object bg = image_spec_value (img->spec, QCbackground, NULL);
 
+#ifndef HAVE_PGTK
   if (STRINGP (bg) && x_parse_color (f, SSDATA (bg), &xbgcolor))
     bgcolor = xcolor_to_argb32 (xbgcolor);
+#else
+  if (STRINGP (bg) && pgtk_parse_color (SSDATA (bg), &xbgcolor))
+    bgcolor = xcolor_to_argb32 (xbgcolor);
+#endif
 
   return bgcolor;
 }
@@ -1218,8 +1255,7 @@ four_corners_best (XImagePtr_or_DC ximg, int *corners,
 
 #elif defined (HAVE_PGTK)
 
-#define Free_Pixmap(display, pixmap) ((void) 0)
-//  ns_release_object (pixmap)
+#define Free_Pixmap(display, pixmap) pgtk_image_destroy(pixmap)
 
 #else
 
@@ -2127,21 +2163,15 @@ x_create_x_image_and_pixmap (struct frame *f, int width, int height, int depth,
 #endif
 
 #ifdef HAVE_PGTK
-#if 0
-  *pixmap = ns_image_for_XPM (width, height, depth);
+  *pixmap = pgtk_image_create(width, height, depth);
   if (*pixmap == 0)
     {
       *ximg = NULL;
-      image_error ("Unable to allocate NSImage for XPM pixmap");
+      image_error ("Unable to allocate pgtk_image for XPM pixmap");
       return 0;
     }
   *ximg = *pixmap;
   return 1;
-#else
-  *pixmap = 0;
-  *ximg = NULL;
-  return 0;
-#endif
 #endif
 }
 
@@ -2168,8 +2198,8 @@ x_destroy_x_image (XImagePtr ximg)
       ns_release_object (ximg);
 #endif /* HAVE_NS */
 #ifdef HAVE_PGTK
-      // ns_release_object (ximg);
-#endif /* HAVE_NS */
+      pgtk_image_destroy (ximg);
+#endif /* HAVE_PGTK */
     }
 }
 
@@ -2204,7 +2234,6 @@ x_put_x_image (struct frame *f, XImagePtr ximg, Pixmap pixmap, int width, int he
 
 #ifdef HAVE_PGTK
   eassert (ximg == pixmap);
-  // ns_retain_object (ximg);
 #endif
 }
 
@@ -2319,8 +2348,6 @@ image_get_x_image (struct frame *f, struct image *img, bool mask_p)
   return pixmap;
 #elif defined (HAVE_PGTK)
   XImagePtr pixmap = !mask_p ? img->pixmap : img->mask;
-
-  // ns_retain_object (pixmap);
   return pixmap;
 #endif
 }
@@ -2813,8 +2840,26 @@ Create_Pixmap_From_Bitmap_Data (struct frame *f, struct image *img, char *data,
   img->pixmap = ns_image_from_XBM (data, img->width, img->height, fg, bg);
 
 #elif defined (HAVE_PGTK)
-  img->pixmap = 0;
+  unsigned char *pix = xmalloc(img->width * img->height * 4);
+  int x, y;
+  uint32_t *dp = (uint32_t *) pix;
+  unsigned char *sp = (unsigned char *) data;
+  int mask = 0x01;
+  for (y = 0; y < img->height; y++) {
+    for (x = 0; x < img->width; x++) {
+      *dp++ = (*sp & mask) ? fg : bg;
 
+      if ((mask <<= 1) >= 0x100) {
+	sp++;
+	mask = 0x01;
+      }
+    }
+    if (mask != 0x01) {
+      sp++;
+      mask = 0x01;
+    }
+  }
+  create_cairo_image_surface(img, pix, img->width, img->height);
 #else
   img->pixmap =
    (x_check_image_size (0, img->width, img->height)
@@ -3039,12 +3084,14 @@ xbm_load_image (struct frame *f, struct image *img, char *contents, char *end)
 				      non_default_colors);
       xfree (data);
 
+#ifndef HAVE_PGTK
       if (img->pixmap == NO_PIXMAP)
 	{
 	  x_clear_image (f, img);
 	  image_error ("Unable to create X pixmap for `%s'", img->spec);
 	}
       else
+#endif
 	success_p = 1;
     }
   else
@@ -3223,7 +3270,7 @@ xbm_load (struct frame *f, struct image *img)
 			      XPM images
  ***********************************************************************/
 
-#if defined (HAVE_XPM) || defined (HAVE_NS)
+#if defined (HAVE_XPM) || defined (HAVE_NS) || defined (HAVE_PGTK)
 
 static bool xpm_image_p (Lisp_Object object);
 static bool xpm_load (struct frame *f, struct image *img);
@@ -4161,7 +4208,7 @@ xpm_load_image (struct frame *f,
   Lisp_Object (*get_color_table) (Lisp_Object, const char *, int);
   Lisp_Object frame, color_symbols, color_table;
   int best_key;
-#ifndef HAVE_NS
+#if !defined(HAVE_NS) && !defined(HAVE_PGTK)
   bool have_mask = false;
 #endif
   XImagePtr ximg = NULL, mask_img = NULL;
@@ -4215,7 +4262,7 @@ xpm_load_image (struct frame *f,
     }
 
   if (!image_create_x_image_and_pixmap (f, img, width, height, 0, &ximg, 0)
-#ifndef HAVE_NS
+#if !defined(HAVE_NS) && !defined(HAVE_PGTK)
       || !image_create_x_image_and_pixmap (f, img, width, height, 1,
 					   &mask_img, 1)
 #endif
@@ -4332,10 +4379,13 @@ xpm_load_image (struct frame *f,
 	  XPutPixel (ximg, x, y,
 		     (INTEGERP (color_val) ? XINT (color_val)
 		      : FRAME_FOREGROUND_PIXEL (f)));
-#ifndef HAVE_NS
+#if !defined(HAVE_NS) && !defined(HAVE_PGTK)
 	  XPutPixel (mask_img, x, y,
 		     (!EQ (color_val, Qt) ? PIX_MASK_DRAW
 		      : (have_mask = true, PIX_MASK_RETAIN)));
+#elif defined(HAVE_PGTK)
+          if (EQ (color_val, Qt))
+            pgtk_image_set_alpha (ximg, x, y, 0);
 #else
           if (EQ (color_val, Qt))
             ns_set_alpha (ximg, x, y, 0);
@@ -4353,7 +4403,7 @@ xpm_load_image (struct frame *f,
     IMAGE_BACKGROUND (img, f, ximg);
 
   image_put_x_image (f, img, ximg, 0);
-#ifndef HAVE_NS
+#if !defined(HAVE_NS) && !defined(HAVE_PGTK)
   if (have_mask)
     {
       /* Fill in the background_transparent field while we have the
@@ -4690,7 +4740,7 @@ lookup_rgb_color (struct frame *f, int r, int g, int b)
 {
 #ifdef HAVE_NTGUI
   return PALETTERGB (r >> 8, g >> 8, b >> 8);
-#elif defined HAVE_NS
+#elif defined HAVE_NS || defined HAVE_PGTK
   return RGB_TO_ULONG (r >> 8, g >> 8, b >> 8);
 #else
   xsignal1 (Qfile_error,
@@ -5046,8 +5096,7 @@ x_disable_image (struct frame *f, struct image *img)
   if (n_planes < 2 || cross_disabled_images)
     {
 #ifndef HAVE_NTGUI
-#ifndef HAVE_PGTK
-#ifndef HAVE_NS  /* TODO: NS support, however this not needed for toolbars */
+#if !defined(HAVE_NS) && !defined(HAVE_PGTK)  /* TODO: NS support, however this not needed for toolbars */
 
 #define MaskForeground(f)  WHITE_PIX_DEFAULT (f)
 
@@ -5074,7 +5123,6 @@ x_disable_image (struct frame *f, struct image *img)
 	  XFreeGC (dpy, gc);
 	}
 #endif /* !HAVE_NS */
-#endif
 #else
       HDC hdc, bmpdc;
       HGDIOBJ prev;
@@ -5122,7 +5170,7 @@ x_build_heuristic_mask (struct frame *f, struct image *img, Lisp_Object how)
   HGDIOBJ prev;
   char *mask_img;
   int row_width;
-#elif !defined HAVE_NS
+#elif !defined HAVE_NS && !defined HAVE_PGTK
   XImagePtr mask_img;
 #endif
   int x, y;
@@ -5133,7 +5181,7 @@ x_build_heuristic_mask (struct frame *f, struct image *img, Lisp_Object how)
     x_clear_image_1 (f, img, CLEAR_IMAGE_MASK);
 
 #ifndef HAVE_NTGUI
-#ifndef HAVE_NS
+#if !defined HAVE_NS && !defined HAVE_PGTK
   /* Create an image and pixmap serving as mask.  */
   if (! image_create_x_image_and_pixmap (f, img, img->width, img->height, 1,
 					 &mask_img, 1))
@@ -5184,18 +5232,17 @@ x_build_heuristic_mask (struct frame *f, struct image *img, Lisp_Object how)
 #ifndef HAVE_NTGUI
   for (y = 0; y < img->height; ++y)
     for (x = 0; x < img->width; ++x)
-#ifndef HAVE_NS
 #ifdef HAVE_PGTK
-      XPutPixel (mask_img, x, y, PIX_MASK_DRAW);
-#else
+      if (XGetPixel (ximg, x, y) == bg)
+        pgtk_image_set_alpha (ximg, x, y, 0);
+#elif !defined HAVE_NS
       XPutPixel (mask_img, x, y, (XGetPixel (ximg, x, y) != bg
 				  ? PIX_MASK_DRAW : PIX_MASK_RETAIN));
-#endif
 #else
       if (XGetPixel (ximg, x, y) == bg)
         ns_set_alpha (ximg, x, y, 0);
 #endif /* HAVE_NS */
-#ifndef HAVE_NS
+#if !defined HAVE_NS && !defined HAVE_PGTK
   /* Fill in the background_transparent field while we have the mask handy. */
   image_background_transparent (img, f, mask_img);
 
@@ -8618,7 +8665,9 @@ imagemagick_load_image (struct frame *f, struct image *img,
   int width, height;
   size_t image_width, image_height;
   MagickBooleanType status;
+#ifndef USE_CAIRO
   XImagePtr ximg;
+#endif
   int x, y;
   MagickWand *image_wand;
   PixelIterator *iterator;
@@ -8632,6 +8681,9 @@ imagemagick_load_image (struct frame *f, struct image *img,
   double rotation;
   char hint_buffer[MaxTextExtent];
   char *filename_hint = NULL;
+#ifdef USE_CAIRO
+  uint32_t *pixbuf = NULL;
+#endif
 
   /* Initialize the ImageMagick environment.  */
   static bool imagemagick_initialized;
@@ -8834,7 +8886,7 @@ imagemagick_load_image (struct frame *f, struct image *img,
 
   init_color_table ();
 
-#if defined (HAVE_MAGICKEXPORTIMAGEPIXELS) && ! defined (HAVE_NS)
+#if defined (HAVE_MAGICKEXPORTIMAGEPIXELS) && ! defined (HAVE_NS) && !defined (HAVE_PGTK)
   if (imagemagick_render_type != 0)
     {
       /* Magicexportimage is normally faster than pixelpushing.  This
@@ -8882,6 +8934,7 @@ imagemagick_load_image (struct frame *f, struct image *img,
       size_t image_height;
       MagickRealType color_scale = 65535.0 / QuantumRange;
 
+#ifndef USE_CAIRO
       /* Try to create a x pixmap to hold the imagemagick pixmap.  */
       if (!image_create_x_image_and_pixmap (f, img, width, height, 0,
 					    &ximg, 0))
@@ -8892,6 +8945,13 @@ imagemagick_load_image (struct frame *f, struct image *img,
           image_error ("Imagemagick X bitmap allocation failure");
           goto imagemagick_error;
         }
+#else
+      pixbuf = xmalloc(width * height * 4);
+      if (pixbuf == NULL) {
+	image_error ("Imagemagick pixbuf allocation failure");
+	goto imagemagick_error;
+      }
+#endif
 
       /* Copy imagemagick image to x with primitive yet robust pixel
          pusher loop.  This has been tested a lot with many different
@@ -8904,7 +8964,12 @@ imagemagick_load_image (struct frame *f, struct image *img,
 #ifdef COLOR_TABLE_SUPPORT
 	  free_color_table ();
 #endif
+#ifndef USE_CAIRO
 	  x_destroy_x_image (ximg);
+#else
+	  xfree(pixbuf);
+	  pixbuf = NULL;
+#endif
           image_error ("Imagemagick pixel iterator creation failed");
           goto imagemagick_error;
         }
@@ -8920,11 +8985,19 @@ imagemagick_load_image (struct frame *f, struct image *img,
 	  for (x = 0; x < xlim; x++)
             {
               PixelGetMagickColor (pixels[x], &pixel);
+#ifndef USE_CAIRO
               XPutPixel (ximg, x, y,
                          lookup_rgb_color (f,
 					   color_scale * pixel.red,
 					   color_scale * pixel.green,
 					   color_scale * pixel.blue));
+#else
+	      pixbuf[y * width + x] =
+                         lookup_rgb_color (f,
+					   color_scale * pixel.red,
+					   color_scale * pixel.green,
+					   color_scale * pixel.blue);
+#endif
             }
         }
       DestroyPixelIterator (iterator);
@@ -8936,11 +9009,15 @@ imagemagick_load_image (struct frame *f, struct image *img,
   free_color_table ();
 #endif /* COLOR_TABLE_SUPPORT */
 
+#ifndef USE_CAIRO
   img->width  = width;
   img->height = height;
 
   /* Put ximg into the image.  */
   image_put_x_image (f, img, ximg, 0);
+#else
+  create_cairo_image_surface(img, (unsigned char *) pixbuf, width, height);
+#endif
 
   /* Final cleanup. image_wand should be the only resource left. */
   DestroyMagickWand (image_wand);

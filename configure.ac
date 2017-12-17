@@ -2506,7 +2506,7 @@ fi
 
 ### Use -lrsvg-2 if available, unless '--with-rsvg=no' is specified.
 HAVE_RSVG=no
-if test "${HAVE_X11}" = "yes" || test "${HAVE_NS}" = "yes" || test "${opsys}" = "mingw32"; then
+if test "${HAVE_X11}" = "yes" || test "${HAVE_NS}" = "yes" || test "${window_system}" = "pgtk" || test "${opsys}" = "mingw32"; then
   if test "${with_rsvg}" != "no"; then
     RSVG_REQUIRED=2.11.0
     RSVG_MODULE="librsvg-2.0 >= $RSVG_REQUIRED"
@@ -2527,13 +2527,18 @@ if test "${HAVE_X11}" = "yes" || test "${HAVE_NS}" = "yes" || test "${opsys}" = 
 fi
 
 HAVE_IMAGEMAGICK=no
-if test "${HAVE_X11}" = "yes" || test "${HAVE_NS}" = "yes" || test "${HAVE_W32}" = "yes"; then
+if test "${HAVE_X11}" = "yes" || test "${HAVE_NS}" = "yes" || test "${window_system}" = "pgtk" || test "${HAVE_W32}" = "yes"; then
   if test "${with_imagemagick}" != "no"; then
     ## 6.3.5 is the earliest version known to work; see Bug#17339.
     ## 6.8.2 makes Emacs crash; see Bug#13867.
     ## 7 and later have not been ported to; See Bug#25967.
     IMAGEMAGICK_MODULE="Wand >= 6.3.5 Wand != 6.8.2 Wand < 7"
     EMACS_CHECK_MODULES([IMAGEMAGICK], [$IMAGEMAGICK_MODULE])
+
+    if test $HAVE_IMAGEMAGICK != yes; then
+      IMAGEMAGICK_MODULE="MagickWand-6.Q16HDRI >= 6.3.5 MagickWand-6.Q16HDRI != 6.8.2 MagickWand-6.Q16HDRI < 7 MagickCore-6.Q16HDRI >= 6.9.9 MagickCore-6.Q16HDRI < 7"
+      EMACS_CHECK_MODULES([IMAGEMAGICK], [$IMAGEMAGICK_MODULE])
+    fi
 
     if test $HAVE_IMAGEMAGICK = yes; then
       OLD_CFLAGS=$CFLAGS
@@ -2747,7 +2752,7 @@ LIBS=$OLD_LIBS
 PGTK_OBJ=
 PGTK_LIBS=
 if test "$window_system" = "pgtk"; then
-  PGTK_OBJ="pgtkfns.o pgtkterm.o pgtkselect.o xsettings.o"
+  PGTK_OBJ="pgtkfns.o pgtkterm.o pgtkselect.o xsettings.o pgtkimage.o"
   PGTK_LIBS="$GTK_LIBS -ldl"
   AC_DEFINE([HAVE_PGTK], 1, [Define to 1 if you have pure Gtk+-3.])
 fi
@@ -3697,7 +3702,7 @@ if test "${opsys}" = "mingw32"; then
   if test "${HAVE_TIFF}" = "yes"; then
     AC_DEFINE(HAVE_TIFF, 1, [Define to 1 if you have the tiff library (-ltiff).])
   fi
-elif test "${HAVE_X11}" = "yes" || test "${HAVE_W32}" = "yes"; then
+elif test "${HAVE_X11}" = "yes" || test "${window_system}" = "pgtk" || test "${HAVE_W32}" = "yes"; then
   if test "${with_tiff}" != "no"; then
     AC_CHECK_HEADER(tiffio.h,
       [tifflibs="-lz -lm"
@@ -3725,7 +3730,7 @@ if test "${opsys}" = "mingw32"; then
   if test "${HAVE_GIF}" = "yes"; then
     AC_DEFINE(HAVE_GIF, 1, [Define to 1 if you have a gif (or ungif) library.])
   fi
-elif test "${HAVE_X11}" = "yes" && test "${with_gif}" != "no" \
+elif test "${HAVE_X11}" = "yes" -o "${window_system}" = "pgtk" && test "${with_gif}" != "no" \
         || test "${HAVE_W32}" = "yes"; then
   AC_CHECK_HEADER(gif_lib.h,
 # EGifPutExtensionLast only exists from version libungif-4.1.0b1.
