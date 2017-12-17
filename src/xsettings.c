@@ -1096,7 +1096,7 @@ If this variable is nil, Emacs ignores system font changes.  */);
                doc: /* Font settings applied to Xft.  */);
   Vxft_settings = empty_unibyte_string;
 
-#if defined(HAVE_XFT) || defined(HAVE_CAIRO)
+#if defined(HAVE_XFT) || defined(USE_CAIRO)
   Fprovide (intern_c_string ("font-render-setting"), Qnil);
 #if defined (HAVE_GCONF) || defined (HAVE_GSETTINGS)
   Fprovide (intern_c_string ("system-font-setting"), Qnil);
