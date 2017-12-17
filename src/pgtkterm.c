@@ -891,6 +891,17 @@ x_set_glyph_string_clipping (struct glyph_string *s, cairo_t *cr)
     cairo_rectangle(cr, r[i].x, r[i].y, r[i].width, r[i].height);
     cairo_clip(cr);
   }
+  PGTK_TRACE("clip result:");
+  cairo_rectangle_list_t *rects = cairo_copy_clip_rectangle_list(cr);
+  for (int i = 0; i < rects->num_rectangles; i++) {
+    PGTK_TRACE(" rect[%d]: %dx%d+%d+%d.",
+	       i,
+	       (int) rects->rectangles[i].width,
+	       (int) rects->rectangles[i].height,
+	       (int) rects->rectangles[i].x,
+	       (int) rects->rectangles[i].y);
+  }
+  cairo_rectangle_list_destroy(rects);
 }
 
 

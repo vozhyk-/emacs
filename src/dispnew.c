@@ -3285,6 +3285,7 @@ redraw_overlapped_rows (struct window *w, int yb)
   int i;
   struct frame *f = XFRAME (WINDOW_FRAME (w));
 
+  PGTK_TRACE("redraw_overlapped_rows: enter.");
   /* If rows overlapping others have been changed, the rows being
      overlapped have to be redrawn.  This won't draw lines that have
      already been drawn in update_window_line because overlapped_p in
@@ -3319,6 +3320,7 @@ redraw_overlapped_rows (struct window *w, int yb)
       if (MATRIX_ROW_BOTTOM_Y (row) >= yb)
 	break;
     }
+  PGTK_TRACE("redraw_overlapped_rows: leave.");
 }
 
 
@@ -3482,6 +3484,7 @@ update_window (struct window *w, bool force_p)
       if (row < end && !desired_matrix->no_scrolling_p)
 	{
 	  int rc = scrolling_window (w, header_line_row != NULL);
+	  PGTK_TRACE("rc=%d.", rc);
 	  if (rc < 0)
 	    {
 	      /* All rows were found to be equal.  */
@@ -3606,6 +3609,7 @@ update_marginal_area (struct window *w, struct glyph_row *updated_row,
   struct glyph_row *desired_row = MATRIX_ROW (w->desired_matrix, vpos);
   struct redisplay_interface *rif = FRAME_RIF (XFRAME (WINDOW_FRAME (w)));
 
+  PGTK_TRACE("update_marginal_area: enter.");
   /* Set cursor to start of glyphs, write them, and clear to the end
      of the area.  I don't think that something more sophisticated is
      necessary here, since marginal areas will not be the default.  */
@@ -3614,6 +3618,7 @@ update_marginal_area (struct window *w, struct glyph_row *updated_row,
     rif->write_glyphs (w, updated_row, desired_row->glyphs[area],
 		       area, desired_row->used[area]);
   rif->clear_end_of_line (w, updated_row, area, -1);
+  PGTK_TRACE("update_marginal_area: leave.");
 }
 
 
@@ -3628,6 +3633,7 @@ update_text_area (struct window *w, struct glyph_row *updated_row, int vpos)
   struct redisplay_interface *rif = FRAME_RIF (XFRAME (WINDOW_FRAME (w)));
   bool changed_p = 0;
 
+  PGTK_TRACE("update_text_area: enter.");
   PGTK_TRACE("update_text_area: 0. current_row->y=%d.", current_row->y);
   PGTK_TRACE("update_text_area: 0. desired_row->y=%d.", desired_row->y);
   /* If rows are at different X or Y, or rows have different height,
@@ -3864,6 +3870,7 @@ update_text_area (struct window *w, struct glyph_row *updated_row, int vpos)
 	}
     }
 
+  PGTK_TRACE("update_text_area: leave.");
   return changed_p;
 }
 
