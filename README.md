@@ -35,7 +35,6 @@ Higher:
 - no scrollbar.
 - no audible bell.
 - clipboard not supported.
-- sometimes segmentation fault.
 
 Lower:
 - no toolbar.
