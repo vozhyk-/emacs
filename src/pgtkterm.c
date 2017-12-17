@@ -2780,6 +2780,29 @@ pgtk_draw_window_cursor (struct window *w, struct glyph_row *glyph_row, int x,
   gtk_widget_queue_draw(FRAME_GTK_WIDGET(f));
 }
 
+static void
+pgtk_copy_bits (struct frame *f, cairo_rectangle_t *src_rect, cairo_rectangle_t *dst_rect)
+{
+  PGTK_TRACE ("pgtk_copy_bits: %dx%d+%d+%d -> %dx%d+%d+%d",
+	      (int) src_rect->width,
+	      (int) src_rect->height,
+	      (int) src_rect->x,
+	      (int) src_rect->y,
+	      (int) dst_rect->width,
+	      (int) dst_rect->height,
+	      (int) dst_rect->x,
+	      (int) dst_rect->y);
+
+  cairo_t *cr = pgtk_begin_cr_clip(f, NULL);
+
+  cairo_set_source_surface(cr, FRAME_CR_SURFACE(f), dst_rect->x - src_rect->x, dst_rect->y - src_rect->y);
+  cairo_rectangle(cr, dst_rect->x, dst_rect->y, dst_rect->width, dst_rect->height);
+  cairo_clip(cr);
+  cairo_paint(cr);
+
+  pgtk_end_cr_clip(f);
+}
+
 /* Scroll part of the display as described by RUN.  */
 
 static void
@@ -2821,7 +2844,13 @@ pgtk_scroll_run (struct window *w, struct run *run)
   /* Cursor off.  Will be switched on again in x_update_window_end.  */
   // x_clear_cursor (w);
 
-  SET_FRAME_GARBAGED (f);
+  {
+    cairo_rectangle_t src_rect = { x, from_y, width, height };
+    cairo_rectangle_t dst_rect = { x, to_y, width, height };
+    pgtk_copy_bits (f, &src_rect , &dst_rect);
+  }
+
+  // SET_FRAME_GARBAGED (f);
 
   unblock_input ();
 }
