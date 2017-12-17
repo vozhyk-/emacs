@@ -35,6 +35,7 @@ Higher:
 - no scrollbar.
 - no audible bell.
 - clipboard not supported.
+- scroll-up issue. (master of emacs-mirror is also affected.)
 
 Lower:
 - no toolbar.
@@ -59,7 +60,7 @@ I wrote this code in configure.ac:
 ```
 
 However, MagickWand-6.Q16HDRI requires MagickCore, which may be ImageMagick 7.
-So, you may fix `Requires:` in `/usr/lib/pkgconfig/MagickWand-6.Q16HDRI.pc`:
+So, you may need to fix `Requires:` in `/usr/lib/pkgconfig/MagickWand-6.Q16HDRI.pc`:
 
 ```
 Requires: MagickCore-6.Q16HDRI
@@ -71,9 +72,9 @@ Requires: MagickCore-6.Q16HDRI
 - gtk+-3.22.26
 - glib-2.54.2
 - gnome-shell 3.26.2
-- gcc 7.2.0
+- gcc 7.2.1
 - wayland 1.14.0
-- wayland-protocols 1.11
+- wayland-protocols 1.12
 
 ## Notice
 
