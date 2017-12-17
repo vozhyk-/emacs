@@ -2375,7 +2375,7 @@ xg_get_font (struct frame *f, const char *default_name)
 #define FONT_TYPE_WANTED (Qxft)
 #endif
 #else
-#define FONT_TYPE_WANTED (Qfreetype)
+#define FONT_TYPE_WANTED (Qftcr)
 #endif
 	  font = CALLN (Ffont_spec,
 			QCname, build_string (name),
