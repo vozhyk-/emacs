@@ -33,14 +33,11 @@ Many many debugging outputs. Please ignore them.
 
 Higher:
 - no scrollbar.
-- no audible bell.
 - clipboard not supported.
-- scroll-up issue. (master of emacs-mirror is also affected.)
 
 Lower:
 - no toolbar.
 - no menubar.
-- no visual-bell.
 - sometimes cursor are left at the end of line.
 - fullscreen not supported.
 - does not work on pure gtk+-3 with X11.
