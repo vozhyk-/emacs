@@ -1686,6 +1686,9 @@ This function is an internal primitive--use `make-frame' instead.  */)
     if (CONSP (XCAR (tem)) && !NILP (XCAR (XCAR (tem))))
       fset_param_alist (f, Fcons (XCAR (tem), f->param_alist));
 
+  f->output_data.pgtk->cr_surface_visible_bell = NULL;
+  f->output_data.pgtk->atimer_visible_bell = NULL;
+
   /* Make sure windows on this frame appear in calls to next-window
      and similar functions.  */
   Vwindow_list = Qnil;

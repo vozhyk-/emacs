@@ -52,6 +52,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include "menu.h"
 #include "window.h"
 #include "keyboard.h"
+#include "atimer.h"
 #include "buffer.h"
 #include "font.h"
 #include "xsettings.h"
@@ -157,6 +158,16 @@ x_free_frame_resources (struct frame *f)
     reset_mouse_highlight (hlinfo);
 
   gtk_widget_destroy(FRAME_GTK_OUTER_WIDGET(f));
+
+  if (f->output_data.pgtk->cr_surface_visible_bell != NULL) {
+    cairo_surface_destroy(f->output_data.pgtk->cr_surface_visible_bell);
+    f->output_data.pgtk->cr_surface_visible_bell = NULL;
+  }
+
+  if (f->output_data.pgtk->atimer_visible_bell != NULL) {
+    cancel_atimer(f->output_data.pgtk->atimer_visible_bell);
+    f->output_data.pgtk->atimer_visible_bell = NULL;
+  }
 
   xfree (f->output_data.pgtk);
 
@@ -3573,6 +3584,116 @@ pgtk_clear_frame (struct frame *f)
   unblock_input ();
 }
 
+/* Invert the middle quarter of the frame for .15 sec.  */
+
+static void
+recover_from_visible_bell(struct atimer *timer)
+{
+  struct frame *f = timer->client_data;
+
+  if (f->output_data.pgtk->cr_surface_visible_bell != NULL) {
+    cairo_surface_destroy(f->output_data.pgtk->cr_surface_visible_bell);
+    f->output_data.pgtk->cr_surface_visible_bell = NULL;
+  }
+
+  if (f->output_data.pgtk->atimer_visible_bell != NULL)
+    f->output_data.pgtk->atimer_visible_bell = NULL;
+
+  gtk_widget_queue_draw(FRAME_GTK_WIDGET(f));
+}
+
+static void
+pgtk_flash (struct frame *f)
+{
+  block_input ();
+
+  {
+    cairo_surface_t *surface_orig = FRAME_CR_SURFACE(f);
+
+    int width = cairo_image_surface_get_width(surface_orig);
+    int height = cairo_image_surface_get_height(surface_orig);
+    cairo_surface_t *surface = cairo_surface_create_similar(surface_orig, CAIRO_CONTENT_COLOR_ALPHA,
+							    width, height);
+
+    cairo_t *cr = cairo_create(surface);
+    cairo_set_source_surface(cr, surface_orig, 0, 0);
+    cairo_rectangle(cr, 0, 0, width, height);
+    cairo_clip(cr);
+    cairo_paint(cr);
+
+    cairo_set_source_rgb (cr, 1, 1, 1);
+    cairo_set_operator (cr, CAIRO_OPERATOR_DIFFERENCE);
+
+#define XFillRectangle(d, win, gc, x, y, w, h) \
+    ( cairo_rectangle (cr, x, y, w, h), cairo_fill (cr) )
+
+    {
+      /* Get the height not including a menu bar widget.  */
+      int height = FRAME_PIXEL_HEIGHT (f);
+      /* Height of each line to flash.  */
+      int flash_height = FRAME_LINE_HEIGHT (f);
+      /* These will be the left and right margins of the rectangles.  */
+      int flash_left = FRAME_INTERNAL_BORDER_WIDTH (f);
+      int flash_right = FRAME_PIXEL_WIDTH (f) - FRAME_INTERNAL_BORDER_WIDTH (f);
+      int width = flash_right - flash_left;
+
+      /* If window is tall, flash top and bottom line.  */
+      if (height > 3 * FRAME_LINE_HEIGHT (f))
+	{
+	  XFillRectangle (FRAME_X_DISPLAY (f), FRAME_X_WINDOW (f), gc,
+			  flash_left,
+			  (FRAME_INTERNAL_BORDER_WIDTH (f)
+			   + FRAME_TOP_MARGIN_HEIGHT (f)),
+			  width, flash_height);
+	  XFillRectangle (FRAME_X_DISPLAY (f), FRAME_X_WINDOW (f), gc,
+			  flash_left,
+			  (height - flash_height
+			   - FRAME_INTERNAL_BORDER_WIDTH (f)),
+			  width, flash_height);
+
+	}
+      else
+	/* If it is short, flash it all.  */
+	XFillRectangle (FRAME_X_DISPLAY (f), FRAME_X_WINDOW (f), gc,
+			flash_left, FRAME_INTERNAL_BORDER_WIDTH (f),
+			width, height - 2 * FRAME_INTERNAL_BORDER_WIDTH (f));
+
+      f->output_data.pgtk->cr_surface_visible_bell = surface;
+      gtk_widget_queue_draw(FRAME_GTK_WIDGET(f));
+
+      {
+	struct timespec delay = make_timespec (0, 50 * 1000 * 1000);
+	if (f->output_data.pgtk->atimer_visible_bell != NULL) {
+	  cancel_atimer(f->output_data.pgtk->atimer_visible_bell);
+	  f->output_data.pgtk->atimer_visible_bell = NULL;
+	}
+	f->output_data.pgtk->atimer_visible_bell = start_atimer(ATIMER_RELATIVE, delay, recover_from_visible_bell, f);
+      }
+
+#undef XFillRectangle
+    }
+  }
+
+  unblock_input ();
+}
+
+/* Make audible bell.  */
+
+static void
+pgtk_ring_bell (struct frame *f)
+{
+  if (visible_bell)
+    {
+      pgtk_flash(f);
+    }
+  else
+    {
+      block_input ();
+      gtk_widget_error_bell(FRAME_GTK_WIDGET(f));
+      unblock_input ();
+    }
+}
+
 /* Read events coming from the X server.
    Return as soon as there are no more events to be read.
 
@@ -3790,7 +3911,7 @@ pgtk_create_terminal (struct pgtk_display_info *dpyinfo)
   dpyinfo->terminal = terminal;
 
   terminal->clear_frame_hook = pgtk_clear_frame;
-  // terminal->ring_bell_hook = pgtk_ring_bell;
+  terminal->ring_bell_hook = pgtk_ring_bell;
   terminal->update_begin_hook = pgtk_update_begin;
   terminal->update_end_hook = pgtk_update_end;
   terminal->read_socket_hook = pgtk_read_socket;
@@ -4151,13 +4272,19 @@ pgtk_handle_draw(GtkWidget *widget, cairo_t *cr, gpointer *data)
 
     PGTK_TRACE("  win=%p", win);
     if (win != NULL) {
+      cairo_surface_t *src = NULL;
       f = pgtk_any_window_to_frame(win);
       PGTK_TRACE("  f=%p", f);
-      PGTK_TRACE("  surface=%p", f ? FRAME_CR_SURFACE(f) : NULL);
-      if (f != NULL && FRAME_CR_SURFACE(f) != NULL) {
+      if (f != NULL) {
+	src = f->output_data.pgtk->cr_surface_visible_bell;
+	if (src == NULL)
+	  src = FRAME_CR_SURFACE(f);
+      }
+      PGTK_TRACE("  surface=%p", src);
+      if (src != NULL) {
 	PGTK_TRACE("  resized_p=%d", f->resized_p);
 	PGTK_TRACE("  garbaged=%d", f->garbaged);
-	cairo_set_source_surface(cr, FRAME_CR_SURFACE(f), 0, 0);
+	cairo_set_source_surface(cr, src, 0, 0);
 	cairo_paint(cr);
       }
     }

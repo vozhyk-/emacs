@@ -355,7 +355,9 @@ struct pgtk_output
   cairo_t *cr_context;
   /* Cairo surface for double buffering */
   cairo_surface_t *cr_surface;
+  cairo_surface_t *cr_surface_visible_bell;
 #endif
+  struct atimer *atimer_visible_bell;
 
   int has_been_visible;
 
