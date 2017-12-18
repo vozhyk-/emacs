@@ -2804,14 +2804,28 @@ pgtk_copy_bits (struct frame *f, cairo_rectangle_t *src_rect, cairo_rectangle_t 
 	      (int) dst_rect->x,
 	      (int) dst_rect->y);
 
-  cairo_t *cr = pgtk_begin_cr_clip(f, NULL);
+  cairo_t *cr;
+  cairo_surface_t *surface;  /* temporary surface */
 
-  cairo_set_source_surface(cr, FRAME_CR_SURFACE(f), dst_rect->x - src_rect->x, dst_rect->y - src_rect->y);
+  surface = cairo_surface_create_similar(FRAME_CR_SURFACE(f), CAIRO_CONTENT_COLOR_ALPHA,
+					 (int) src_rect->width,
+					 (int) src_rect->height);
+
+  cr = cairo_create(surface);
+  cairo_set_source_surface(cr, FRAME_CR_SURFACE(f), -src_rect->x, -src_rect->y);
+  cairo_rectangle(cr, 0, 0, src_rect->width, src_rect->height);
+  cairo_clip(cr);
+  cairo_paint(cr);
+  cairo_destroy(cr);
+
+  cr = pgtk_begin_cr_clip(f, NULL);
+  cairo_set_source_surface(cr, surface, dst_rect->x, dst_rect->y);
   cairo_rectangle(cr, dst_rect->x, dst_rect->y, dst_rect->width, dst_rect->height);
   cairo_clip(cr);
   cairo_paint(cr);
-
   pgtk_end_cr_clip(f);
+
+  cairo_surface_destroy(surface);
 }
 
 /* Scroll part of the display as described by RUN.  */
@@ -2853,15 +2867,13 @@ pgtk_scroll_run (struct window *w, struct run *run)
   block_input ();
 
   /* Cursor off.  Will be switched on again in x_update_window_end.  */
-  // x_clear_cursor (w);
+  x_clear_cursor (w);
 
   {
     cairo_rectangle_t src_rect = { x, from_y, width, height };
     cairo_rectangle_t dst_rect = { x, to_y, width, height };
     pgtk_copy_bits (f, &src_rect , &dst_rect);
   }
-
-  // SET_FRAME_GARBAGED (f);
 
   unblock_input ();
 }
