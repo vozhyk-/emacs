@@ -33,17 +33,15 @@ GNUstep port and post-20 update by Adrian Robert (arobert@cogsci.ucsd.edu)
 #include "pgtkterm.h"
 #include "termhooks.h"
 #include "keyboard.h"
+#include "pgtkselect.h"
+#include <gdk/gdk.h>
+
+#define wx pgtk
 
 static Lisp_Object Vselection_alist;
 
-#if 0
-/* NSGeneralPboard is pretty much analogous to X11 CLIPBOARD */
-static NSString *NXPrimaryPboard;
-static NSString *NXSecondaryPboard;
-
-
-static NSMutableDictionary *pasteboard_changecount;
-#endif
+static GQuark quark_data = 0;
+static GQuark quark_size = 0;
 
 /* ==========================================================================
 
@@ -51,180 +49,95 @@ static NSMutableDictionary *pasteboard_changecount;
 
    ========================================================================== */
 
-#if 0
+/* From a Lisp_Object, return a suitable frame for selection
+   operations.  OBJECT may be a frame, a terminal object, or nil
+   (which stands for the selected frame--or, if that is not an pgtk
+   frame, the first pgtk display on the list).  If no suitable frame can
+   be found, return NULL.  */
 
-static NSString *
-symbol_to_nsstring (Lisp_Object sym)
+static struct frame *
+frame_for_pgtk_selection (Lisp_Object object)
 {
-  CHECK_SYMBOL (sym);
-  if (EQ (sym, QCLIPBOARD))   return NSGeneralPboard;
-  if (EQ (sym, QPRIMARY))     return NXPrimaryPboard;
-  if (EQ (sym, QSECONDARY))   return NXSecondaryPboard;
-  if (EQ (sym, QTEXT))        return NSStringPboardType;
-  return [NSString stringWithUTF8String: SSDATA (SYMBOL_NAME (sym))];
-}
+  Lisp_Object tail, frame;
+  struct frame *f;
 
-static NSPasteboard *
-ns_symbol_to_pb (Lisp_Object symbol)
-{
-  return [NSPasteboard pasteboardWithName: symbol_to_nsstring (symbol)];
-}
-
-static Lisp_Object
-ns_string_to_symbol (NSString *t)
-{
-  if ([t isEqualToString: NSGeneralPboard])
-    return QCLIPBOARD;
-  if ([t isEqualToString: NXPrimaryPboard])
-    return QPRIMARY;
-  if ([t isEqualToString: NXSecondaryPboard])
-    return QSECONDARY;
-  if ([t isEqualToString: NSStringPboardType])
-    return QTEXT;
-  if ([t isEqualToString: NSFilenamesPboardType])
-    return QFILE_NAME;
-  if ([t isEqualToString: NSTabularTextPboardType])
-    return QTEXT;
-  return intern ([t UTF8String]);
-}
-
-
-static Lisp_Object
-clean_local_selection_data (Lisp_Object obj)
-{
-  if (CONSP (obj)
-      && INTEGERP (XCAR (obj))
-      && CONSP (XCDR (obj))
-      && INTEGERP (XCAR (XCDR (obj)))
-      && NILP (XCDR (XCDR (obj))))
-    obj = Fcons (XCAR (obj), XCDR (obj));
-
-  if (CONSP (obj)
-      && INTEGERP (XCAR (obj))
-      && INTEGERP (XCDR (obj)))
+  if (NILP (object))
     {
-      if (XINT (XCAR (obj)) == 0)
-        return XCDR (obj);
-      if (XINT (XCAR (obj)) == -1)
-        return make_number (- XINT (XCDR (obj)));
+      f = XFRAME (selected_frame);
+      if (FRAME_PGTK_P (f) && FRAME_LIVE_P (f))
+	return f;
+
+      FOR_EACH_FRAME (tail, frame)
+	{
+	  f = XFRAME (frame);
+	  if (FRAME_PGTK_P (f) && FRAME_LIVE_P (f))
+	    return f;
+	}
+    }
+  else if (TERMINALP (object))
+    {
+      struct terminal *t = decode_live_terminal (object);
+
+      if (t->type == output_pgtk)
+	FOR_EACH_FRAME (tail, frame)
+	  {
+	    f = XFRAME (frame);
+	    if (FRAME_LIVE_P (f) && f->terminal == t)
+	      return f;
+	  }
+    }
+  else if (FRAMEP (object))
+    {
+      f = XFRAME (object);
+      if (FRAME_PGTK_P (f) && FRAME_LIVE_P (f))
+	return f;
     }
 
-  if (VECTORP (obj))
-    {
-      ptrdiff_t i;
-      ptrdiff_t size = ASIZE (obj);
-      Lisp_Object copy;
-
-      if (size == 1)
-        return clean_local_selection_data (AREF (obj, 0));
-      copy = make_uninit_vector (size);
-      for (i = 0; i < size; i++)
-        ASET (copy, i, clean_local_selection_data (AREF (obj, i)));
-      return copy;
-    }
-
-  return obj;
+  return NULL;
 }
 
-
-static void
-ns_declare_pasteboard (id pb)
+static GtkClipboard *symbol_to_gtk_clipboard(GtkWidget *widget, Lisp_Object symbol)
 {
-  [pb declareTypes: ns_send_types owner: NSApp];
-}
+  GdkAtom atom;
 
+  CHECK_SYMBOL (symbol);
+  if (NILP(symbol)) {
+    atom = GDK_SELECTION_PRIMARY;
+  } else if (EQ(symbol, QCLIPBOARD)) {
+    atom = GDK_SELECTION_CLIPBOARD;
+  } else if (EQ(symbol, QPRIMARY)) {
+    atom = GDK_SELECTION_PRIMARY;
+  } else if (EQ(symbol, QSECONDARY)) {
+    atom = GDK_SELECTION_SECONDARY;
+  } else if (EQ(symbol, Qt)) {
+    atom = GDK_SELECTION_SECONDARY;
+  } else {
+    atom = 0;
+    error ("Bad selection");
+  }
 
-static void
-ns_undeclare_pasteboard (id pb)
-{
-  [pb declareTypes: [NSArray array] owner: nil];
+  return gtk_widget_get_clipboard(widget, atom);
 }
 
 static void
-ns_store_pb_change_count (id pb)
+get_func(GtkClipboard *cb, GtkSelectionData *data, guint info, gpointer user_data_or_owner)
 {
-  [pasteboard_changecount
-        setObject: [NSNumber numberWithLong: [pb changeCount]]
-           forKey: [pb name]];
+  PGTK_TRACE("get_func:");
+  GObject *obj = G_OBJECT(user_data_or_owner);
+  const char *str = g_object_get_qdata(obj, quark_data);
+  int size = GPOINTER_TO_SIZE(g_object_get_qdata(obj, quark_size));
+  PGTK_TRACE("get_func: str: %s", str);
+  gtk_selection_data_set_text(data, str, size);
 }
-
-static NSInteger
-ns_get_pb_change_count (Lisp_Object selection)
-{
-  id pb = ns_symbol_to_pb (selection);
-  return pb != nil ? [pb changeCount] : -1;
-}
-
-static NSInteger
-ns_get_our_change_count_for (Lisp_Object selection)
-{
-  NSNumber *num = [pasteboard_changecount
-                    objectForKey: symbol_to_nsstring (selection)];
-  return num != nil ? (NSInteger)[num longValue] : -1;
-}
-
 
 static void
-ns_string_to_pasteboard_internal (id pb, Lisp_Object str, NSString *gtype)
+clear_func(GtkClipboard *cb, gpointer user_data_or_owner)
 {
-  if (EQ (str, Qnil))
-    {
-      [pb declareTypes: [NSArray array] owner: nil];
-    }
-  else
-    {
-      char *utfStr;
-      NSString *type, *nsStr;
-      NSEnumerator *tenum;
-
-      CHECK_STRING (str);
-
-      utfStr = SSDATA (str);
-      nsStr = [[NSString alloc] initWithBytesNoCopy: utfStr
-                                             length: SBYTES (str)
-                                           encoding: NSUTF8StringEncoding
-                                       freeWhenDone: NO];
-      // FIXME: Why those 2 different code paths?
-      if (gtype == nil)
-        {
-	  // Used for ns_string_to_pasteboard
-          [pb declareTypes: ns_send_types owner: nil];
-          tenum = [ns_send_types objectEnumerator];
-          while ( (type = [tenum nextObject]) )
-            [pb setString: nsStr forType: type];
-        }
-      else
-        {
-	  // Used for ns-own-selection-internal.
-	  eassert (gtype == NSStringPboardType);
-          [pb setString: nsStr forType: gtype];
-        }
-      [nsStr release];
-      ns_store_pb_change_count (pb);
-    }
+  PGTK_TRACE("clear_func:");
+  GObject *obj = G_OBJECT(user_data_or_owner);
+  g_object_set_qdata(obj, quark_data, NULL);
+  g_object_set_qdata(obj, quark_size, 0);
 }
-
-
-Lisp_Object
-ns_get_local_selection (Lisp_Object selection_name,
-                        Lisp_Object target_type)
-{
-  Lisp_Object local_value;
-  local_value = assq_no_quit (selection_name, Vselection_alist);
-  return local_value;
-}
-
-
-static Lisp_Object
-ns_get_foreign_selection (Lisp_Object symbol, Lisp_Object target)
-{
-  id pb;
-  pb = ns_symbol_to_pb (symbol);
-  return pb != nil ? ns_string_from_pasteboard (pb) : Qnil;
-}
-
-#endif
-
 
 
 /* ==========================================================================
@@ -233,83 +146,17 @@ ns_get_foreign_selection (Lisp_Object symbol, Lisp_Object target)
 
    ========================================================================== */
 
-#if 0
-
-Lisp_Object
-ns_string_from_pasteboard (id pb)
+void pgtk_selection_init(struct pgtk_display_info *dpyinfo)
 {
-  NSString *type, *str;
-  const char *utfStr;
-  int length;
-
-  type = [pb availableTypeFromArray: ns_return_types];
-  if (type == nil)
-    {
-      return Qnil;
-    }
-
-  /* get the string */
-  if (! (str = [pb stringForType: type]))
-    {
-      NSData *data = [pb dataForType: type];
-      if (data != nil)
-        str = [[NSString alloc] initWithData: data
-                                    encoding: NSUTF8StringEncoding];
-      if (str != nil)
-        {
-          [str autorelease];
-        }
-      else
-        {
-          return Qnil;
-        }
-    }
-
-  /* assume UTF8 */
-  NS_DURING
-    {
-      /* EOL conversion: PENDING- is this too simple? */
-      NSMutableString *mstr = [[str mutableCopy] autorelease];
-      [mstr replaceOccurrencesOfString: @"\r\n" withString: @"\n"
-            options: NSLiteralSearch range: NSMakeRange (0, [mstr length])];
-      [mstr replaceOccurrencesOfString: @"\r" withString: @"\n"
-            options: NSLiteralSearch range: NSMakeRange (0, [mstr length])];
-
-      utfStr = [mstr UTF8String];
-      length = [mstr lengthOfBytesUsingEncoding: NSUTF8StringEncoding];
-
-#if ! defined (NS_IMPL_COCOA)
-      if (!utfStr)
-        {
-          utfStr = [mstr cString];
-          length = strlen (utfStr);
-        }
-#endif
-    }
-  NS_HANDLER
-    {
-      message1 ("ns_string_from_pasteboard: UTF8String failed\n");
-#if defined (NS_IMPL_COCOA)
-      utfStr = "Conversion failed";
-#else
-      utfStr = [str lossyCString];
-#endif
-      length = strlen (utfStr);
-    }
-  NS_ENDHANDLER
-
-    return make_string (utfStr, length);
 }
 
-
-void
-ns_string_to_pasteboard (id pb, Lisp_Object str)
+void pgtk_selection_lost(GtkWidget *widget, GdkEventSelection *event, gpointer user_data)
 {
-  ns_string_to_pasteboard_internal (pb, str, nil);
+  PGTK_TRACE("pgtk_selection_lost:");
+
+  g_object_set_qdata(G_OBJECT(widget), quark_data, NULL);
+  g_object_set_qdata(G_OBJECT(widget), quark_size, 0);
 }
-
-#endif
-
 
 /* ==========================================================================
 
@@ -319,29 +166,40 @@ ns_string_to_pasteboard (id pb, Lisp_Object str)
 
 
 DEFUN ("pgtk-own-selection-internal", Fpgtk_own_selection_internal,
-       Spgtk_own_selection_internal, 2, 2, 0,
+       Spgtk_own_selection_internal, 2, 3, 0,
        doc: /* Assert an X selection of type SELECTION and value VALUE.
 SELECTION is a symbol, typically `PRIMARY', `SECONDARY', or `CLIPBOARD'.
 \(Those are literal upper-case symbol names, since that's what X expects.)
 VALUE is typically a string, or a cons of two markers, but may be
-anything that the functions on `selection-converter-alist' know about.  */)
-     (Lisp_Object selection, Lisp_Object value)
+anything that the functions on `selection-converter-alist' know about.
+
+FRAME should be a frame that should own the selection.  If omitted or
+nil, it defaults to the selected frame.*/)
+     (Lisp_Object selection, Lisp_Object value, Lisp_Object frame)
 {
   PGTK_TRACE("pgtk-own-selection-internal.");
-#if 0
-  id pb;
-  NSString *type;
-  Lisp_Object successful_p = Qnil, rest;
-  Lisp_Object target_symbol;
+  Lisp_Object successful_p = Qnil;
+  Lisp_Object target_symbol, rest;
+  GtkClipboard *cb;
+  struct pgtk_display_info *dpyinfo;
+  struct frame *f;
+
+  if (quark_data == 0) {
+    quark_data = g_quark_from_static_string("pgtk-selection-data");
+    quark_size = g_quark_from_static_string("pgtk-selection-size");
+  }
 
   check_window_system (NULL);
-  CHECK_SYMBOL (selection);
-  if (NILP (value))
-    error ("Selection value may not be nil");
-  pb = ns_symbol_to_pb (selection);
-  if (pb == nil) return Qnil;
 
-  ns_declare_pasteboard (pb);
+  if (NILP (frame)) frame = selected_frame;
+  if (!FRAME_LIVE_P (XFRAME (frame)) || !FRAME_PGTK_P (XFRAME (frame)))
+    error ("pgtk selection unavailable for this frame");
+  f = XFRAME(frame);
+
+  dpyinfo = FRAME_DISPLAY_INFO (f);
+
+  cb = symbol_to_gtk_clipboard(FRAME_GTK_WIDGET(f), selection);
+
   {
     Lisp_Object old_value = assq_no_quit (selection, Vselection_alist);
     Lisp_Object new_value = list2 (selection, value);
@@ -353,134 +211,186 @@ anything that the functions on `selection-converter-alist' know about.  */)
   }
 
   /* We only support copy of text.  */
-  type = NSStringPboardType;
-  target_symbol = ns_string_to_symbol (type);
+  target_symbol = QTEXT;
   if (STRINGP (value))
     {
-      ns_string_to_pasteboard_internal (pb, value, type);
+      GtkTargetList *list;
+      GtkTargetEntry *targets;
+      gint n_targets;
+      GtkWidget *widget;
+
+      list = gtk_target_list_new (NULL, 0);
+      gtk_target_list_add_text_targets (list, 0);
+
+      targets = gtk_target_table_new_from_list (list, &n_targets);
+
+      int size = SBYTES(value);
+      gchar *str = xmalloc(size + 1);
+      memcpy(str, SSDATA(value), size);
+      str[size] = '\0';
+
+      widget = FRAME_GTK_WIDGET(f);
+      g_object_set_qdata_full(G_OBJECT(widget), quark_data, str, xfree);
+      g_object_set_qdata_full(G_OBJECT(widget), quark_size, GSIZE_TO_POINTER(size), NULL);
+
+      PGTK_TRACE("set_with_owner");
+      gtk_clipboard_set_with_owner (cb,
+				    targets, n_targets,
+				    get_func, clear_func,
+				    G_OBJECT(FRAME_GTK_WIDGET(f)));
+      PGTK_TRACE("set_with_owner done");
+      gtk_clipboard_set_can_store (cb, NULL, 0);
+
+      gtk_target_table_free (targets, n_targets);
+      gtk_target_list_unref (list);
+
       successful_p = Qt;
     }
 
-  if (!EQ (Vns_sent_selection_hooks, Qunbound))
+  if (!EQ (Vpgtk_sent_selection_hooks, Qunbound))
     {
       /* FIXME: Use run-hook-with-args!  */
-      for (rest = Vns_sent_selection_hooks; CONSP (rest); rest = Fcdr (rest))
+      for (rest = Vpgtk_sent_selection_hooks; CONSP (rest); rest = Fcdr (rest))
         call3 (Fcar (rest), selection, target_symbol, successful_p);
     }
 
   return value;
-#endif
-  return Qnil;
 }
 
 
 DEFUN ("pgtk-disown-selection-internal", Fpgtk_disown_selection_internal,
-       Spgtk_disown_selection_internal, 1, 1, 0,
+       Spgtk_disown_selection_internal, 1, 3, 0,
        doc: /* If we own the selection SELECTION, disown it.
-Disowning it means there is no such selection.  */)
-  (Lisp_Object selection)
+Disowning it means there is no such selection.
+
+Sets the last-change time for the selection to TIME-OBJECT (by default
+the time of the last event).
+
+TERMINAL should be a terminal object or a frame specifying the X
+server to query.  If omitted or nil, that stands for the selected
+frame's display, or the first available X display.
+
+On Nextstep, the TIME-OBJECT and TERMINAL arguments are unused.
+On MS-DOS, all this does is return non-nil if we own the selection.
+On PGTK, the TIME-OBJECT is unused.  */)
+  (Lisp_Object selection, Lisp_Object time_object, Lisp_Object terminal)
 {
   PGTK_TRACE("pgtk-disown-selection-internal.");
-#if 0
-  id pb;
-  check_window_system (NULL);
-  CHECK_SYMBOL (selection);
 
-  if (ns_get_pb_change_count (selection)
-      != ns_get_our_change_count_for (selection))
-      return Qnil;
+  struct frame *f = frame_for_pgtk_selection (terminal);
+  struct pgtk_display_info *dpyinfo;
+  GtkClipboard *cb;
 
-  pb = ns_symbol_to_pb (selection);
-  if (pb != nil) ns_undeclare_pasteboard (pb);
-  return Qt;
-#endif
+  if (!f)
+    return Qnil;
+
+  dpyinfo = FRAME_DISPLAY_INFO (f);
+
+  cb = symbol_to_gtk_clipboard(FRAME_GTK_WIDGET(f), selection);
+
+  gtk_clipboard_clear(cb);
+
   return Qt;
 }
 
 
 DEFUN ("pgtk-selection-exists-p", Fpgtk_selection_exists_p, Spgtk_selection_exists_p,
-       0, 1, 0, doc: /* Whether there is an owner for the given X selection.
+       0, 2, 0, doc: /* Whether there is an owner for the given X selection.
 SELECTION should be the name of the selection in question, typically
 one of the symbols `PRIMARY', `SECONDARY', or `CLIPBOARD'.  (X expects
 these literal upper-case names.)  The symbol nil is the same as
-`PRIMARY', and t is the same as `SECONDARY'.  */)
-     (Lisp_Object selection)
+`PRIMARY', and t is the same as `SECONDARY'.
+
+TERMINAL should be a terminal object or a frame specifying the X
+server to query.  If omitted or nil, that stands for the selected
+frame's display, or the first available X display.
+
+On Nextstep, TERMINAL is unused.  */)
+     (Lisp_Object selection, Lisp_Object terminal)
 {
   PGTK_TRACE("pgtk-selection-exists-p.");
-#if 0
-  id pb;
-  NSArray *types;
+  struct frame *f = frame_for_pgtk_selection (terminal);
+  struct pgtk_display_info *dpyinfo;
+  GtkClipboard *cb;
 
-  if (!window_system_available (NULL))
+  if (!f)
     return Qnil;
 
-  CHECK_SYMBOL (selection);
-  if (EQ (selection, Qnil)) selection = QPRIMARY;
-  if (EQ (selection, Qt)) selection = QSECONDARY;
-  pb = ns_symbol_to_pb (selection);
-  if (pb == nil) return Qnil;
+  dpyinfo = FRAME_DISPLAY_INFO (f);
 
-  types = [pb types];
-  return ([types count] == 0) ? Qnil : Qt;
-#endif
-  return Qnil;
+  cb = symbol_to_gtk_clipboard(FRAME_GTK_WIDGET(f), selection);
+
+  return gtk_clipboard_wait_is_text_available(cb) ? Qt : Qnil;
 }
 
 
 DEFUN ("pgtk-selection-owner-p", Fpgtk_selection_owner_p, Spgtk_selection_owner_p,
-       0, 1, 0,
+       0, 2, 0,
        doc: /* Whether the current Emacs process owns the given X Selection.
 The arg should be the name of the selection in question, typically one of
 the symbols `PRIMARY', `SECONDARY', or `CLIPBOARD'.
 \(Those are literal upper-case symbol names, since that's what X expects.)
 For convenience, the symbol nil is the same as `PRIMARY',
-and t is the same as `SECONDARY'.  */)
-     (Lisp_Object selection)
+and t is the same as `SECONDARY'.
+
+TERMINAL should be a terminal object or a frame specifying the X
+server to query.  If omitted or nil, that stands for the selected
+frame's display, or the first available X display.
+
+On Nextstep, TERMINAL is unused.  */)
+     (Lisp_Object selection, Lisp_Object terminal)
 {
   PGTK_TRACE("pgtk-selection-owner-p.");
-#if 0
-  check_window_system (NULL);
-  CHECK_SYMBOL (selection);
-  if (EQ (selection, Qnil)) selection = QPRIMARY;
-  if (EQ (selection, Qt)) selection = QSECONDARY;
-  return ns_get_pb_change_count (selection)
-    == ns_get_our_change_count_for (selection)
-    ? Qt : Qnil;
-#endif
-  return Qnil;
+  struct frame *f = frame_for_pgtk_selection (terminal);
+  GtkClipboard *cb;
+  GObject *obj;
+
+  cb = symbol_to_gtk_clipboard(FRAME_GTK_WIDGET(f), selection);
+
+  obj = gtk_clipboard_get_owner(cb);
+
+  return g_object_get_qdata(obj, quark_data) != NULL ? Qt : Qnil;
 }
 
 
-DEFUN ("pgtk-get-selection", Fpgtk_get_selection,
-       Spgtk_get_selection, 2, 2, 0,
+DEFUN ("pgtk-get-selection-internal", Fpgtk_get_selection_internal,
+       Spgtk_get_selection_internal, 2, 4, 0,
        doc: /* Return text selected from some X window.
 SELECTION-SYMBOL is typically `PRIMARY', `SECONDARY', or `CLIPBOARD'.
 \(Those are literal upper-case symbol names, since that's what X expects.)
-TARGET-TYPE is the type of data desired, typically `STRING'.  */)
-     (Lisp_Object selection_name, Lisp_Object target_type)
+TARGET-TYPE is the type of data desired, typically `STRING'.
+
+TIME-STAMP is the time to use in the XConvertSelection call for foreign
+selections.  If omitted, defaults to the time for the last event.
+
+TERMINAL should be a terminal object or a frame specifying the X
+server to query.  If omitted or nil, that stands for the selected
+frame's display, or the first available X display.
+
+On Nextstep, TIME-STAMP and TERMINAL are unused.
+On PGTK, TIME-STAMP is unused.  */)
+  (Lisp_Object selection_symbol, Lisp_Object target_type,
+   Lisp_Object time_stamp, Lisp_Object terminal)
 {
-  Lisp_Object val = Qnil;
+  struct frame *f = frame_for_pgtk_selection (terminal);
+  struct pgtk_display_info *dpyinfo;
+  GtkClipboard *cb;
 
-  PGTK_TRACE("pgtk-get-selection.");
-  check_window_system (NULL);
-  CHECK_SYMBOL (selection_name);
+  CHECK_SYMBOL (selection_symbol);
   CHECK_SYMBOL (target_type);
+  if (EQ (target_type, QMULTIPLE))
+    error ("Retrieving MULTIPLE selections is currently unimplemented");
+  if (!f)
+    error ("PGTK selection unavailable for this frame");
 
-#if 0
-  if (ns_get_pb_change_count (selection_name)
-      == ns_get_our_change_count_for (selection_name))
-      val = ns_get_local_selection (selection_name, target_type);
-  if (NILP (val))
-    val = ns_get_foreign_selection (selection_name, target_type);
-  if (CONSP (val) && SYMBOLP (Fcar (val)))
-    {
-      val = Fcdr (val);
-      if (CONSP (val) && NILP (Fcdr (val)))
-        val = Fcar (val);
-    }
-  val = clean_local_selection_data (val);
-#endif
-  return val;
+  dpyinfo = FRAME_DISPLAY_INFO (f);
+
+  cb = symbol_to_gtk_clipboard(FRAME_GTK_WIDGET(f), selection_symbol);
+
+  gchar *str = gtk_clipboard_wait_for_text(cb);
+  if (str == NULL)
+    return Qnil;
+  return make_unibyte_string (str, strlen(str));
 }
 
 
@@ -488,35 +398,21 @@ void
 nxatoms_of_pgtkselect (void)
 {
   PGTK_TRACE("nxatoms_of_pgtkselect");
-#if 0
-  NXPrimaryPboard = @"Selection";
-  NXSecondaryPboard = @"Secondary";
-
-  // This is a memory loss, never released.
-  pasteboard_changecount
-    = [[NSMutableDictionary
-	 dictionaryWithObjectsAndKeys:
-	     [NSNumber numberWithLong:0], NSGeneralPboard,
-	     [NSNumber numberWithLong:0], NXPrimaryPboard,
-	     [NSNumber numberWithLong:0], NXSecondaryPboard,
-	     [NSNumber numberWithLong:0], NSStringPboardType,
-	     [NSNumber numberWithLong:0], NSFilenamesPboardType,
-	     [NSNumber numberWithLong:0], NSTabularTextPboardType,
-	 nil] retain];
-#endif
 }
 
 void
 syms_of_pgtkselect (void)
 {
   PGTK_TRACE("syms_of_pgtkselect");
+
   DEFSYM (QCLIPBOARD, "CLIPBOARD");
   DEFSYM (QSECONDARY, "SECONDARY");
   DEFSYM (QTEXT, "TEXT");
   DEFSYM (QFILE_NAME, "FILE_NAME");
+  DEFSYM (QMULTIPLE, "MULTIPLE");
 
   defsubr (&Spgtk_disown_selection_internal);
-  defsubr (&Spgtk_get_selection);
+  defsubr (&Spgtk_get_selection_internal);
   defsubr (&Spgtk_own_selection_internal);
   defsubr (&Spgtk_selection_exists_p);
   defsubr (&Spgtk_selection_owner_p);

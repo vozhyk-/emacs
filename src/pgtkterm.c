@@ -56,6 +56,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include "buffer.h"
 #include "font.h"
 #include "xsettings.h"
+#include "pgtkselect.h"
 
 #define STORE_KEYSYM_FOR_DEBUG(keysym) ((void)0)
 
@@ -5412,6 +5413,7 @@ pgtk_set_event_handler(struct frame *f)
   g_signal_connect(G_OBJECT(FRAME_GTK_WIDGET(f)), "button-press-event", G_CALLBACK(button_event), NULL);
   g_signal_connect(G_OBJECT(FRAME_GTK_WIDGET(f)), "button-release-event", G_CALLBACK(button_event), NULL);
   g_signal_connect(G_OBJECT(FRAME_GTK_WIDGET(f)), "scroll-event", G_CALLBACK(scroll_event), NULL);
+  g_signal_connect(G_OBJECT(FRAME_GTK_WIDGET(f)), "selection-clear-event", G_CALLBACK(pgtk_selection_lost), NULL);
   g_signal_connect(G_OBJECT(FRAME_GTK_WIDGET(f)), "event", G_CALLBACK(pgtk_handle_event), NULL);
   g_signal_connect(G_OBJECT(FRAME_GTK_WIDGET(f)), "draw", G_CALLBACK(pgtk_handle_draw), NULL);
 }
@@ -5799,6 +5801,8 @@ pgtk_term_init (Lisp_Object display_name, char *resource_name)
 
   if (interrupt_input)
     init_sigio (dpyinfo->connection);
+
+  pgtk_selection_init(dpyinfo);
 
   unblock_input ();
 
