@@ -868,11 +868,11 @@ See the documentation of `create-fontset-from-fontset-spec' for the format.")
 (cl-defmethod frame-creation-function (params &context (window-system pgtk))
   (x-create-frame-with-faces params))
 
-(declare-function pgtk-own-selection-internal "pgtkselect.c" (selection value))
-(declare-function pgtk-disown-selection-internal "pgtkselect.c" (selection))
-(declare-function pgtk-selection-owner-p "pgtkselect.c" (&optional selection))
-(declare-function pgtk-selection-exists-p "pgtkselect.c" (&optional selection))
-(declare-function pgtk-get-selection "pgtkselect.c" (selection-symbol target-type))
+(declare-function pgtk-own-selection-internal "pgtkselect.c" (selection value &optional frame))
+(declare-function pgtk-disown-selection-internal "pgtkselect.c" (selection &optional time_object terminal))
+(declare-function pgtk-selection-owner-p "pgtkselect.c" (&optional selection terminal))
+(declare-function pgtk-selection-exists-p "pgtkselect.c" (&optional selection terminal))
+(declare-function pgtk-get-selection-internal "pgtkselect.c" (selection-symbol target-type &optional time_stamp terminal))
 
 (cl-defmethod gui-backend-set-selection (selection value
                                          &context (window-system pgtk))
@@ -889,7 +889,7 @@ See the documentation of `create-fontset-from-fontset-spec' for the format.")
 
 (cl-defmethod gui-backend-get-selection (selection-symbol target-type
                                          &context (window-system pgtk))
-  (pgtk-get-selection selection-symbol target-type))
+  (pgtk-get-selection-internal selection-symbol target-type))
 
 ;; If you want to use alt key as alt key:
 ;;   (setq x-alt-keysym nil)

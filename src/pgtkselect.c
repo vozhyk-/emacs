@@ -233,18 +233,20 @@ nil, it defaults to the selected frame.*/)
       g_object_set_qdata_full(G_OBJECT(widget), quark_data, str, xfree);
       g_object_set_qdata_full(G_OBJECT(widget), quark_size, GSIZE_TO_POINTER(size), NULL);
 
-      PGTK_TRACE("set_with_owner");
-      gtk_clipboard_set_with_owner (cb,
-				    targets, n_targets,
-				    get_func, clear_func,
-				    G_OBJECT(FRAME_GTK_WIDGET(f)));
-      PGTK_TRACE("set_with_owner done");
+      PGTK_TRACE("set_with_owner: owner=%p", FRAME_GTK_WIDGET(f));
+      if (gtk_clipboard_set_with_owner (cb,
+					targets, n_targets,
+					get_func, clear_func,
+					G_OBJECT(FRAME_GTK_WIDGET(f)))) {
+	PGTK_TRACE("set_with_owner succeeded..");
+	successful_p = Qt;
+      } else {
+	PGTK_TRACE("set_with_owner failed.");
+      }
       gtk_clipboard_set_can_store (cb, NULL, 0);
 
       gtk_target_table_free (targets, n_targets);
       gtk_target_list_unref (list);
-
-      successful_p = Qt;
     }
 
   if (!EQ (Vpgtk_sent_selection_hooks, Qunbound))
