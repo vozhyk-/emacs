@@ -33,7 +33,6 @@ Many many debugging outputs. Please ignore them.
 
 Higher:
 - no scrollbar.
-- clipboard not supported.
 
 Lower:
 - no toolbar.
