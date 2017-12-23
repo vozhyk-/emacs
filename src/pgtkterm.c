@@ -30,7 +30,6 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include <signal.h>
 #include <unistd.h>
 #include <errno.h>
-#include <dlfcn.h>
 
 #include <c-ctype.h>
 #include <c-strcase.h>
@@ -45,6 +44,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include "fontset.h"
 #include "composite.h"
 #include "ccl.h"
+#include "dynlib.h"
 
 #include "termhooks.h"
 #include "termopts.h"
@@ -5431,15 +5431,15 @@ my_log_handler (const gchar *log_domain, GLogLevelFlags log_level,
     Don't assume existence of X11 or Wayland specific functions.
 ***/
 
-static GType get_type(void *h, const char *funcname)
+static GType get_type(dynlib_handle_ptr h, const char *funcname)
 {
   void *fn;
-  if ((fn = dlsym(h, funcname)) == NULL)
+  if ((fn = dynlib_sym(h, funcname)) == NULL)
     return G_TYPE_INVALID;
   return ((GType (*)(void)) fn)();
 }
 
-static int pgtk_detect_wayland_connection(void *h, GdkDisplay *gdpy)
+static int pgtk_detect_wayland_connection(dynlib_handle_ptr h, GdkDisplay *gdpy)
 {
   GType wldpy_type;
   void *(*fn1)(void *);
@@ -5448,14 +5448,14 @@ static int pgtk_detect_wayland_connection(void *h, GdkDisplay *gdpy)
     return -1;
   if (!g_type_check_instance_is_a(gdpy, wldpy_type))
     return -1;
-  fn1 = dlsym(h, "gdk_wayland_display_get_wl_display");
-  fn2 = dlsym(h, "wl_display_get_fd");
+  fn1 = dynlib_sym(h, "gdk_wayland_display_get_wl_display");
+  fn2 = dynlib_sym(h, "wl_display_get_fd");
   if (!fn1 || !fn2)
     return -1;
   return fn2(fn1(gdpy));
 }
 
-static int pgtk_detect_x11_connection(void *h, GdkDisplay *gdpy)
+static int pgtk_detect_x11_connection(dynlib_handle_ptr h, GdkDisplay *gdpy)
 {
   GType xdpy_type;
   void *(*fn1)(void *);
@@ -5464,8 +5464,8 @@ static int pgtk_detect_x11_connection(void *h, GdkDisplay *gdpy)
     return -1;
   if (!g_type_check_instance_is_a(gdpy, xdpy_type))
     return -1;
-  fn1 = dlsym(h, "gdk_x11_display_get_xdisplay");
-  fn2 = dlsym(h, "XConnectionNumber");
+  fn1 = dynlib_sym(h, "gdk_x11_display_get_xdisplay");
+  fn2 = dynlib_sym(h, "XConnectionNumber");
   if (!fn1 || !fn2)
     return -1;
   return fn2(fn1(gdpy));
@@ -5473,21 +5473,19 @@ static int pgtk_detect_x11_connection(void *h, GdkDisplay *gdpy)
 
 static int pgtk_detect_connection(GdkDisplay *gdpy)
 {
-  void *h;
+  static dynlib_handle_ptr h = NULL;
   int fd;
-  if ((h = dlopen(NULL, RTLD_NOW)) == NULL) {
-    error("dlopen failed.");
-    return -1;
+  if (h == NULL) {
+    if ((h = dynlib_open(NULL)) == NULL) {
+      error("dynlib_open failed.");
+      return -1;
+    }
   }
-  if ((fd = pgtk_detect_x11_connection(h, gdpy)) != -1) {
-    dlclose(h);
+  if ((fd = pgtk_detect_x11_connection(h, gdpy)) != -1)
     return fd;
-  }
-  if ((fd = pgtk_detect_wayland_connection(h, gdpy)) != -1) {
-    dlclose(h);
+  if ((fd = pgtk_detect_wayland_connection(h, gdpy)) != -1)
     return fd;
-  }
-  dlclose(h);
+
   error("socket detection failed.");
   return -1;
 }
