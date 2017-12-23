@@ -14,7 +14,7 @@ You need cairo.
 git clone https://github.com/masm11/emacs.git
 cd emacs
 ./autogen.sh
-./configure --without-x --with-cairo
+./configure --without-x --with-cairo --with-modules
 make
 ```
 
