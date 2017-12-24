@@ -3765,10 +3765,10 @@ pgtk_select (int fds_lim, fd_set *rfds, fd_set *wfds, fd_set *efds,
   int i, nfds, tmo_in_millisec, must_free = 0;
   bool need_to_dispatch;
 
-  fprintf(stderr, "pgtk_select: enter.\n");
+  PGTK_TRACE("pgtk_select: enter.");
 
   if (event_q.nr >= 1) {
-    fprintf(stderr, "pgtk_select: raise.\n");
+    PGTK_TRACE("pgtk_select: raise.");
     raise(SIGIO);
     errno = EINTR;
     return -1;
@@ -3866,18 +3866,18 @@ pgtk_select (int fds_lim, fd_set *rfds, fd_set *wfds, fd_set *efds,
   if (need_to_dispatch && context_acquired)
     {
       int pselect_errno = errno;
-      fprintf(stderr, "retval=%d.\n", retval);
-      fprintf(stderr, "need_to_dispatch=%d.\n", need_to_dispatch);
-      fprintf(stderr, "context_acquired=%d.\n", context_acquired);
-      fprintf(stderr, "pselect_errno=%d.\n", pselect_errno);
+      PGTK_TRACE("retval=%d.", retval);
+      PGTK_TRACE("need_to_dispatch=%d.", need_to_dispatch);
+      PGTK_TRACE("context_acquired=%d.", context_acquired);
+      PGTK_TRACE("pselect_errno=%d.", pselect_errno);
       /* Prevent g_main_dispatch recursion, that would occur without
          block_input wrapper, because event handlers call
          unblock_input.  Event loop recursion was causing Bug#15801.  */
       block_input ();
       while (g_main_context_pending (context)) {
-	fprintf(stderr, "dispatch...\n");
+	PGTK_TRACE("dispatch...");
         g_main_context_dispatch (context);
-	fprintf(stderr, "dispatch... done.\n");
+	PGTK_TRACE("dispatch... done.");
       }
       unblock_input ();
       errno = pselect_errno;
@@ -3893,7 +3893,7 @@ pgtk_select (int fds_lim, fd_set *rfds, fd_set *wfds, fd_set *efds,
       errno = EINTR;
     }
 
-  fprintf(stderr, "pgtk_select: leave.\n");
+  PGTK_TRACE("pgtk_select: leave.");
   return retval;
 }
 
@@ -6634,6 +6634,9 @@ gtk_window_move to set or store frame positions and disables some time
 consuming frame position adjustments.  In newer versions of GTK, Emacs
 always uses gtk_window_move and ignores the value of this variable.  */);
   x_gtk_use_window_move = true;
+
+  window_being_scrolled = Qnil;
+  staticpro(&window_being_scrolled);
 
   /* Tell Emacs about this window system.  */
   Fprovide (Qpgtk, Qnil);

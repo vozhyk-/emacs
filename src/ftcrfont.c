@@ -261,7 +261,6 @@ ftcrfont_draw (struct glyph_string *s,
       unsigned code = ((XCHAR2B_BYTE1 (s->char2b + from + i) << 8)
 		       | XCHAR2B_BYTE2 (s->char2b + from + i));
 
-      ftfont_print_char_from_char2b(code);
       glyphs[i].index = code;
       glyphs[i].x = x;
       glyphs[i].y = y;

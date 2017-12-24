@@ -1294,17 +1294,6 @@ ftfont_has_char (Lisp_Object font, int c)
     }
 }
 
-static int char2b_table[128] = { 0, };
-void ftfont_print_char_from_char2b(int c2b)
-{
-  for (int i = 0x20; i < 127; i++) {
-    if (char2b_table[i] == c2b) {
-      fprintf(stderr, "'%c'\n", i);
-      break;
-    }
-  }
-}
-
 unsigned
 ftfont_encode_char (struct font *font, int c)
 {
@@ -1312,9 +1301,6 @@ ftfont_encode_char (struct font *font, int c)
   FT_Face ft_face = ftfont_info->ft_size->face;
   FT_ULong charcode = c;
   FT_UInt code = FT_Get_Char_Index (ft_face, charcode);
-  if (c >= 0 && c < 256) {
-    char2b_table[c] = code;
-  }
 
   return (code > 0 ? code : FONT_INVALID_CODE);
 }

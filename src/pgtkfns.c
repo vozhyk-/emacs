@@ -3426,6 +3426,8 @@ When using Gtk+ tooltips, the tooltip face is not used.  */);
 #endif
 }
 
+#ifdef PGTK_DEBUG
+
 #include <stdarg.h>
 #include <time.h>
 void pgtk_log(const char *file, int lineno, const char *fmt, ...)
@@ -3476,3 +3478,5 @@ void pgtk_backtrace(const char *file, int lineno)
 
   fprintf(stderr, "%s %.10s:%04d ********\n", timestr, file, lineno);
 }
+
+#endif

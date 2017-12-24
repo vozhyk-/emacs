@@ -57,7 +57,7 @@ unsigned long pgtk_image_get_pixel(Pixmap pixmap, int x, int y)
   if (y < 0 || y >= img->height)
     return 0;
   unsigned char *p = img->data + img->width * y * 4 + x * 4;
-  fprintf(stderr, "get_pixel(%d,%d)=%08x\n", x, y, p[3] << 24 | p[2] << 16 | p[1] << 8 | p[0]);
+  PGTK_TRACE("get_pixel(%d,%d)=%08x.", x, y, p[3] << 24 | p[2] << 16 | p[1] << 8 | p[0]);
   return p[3] << 24 | p[2] << 16 | p[1] << 8 | p[0];   // little endian.
 }
 
@@ -68,7 +68,7 @@ void pgtk_image_put_pixel(Pixmap pixmap, int x, int y, unsigned long pixel)
     return;
   if (y < 0 || y >= img->height)
     return;
-  fprintf(stderr, "put_pixel: (%d,%d)=%08lx\n", x, y, pixel);
+  PGTK_TRACE("put_pixel: (%d,%d)=%08lx.", x, y, pixel);
   unsigned char *p = img->data + img->width * y * 4 + x * 4;
   p[0] = pixel >> 0;
   p[1] = pixel >> 8;
@@ -78,7 +78,7 @@ void pgtk_image_put_pixel(Pixmap pixmap, int x, int y, unsigned long pixel)
 
 Pixmap pgtk_image_create_from_xbm(char *bits, unsigned int width, unsigned int height, unsigned long fg, unsigned long bg)
 {
-  fprintf(stderr, "create_from_xbm: 0\n");
+  PGTK_TRACE("create_from_xbm: 0");
   struct pgtk_image_t *img = pgtk_image_create(width, height, 32);
   char *p = bits;
   int mask = 0x80;
@@ -127,7 +127,7 @@ Pixmap pgtk_image_convert_from_xbm(char *bits, unsigned int width, unsigned int 
 
 void pgtk_image_set_alpha(Pixmap pixmap, int x, int y, int alpha)
 {
-  fprintf(stderr, "set_alpha: (%d,%d)=%d.\n", x, y, alpha);
+  PGTK_TRACE("set_alpha: (%d,%d)=%d.", x, y, alpha);
   struct pgtk_image_t *img = pixmap;
   if (x < 0 || x >= img->width)
     return;
