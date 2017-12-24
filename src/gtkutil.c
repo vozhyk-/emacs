@@ -1074,6 +1074,7 @@ xg_frame_set_char_size (struct frame *f, int width, int height)
     adjust_frame_size (f, width, height, 5, 0, Qxg_frame_set_char_size);
 }
 
+#ifndef HAVE_PGTK
 /* Handle height/width changes (i.e. add/remove/move menu/toolbar).
    The policy is to keep the number of editable lines.  */
 
@@ -1086,6 +1087,7 @@ xg_height_or_width_changed (struct frame *f)
   f->output_data.wx->hint_flags = 0;
   x_wm_set_size_hint (f, 0, 0);
 }
+#endif
 
 #ifndef HAVE_PGTK
 /* Convert an X Window WSESC on display DPY to its corresponding GtkWidget.
@@ -4070,6 +4072,8 @@ xg_update_scrollbar_pos (struct frame *f,
 #ifndef HAVE_PGTK
 	  /* Don't obscure any child frames.  */
 	  XLowerWindow (FRAME_X_DISPLAY (f), GTK_WIDGET_TO_X_WIN (webox));
+#else
+	  gdk_window_lower(gtk_widget_get_window(webox));
 #endif
 	}
 
@@ -4079,6 +4083,8 @@ xg_update_scrollbar_pos (struct frame *f,
 
 #ifndef HAVE_PGTK
       x_sync (f);
+#else
+      gdk_flush();
 #endif
       SET_FRAME_GARBAGED (f);
       cancel_mouse_face (f);
@@ -4152,11 +4158,15 @@ xg_update_horizontal_scrollbar_pos (struct frame *f,
 #ifndef HAVE_PGTK
 	/* Don't obscure any child frames.  */
 	XLowerWindow (FRAME_X_DISPLAY (f), GTK_WIDGET_TO_X_WIN (webox));
+#else
+	gdk_window_lower(gtk_widget_get_window(webox));
 #endif
       }
 
 #ifndef HAVE_PGTK
       x_sync (f);
+#else
+      gdk_flush();
 #endif
       SET_FRAME_GARBAGED (f);
       cancel_mouse_face (f);
@@ -4514,6 +4524,7 @@ xg_tool_bar_button_cb (GtkWidget *widget,
 }
 
 
+#ifndef HAVE_PGTK
 /* Callback function invoked when a tool bar item is pressed.
    W is the button widget in the tool bar that got pressed,
    CLIENT_DATA is an integer that is the index of the button in the
@@ -4559,6 +4570,7 @@ xg_tool_bar_callback (GtkWidget *w, gpointer client_data)
      tool bar button. */
   x_focus_frame (f, false);
 }
+#endif
 
 static GtkWidget *
 xg_get_tool_bar_widgets (GtkWidget *vb, GtkWidget **wimage)
@@ -4790,6 +4802,7 @@ find_rtl_image (struct frame *f, Lisp_Object image, Lisp_Object rtl)
   return image;
 }
 
+#ifndef HAVE_PGTK
 static GtkToolItem *
 xg_make_tool_item (struct frame *f,
                    GtkWidget *wimage,
@@ -4889,6 +4902,7 @@ xg_make_tool_item (struct frame *f,
 
   return ti;
 }
+#endif
 
 static bool
 is_box_type (GtkWidget *vb, bool is_horizontal)

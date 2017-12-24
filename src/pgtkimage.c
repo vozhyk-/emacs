@@ -57,7 +57,7 @@ unsigned long pgtk_image_get_pixel(Pixmap pixmap, int x, int y)
   if (y < 0 || y >= img->height)
     return 0;
   unsigned char *p = img->data + img->width * y * 4 + x * 4;
-  PGTK_TRACE("get_pixel(%d,%d)=%08x.", x, y, p[3] << 24 | p[2] << 16 | p[1] << 8 | p[0]);
+  PGTK_TRACE("get_pixel(%d,%d)=%08x.", x, y, (unsigned int) (p[3] << 24 | p[2] << 16 | p[1] << 8 | p[0]));
   return p[3] << 24 | p[2] << 16 | p[1] << 8 | p[0];   // little endian.
 }
 

@@ -66,7 +66,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 struct pgtk_display_info *x_display_list; /* Chain of existing displays */
 
 static struct event_queue_t {
-  struct input_event *q;
+  union buffered_input_event *q;
   int nr, cap;
 } event_q = {
   NULL, 0, 0,
@@ -83,7 +83,7 @@ static void pgtk_fill_rectangle(struct frame *f, unsigned long color, int x, int
 static void pgtk_clip_to_row (struct window *w, struct glyph_row *row,
 				enum glyph_row_area area, cairo_t *cr);
 
-static void evq_enqueue(struct input_event *ev)
+static void evq_enqueue(union buffered_input_event *ev)
 {
   struct event_queue_t *evq = &event_q;
   if (evq->cap == 0) {
@@ -6046,7 +6046,7 @@ static int pgtk_detect_wayland_connection(dynlib_handle_ptr h, GdkDisplay *gdpy)
   int (*fn2)(void *);
   if ((wldpy_type = get_type(h, "gdk_wayland_display_get_type")) == G_TYPE_INVALID)
     return -1;
-  if (!g_type_check_instance_is_a(gdpy, wldpy_type))
+  if (!g_type_check_instance_is_a(G_OBJECT(gdpy), wldpy_type))
     return -1;
   fn1 = dynlib_sym(h, "gdk_wayland_display_get_wl_display");
   fn2 = dynlib_sym(h, "wl_display_get_fd");
@@ -6062,7 +6062,7 @@ static int pgtk_detect_x11_connection(dynlib_handle_ptr h, GdkDisplay *gdpy)
   int (*fn2)(void *);
   if ((xdpy_type = get_type(h, "gdk_x11_display_get_type")) == G_TYPE_INVALID)
     return -1;
-  if (!g_type_check_instance_is_a(gdpy, xdpy_type))
+  if (!g_type_check_instance_is_a(G_OBJECT(gdpy), xdpy_type))
     return -1;
   fn1 = dynlib_sym(h, "gdk_x11_display_get_xdisplay");
   fn2 = dynlib_sym(h, "XConnectionNumber");

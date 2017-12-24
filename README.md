@@ -32,7 +32,8 @@ Many many debugging outputs. Please ignore them.
 ## TODO
 
 Higher:
-- no scrollbar.
+- hourglass?
+- tooltip?
 
 Lower:
 - no toolbar.
