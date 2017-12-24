@@ -4035,9 +4035,7 @@ xg_update_scrollbar_pos (struct frame *f,
         }
 
       /* Move and resize to new values.  */
-#ifndef HAVE_PGTK
       gtk_fixed_move (GTK_FIXED (wfixed), wparent, left, top);
-#endif
       gtk_widget_style_get (wscroll, "min-slider-length", &msl, NULL);
       bool hidden = height < msl;
       if (hidden)
@@ -4120,9 +4118,7 @@ xg_update_horizontal_scrollbar_pos (struct frame *f,
         }
 
       /* Move and resize to new values.  */
-#ifndef HAVE_PGTK
       gtk_fixed_move (GTK_FIXED (wfixed), wparent, left, top);
-#endif
       gtk_widget_style_get (wscroll, "min-slider-length", &msl, NULL);
       if (msl > width)
         {
@@ -4190,6 +4186,8 @@ xg_set_toolkit_scroll_bar_thumb (struct scroll_bar *bar,
 
   struct frame *f = XFRAME (WINDOW_FRAME (XWINDOW (bar->window)));
 
+  PGTK_TRACE("xg_set_toolkit_scroll_bar_thumb: ----------------------------------");
+  PGTK_TRACE("xg_set_toolkit_scroll_bar_thumb: %p, %d, %d, %d.", bar, portion, position, whole);
   if (wscroll && bar->dragging == -1)
     {
       GtkAdjustment *adj;
@@ -4221,17 +4219,26 @@ xg_set_toolkit_scroll_bar_thumb (struct scroll_bar *bar,
           top = (gdouble) position / whole;
           shown = (gdouble) portion / whole;
         }
+      PGTK_TRACE("xg_set_toolkit_scroll_bar_thumb: position=%d, portion=%d, whole=%d", position, portion, whole);
+      PGTK_TRACE("xg_set_toolkit_scroll_bar_thumb: top=%f, shown=%f", top, shown);
 
+      PGTK_TRACE("xg_set_toolkit_scroll_bar_thumb: shown*range=%f", shown * XG_SB_RANGE);
       size = clip_to_bounds (1, shown * XG_SB_RANGE, XG_SB_RANGE);
+      PGTK_TRACE("xg_set_toolkit_scroll_bar_thumb: size=%d.", size);
+      PGTK_TRACE("xg_set_toolkit_scroll_bar_thumb: top*range=%f.", top * XG_SB_RANGE);
+      PGTK_TRACE("xg_set_toolkit_scroll_bar_thumb: max-size=%d.", XG_SB_MAX - size);
       value = clip_to_bounds (XG_SB_MIN, top * XG_SB_RANGE, XG_SB_MAX - size);
+      PGTK_TRACE("xg_set_toolkit_scroll_bar_thumb: value=%d.", value);
 
       /* Assume all lines are of equal size.  */
       new_step = size / max (1, FRAME_LINES (f));
 
       old_size = gtk_adjustment_get_page_size (adj);
+      PGTK_TRACE("xg_set_toolkit_scroll_bar_thumb: old_size=%d, size=%d", old_size, size);
       if (old_size != size)
 	{
 	  int old_step = gtk_adjustment_get_step_increment (adj);
+	  PGTK_TRACE("xg_set_toolkit_scroll_bar_thumb: old_step=%d, new_step=%d", old_step, new_step);
 	  if (old_step != new_step)
 	    {
 	      gtk_adjustment_set_page_size (adj, size);
@@ -4242,6 +4249,8 @@ xg_set_toolkit_scroll_bar_thumb (struct scroll_bar *bar,
 	    }
 	}
 
+      PGTK_TRACE("xg_set_toolkit_scroll_bar_thumb: changed=%d, old=%d, value=%d.",
+		 changed, int_gtk_range_get_value (GTK_RANGE (wscroll)), value);
       if (changed || int_gtk_range_get_value (GTK_RANGE (wscroll)) != value)
       {
         block_input ();

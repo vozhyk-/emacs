@@ -4946,126 +4946,30 @@ pgtk_handle_draw(GtkWidget *widget, cairo_t *cr, gpointer *data)
 
   print_widget_tree(widget);
 
-#if 1
-  {
-#if 0
-    PGTK_TRACE("widget: %s (window %s) (%p)", G_OBJECT_TYPE_NAME(widget), gtk_widget_get_has_window(widget) ? "yes" : "no", gtk_widget_get_window(widget));
-    {
-      GtkWidget *w = widget;
-      while (w != NULL) {
-	w = gtk_widget_get_parent(w);
-	if (w != NULL)
-	  PGTK_TRACE("widget: %s (window %s) (%p)", G_OBJECT_TYPE_NAME(w), gtk_widget_get_has_window(w) ? "yes" : "no", gtk_widget_get_window(w));
-      }
-    }
-#endif
-
-    GdkWindow *win = gtk_widget_get_window(widget);
-#if 0
-    {
-      GdkWindow *w = win;
-      PGTK_TRACE("window: %s %p %s", G_OBJECT_TYPE_NAME(w), w, gdk_window_has_native(w) ? "native" :"");
-      while (w != NULL) {
-	w = gdk_window_get_parent(w);
-	if (w != NULL)
-	  PGTK_TRACE("window: %s %p %s", G_OBJECT_TYPE_NAME(w), w, gdk_window_has_native(w) ? "native" :"");
-      }
-    }
-#endif
-
-    PGTK_TRACE("  win=%p", win);
-    if (win != NULL) {
-      cairo_surface_t *src = NULL;
-      f = pgtk_any_window_to_frame(win);
-      PGTK_TRACE("  f=%p", f);
-      if (f != NULL) {
-	src = f->output_data.pgtk->cr_surface_visible_bell;
-	if (src == NULL)
-	  src = FRAME_CR_SURFACE(f);
-      }
-      PGTK_TRACE("  surface=%p", src);
-      if (src != NULL) {
-	PGTK_TRACE("  resized_p=%d", f->resized_p);
-	PGTK_TRACE("  garbaged=%d", f->garbaged);
-	cairo_set_source_surface(cr, src, 0, 0);
-	cairo_paint(cr);
-      }
-    }
-    return TRUE;
-  }
-#endif
-
-
   GdkWindow *win = gtk_widget_get_window(widget);
-  if (win == NULL) {
-    PGTK_TRACE("win == NULL");
-    return TRUE;
+
+  PGTK_TRACE("  win=%p", win);
+  if (win != NULL) {
+    cairo_surface_t *src = NULL;
+    f = pgtk_any_window_to_frame(win);
+    PGTK_TRACE("  f=%p", f);
+    if (f != NULL) {
+      src = f->output_data.pgtk->cr_surface_visible_bell;
+      if (src == NULL)
+	src = FRAME_CR_SURFACE(f);
+    }
+    PGTK_TRACE("  surface=%p", src);
+    if (src != NULL) {
+      PGTK_TRACE("  resized_p=%d", f->resized_p);
+      PGTK_TRACE("  garbaged=%d", f->garbaged);
+      PGTK_TRACE("  scroll_bar_width=%f", (double) PGTK_SCROLL_BAR_WIDTH(f));
+      // PGTK_TRACE("  scroll_bar_adjust=%d", PGTK_SCROLL_BAR_ADJUST(f));
+      PGTK_TRACE("  scroll_bar_cols=%d", FRAME_SCROLL_BAR_COLS(f));
+      PGTK_TRACE("  column_width=%d", FRAME_COLUMN_WIDTH(f));
+      cairo_set_source_surface(cr, src, 0, 0);
+      cairo_paint(cr);
+    }
   }
-  f = pgtk_any_window_to_frame(win);
-  PGTK_TRACE(" f=%p", f);
-
-  if (f)
-    {
-      PGTK_TRACE("f != NULL");
-      PGTK_TRACE("  resized_p=%d\n", f->resized_p);
-      PGTK_TRACE("  garbaged=%d\n", f->garbaged);
-      if (!FRAME_VISIBLE_P (f))
-	{
-	  PGTK_TRACE("not visible");
-	  block_input ();
-	  SET_FRAME_VISIBLE (f, 1);
-	  SET_FRAME_ICONIFIED (f, false);
-#if 0
-	  if (FRAME_X_DOUBLE_BUFFERED_P (f))
-	    font_drop_xrender_surfaces (f);
-#endif
-	  f->output_data.pgtk->has_been_visible = true;
-	  SET_FRAME_GARBAGED (f);
-	  unblock_input ();
-	}
-      else if (FRAME_GARBAGED_P (f))
-	{
-	  PGTK_TRACE("garbaged.");
-	  /* Go around the back buffer and manually clear the
-	     window the first time we show it.  This way, we avoid
-	     showing users the sanity-defying horror of whatever
-	     GtkWindow is rendering beneath us.  We've garbaged
-	     the frame, so we'll redraw the whole thing on next
-	     redisplay anyway.  Yuck.  */
-	  pgtk_clear_area(f, 0, 0, FRAME_PIXEL_WIDTH(f), FRAME_PIXEL_HEIGHT(f));
-	  pgtk_clear_under_internal_border (f);
-	}
-
-
-      if (!FRAME_GARBAGED_P (f))
-	{
-	  PGTK_TRACE("not garbaged.");
-	  /* This seems to be needed for GTK 2.6 and later, see
-	     https://debbugs.gnu.org/cgi/bugreport.cgi?bug=15398.  */
-	  PGTK_TRACE("%dx%d.", FRAME_PIXEL_WIDTH(f), FRAME_PIXEL_HEIGHT(f));
-	  pgtk_clear_area(f, 0, 0, FRAME_PIXEL_WIDTH(f), FRAME_PIXEL_HEIGHT(f));
-	  expose_frame (f, 0, 0, FRAME_PIXEL_WIDTH(f), FRAME_PIXEL_HEIGHT(f));
-	  pgtk_clear_under_internal_border (f);
-	}
-
-#if 0
-      if (!FRAME_GARBAGED_P (f))
-	show_back_buffer (f);
-#endif
-    }
-  else
-    {
-#if 0
-      struct scroll_bar *bar;
-
-      bar = x_window_to_scroll_bar (event->xexpose.display,
-				    event->xexpose.window, 2);
-
-      if (bar)
-	x_scroll_bar_expose (bar, event);
-#endif
-    }
-
   return FALSE;
 }
 
