@@ -82,7 +82,6 @@ static void pgtk_clear_frame_area(struct frame *f, int x, int y, int width, int 
 static void pgtk_fill_rectangle(struct frame *f, unsigned long color, int x, int y, int width, int height);
 static void pgtk_clip_to_row (struct window *w, struct glyph_row *row,
 				enum glyph_row_area area, cairo_t *cr);
-static void pgtk_cr_destroy_surface(struct frame *f);
 
 static void evq_enqueue(struct input_event *ev)
 {
@@ -3898,6 +3897,653 @@ pgtk_select (int fds_lim, fd_set *rfds, fd_set *wfds, fd_set *efds,
   return retval;
 }
 
+
+static void x_send_scroll_bar_event (Lisp_Object, enum scroll_bar_part,
+                                     int, int, bool);
+
+/* Lisp window being scrolled.  Set when starting to interact with
+   a toolkit scroll bar, reset to nil when ending the interaction.  */
+
+static Lisp_Object window_being_scrolled;
+
+/* Send a client message with message type Xatom_Scrollbar for a
+   scroll action to the frame of WINDOW.  PART is a value identifying
+   the part of the scroll bar that was clicked on.  PORTION is the
+   amount to scroll of a whole of WHOLE.  */
+
+static void
+x_send_scroll_bar_event (Lisp_Object window, enum scroll_bar_part part,
+			 int portion, int whole, bool horizontal)
+{
+#if 0
+  XEvent event;
+  XClientMessageEvent *ev = &event.xclient;
+  struct window *w = XWINDOW (window);
+  struct frame *f = XFRAME (w->frame);
+  intptr_t iw = (intptr_t) w;
+  verify (INTPTR_WIDTH <= 64);
+  int sign_shift = INTPTR_WIDTH - 32;
+
+  block_input ();
+
+  /* Construct a ClientMessage event to send to the frame.  */
+  ev->type = ClientMessage;
+  ev->message_type = (horizontal
+		      ? FRAME_DISPLAY_INFO (f)->Xatom_Horizontal_Scrollbar
+		      : FRAME_DISPLAY_INFO (f)->Xatom_Scrollbar);
+  ev->display = FRAME_X_DISPLAY (f);
+  ev->window = FRAME_X_WINDOW (f);
+  ev->format = 32;
+
+  /* A 32-bit X client on a 64-bit X server can pass a window pointer
+     as-is.  A 64-bit client on a 32-bit X server is in trouble
+     because a pointer does not fit and would be truncated while
+     passing through the server.  So use two slots and hope that X12
+     will resolve such issues someday.  */
+  ev->data.l[0] = iw >> 31 >> 1;
+  ev->data.l[1] = sign_shift <= 0 ? iw : iw << sign_shift >> sign_shift;
+  ev->data.l[2] = part;
+  ev->data.l[3] = portion;
+  ev->data.l[4] = whole;
+
+  /* Setting the event mask to zero means that the message will
+     be sent to the client that created the window, and if that
+     window no longer exists, no event will be sent.  */
+  XSendEvent (FRAME_X_DISPLAY (f), FRAME_X_WINDOW (f), False, 0, &event);
+  unblock_input ();
+#endif
+}
+
+
+/* Transform a scroll bar ClientMessage EVENT to an Emacs input event
+   in *IEVENT.  */
+
+static void
+x_scroll_bar_to_input_event (const GdkEvent *event,
+			     struct input_event *ievent)
+{
+#if 0
+  const XClientMessageEvent *ev = &event->xclient;
+  Lisp_Object window;
+  struct window *w;
+
+  /* See the comment in the function above.  */
+  intptr_t iw0 = ev->data.l[0];
+  intptr_t iw1 = ev->data.l[1];
+  intptr_t iw = (iw0 << 31 << 1) + (iw1 & 0xffffffffu);
+  w = (struct window *) iw;
+
+  XSETWINDOW (window, w);
+
+  ievent->kind = SCROLL_BAR_CLICK_EVENT;
+  ievent->frame_or_window = window;
+  ievent->arg = Qnil;
+  ievent->timestamp = CurrentTime;
+  ievent->code = 0;
+  ievent->part = ev->data.l[2];
+  ievent->x = make_number (ev->data.l[3]);
+  ievent->y = make_number (ev->data.l[4]);
+  ievent->modifiers = 0;
+#endif
+}
+
+/* Transform a horizontal scroll bar ClientMessage EVENT to an Emacs
+   input event in *IEVENT.  */
+
+static void
+x_horizontal_scroll_bar_to_input_event (const GdkEvent *event,
+					struct input_event *ievent)
+{
+#if 0
+  const XClientMessageEvent *ev = &event->xclient;
+  Lisp_Object window;
+  struct window *w;
+
+  /* See the comment in the function above.  */
+  intptr_t iw0 = ev->data.l[0];
+  intptr_t iw1 = ev->data.l[1];
+  intptr_t iw = (iw0 << 31 << 1) + (iw1 & 0xffffffffu);
+  w = (struct window *) iw;
+
+  XSETWINDOW (window, w);
+
+  ievent->kind = HORIZONTAL_SCROLL_BAR_CLICK_EVENT;
+  ievent->frame_or_window = window;
+  ievent->arg = Qnil;
+  ievent->timestamp = CurrentTime;
+  ievent->code = 0;
+  ievent->part = ev->data.l[2];
+  ievent->x = make_number (ev->data.l[3]);
+  ievent->y = make_number (ev->data.l[4]);
+  ievent->modifiers = 0;
+#endif
+}
+
+
+
+/* Scroll bar callback for GTK scroll bars.  WIDGET is the scroll
+   bar widget.  DATA is a pointer to the scroll_bar structure. */
+
+static gboolean
+xg_scroll_callback (GtkRange     *range,
+                    GtkScrollType scroll,
+                    gdouble       value,
+                    gpointer      user_data)
+{
+  int whole = 0, portion = 0;
+  struct scroll_bar *bar = user_data;
+  enum scroll_bar_part part = scroll_bar_nowhere;
+  GtkAdjustment *adj = GTK_ADJUSTMENT (gtk_range_get_adjustment (range));
+  struct frame *f = g_object_get_data (G_OBJECT (range), XG_FRAME_DATA);
+
+  if (xg_ignore_gtk_scrollbar) return false;
+
+  switch (scroll)
+    {
+    case GTK_SCROLL_JUMP:
+      /* Buttons 1 2 or 3 must be grabbed.  */
+      if (FRAME_DISPLAY_INFO (f)->grabbed != 0
+          && FRAME_DISPLAY_INFO (f)->grabbed < (1 << 4))
+        {
+	  if (bar->horizontal)
+	    {
+	      part = scroll_bar_horizontal_handle;
+	      whole = (int)(gtk_adjustment_get_upper (adj) -
+			    gtk_adjustment_get_page_size (adj));
+	      portion = min ((int)value, whole);
+	      bar->dragging = portion;
+	    }
+	  else
+	    {
+	      part = scroll_bar_handle;
+	      whole = gtk_adjustment_get_upper (adj) -
+		gtk_adjustment_get_page_size (adj);
+	      portion = min ((int)value, whole);
+	      bar->dragging = portion;
+	    }
+	}
+      break;
+    case GTK_SCROLL_STEP_BACKWARD:
+      part = (bar->horizontal
+	      ? scroll_bar_left_arrow : scroll_bar_up_arrow);
+      bar->dragging = -1;
+      break;
+    case GTK_SCROLL_STEP_FORWARD:
+      part = (bar->horizontal
+	      ? scroll_bar_right_arrow : scroll_bar_down_arrow);
+      bar->dragging = -1;
+      break;
+    case GTK_SCROLL_PAGE_BACKWARD:
+      part = (bar->horizontal
+	      ? scroll_bar_before_handle : scroll_bar_above_handle);
+      bar->dragging = -1;
+      break;
+    case GTK_SCROLL_PAGE_FORWARD:
+      part = (bar->horizontal
+	      ? scroll_bar_after_handle : scroll_bar_below_handle);
+      bar->dragging = -1;
+      break;
+    default:
+      break;
+    }
+
+  if (part != scroll_bar_nowhere)
+    {
+      window_being_scrolled = bar->window;
+      x_send_scroll_bar_event (bar->window, part, portion, whole,
+			       bar->horizontal);
+    }
+
+  return false;
+}
+
+/* Callback for button release. Sets dragging to -1 when dragging is done.  */
+
+static gboolean
+xg_end_scroll_callback (GtkWidget *widget,
+                        GdkEventButton *event,
+                        gpointer user_data)
+{
+  struct scroll_bar *bar = user_data;
+  bar->dragging = -1;
+  if (WINDOWP (window_being_scrolled))
+    {
+      x_send_scroll_bar_event (window_being_scrolled,
+                               scroll_bar_end_scroll, 0, 0, bar->horizontal);
+      window_being_scrolled = Qnil;
+    }
+
+  return false;
+}
+
+#define SCROLL_BAR_NAME "verticalScrollBar"
+#define SCROLL_BAR_HORIZONTAL_NAME "horizontalScrollBar"
+
+/* Create the widget for scroll bar BAR on frame F.  Record the widget
+   and X window of the scroll bar in BAR.  */
+
+static void
+x_create_toolkit_scroll_bar (struct frame *f, struct scroll_bar *bar)
+{
+  const char *scroll_bar_name = SCROLL_BAR_NAME;
+
+  block_input ();
+  xg_create_scroll_bar (f, bar, G_CALLBACK (xg_scroll_callback),
+                        G_CALLBACK (xg_end_scroll_callback),
+                        scroll_bar_name);
+  unblock_input ();
+}
+
+static void
+x_create_horizontal_toolkit_scroll_bar (struct frame *f, struct scroll_bar *bar)
+{
+  const char *scroll_bar_name = SCROLL_BAR_HORIZONTAL_NAME;
+
+  block_input ();
+  xg_create_horizontal_scroll_bar (f, bar, G_CALLBACK (xg_scroll_callback),
+				   G_CALLBACK (xg_end_scroll_callback),
+				   scroll_bar_name);
+  unblock_input ();
+}
+
+/* Set the thumb size and position of scroll bar BAR.  We are currently
+   displaying PORTION out of a whole WHOLE, and our position POSITION.  */
+
+static void
+x_set_toolkit_scroll_bar_thumb (struct scroll_bar *bar, int portion, int position, int whole)
+{
+  xg_set_toolkit_scroll_bar_thumb (bar, portion, position, whole);
+}
+
+static void
+x_set_toolkit_horizontal_scroll_bar_thumb (struct scroll_bar *bar, int portion, int position, int whole)
+{
+  xg_set_toolkit_horizontal_scroll_bar_thumb (bar, portion, position, whole);
+}
+
+
+
+/* Create a scroll bar and return the scroll bar vector for it.  W is
+   the Emacs window on which to create the scroll bar. TOP, LEFT,
+   WIDTH and HEIGHT are the pixel coordinates and dimensions of the
+   scroll bar. */
+
+static struct scroll_bar *
+x_scroll_bar_create (struct window *w, int top, int left,
+		     int width, int height, bool horizontal)
+{
+  struct frame *f = XFRAME (w->frame);
+  struct scroll_bar *bar
+    = ALLOCATE_PSEUDOVECTOR (struct scroll_bar, x_window, PVEC_OTHER);
+  Lisp_Object barobj;
+
+  block_input ();
+
+  if (horizontal)
+    x_create_horizontal_toolkit_scroll_bar (f, bar);
+  else
+    x_create_toolkit_scroll_bar (f, bar);
+
+  XSETWINDOW (bar->window, w);
+  bar->top = top;
+  bar->left = left;
+  bar->width = width;
+  bar->height = height;
+  bar->start = 0;
+  bar->end = 0;
+  bar->dragging = -1;
+  bar->horizontal = horizontal;
+
+  /* Add bar to its frame's list of scroll bars.  */
+  bar->next = FRAME_SCROLL_BARS (f);
+  bar->prev = Qnil;
+  XSETVECTOR (barobj, bar);
+  fset_scroll_bars (f, barobj);
+  if (!NILP (bar->next))
+    XSETVECTOR (XSCROLL_BAR (bar->next)->prev, bar);
+
+  /* Map the window/widget.  */
+  {
+    if (horizontal)
+      xg_update_horizontal_scrollbar_pos (f, bar->x_window, top,
+					  left, width, max (height, 1));
+    else
+      xg_update_scrollbar_pos (f, bar->x_window, top,
+			       left, width, max (height, 1));
+    }
+
+  unblock_input ();
+  return bar;
+}
+
+/* Destroy scroll bar BAR, and set its Emacs window's scroll bar to
+   nil.  */
+
+static void
+x_scroll_bar_remove (struct scroll_bar *bar)
+{
+  struct frame *f = XFRAME (WINDOW_FRAME (XWINDOW (bar->window)));
+  block_input ();
+
+  xg_remove_scroll_bar (f, bar->x_window);
+
+  /* Dissociate this scroll bar from its window.  */
+  if (bar->horizontal)
+    wset_horizontal_scroll_bar (XWINDOW (bar->window), Qnil);
+  else
+    wset_vertical_scroll_bar (XWINDOW (bar->window), Qnil);
+
+  unblock_input ();
+}
+
+/* Set the handle of the vertical scroll bar for WINDOW to indicate
+   that we are displaying PORTION characters out of a total of WHOLE
+   characters, starting at POSITION.  If WINDOW has no scroll bar,
+   create one.  */
+
+static void
+pgtk_set_vertical_scroll_bar (struct window *w, int portion, int whole, int position)
+{
+  struct frame *f = XFRAME (w->frame);
+  Lisp_Object barobj;
+  struct scroll_bar *bar;
+  int top, height, left, width;
+  int window_y, window_height;
+
+  /* Get window dimensions.  */
+  window_box (w, ANY_AREA, 0, &window_y, 0, &window_height);
+  top = window_y;
+  height = window_height;
+  left = WINDOW_SCROLL_BAR_AREA_X (w);
+  width = WINDOW_SCROLL_BAR_AREA_WIDTH (w);
+  PGTK_TRACE("pgtk_set_vertical_scroll_bar: has_vertical_scroll_bar: %d", WINDOW_HAS_VERTICAL_SCROLL_BAR(w));
+  PGTK_TRACE("pgtk_set_vertical_scroll_bar: config_scroll_bar_width: %d", WINDOW_CONFIG_SCROLL_BAR_WIDTH(w));
+  PGTK_TRACE("pgtk_set_vertical_scroll_bar: scroll_bar_width: %d", w->scroll_bar_width);
+  PGTK_TRACE("pgtk_set_vertical_scroll_bar: config_scroll_bar_width: %d", FRAME_CONFIG_SCROLL_BAR_WIDTH (WINDOW_XFRAME (w)));
+  PGTK_TRACE("pgtk_set_vertical_scroll_bar: %dx%d+%d+%d", width, height, left, top);
+
+  /* Does the scroll bar exist yet?  */
+  if (NILP (w->vertical_scroll_bar))
+    {
+      if (width > 0 && height > 0)
+	{
+	  block_input ();
+          pgtk_clear_area (f, left, top, width, height);
+	  unblock_input ();
+	}
+
+      bar = x_scroll_bar_create (w, top, left, width, max (height, 1), false);
+    }
+  else
+    {
+      /* It may just need to be moved and resized.  */
+      unsigned int mask = 0;
+
+      bar = XSCROLL_BAR (w->vertical_scroll_bar);
+
+      block_input ();
+
+      if (left != bar->left)
+	mask |= 1;
+      if (top != bar->top)
+	mask |= 1;
+      if (width != bar->width)
+	mask |= 1;
+      if (height != bar->height)
+	mask |= 1;
+
+      /* Move/size the scroll bar widget.  */
+      if (mask)
+	{
+	  /* Since toolkit scroll bars are smaller than the space reserved
+	     for them on the frame, we have to clear "under" them.  */
+	  if (width > 0 && height > 0)
+	    pgtk_clear_area (f, left, top, width, height);
+          xg_update_scrollbar_pos (f, bar->x_window, top,
+				   left, width, max (height, 1));
+	}
+
+      /* Remember new settings.  */
+      bar->left = left;
+      bar->top = top;
+      bar->width = width;
+      bar->height = height;
+
+      unblock_input ();
+    }
+
+  x_set_toolkit_scroll_bar_thumb (bar, portion, position, whole);
+
+  XSETVECTOR (barobj, bar);
+  wset_vertical_scroll_bar (w, barobj);
+}
+
+
+static void
+pgtk_set_horizontal_scroll_bar (struct window *w, int portion, int whole, int position)
+{
+  struct frame *f = XFRAME (w->frame);
+  Lisp_Object barobj;
+  struct scroll_bar *bar;
+  int top, height, left, width;
+  int window_x, window_width;
+  int pixel_width = WINDOW_PIXEL_WIDTH (w);
+
+  /* Get window dimensions.  */
+  window_box (w, ANY_AREA, &window_x, 0, &window_width, 0);
+  left = window_x;
+  width = window_width;
+  top = WINDOW_SCROLL_BAR_AREA_Y (w);
+  height = WINDOW_SCROLL_BAR_AREA_HEIGHT (w);
+
+  /* Does the scroll bar exist yet?  */
+  if (NILP (w->horizontal_scroll_bar))
+    {
+      if (width > 0 && height > 0)
+	{
+	  block_input ();
+
+	  /* Clear also part between window_width and
+	     WINDOW_PIXEL_WIDTH.  */
+	  pgtk_clear_area (f, left, top, pixel_width, height);
+	  unblock_input ();
+	}
+
+      bar = x_scroll_bar_create (w, top, left, width, height, true);
+    }
+  else
+    {
+      /* It may just need to be moved and resized.  */
+      unsigned int mask = 0;
+
+      bar = XSCROLL_BAR (w->horizontal_scroll_bar);
+
+      block_input ();
+
+      if (left != bar->left)
+	mask |= 1;
+      if (top != bar->top)
+	mask |= 1;
+      if (width != bar->width)
+	mask |= 1;
+      if (height != bar->height)
+	mask |= 1;
+
+      /* Move/size the scroll bar widget.  */
+      if (mask)
+	{
+	  /* Since toolkit scroll bars are smaller than the space reserved
+	     for them on the frame, we have to clear "under" them.  */
+	  if (width > 0 && height > 0)
+	    pgtk_clear_area (f,
+			  WINDOW_LEFT_EDGE_X (w), top,
+			  pixel_width - WINDOW_RIGHT_DIVIDER_WIDTH (w), height);
+          xg_update_horizontal_scrollbar_pos (f, bar->x_window, top, left,
+					      width, height);
+	}
+
+      /* Remember new settings.  */
+      bar->left = left;
+      bar->top = top;
+      bar->width = width;
+      bar->height = height;
+
+      unblock_input ();
+    }
+
+  x_set_toolkit_horizontal_scroll_bar_thumb (bar, portion, position, whole);
+
+  XSETVECTOR (barobj, bar);
+  wset_horizontal_scroll_bar (w, barobj);
+}
+
+/* The following three hooks are used when we're doing a thorough
+   redisplay of the frame.  We don't explicitly know which scroll bars
+   are going to be deleted, because keeping track of when windows go
+   away is a real pain - "Can you say set-window-configuration, boys
+   and girls?"  Instead, we just assert at the beginning of redisplay
+   that *all* scroll bars are to be removed, and then save a scroll bar
+   from the fiery pit when we actually redisplay its window.  */
+
+/* Arrange for all scroll bars on FRAME to be removed at the next call
+   to `*judge_scroll_bars_hook'.  A scroll bar may be spared if
+   `*redeem_scroll_bar_hook' is applied to its window before the judgment.  */
+
+static void
+pgtk_condemn_scroll_bars (struct frame *frame)
+{
+  if (!NILP (FRAME_SCROLL_BARS (frame)))
+    {
+      if (!NILP (FRAME_CONDEMNED_SCROLL_BARS (frame)))
+	{
+	  /* Prepend scrollbars to already condemned ones.  */
+	  Lisp_Object last = FRAME_SCROLL_BARS (frame);
+
+	  while (!NILP (XSCROLL_BAR (last)->next))
+	    last = XSCROLL_BAR (last)->next;
+
+	  XSCROLL_BAR (last)->next = FRAME_CONDEMNED_SCROLL_BARS (frame);
+	  XSCROLL_BAR (FRAME_CONDEMNED_SCROLL_BARS (frame))->prev = last;
+	}
+
+      fset_condemned_scroll_bars (frame, FRAME_SCROLL_BARS (frame));
+      fset_scroll_bars (frame, Qnil);
+    }
+}
+
+
+/* Un-mark WINDOW's scroll bar for deletion in this judgment cycle.
+   Note that WINDOW isn't necessarily condemned at all.  */
+
+static void
+pgtk_redeem_scroll_bar (struct window *w)
+{
+  struct scroll_bar *bar;
+  Lisp_Object barobj;
+  struct frame *f;
+
+  /* We can't redeem this window's scroll bar if it doesn't have one.  */
+  if (NILP (w->vertical_scroll_bar) && NILP (w->horizontal_scroll_bar))
+    emacs_abort ();
+
+  if (!NILP (w->vertical_scroll_bar) && WINDOW_HAS_VERTICAL_SCROLL_BAR (w))
+    {
+      bar = XSCROLL_BAR (w->vertical_scroll_bar);
+      /* Unlink it from the condemned list.  */
+      f = XFRAME (WINDOW_FRAME (w));
+      if (NILP (bar->prev))
+	{
+	  /* If the prev pointer is nil, it must be the first in one of
+	     the lists.  */
+	  if (EQ (FRAME_SCROLL_BARS (f), w->vertical_scroll_bar))
+	    /* It's not condemned.  Everything's fine.  */
+	    goto horizontal;
+	  else if (EQ (FRAME_CONDEMNED_SCROLL_BARS (f),
+		       w->vertical_scroll_bar))
+	    fset_condemned_scroll_bars (f, bar->next);
+	  else
+	    /* If its prev pointer is nil, it must be at the front of
+	       one or the other!  */
+	    emacs_abort ();
+	}
+      else
+	XSCROLL_BAR (bar->prev)->next = bar->next;
+
+      if (! NILP (bar->next))
+	XSCROLL_BAR (bar->next)->prev = bar->prev;
+
+      bar->next = FRAME_SCROLL_BARS (f);
+      bar->prev = Qnil;
+      XSETVECTOR (barobj, bar);
+      fset_scroll_bars (f, barobj);
+      if (! NILP (bar->next))
+	XSETVECTOR (XSCROLL_BAR (bar->next)->prev, bar);
+    }
+
+ horizontal:
+  if (!NILP (w->horizontal_scroll_bar) && WINDOW_HAS_HORIZONTAL_SCROLL_BAR (w))
+    {
+      bar = XSCROLL_BAR (w->horizontal_scroll_bar);
+      /* Unlink it from the condemned list.  */
+      f = XFRAME (WINDOW_FRAME (w));
+      if (NILP (bar->prev))
+	{
+	  /* If the prev pointer is nil, it must be the first in one of
+	     the lists.  */
+	  if (EQ (FRAME_SCROLL_BARS (f), w->horizontal_scroll_bar))
+	    /* It's not condemned.  Everything's fine.  */
+	    return;
+	  else if (EQ (FRAME_CONDEMNED_SCROLL_BARS (f),
+		       w->horizontal_scroll_bar))
+	    fset_condemned_scroll_bars (f, bar->next);
+	  else
+	    /* If its prev pointer is nil, it must be at the front of
+	       one or the other!  */
+	    emacs_abort ();
+	}
+      else
+	XSCROLL_BAR (bar->prev)->next = bar->next;
+
+      if (! NILP (bar->next))
+	XSCROLL_BAR (bar->next)->prev = bar->prev;
+
+      bar->next = FRAME_SCROLL_BARS (f);
+      bar->prev = Qnil;
+      XSETVECTOR (barobj, bar);
+      fset_scroll_bars (f, barobj);
+      if (! NILP (bar->next))
+	XSETVECTOR (XSCROLL_BAR (bar->next)->prev, bar);
+    }
+}
+
+/* Remove all scroll bars on FRAME that haven't been saved since the
+   last call to `*condemn_scroll_bars_hook'.  */
+
+static void
+pgtk_judge_scroll_bars (struct frame *f)
+{
+  Lisp_Object bar, next;
+
+  bar = FRAME_CONDEMNED_SCROLL_BARS (f);
+
+  /* Clear out the condemned list now so we won't try to process any
+     more events on the hapless scroll bars.  */
+  fset_condemned_scroll_bars (f, Qnil);
+
+  for (; ! NILP (bar); bar = next)
+    {
+      struct scroll_bar *b = XSCROLL_BAR (bar);
+
+      x_scroll_bar_remove (b);
+
+      next = b->next;
+      b->next = b->prev = Qnil;
+    }
+
+  /* Now there should be no references to the condemned scroll bars,
+     and they should get garbage-collected.  */
+}
+
 static struct terminal *
 pgtk_create_terminal (struct pgtk_display_info *dpyinfo)
 /* --------------------------------------------------------------------------
@@ -3923,16 +4569,48 @@ pgtk_create_terminal (struct pgtk_display_info *dpyinfo)
   // terminal->fullscreen_hook = pgtk_fullscreen_hook;
   // terminal->menu_show_hook = pgtk_menu_show;
   // terminal->popup_dialog_hook = pgtk_popup_dialog;
-  // terminal->set_vertical_scroll_bar_hook = pgtk_set_vertical_scroll_bar;
-  // terminal->set_horizontal_scroll_bar_hook = pgtk_set_horizontal_scroll_bar;
-  // terminal->condemn_scroll_bars_hook = pgtk_condemn_scroll_bars;
-  // terminal->redeem_scroll_bar_hook = pgtk_redeem_scroll_bar;
-  // terminal->judge_scroll_bars_hook = pgtk_judge_scroll_bars;
+  terminal->set_vertical_scroll_bar_hook = pgtk_set_vertical_scroll_bar;
+  terminal->set_horizontal_scroll_bar_hook = pgtk_set_horizontal_scroll_bar;
+  terminal->condemn_scroll_bars_hook = pgtk_condemn_scroll_bars;
+  terminal->redeem_scroll_bar_hook = pgtk_redeem_scroll_bar;
+  terminal->judge_scroll_bars_hook = pgtk_judge_scroll_bars;
   terminal->delete_frame_hook = x_destroy_window;
   // terminal->delete_terminal_hook = pgtk_delete_terminal;
   /* Other hooks are NULL by default.  */
 
   return terminal;
+}
+
+struct pgtk_window_is_of_frame_recursive_t {
+  GdkWindow *window;
+  bool result;
+};
+
+static void
+pgtk_window_is_of_frame_recursive(GtkWidget *widget, gpointer data)
+{
+  struct pgtk_window_is_of_frame_recursive_t *datap = data;
+
+  if (datap->result)
+    return;
+
+  if (gtk_widget_get_window(widget) == datap->window) {
+    datap->result = true;
+    return;
+  }
+
+  if (GTK_IS_CONTAINER(widget))
+    gtk_container_foreach(GTK_CONTAINER(widget), pgtk_window_is_of_frame_recursive, datap);
+}
+
+static bool
+pgtk_window_is_of_frame(struct frame *f, GdkWindow *window)
+{
+  struct pgtk_window_is_of_frame_recursive_t data;
+  data.window = window;
+  data.result = false;
+  pgtk_window_is_of_frame_recursive(FRAME_GTK_OUTER_WIDGET(f), &data);
+  return data.result;
 }
 
 /* Like x_window_to_frame but also compares the window with the widget's
@@ -3955,6 +4633,9 @@ pgtk_any_window_to_frame (GdkWindow *window)
       if (FRAME_PGTK_P (f))
 	{
 #if 1
+	  if (pgtk_window_is_of_frame(f, window))
+	    found = f;
+#elif 1
 	  if (FRAME_GTK_OUTER_WIDGET(f) && gtk_widget_get_window(FRAME_GTK_OUTER_WIDGET(f)) == window)
 	    found = f;
 	  if (FRAME_GTK_WIDGET(f) && gtk_widget_get_window(FRAME_GTK_WIDGET(f)) == window)
@@ -4020,7 +4701,7 @@ pgtk_handle_event(GtkWidget *widget, GdkEvent *event, gpointer *data)
 	       GtkWindow is rendering beneath us.  We've garbaged
 	       the frame, so we'll redraw the whole thing on next
 	       redisplay anyway.  Yuck.  */
-	    x_clear_area1 (
+	    pgtk_clear_area1 (
 	      FRAME_X_DISPLAY (f),
 	      FRAME_X_WINDOW (f),
 	      event->xexpose.x, event->xexpose.y,
@@ -4034,7 +4715,7 @@ pgtk_handle_event(GtkWidget *widget, GdkEvent *event, gpointer *data)
 	  {
 	    /* This seems to be needed for GTK 2.6 and later, see
 	       https://debbugs.gnu.org/cgi/bugreport.cgi?bug=15398.  */
-	    x_clear_area (f,
+	    pgtk_clear_area (f,
 			  event->xexpose.x, event->xexpose.y,
 			  event->xexpose.width, event->xexpose.height);
 	    expose_frame (f, event->xexpose.x, event->xexpose.y,
@@ -4072,8 +4753,6 @@ pgtk_handle_event(GtkWidget *widget, GdkEvent *event, gpointer *data)
     PGTK_TRACE("GDK_CONFIGURE");
     f = pgtk_any_window_to_frame (event->configure.window);
     if (f) {
-      pgtk_cr_destroy_surface (f);
-
       PGTK_TRACE("%dx%d", event->configure.width, event->configure.height);
       xg_frame_resized(f, event->configure.width, event->configure.height);
     }
@@ -4227,6 +4906,37 @@ pgtk_clear_under_internal_border (struct frame *f)
     }
 }
 
+static void print_widget_tree_recursive(GtkWidget *w, gpointer user_data)
+{
+  const char *indent = user_data;
+  char buf[1024] = "";
+  int len = 0;
+  len += sprintf(buf + len, "%s", indent);
+  len += sprintf(buf + len, "%p %s mapped:%d visible:%d", w, G_OBJECT_TYPE_NAME(w), gtk_widget_get_mapped(w), gtk_widget_get_visible(w));
+  gint wd, hi;
+  gtk_widget_get_size_request(w, &wd, &hi);
+  len += sprintf(buf + len, " size_req:%dx%d", wd, hi);
+  GtkAllocation alloc;
+  gtk_widget_get_allocation(w, &alloc);
+  len += sprintf(buf + len, " alloc:%dx%d+%d+%d", alloc.width, alloc.height, alloc.x, alloc.y);
+  len += sprintf(buf + len, " haswin:%d", gtk_widget_get_has_window(w));
+  len += sprintf(buf + len, " gdkwin:%p", gtk_widget_get_window(w));
+  PGTK_TRACE("%s", buf);
+
+  if (GTK_IS_CONTAINER(w)) {
+    strcpy(buf, indent);
+    strcat(buf, "  ");
+    gtk_container_foreach(GTK_CONTAINER(w), print_widget_tree_recursive, buf);
+  }
+}
+
+static void print_widget_tree(GtkWidget *w)
+{
+  char indent[1] = "";
+  w = gtk_widget_get_toplevel(w);
+  print_widget_tree_recursive(w, indent);
+}
+
 static gboolean
 pgtk_handle_draw(GtkWidget *widget, cairo_t *cr, gpointer *data)
 {
@@ -4234,15 +4944,7 @@ pgtk_handle_draw(GtkWidget *widget, cairo_t *cr, gpointer *data)
 
   PGTK_TRACE("pgtk_handle_draw");
 
-  for (GtkWidget *w = widget; w != NULL; w = gtk_widget_get_parent(w)) {
-    PGTK_TRACE("%p %s %d %d", w, G_OBJECT_TYPE_NAME(w), gtk_widget_get_mapped(w), gtk_widget_get_visible(w));
-    gint wd, hi;
-    gtk_widget_get_size_request(w, &wd, &hi);
-    PGTK_TRACE(" %dx%d", wd, hi);
-    GtkAllocation alloc;
-    gtk_widget_get_allocation(w, &alloc);
-    PGTK_TRACE(" %dx%d+%d+%d", alloc.width, alloc.height, alloc.x, alloc.y);
-  }
+  print_widget_tree(widget);
 
 #if 1
   {
@@ -4373,8 +5075,6 @@ static void size_allocate(GtkWidget *widget, GtkAllocation *alloc, gpointer *use
 
   struct frame *f = pgtk_any_window_to_frame (gtk_widget_get_window(widget));
   if (f) {
-    pgtk_cr_destroy_surface (f);
-
     PGTK_TRACE("%dx%d", alloc->width, alloc->height);
     xg_frame_resized(f, alloc->width, alloc->height);
   }
@@ -5054,10 +5754,8 @@ motion_notify_event(GtkWidget *widget, GdkEvent *event, gpointer *user_data)
       clear_mouse_face (hlinfo);
     }
 
-#if 0
   if (f && xg_event_is_for_scrollbar (f, event))
     f = 0;
-#endif
   if (f)
     {
       /* Maybe generate a SELECT_WINDOW_EVENT for
@@ -5239,10 +5937,8 @@ button_event(GtkWidget *widget, GdkEvent *event, gpointer *user_data)
 	}
     }
 
-#if 0
   if (f && xg_event_is_for_scrollbar (f, event))
     f = 0;
-#endif
   if (f)
     {
       if (!tool_bar_p)
@@ -6139,7 +6835,7 @@ pgtk_cr_draw_frame (cairo_t *cr, struct frame *f)
 #endif
 }
 
-static void
+void
 pgtk_cr_destroy_surface(struct frame *f)
 {
   PGTK_TRACE("pgtk_cr_destroy_surface");
@@ -6151,6 +6847,7 @@ pgtk_cr_destroy_surface(struct frame *f)
     cairo_surface_destroy(FRAME_CR_SURFACE(f));
     FRAME_CR_SURFACE(f) = NULL;
   }
+  SET_FRAME_GARBAGED (f);
 }
 
 void

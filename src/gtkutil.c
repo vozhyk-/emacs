@@ -968,6 +968,9 @@ xg_frame_resized (struct frame *f, int pixelwidth, int pixelheight)
       change_frame_size (f, width, height, 0, 1, 0, 1);
       SET_FRAME_GARBAGED (f);
       cancel_mouse_face (f);
+#ifdef HAVE_PGTK
+      pgtk_cr_destroy_surface (f);
+#endif
     }
 }
 
@@ -4296,7 +4299,6 @@ xg_set_toolkit_horizontal_scroll_bar_thumb (struct scroll_bar *bar,
     }
 }
 
-#ifndef HAVE_PGTK
 /* Return true if EVENT is for a scroll bar in frame F.
    When the same X window is used for several Gtk+ widgets, we cannot
    say for sure based on the X window alone if an event is for the
@@ -4307,10 +4309,20 @@ xg_event_is_for_scrollbar (struct frame *f, const EVENT *event)
 {
   bool retval = 0;
 
-  if (f && event->type == ButtonPress && event->xbutton.button < 4)
+  if (f
+#ifndef HAVE_PGTK
+      && event->type == ButtonPress && event->xbutton.button < 4
+#else
+      && event->type == GDK_BUTTON_PRESS && event->button.button < 4
+#endif
+      )
     {
       /* Check if press occurred outside the edit widget.  */
+#ifndef HAVE_PGTK
       GdkDisplay *gdpy = gdk_x11_lookup_xdisplay (FRAME_X_DISPLAY (f));
+#else
+      GdkDisplay *gdpy = DEFAULT_GDK_DISPLAY();
+#endif
       GdkWindow *gwin;
 #ifdef HAVE_GTK3
 #if GTK_CHECK_VERSION (3, 20, 0)
@@ -4327,8 +4339,14 @@ xg_event_is_for_scrollbar (struct frame *f, const EVENT *event)
       retval = gwin != gtk_widget_get_window (f->output_data.wx->edit_widget);
     }
   else if (f
+#ifndef HAVE_PGTK
            && ((event->type == ButtonRelease && event->xbutton.button < 4)
-               || event->type == MotionNotify))
+               || event->type == MotionNotify)
+#else
+           && ((event->type == GDK_BUTTON_RELEASE && event->button.button < 4)
+               || event->type == GDK_MOTION_NOTIFY)
+#endif
+	   )
     {
       /* If we are releasing or moving the scroll bar, it has the grab.  */
       GtkWidget *w = gtk_grab_get_current ();
@@ -4337,7 +4355,6 @@ xg_event_is_for_scrollbar (struct frame *f, const EVENT *event)
 
   return retval;
 }
-#endif
 
 
 /***********************************************************************

@@ -2447,23 +2447,21 @@ check_x_display_info (Lisp_Object frame)
 void
 x_set_scroll_bar_default_width (struct frame *f)
 {
-#if 0
-  int wid = FRAME_COLUMN_WIDTH (f);
-  FRAME_CONFIG_SCROLL_BAR_WIDTH (f) = PGTK_SCROLL_BAR_WIDTH_DEFAULT;
-  FRAME_CONFIG_SCROLL_BAR_COLS (f) = (FRAME_CONFIG_SCROLL_BAR_WIDTH (f) +
-                                      wid - 1) / wid;
-#endif
+  int unit = FRAME_COLUMN_WIDTH (f);
+  int minw = xg_get_default_scrollbar_width (f);
+  /* A minimum width of 14 doesn't look good for toolkit scroll bars.  */
+  FRAME_CONFIG_SCROLL_BAR_COLS (f) = (minw + unit - 1) / unit;
+  FRAME_CONFIG_SCROLL_BAR_WIDTH (f) = minw;
 }
 
 void
 x_set_scroll_bar_default_height (struct frame *f)
 {
-#if 0
   int height = FRAME_LINE_HEIGHT (f);
-  FRAME_CONFIG_SCROLL_BAR_HEIGHT (f) = PGTK_SCROLL_BAR_WIDTH_DEFAULT;
-  FRAME_CONFIG_SCROLL_BAR_LINES (f) = (FRAME_CONFIG_SCROLL_BAR_HEIGHT (f) +
-				       height - 1) / height;
-#endif
+  int min_height = xg_get_default_scrollbar_height (f);
+  /* A minimum height of 14 doesn't look good for toolkit scroll bars.  */
+  FRAME_CONFIG_SCROLL_BAR_HEIGHT (f) = min_height;
+  FRAME_CONFIG_SCROLL_BAR_LINES (f) = (min_height + height - 1) / height;
 }
 
 /* terms impl this instead of x-get-resource directly */
