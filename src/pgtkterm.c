@@ -3521,7 +3521,47 @@ pgtk_draw_fringe_bitmap (struct window *w, struct glyph_row *row, struct draw_fr
   cairo_restore(cr);
 }
 
+static struct atimer *hourglass_atimer = NULL;
+static GtkWidget *hourglass_widget = NULL;
 
+static void hourglass_cb(struct atimer *timer)
+{
+  /*NOP*/
+}
+
+static void
+pgtk_show_hourglass(struct frame *f)
+{
+  if (hourglass_widget != NULL)
+    gtk_widget_destroy(hourglass_widget);
+  hourglass_widget = gtk_event_box_new();   /* gtk_event_box is GDK_INPUT_ONLY. */
+  gtk_widget_set_has_window(hourglass_widget, true);
+  gtk_fixed_put(FRAME_GTK_WIDGET(f), hourglass_widget, 0, 0);
+  gtk_widget_show(hourglass_widget);
+  gtk_widget_set_size_request(hourglass_widget, 10000, 10000);
+  gdk_window_raise(gtk_widget_get_window(hourglass_widget));
+  gdk_window_set_cursor(gtk_widget_get_window(hourglass_widget), f->output_data.pgtk->hourglass_cursor);
+
+  struct timespec ts = make_timespec(0, 50 * 1000 * 1000);
+  if (hourglass_atimer != NULL)
+    cancel_atimer(hourglass_atimer);
+  hourglass_atimer = start_atimer(ATIMER_CONTINUOUS, ts, hourglass_cb, NULL);
+
+  /* Cursor frequently stops animation. gtk's bug? */
+}
+
+static void
+pgtk_hide_hourglass(struct frame *f)
+{
+  if (hourglass_atimer != NULL) {
+    cancel_atimer(hourglass_atimer);
+    hourglass_atimer = NULL;
+  }
+  if (hourglass_widget != NULL) {
+    gtk_widget_destroy(hourglass_widget);
+    hourglass_widget = NULL;
+  }
+}
 
 extern frame_parm_handler pgtk_frame_parm_handlers[];
 
@@ -3551,8 +3591,8 @@ static struct redisplay_interface pgtk_redisplay_interface =
   NULL, // pgtk_draw_vertical_window_border,
   NULL, // pgtk_draw_window_divider,
   NULL, // pgtk_shift_glyphs_for_insert,
-  NULL, // pgtk_show_hourglass,
-  NULL, // pgtk_hide_hourglass
+  pgtk_show_hourglass,
+  pgtk_hide_hourglass
 };
 
 static void
@@ -3724,6 +3764,7 @@ pgtk_read_socket (struct terminal *terminal, struct input_event *hold_quit)
   PGTK_TRACE("pgtk_read_socket: 3: errno=%d.", errno);
 
   if (context_acquired) {
+    PGTK_TRACE("pgtk_read_socket: 4.1: acquired.");
     while (g_main_context_pending (context)) {
       PGTK_TRACE("pgtk_read_socket: 4: dispatch...");
       g_main_context_dispatch (context);
@@ -6046,7 +6087,7 @@ static int pgtk_detect_wayland_connection(dynlib_handle_ptr h, GdkDisplay *gdpy)
   int (*fn2)(void *);
   if ((wldpy_type = get_type(h, "gdk_wayland_display_get_type")) == G_TYPE_INVALID)
     return -1;
-  if (!g_type_check_instance_is_a(G_OBJECT(gdpy), wldpy_type))
+  if (!g_type_check_instance_is_a((void *) gdpy, wldpy_type))
     return -1;
   fn1 = dynlib_sym(h, "gdk_wayland_display_get_wl_display");
   fn2 = dynlib_sym(h, "wl_display_get_fd");
@@ -6062,7 +6103,7 @@ static int pgtk_detect_x11_connection(dynlib_handle_ptr h, GdkDisplay *gdpy)
   int (*fn2)(void *);
   if ((xdpy_type = get_type(h, "gdk_x11_display_get_type")) == G_TYPE_INVALID)
     return -1;
-  if (!g_type_check_instance_is_a(G_OBJECT(gdpy), xdpy_type))
+  if (!g_type_check_instance_is_a((void *) gdpy, xdpy_type))
     return -1;
   fn1 = dynlib_sym(h, "gdk_x11_display_get_xdisplay");
   fn2 = dynlib_sym(h, "XConnectionNumber");
@@ -6760,4 +6801,5 @@ pgtk_cr_destroy_surface(struct frame *f)
 void
 init_pgtkterm (void)
 {
+  xputenv ("EMACS_IGNORE_TIMERFD=1");
 }

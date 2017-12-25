@@ -266,7 +266,7 @@ struct pgtk_output
   Cursor nontext_cursor;
   Cursor modeline_cursor;
   Cursor hand_cursor;
-  Cursor hourglass_cursor;
+  GdkCursor *hourglass_cursor;
   Cursor horizontal_drag_cursor;
   Cursor vertical_drag_cursor;
   Cursor left_edge_cursor;

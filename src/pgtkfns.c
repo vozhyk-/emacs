@@ -1520,6 +1520,9 @@ This function is an internal primitive--use `make-frame' instead.  */)
   tem = x_get_arg (dpyinfo, parms, Qunsplittable, 0, 0, RES_TYPE_BOOLEAN);
   f->no_split = minibuffer_only || EQ (tem, Qt);
 
+  f->output_data.pgtk->hourglass_cursor = gdk_cursor_new(GDK_WATCH);
+  // f->output_data.pgtk->hourglass_cursor = gdk_cursor_new(GDK_CLOCK);
+
 #if 0
   x_icon_verify (f, parms);
 #endif
