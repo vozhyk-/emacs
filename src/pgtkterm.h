@@ -281,6 +281,10 @@ struct pgtk_output
   /* PGTK-specific */
   Cursor current_pointer;
 
+  /* Widget whose cursor is hourglass_cursor.  This widget is temporarily
+     mapped to display an hourglass cursor.  */
+  GtkWidget *hourglass_widget;
+
   XGCValues cursor_xgcv;
 
   /* lord knows why Emacs needs to know about our Window ids.. */

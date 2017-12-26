@@ -3522,7 +3522,6 @@ pgtk_draw_fringe_bitmap (struct window *w, struct glyph_row *row, struct draw_fr
 }
 
 static struct atimer *hourglass_atimer = NULL;
-static GtkWidget *hourglass_widget = NULL;
 
 static void hourglass_cb(struct atimer *timer)
 {
@@ -3532,15 +3531,16 @@ static void hourglass_cb(struct atimer *timer)
 static void
 pgtk_show_hourglass(struct frame *f)
 {
-  if (hourglass_widget != NULL)
-    gtk_widget_destroy(hourglass_widget);
-  hourglass_widget = gtk_event_box_new();   /* gtk_event_box is GDK_INPUT_ONLY. */
-  gtk_widget_set_has_window(hourglass_widget, true);
-  gtk_fixed_put(FRAME_GTK_WIDGET(f), hourglass_widget, 0, 0);
-  gtk_widget_show(hourglass_widget);
-  gtk_widget_set_size_request(hourglass_widget, 10000, 10000);
-  gdk_window_raise(gtk_widget_get_window(hourglass_widget));
-  gdk_window_set_cursor(gtk_widget_get_window(hourglass_widget), f->output_data.pgtk->hourglass_cursor);
+  struct pgtk_output *x = f->output_data.pgtk;
+  if (x->hourglass_widget != NULL)
+    gtk_widget_destroy(x->hourglass_widget);
+  x->hourglass_widget = gtk_event_box_new();   /* gtk_event_box is GDK_INPUT_ONLY. */
+  gtk_widget_set_has_window(x->hourglass_widget, true);
+  gtk_fixed_put(FRAME_GTK_WIDGET(f), x->hourglass_widget, 0, 0);
+  gtk_widget_show(x->hourglass_widget);
+  gtk_widget_set_size_request(x->hourglass_widget, 30000, 30000);
+  gdk_window_raise(gtk_widget_get_window(x->hourglass_widget));
+  gdk_window_set_cursor(gtk_widget_get_window(x->hourglass_widget), x->hourglass_cursor);
 
   struct timespec ts = make_timespec(0, 50 * 1000 * 1000);
   if (hourglass_atimer != NULL)
@@ -3553,13 +3553,14 @@ pgtk_show_hourglass(struct frame *f)
 static void
 pgtk_hide_hourglass(struct frame *f)
 {
+  struct pgtk_output *x = f->output_data.pgtk;
   if (hourglass_atimer != NULL) {
     cancel_atimer(hourglass_atimer);
     hourglass_atimer = NULL;
   }
-  if (hourglass_widget != NULL) {
-    gtk_widget_destroy(hourglass_widget);
-    hourglass_widget = NULL;
+  if (x->hourglass_widget != NULL) {
+    gtk_widget_destroy(x->hourglass_widget);
+    x->hourglass_widget = NULL;
   }
 }
 
