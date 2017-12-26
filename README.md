@@ -31,12 +31,16 @@ Many many debugging outputs. Please ignore them.
 
 ## TODO
 
+- High: SIGPIPE while selecting region.
+
 - tooltip.
 - toolbar.
 - menubar.
 - fullscreen?
 - not works on pure gtk+-3 with X11.
 - so many features not supported.
+
+I don't use these features, so they may not be developed.
 
 ## ImageMagick
 
