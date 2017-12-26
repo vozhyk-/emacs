@@ -896,10 +896,12 @@ x_set_glyph_string_clipping (struct glyph_string *s, cairo_t *cr)
   int n = get_glyph_string_clip_rects (s, r, 2);
   PGTK_TRACE("x_set_glyph_string_clipping: n=%d.", n);
 
-  for (int i = 0; i < n; i++) {
-    PGTK_TRACE("x_set_glyph_string_clipping: r[%d]: %ux%u+%d+%d.",
+  if (n > 0) {
+    for (int i = 0; i < n; i++) {
+      PGTK_TRACE("x_set_glyph_string_clipping: r[%d]: %ux%u+%d+%d.",
 		 i, r[i].width, r[i].height, r[i].x, r[i].y);
-    cairo_rectangle(cr, r[i].x, r[i].y, r[i].width, r[i].height);
+      cairo_rectangle(cr, r[i].x, r[i].y, r[i].width, r[i].height);
+    }
     cairo_clip(cr);
   }
   PGTK_TRACE("clip result:");
@@ -1479,12 +1481,14 @@ x_setup_relief_colors (struct glyph_string *s)
 static void
 x_set_clip_rectangles (struct frame *f, cairo_t *cr, XRectangle *rectangles, int n)
 {
-  for (int i = 0; i < n; i++) {
-    cairo_rectangle(cr,
-		    rectangles[i].x,
-		    rectangles[i].y,
-		    rectangles[i].width,
-		    rectangles[i].height);
+  if (n > 0) {
+    for (int i = 0; i < n; i++) {
+      cairo_rectangle(cr,
+		      rectangles[i].x,
+		      rectangles[i].y,
+		      rectangles[i].width,
+		      rectangles[i].height);
+    }
     cairo_clip(cr);
   }
 }
