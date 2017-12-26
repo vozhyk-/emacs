@@ -31,16 +31,11 @@ Many many debugging outputs. Please ignore them.
 
 ## TODO
 
-Higher:
-- hourglass?
-- tooltip?
-
-Lower:
-- no toolbar.
-- no menubar.
-- sometimes cursor are left at the end of line.
-- fullscreen not supported.
-- does not work on pure gtk+-3 with X11.
+- tooltip.
+- toolbar.
+- menubar.
+- fullscreen?
+- not works on pure gtk+-3 with X11.
 - so many features not supported.
 
 ## ImageMagick
