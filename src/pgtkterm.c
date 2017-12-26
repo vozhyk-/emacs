@@ -4711,80 +4711,11 @@ pgtk_any_window_to_frame (GdkWindow *window)
 static gboolean
 pgtk_handle_event(GtkWidget *widget, GdkEvent *event, gpointer *data)
 {
-  struct frame *f;
-  union buffered_input_event inev;
-
-  EVENT_INIT (inev.ie);
-  inev.ie.kind = NO_EVENT;
-  inev.ie.arg = Qnil;
-
   switch (event->type) {
   case GDK_NOTHING:               PGTK_TRACE("GDK_NOTHING"); break;
   case GDK_DELETE:                PGTK_TRACE("GDK_DELETE"); break;
   case GDK_DESTROY:               PGTK_TRACE("GDK_DESTROY"); break;
-  case GDK_EXPOSE:
-    PGTK_TRACE("GDK_EXPOSE");
-    f = pgtk_any_window_to_frame (event->expose.window);
-#if 0
-    if (f)
-      {
-	if (!FRAME_VISIBLE_P (f))
-	  {
-	    block_input ();
-	    SET_FRAME_VISIBLE (f, 1);
-	    SET_FRAME_ICONIFIED (f, false);
-	    if (FRAME_X_DOUBLE_BUFFERED_P (f))
-	      font_drop_xrender_surfaces (f);
-	    f->output_data.x->has_been_visible = true;
-	    SET_FRAME_GARBAGED (f);
-	    unblock_input ();
-	  }
-	else if (FRAME_GARBAGED_P (f))
-	  {
-	    /* Go around the back buffer and manually clear the
-	       window the first time we show it.  This way, we avoid
-	       showing users the sanity-defying horror of whatever
-	       GtkWindow is rendering beneath us.  We've garbaged
-	       the frame, so we'll redraw the whole thing on next
-	       redisplay anyway.  Yuck.  */
-	    pgtk_clear_area1 (
-	      FRAME_X_DISPLAY (f),
-	      FRAME_X_WINDOW (f),
-	      event->xexpose.x, event->xexpose.y,
-	      event->xexpose.width, event->xexpose.height,
-	      0);
-	    x_clear_under_internal_border (f);
-	  }
-
-
-	if (!FRAME_GARBAGED_P (f))
-	  {
-	    /* This seems to be needed for GTK 2.6 and later, see
-	       https://debbugs.gnu.org/cgi/bugreport.cgi?bug=15398.  */
-	    pgtk_clear_area (f,
-			  event->xexpose.x, event->xexpose.y,
-			  event->xexpose.width, event->xexpose.height);
-	    expose_frame (f, event->xexpose.x, event->xexpose.y,
-			  event->xexpose.width, event->xexpose.height);
-	    x_clear_under_internal_border (f);
-	  }
-
-	if (!FRAME_GARBAGED_P (f))
-	  show_back_buffer (f);
-      }
-    else
-      {
-	struct scroll_bar *bar;
-
-	bar = x_window_to_scroll_bar (event->xexpose.display,
-				      event->xexpose.window, 2);
-
-	if (bar)
-	  x_scroll_bar_expose (bar, event);
-      }
-#endif
-      break;
-
+  case GDK_EXPOSE:                PGTK_TRACE("GDK_EXPOSE"); break;
   case GDK_MOTION_NOTIFY:         PGTK_TRACE("GDK_MOTION_NOTIFY"); break;
   case GDK_BUTTON_PRESS:          PGTK_TRACE("GDK_BUTTON_PRESS"); break;
   case GDK_2BUTTON_PRESS:         PGTK_TRACE("GDK_2BUTTON_PRESS"); break;
@@ -4795,56 +4726,8 @@ pgtk_handle_event(GtkWidget *widget, GdkEvent *event, gpointer *data)
   case GDK_ENTER_NOTIFY:          PGTK_TRACE("GDK_ENTER_NOTIFY"); break;
   case GDK_LEAVE_NOTIFY:          PGTK_TRACE("GDK_LEAVE_NOTIFY"); break;
   case GDK_FOCUS_CHANGE:          PGTK_TRACE("GDK_FOCUS_CHANGE"); break;
-  case GDK_CONFIGURE:
-    PGTK_TRACE("GDK_CONFIGURE");
-    f = pgtk_any_window_to_frame (event->configure.window);
-    if (f) {
-      PGTK_TRACE("%dx%d", event->configure.width, event->configure.height);
-      xg_frame_resized(f, event->configure.width, event->configure.height);
-    }
-    break;
-
-  case GDK_MAP:
-    PGTK_TRACE("GDK_MAP");
-      f = pgtk_any_window_to_frame (event->any.window);
-      if (f)
-        {
-	  bool iconified = FRAME_ICONIFIED_P (f);
-
-#if 0
-          /* Check if fullscreen was specified before we where mapped the
-             first time, i.e. from the command line.  */
-          if (!f->output_data.pgtk->has_been_visible)
-	    {
-	      x_check_fullscreen (f);
-	    }
-#endif
-
-	  if (!iconified)
-	    {
-	      /* The `z-group' is reset every time a frame becomes
-		 invisible.  Handle this here.  */
-	      if (FRAME_Z_GROUP (f) == z_group_above)
-		x_set_z_group (f, Qabove, Qnil);
-	      else if (FRAME_Z_GROUP (f) == z_group_below)
-		x_set_z_group (f, Qbelow, Qnil);
-	    }
-
-          SET_FRAME_VISIBLE (f, 1);
-          SET_FRAME_ICONIFIED (f, false);
-          f->output_data.pgtk->has_been_visible = true;
-
-          if (iconified)
-            {
-              inev.ie.kind = DEICONIFY_EVENT;
-              XSETFRAME (inev.ie.frame_or_window, f);
-            }
-          else if (! NILP (Vframe_list) && ! NILP (XCDR (Vframe_list)))
-            /* Force a redisplay sooner or later to update the
-	       frame titles in case this is the second frame.  */
-            record_asynch_buffer_change ();
-        }
-    break;
+  case GDK_CONFIGURE:             PGTK_TRACE("GDK_CONFIGURE"); break;
+  case GDK_MAP:                   PGTK_TRACE("GDK_MAP"); break;
   case GDK_UNMAP:                 PGTK_TRACE("GDK_UNMAP"); break;
   case GDK_PROPERTY_NOTIFY:       PGTK_TRACE("GDK_PROPERTY_NOTIFY"); break;
   case GDK_SELECTION_CLEAR:       PGTK_TRACE("GDK_SELECTION_CLEAR"); break;
@@ -4861,30 +4744,7 @@ pgtk_handle_event(GtkWidget *widget, GdkEvent *event, gpointer *data)
   case GDK_CLIENT_EVENT:          PGTK_TRACE("GDK_CLIENT_EVENT"); break;
   case GDK_VISIBILITY_NOTIFY:     PGTK_TRACE("GDK_VISIBILITY_NOTIFY"); break;
   case GDK_SCROLL:                PGTK_TRACE("GDK_SCROLL"); break;
-  case GDK_WINDOW_STATE:
-    PGTK_TRACE("GDK_WINDOW_STATE");
-    f = pgtk_any_window_to_frame (event->window_state.window);
-    if (f && (event->window_state.changed_mask & GDK_WINDOW_STATE_ICONIFIED)) {
-      if (FRAME_ICONIFIED_P (f))
-	{
-	  /* Gnome shell does not iconify us when C-z is pressed.
-	     It hides the frame.  So if our state says we aren't
-	     hidden anymore, treat it as deiconified.  */
-	  SET_FRAME_VISIBLE (f, 1);
-	  SET_FRAME_ICONIFIED (f, false);
-	  f->output_data.pgtk->has_been_visible = true;
-	  inev.ie.kind = DEICONIFY_EVENT;
-	  XSETFRAME (inev.ie.frame_or_window, f);
-	}
-      else
-	{
-	  SET_FRAME_VISIBLE (f, 0);
-	  SET_FRAME_ICONIFIED (f, true);
-	  inev.ie.kind = ICONIFY_EVENT;
-	  XSETFRAME (inev.ie.frame_or_window, f);
-	}
-    }
-    break;
+  case GDK_WINDOW_STATE:          PGTK_TRACE("GDK_WINDOW_STATE"); break;
   case GDK_SETTING:               PGTK_TRACE("GDK_SETTING"); break;
   case GDK_OWNER_CHANGE:          PGTK_TRACE("GDK_OWNER_CHANGE"); break;
   case GDK_GRAB_BROKEN:           PGTK_TRACE("GDK_GRAB_BROKEN"); break;
@@ -4900,7 +4760,7 @@ pgtk_handle_event(GtkWidget *widget, GdkEvent *event, gpointer *data)
   case GDK_PAD_RING:              PGTK_TRACE("GDK_PAD_RING"); break;
   case GDK_PAD_STRIP:             PGTK_TRACE("GDK_PAD_STRIP"); break;
   case GDK_PAD_GROUP_MODE:        PGTK_TRACE("GDK_PAD_GROUP_MODE"); break;
-  default:                        PGTK_TRACE("%d", event->type);
+  default:                        PGTK_TRACE("GDK_EVENT %d", event->type);
   }
   return FALSE;
 }
@@ -5371,6 +5231,105 @@ static gboolean key_press_event(GtkWidget *widget, GdkEvent *event, gpointer *us
 static gboolean key_release_event(GtkWidget *widget, GdkEvent *event, gpointer *user_data)
 {
   PGTK_TRACE("key_release_event");
+  return TRUE;
+}
+
+static gboolean configure_event(GtkWidget *widget, GdkEvent *event, gpointer *user_data)
+{
+  struct frame *f = pgtk_any_window_to_frame (event->configure.window);
+  if (f) {
+    PGTK_TRACE("%dx%d", event->configure.width, event->configure.height);
+    xg_frame_resized(f, event->configure.width, event->configure.height);
+  }
+  return TRUE;
+}
+
+static gboolean map_event(GtkWidget *widget, GdkEvent *event, gpointer *user_data)
+{
+  struct frame *f = pgtk_any_window_to_frame (event->any.window);
+  union buffered_input_event inev;
+
+  PGTK_TRACE("map_event");
+
+  EVENT_INIT (inev.ie);
+  inev.ie.kind = NO_EVENT;
+  inev.ie.arg = Qnil;
+
+  if (f)
+    {
+      bool iconified = FRAME_ICONIFIED_P (f);
+
+#if 0
+      /* Check if fullscreen was specified before we where mapped the
+	 first time, i.e. from the command line.  */
+      if (!f->output_data.pgtk->has_been_visible)
+	{
+	  x_check_fullscreen (f);
+	}
+#endif
+
+      if (!iconified)
+	{
+	  /* The `z-group' is reset every time a frame becomes
+	     invisible.  Handle this here.  */
+	  if (FRAME_Z_GROUP (f) == z_group_above)
+	    x_set_z_group (f, Qabove, Qnil);
+	  else if (FRAME_Z_GROUP (f) == z_group_below)
+	    x_set_z_group (f, Qbelow, Qnil);
+	}
+
+      SET_FRAME_VISIBLE (f, 1);
+      SET_FRAME_ICONIFIED (f, false);
+      f->output_data.pgtk->has_been_visible = true;
+
+      if (iconified)
+	{
+	  inev.ie.kind = DEICONIFY_EVENT;
+	  XSETFRAME (inev.ie.frame_or_window, f);
+	}
+      else if (! NILP (Vframe_list) && ! NILP (XCDR (Vframe_list)))
+	/* Force a redisplay sooner or later to update the
+	   frame titles in case this is the second frame.  */
+	record_asynch_buffer_change ();
+    }
+
+  if (inev.ie.kind != NO_EVENT)
+    evq_enqueue(&inev);
+  return TRUE;
+}
+
+static gboolean window_state_event(GtkWidget *widget, GdkEvent *event, gpointer *user_data)
+{
+  struct frame *f = pgtk_any_window_to_frame (event->window_state.window);
+  union buffered_input_event inev;
+
+  EVENT_INIT (inev.ie);
+  inev.ie.kind = NO_EVENT;
+  inev.ie.arg = Qnil;
+
+  if (f && (event->window_state.changed_mask & GDK_WINDOW_STATE_ICONIFIED)) {
+    if (FRAME_ICONIFIED_P (f))
+      {
+	/* Gnome shell does not iconify us when C-z is pressed.
+	   It hides the frame.  So if our state says we aren't
+	   hidden anymore, treat it as deiconified.  */
+	SET_FRAME_VISIBLE (f, 1);
+	SET_FRAME_ICONIFIED (f, false);
+	f->output_data.pgtk->has_been_visible = true;
+	inev.ie.kind = DEICONIFY_EVENT;
+	XSETFRAME (inev.ie.frame_or_window, f);
+      }
+    else
+      {
+	SET_FRAME_VISIBLE (f, 0);
+	SET_FRAME_ICONIFIED (f, true);
+	inev.ie.kind = ICONIFY_EVENT;
+	XSETFRAME (inev.ie.frame_or_window, f);
+      }
+  }
+
+  if (inev.ie.kind != NO_EVENT)
+    evq_enqueue(&inev);
   return TRUE;
 }
 
@@ -6060,6 +6019,9 @@ pgtk_set_event_handler(struct frame *f)
   g_signal_connect(G_OBJECT(FRAME_GTK_WIDGET(f)), "button-release-event", G_CALLBACK(button_event), NULL);
   g_signal_connect(G_OBJECT(FRAME_GTK_WIDGET(f)), "scroll-event", G_CALLBACK(scroll_event), NULL);
   g_signal_connect(G_OBJECT(FRAME_GTK_WIDGET(f)), "selection-clear-event", G_CALLBACK(pgtk_selection_lost), NULL);
+  g_signal_connect(G_OBJECT(FRAME_GTK_WIDGET(f)), "configure-event", G_CALLBACK(configure_event), NULL);
+  g_signal_connect(G_OBJECT(FRAME_GTK_WIDGET(f)), "map-event", G_CALLBACK(map_event), NULL);
+  g_signal_connect(G_OBJECT(FRAME_GTK_WIDGET(f)), "window-state-event", G_CALLBACK(window_state_event), NULL);
   g_signal_connect(G_OBJECT(FRAME_GTK_WIDGET(f)), "event", G_CALLBACK(pgtk_handle_event), NULL);
   g_signal_connect(G_OBJECT(FRAME_GTK_WIDGET(f)), "draw", G_CALLBACK(pgtk_handle_draw), NULL);
 }
