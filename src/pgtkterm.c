@@ -5218,8 +5218,8 @@ static gboolean key_press_event(GtkWidget *widget, GdkEvent *event, gpointer *us
  done:
   if (inev.ie.kind != NO_EVENT)
     {
-      evq_enqueue (&inev);
       XSETFRAME (inev.ie.frame_or_window, f);
+      evq_enqueue (&inev);
       // count++;
     }
 
