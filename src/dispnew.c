@@ -4505,7 +4505,7 @@ scrolling_window (struct window *w, bool header_line_p)
 	       and thus the assigned row should always be enabled.  */
 	    eassert (to->enabled_p);
 	    PGTK_TRACE("[%d].enabled_p=false.", r->desired_vpos + j),
-	    from->enabled_p = false;  // ここ???????????? でも違うみたい?
+	    from->enabled_p = false;
 	    to->overlapped_p = to_overlapped_p;
 	  }
       }
