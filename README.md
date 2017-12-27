@@ -27,11 +27,7 @@ cd src
 GDK_BACKEND=wayland ./emacs  (or ./emacs -Q if you have problems.)
 ```
 
-Many many debugging outputs. Please ignore them.
-
 ## TODO
-
-- High: SIGPIPE while selecting region.
 
 - tooltip.
 - toolbar.
@@ -62,6 +58,22 @@ So, you may need to fix `Requires:` in `/usr/lib/pkgconfig/MagickWand-6.Q16HDRI.
 Requires: MagickCore-6.Q16HDRI
 ```
 
+## Debugging
+
+Edit src/pgtkterm.h to uncomment:
+
+```c
+#define PGTK_DEBUG 1
+```
+
+It enables many many debugging outputs.
+
+On gdb, you may want to do:
+
+```
+(gdb) handle SIGPIPE nostop noprint
+```
+
 ## My Environment
 
 - archlinux
@@ -74,7 +86,7 @@ Requires: MagickCore-6.Q16HDRI
 
 ## Notice
 
-Commit messages and comments in codes are in Japanese.
+Commit messages are in Japanese.
 
 ## About me
 
