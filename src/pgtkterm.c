@@ -4966,6 +4966,10 @@ static gboolean key_press_event(GtkWidget *widget, GdkEvent *event, gpointer *us
 
   PGTK_TRACE("key_press_event");
 
+  EVENT_INIT (inev.ie);
+  inev.ie.kind = NO_EVENT;
+  inev.ie.arg = Qnil;
+
 #if 0
   /* Dispatch KeyPress events when in menu.  */
   if (popup_activated ())
