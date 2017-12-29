@@ -6122,6 +6122,9 @@ pgtk_term_init (Lisp_Object display_name, char *resource_name)
       /* Try to not use interrupt input; start polling.  */
       Fset_input_interrupt_mode (Qt);
       x_cr_init_fringe (&pgtk_redisplay_interface);
+
+      baud_rate = 19200;
+
       ++x_initialized;
     }
 
