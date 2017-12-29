@@ -38,7 +38,9 @@ GNUstep port and post-20 update by Adrian Robert (arobert@cogsci.ucsd.edu)
 
 #define wx pgtk
 
+#if 0
 static Lisp_Object Vselection_alist;
+#endif
 
 static GQuark quark_data = 0;
 static GQuark quark_size = 0;
@@ -200,6 +202,7 @@ nil, it defaults to the selected frame.*/)
 
   cb = symbol_to_gtk_clipboard(FRAME_GTK_WIDGET(f), selection);
 
+#if 0
   {
     Lisp_Object old_value = assq_no_quit (selection, Vselection_alist);
     Lisp_Object new_value = list2 (selection, value);
@@ -209,6 +212,7 @@ nil, it defaults to the selected frame.*/)
     else
       Fsetcdr (old_value, Fcdr (new_value));
   }
+#endif
 
   /* We only support copy of text.  */
   target_symbol = QTEXT;
@@ -389,10 +393,14 @@ On PGTK, TIME-STAMP is unused.  */)
 
   cb = symbol_to_gtk_clipboard(FRAME_GTK_WIDGET(f), selection_symbol);
 
-  gchar *str = gtk_clipboard_wait_for_text(cb);
-  if (str == NULL)
+  gchar *s = gtk_clipboard_wait_for_text(cb);
+  if (s == NULL)
     return Qnil;
-  return make_unibyte_string (str, strlen(str));
+  int size = strlen(s);
+  Lisp_Object str = make_unibyte_string (s, size);
+  Fput_text_property (make_number (0), make_number (size),
+		      Qforeign_selection, QUTF8_STRING, str);
+  return str;
 }
 
 
@@ -413,14 +421,19 @@ syms_of_pgtkselect (void)
   DEFSYM (QFILE_NAME, "FILE_NAME");
   DEFSYM (QMULTIPLE, "MULTIPLE");
 
+  DEFSYM (Qforeign_selection, "foreign-selection");
+  DEFSYM (QUTF8_STRING, "UTF8_STRING");
+
   defsubr (&Spgtk_disown_selection_internal);
   defsubr (&Spgtk_get_selection_internal);
   defsubr (&Spgtk_own_selection_internal);
   defsubr (&Spgtk_selection_exists_p);
   defsubr (&Spgtk_selection_owner_p);
 
+#if 0
   Vselection_alist = Qnil;
   staticpro (&Vselection_alist);
+#endif
 
   DEFVAR_LISP ("pgtk-sent-selection-hooks", Vpgtk_sent_selection_hooks,
                "A list of functions to be called when Emacs answers a selection request.\n\
