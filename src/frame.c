@@ -5535,7 +5535,7 @@ selected frame.  This is useful when `make-pointer-invisible' is set.  */)
 
 #ifdef HAVE_WINDOW_SYSTEM
 
-# if (defined HAVE_NS \
+# if (defined HAVE_NS || defined HAVE_PGTK \
       || (!defined USE_GTK && (defined HAVE_XINERAMA || defined HAVE_XRANDR)))
 void
 free_monitors (struct MonitorInfo *monitors, int n_monitors)

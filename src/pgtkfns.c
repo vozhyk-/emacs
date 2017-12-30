@@ -2506,46 +2506,6 @@ each physical monitor, use `display-monitor-attributes-list'.  */)
   return make_number (x_display_pixel_height (dpyinfo));
 }
 
-static Lisp_Object
-pgtk_make_monitor_attribute_list (struct MonitorInfo *monitors,
-                                int n_monitors,
-                                int primary_monitor,
-                                const char *source)
-{
-#if 0
-  Lisp_Object monitor_frames = Fmake_vector (make_number (n_monitors), Qnil);
-  Lisp_Object frame, rest;
-  NSArray *screens = [NSScreen screens];
-  int i;
-
-  FOR_EACH_FRAME (rest, frame)
-    {
-      struct frame *f = XFRAME (frame);
-
-      if (FRAME_PGTK_P (f))
-	{
-          NSView *view = FRAME_PGTK_VIEW (f);
-          NSScreen *screen = [[view window] screen];
-          NSUInteger k;
-
-          i = -1;
-          for (k = 0; i == -1 && k < [screens count]; ++k)
-            {
-              if ([screens objectAtIndex: k] == screen)
-                i = (int)k;
-            }
-
-          if (i > -1)
-            ASET (monitor_frames, i, Fcons (frame, AREF (monitor_frames, i)));
-	}
-    }
-
-  return make_monitor_attribute_list (monitors, n_monitors, primary_monitor,
-                                      monitor_frames, source);
-#endif
-  return Qnil;
-}
-
 DEFUN ("pgtk-display-monitor-attributes-list",
        Fpgtk_display_monitor_attributes_list,
        Spgtk_display_monitor_attributes_list,
@@ -2556,106 +2516,95 @@ The optional argument TERMINAL specifies which display to ask about.
 TERMINAL should be a terminal object, a frame or a display name (a string).
 If omitted or nil, that stands for the selected frame's display.
 
-In addition to the standard attribute keys listed in
-`display-monitor-attributes-list', the following keys are contained in
-the attributes:
-
- source -- String describing the source from which multi-monitor
-	   information is obtained, \"NS\" is always the source."
-
 Internal use only, use `display-monitor-attributes-list' instead.  */)
   (Lisp_Object terminal)
 {
-#if 0
   struct terminal *term = decode_live_terminal (terminal);
-  NSArray *screens;
-  NSUInteger i, n_monitors;
+  GdkDisplay *gdpy = DEFAULT_GDK_DISPLAY();
+  GdkMonitor **gmons;
+  int i, n_monitors, primary_index;
   struct MonitorInfo *monitors;
-  Lisp_Object attributes_list = Qnil;
-  CGFloat primary_display_height = 0;
+  Lisp_Object monitor_frames = Qnil;
+  Lisp_Object frame = Qnil, rest = Qnil;
+  Lisp_Object rv = Qnil;
 
-  if (term->type != output_ns)
+  if (term->type != output_pgtk)
     return Qnil;
 
-  screens = [NSScreen screens];
-  n_monitors = [screens count];
+  gdpy = DEFAULT_GDK_DISPLAY();
+
+  n_monitors = gdk_display_get_n_monitors(gdpy);
   if (n_monitors == 0)
     return Qnil;
 
+  gmons = xmalloc(sizeof *gmons * n_monitors);
+  for (i = 0; i < n_monitors; i++)
+    gmons[i] = gdk_display_get_monitor(gdpy, i);
+
   monitors = xzalloc (n_monitors * sizeof *monitors);
+  for (i = 0; i < n_monitors; i++) {
+    struct MonitorInfo *mon = &monitors[i];
+    GdkMonitor *gmon = gmons[i];
+    if (gmon != NULL) {
+      GdkRectangle geom;
+      gdk_monitor_get_geometry(gmon, &geom);
+      mon->geom.x = geom.x;
+      mon->geom.y = geom.y;
+      mon->geom.width = geom.width;
+      mon->geom.height = geom.height;
 
-  for (i = 0; i < [screens count]; ++i)
+      gdk_monitor_get_workarea(gmon, &geom);
+      mon->work.x = geom.x;
+      mon->work.y = geom.y;
+      mon->work.width = geom.width;
+      mon->work.height = geom.height;
+
+      mon->mm_width = gdk_monitor_get_width_mm(gmon);
+      mon->mm_height = gdk_monitor_get_height_mm(gmon);
+
+      mon->name = g_strdup(gdk_monitor_get_model(gmon));
+    }
+  }
+
+  monitor_frames = Fmake_vector (make_number (n_monitors), Qnil);
+  FOR_EACH_FRAME (rest, frame)
     {
-      NSScreen *s = [screens objectAtIndex:i];
-      struct MonitorInfo *m = &monitors[i];
-      NSRect fr = [s frame];
-      NSRect vfr = [s visibleFrame];
-      short y, vy;
+      struct frame *f = XFRAME (frame);
 
-#ifdef PGTK_IMPL_COCOA
-      NSDictionary *dict = [s deviceDescription];
-      NSNumber *nid = [dict objectForKey:@"NSScreenNumber"];
-      CGDirectDisplayID did = [nid unsignedIntValue];
-#endif
-      if (i == 0)
-        {
-          primary_display_height = fr.size.height;
-          y = (short) fr.origin.y;
-          vy = (short) vfr.origin.y;
-        }
-      else
-        {
-          // Flip y coordinate as NS has y starting from the bottom.
-          y = (short) (primary_display_height - fr.size.height - fr.origin.y);
-          vy = (short) (primary_display_height -
-                        vfr.size.height - vfr.origin.y);
-        }
+      if (FRAME_PGTK_P (f))
+	{
+	  GtkWidget *widget = FRAME_GTK_WIDGET(f);
+	  GdkMonitor *gmon = gdk_display_get_monitor_at_window(gdpy, gtk_widget_get_window(widget));
 
-      m->geom.x = (short) fr.origin.x;
-      m->geom.y = y;
-      m->geom.width = (unsigned short) fr.size.width;
-      m->geom.height = (unsigned short) fr.size.height;
-
-      m->work.x = (short) vfr.origin.x;
-      // y is flipped on NS, so vy - y are pixels missing at the bottom,
-      // and fr.size.height - vfr.size.height are pixels missing in total.
-      // Pixels missing at top are
-      // fr.size.height - vfr.size.height - vy + y.
-      // work.y is then pixels missing at top + y.
-      m->work.y = (short) (fr.size.height - vfr.size.height) - vy + y + y;
-      m->work.width = (unsigned short) vfr.size.width;
-      m->work.height = (unsigned short) vfr.size.height;
-
-#ifdef PGTK_IMPL_COCOA
-      m->name = pgtk_screen_name (did);
-
-      {
-        CGSize mms = CGDisplayScreenSize (did);
-        m->mm_width = (int) mms.width;
-        m->mm_height = (int) mms.height;
-      }
-
-#else
-      // Assume 92 dpi as x-display-mm-height/x-display-mm-width does.
-      m->mm_width = (int) (25.4 * fr.size.width / 92.0);
-      m->mm_height = (int) (25.4 * fr.size.height / 92.0);
-#endif
+          for (i = 0; i < n_monitors; i++) {
+	    if (gmons[i] == gmon) {
+	      ASET (monitor_frames, i, Fcons (frame, AREF (monitor_frames, i)));
+	      break;
+	    }
+	  }
+	}
     }
 
-  // Primary monitor is always first for NS.
-  attributes_list = pgtk_make_monitor_attribute_list (monitors, n_monitors,
-                                                    0, "NS");
+  primary_index = -1;
+  for (i = 0; i < n_monitors; i++) {
+    if (gdk_monitor_is_primary(gmons[i])) {
+      primary_index = i;
+      break;
+    }
+  }
 
-  free_monitors (monitors, n_monitors);
-  return attributes_list;
-#endif
-  return Qnil;
+  rv = make_monitor_attribute_list(monitors, n_monitors, primary_index, monitor_frames, "Gdk");
+
+  free_monitors(monitors, n_monitors);
+  xfree(gmons);
+
+  return rv;
 }
 
 
 DEFUN ("x-display-planes", Fx_display_planes, Sx_display_planes,
        0, 1, 0,
-       doc: /* Return the number of bitplanes of the Nextstep display TERMINAL.
+       doc: /* Return the number of bitplanes of the display TERMINAL.
 The optional argument TERMINAL specifies which display to ask about.
 TERMINAL should be a terminal object, a frame or a display name (a string).
 If omitted or nil, that stands for the selected frame's display.  */)
