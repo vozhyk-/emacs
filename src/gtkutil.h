@@ -165,7 +165,11 @@ extern void xg_frame_set_char_size (struct frame *f, int width, int height);
 extern GtkWidget * xg_win_to_widget (Display *dpy, Window wdesc);
 
 extern int xg_get_scale (struct frame *f);
+#ifndef HAVE_PGTK
 extern void xg_display_open (char *display_name, Display **dpy);
+#else
+extern void xg_display_open (char *display_name, GdkDisplay **dpy);
+#endif
 extern void xg_display_close (Display *dpy);
 extern GdkCursor * xg_create_default_cursor (Display *dpy);
 

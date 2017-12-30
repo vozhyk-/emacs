@@ -2124,7 +2124,7 @@ for each physical monitor, use `display-monitor-attributes-list'.  */)
   (Lisp_Object terminal)
 {
   struct pgtk_display_info *dpyinfo = check_pgtk_display_info (terminal);
-  GdkDisplay *gdpy = DEFAULT_GDK_DISPLAY();
+  GdkDisplay *gdpy = dpyinfo->gdpy;
   GdkMonitor *gmon = gdk_display_get_monitor_at_point(gdpy, 0, 0);
   return make_number (gdk_monitor_get_height_mm(gmon));
 }
@@ -2142,7 +2142,7 @@ for each physical monitor, use `display-monitor-attributes-list'.  */)
   (Lisp_Object terminal)
 {
   struct pgtk_display_info *dpyinfo = check_pgtk_display_info (terminal);
-  GdkDisplay *gdpy = DEFAULT_GDK_DISPLAY();
+  GdkDisplay *gdpy = dpyinfo->gdpy;
   GdkMonitor *gmon = gdk_display_get_monitor_at_point(gdpy, 0, 0);
   return make_number (gdk_monitor_get_width_mm(gmon));
 }
@@ -2522,7 +2522,8 @@ Internal use only, use `display-monitor-attributes-list' instead.  */)
   (Lisp_Object terminal)
 {
   struct terminal *term = decode_live_terminal (terminal);
-  GdkDisplay *gdpy = DEFAULT_GDK_DISPLAY();
+  struct pgtk_display_info *dpyinfo = check_pgtk_display_info (terminal);
+  GdkDisplay *gdpy = dpyinfo->gdpy;
   GdkMonitor **gmons;
   int i, n_monitors, primary_index;
   struct MonitorInfo *monitors;
@@ -2532,8 +2533,6 @@ Internal use only, use `display-monitor-attributes-list' instead.  */)
 
   if (term->type != output_pgtk)
     return Qnil;
-
-  gdpy = DEFAULT_GDK_DISPLAY();
 
   n_monitors = gdk_display_get_n_monitors(gdpy);
   if (n_monitors == 0)

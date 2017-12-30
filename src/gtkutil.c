@@ -198,7 +198,11 @@ xg_set_screen (GtkWidget *w, struct frame *f)
    multiple displays.  */
 
 void
+#ifndef HAVE_PGTK
 xg_display_open (char *display_name, Display **dpy)
+#else
+xg_display_open (char *display_name, GdkDisplay **dpy)
+#endif
 {
   GdkDisplay *gdpy;
 
@@ -212,7 +216,11 @@ xg_display_open (char *display_name, Display **dpy)
 					       gdpy);
     }
 
+#ifndef HAVE_PGTK
   *dpy = gdpy ? GDK_DISPLAY_XDISPLAY (gdpy) : NULL;
+#else
+  *dpy = gdpy;
+#endif
 }
 
 /* Scaling/HiDPI functions. */

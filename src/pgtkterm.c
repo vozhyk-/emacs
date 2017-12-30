@@ -6150,7 +6150,7 @@ static int pgtk_detect_connection(GdkDisplay *gdpy)
 struct pgtk_display_info *
 pgtk_term_init (Lisp_Object display_name, char *resource_name)
 {
-  Display *dpy;
+  GdkDisplay *dpy;
   struct terminal *terminal;
   struct pgtk_display_info *dpyinfo;
   static int x_initialized = 0;
@@ -6160,10 +6160,8 @@ pgtk_term_init (Lisp_Object display_name, char *resource_name)
 
   if (!x_initialized)
     {
-      /* Try to not use interrupt input; start polling.  */
       Fset_input_interrupt_mode (Qt);
       x_cr_init_fringe (&pgtk_redisplay_interface);
-
       baud_rate = 19200;
 
       ++x_initialized;
@@ -6233,32 +6231,7 @@ pgtk_term_init (Lisp_Object display_name, char *resource_name)
         xg_initialize ();
 
         dpy = DEFAULT_GDK_DISPLAY ();
-
-#if ! GTK_CHECK_VERSION (2, 90, 0)
-        /* Load our own gtkrc if it exists.  */
-        {
-          const char *file = "~/.emacs.d/gtkrc";
-          Lisp_Object s, abs_file;
-
-          s = build_string (file);
-          abs_file = Fexpand_file_name (s, Qnil);
-
-          if (! NILP (abs_file) && !NILP (Ffile_readable_p (abs_file)))
-            gtk_rc_parse (SSDATA (abs_file));
-        }
-#endif
-
-#if 0
-        XSetErrorHandler (x_error_handler);
-        XSetIOErrorHandler (x_io_error_quitter);
-#endif
       }
-  }
-
-  conn_fd = pgtk_detect_connection(DEFAULT_GDK_DISPLAY());
-  if (conn_fd < 0) {
-    unblock_input();
-    return 0;
   }
 
   /* Detect failure.  */
@@ -6267,6 +6240,12 @@ pgtk_term_init (Lisp_Object display_name, char *resource_name)
       unblock_input ();
       return 0;
     }
+
+  conn_fd = pgtk_detect_connection(dpy);
+  if (conn_fd < 0) {
+    unblock_input();
+    return 0;
+  }
 
   /* We have definitely succeeded.  Record the new connection.  */
 
@@ -6321,9 +6300,7 @@ pgtk_term_init (Lisp_Object display_name, char *resource_name)
   x_display_list = dpyinfo;
 
   dpyinfo->name_list_element = Fcons (display_name, Qnil);
-#if 0
-  dpyinfo->display = dpy;
-#endif
+  dpyinfo->gdpy = dpy;
   dpyinfo->connection = conn_fd;
 
   /* https://lists.gnu.org/r/emacs-devel/2015-11/msg00194.html  */

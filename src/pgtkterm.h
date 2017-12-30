@@ -163,6 +163,9 @@ struct pgtk_display_info
   /* The generic display parameters corresponding to this PGTK display. */
   struct terminal *terminal;
 
+  /* This says how to access this display in Gdk.  */
+  GdkDisplay *gdpy;
+
   /* A connection number (file descriptor) for the display.  */
   int connection;
 
