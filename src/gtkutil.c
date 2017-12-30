@@ -1323,10 +1323,12 @@ xg_create_frame_widgets (struct frame *f)
                           SSDATA (Vx_resource_class));
 #endif
 
+#ifndef HAVE_PGTK
   /* Add callback to do nothing on WM_DELETE_WINDOW.  The default in
      GTK is to destroy the widget.  We want Emacs to do that instead.  */
   g_signal_connect (G_OBJECT (wtop), "delete-event",
                     G_CALLBACK (delete_cb), f);
+#endif
 
   /* Convert our geometry parameters into a geometry string
      and specify it.

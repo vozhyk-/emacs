@@ -367,37 +367,59 @@ x_iconify_frame (struct frame *f)
    -------------------------------------------------------------------------- */
 {
   PGTK_TRACE("x_iconify_frame");
+
+  /* Don't keep the highlight on an invisible frame.  */
+  if (FRAME_DISPLAY_INFO (f)->x_highlight_frame == f)
+    FRAME_DISPLAY_INFO (f)->x_highlight_frame = 0;
+
+  if (FRAME_ICONIFIED_P (f))
+    return;
+
+  block_input ();
+
 #if 0
-  NSView *view;
-  struct ns_display_info *dpyinfo;
+  x_set_bitmap_icon (f);
+#endif
 
-  NSTRACE ("x_iconify_frame");
-  check_window_system (f);
-  view = FRAME_NS_VIEW (f);
-  dpyinfo = FRAME_DISPLAY_INFO (f);
-
-  if (dpyinfo->x_highlight_frame == f)
-    dpyinfo->x_highlight_frame = 0;
-
-  if ([[view window] windowNumber] <= 0)
+  if (FRAME_GTK_OUTER_WIDGET (f))
     {
-      /* the window is still deferred.  Make it very small, bring it
-         on screen and order it out. */
-      NSRect s = { { 100, 100}, {0, 0} };
-      NSRect t;
-      t = [[view window] frame];
-      [[view window] setFrame: s display: NO];
-      [[view window] orderBack: NSApp];
-      [[view window] orderOut: NSApp];
-      [[view window] setFrame: t display: NO];
+      if (! FRAME_VISIBLE_P (f))
+        gtk_widget_show_all (FRAME_GTK_OUTER_WIDGET (f));
+
+      gtk_window_iconify (GTK_WINDOW (FRAME_GTK_OUTER_WIDGET (f)));
+      SET_FRAME_VISIBLE (f, 0);
+      SET_FRAME_ICONIFIED (f, true);
+      unblock_input ();
+      return;
     }
 
-  /* Processing input while Emacs is being minimized can cause a
-     crash, so block it for the duration. */
-  block_input();
-  [[view window] miniaturize: NSApp];
-  unblock_input();
+  /* Make sure the X server knows where the window should be positioned,
+     in case the user deiconifies with the window manager.  */
+  if (! FRAME_VISIBLE_P (f)
+      && ! FRAME_ICONIFIED_P (f)
+#if 0
+      && ! FRAME_X_EMBEDDED_P (f)
 #endif
+      )
+    x_set_offset (f, f->left_pos, f->top_pos, 0);
+
+#if 0
+  if (!FRAME_VISIBLE_P (f))
+    {
+      /* If the frame was withdrawn, before, we must map it.  */
+      XMapRaised (FRAME_X_DISPLAY (f), FRAME_X_WINDOW (f));
+    }
+#endif
+
+  SET_FRAME_ICONIFIED (f, true);
+  SET_FRAME_VISIBLE (f, 0);
+
+#if 0
+  XFlush (FRAME_X_DISPLAY (f));
+#else
+  gdk_flush();
+#endif
+  unblock_input ();
 }
 
 void
@@ -5311,25 +5333,42 @@ static gboolean window_state_event(GtkWidget *widget, GdkEvent *event, gpointer 
   inev.ie.kind = NO_EVENT;
   inev.ie.arg = Qnil;
 
-  if (f && (event->window_state.changed_mask & GDK_WINDOW_STATE_ICONIFIED)) {
-    if (FRAME_ICONIFIED_P (f))
+  if (f) {
+    if (event->window_state.new_window_state & GDK_WINDOW_STATE_FOCUSED)
       {
-	/* Gnome shell does not iconify us when C-z is pressed.
-	   It hides the frame.  So if our state says we aren't
-	   hidden anymore, treat it as deiconified.  */
-	SET_FRAME_VISIBLE (f, 1);
-	SET_FRAME_ICONIFIED (f, false);
-	f->output_data.pgtk->has_been_visible = true;
-	inev.ie.kind = DEICONIFY_EVENT;
-	XSETFRAME (inev.ie.frame_or_window, f);
+	if (FRAME_ICONIFIED_P (f))
+	  {
+	    /* Gnome shell does not iconify us when C-z is pressed.
+	       It hides the frame.  So if our state says we aren't
+	       hidden anymore, treat it as deiconified.  */
+	    SET_FRAME_VISIBLE (f, 1);
+	    SET_FRAME_ICONIFIED (f, false);
+	    f->output_data.pgtk->has_been_visible = true;
+	    inev.ie.kind = DEICONIFY_EVENT;
+	    XSETFRAME (inev.ie.frame_or_window, f);
+	  }
       }
-    else
-      {
-	SET_FRAME_VISIBLE (f, 0);
-	SET_FRAME_ICONIFIED (f, true);
-	inev.ie.kind = ICONIFY_EVENT;
-	XSETFRAME (inev.ie.frame_or_window, f);
-      }
+  }
+
+  if (inev.ie.kind != NO_EVENT)
+    evq_enqueue(&inev);
+  return TRUE;
+}
+
+static gboolean delete_event(GtkWidget *widget, GdkEvent *event, gpointer *user_data)
+{
+  struct frame *f = pgtk_any_window_to_frame (event->any.window);
+  union buffered_input_event inev;
+
+  PGTK_TRACE("delete_event");
+
+  EVENT_INIT (inev.ie);
+  inev.ie.kind = NO_EVENT;
+  inev.ie.arg = Qnil;
+
+  if (f) {
+    inev.ie.kind = DELETE_WINDOW_EVENT;
+    XSETFRAME (inev.ie.frame_or_window, f);
   }
 
   if (inev.ie.kind != NO_EVENT)
@@ -6011,6 +6050,9 @@ scroll_event(GtkWidget *widget, GdkEvent *event, gpointer *user_data)
 void
 pgtk_set_event_handler(struct frame *f)
 {
+  g_signal_connect(G_OBJECT(FRAME_GTK_OUTER_WIDGET(f)), "window-state-event", G_CALLBACK(window_state_event), NULL);
+  g_signal_connect(G_OBJECT(FRAME_GTK_OUTER_WIDGET(f)), "delete-event", G_CALLBACK(delete_event), NULL);
+
   g_signal_connect(G_OBJECT(FRAME_GTK_WIDGET(f)), "size-allocate", G_CALLBACK(size_allocate), NULL);
   g_signal_connect(G_OBJECT(FRAME_GTK_WIDGET(f)), "key-press-event", G_CALLBACK(key_press_event), NULL);
   g_signal_connect(G_OBJECT(FRAME_GTK_WIDGET(f)), "key-release-event", G_CALLBACK(key_release_event), NULL);
@@ -6025,7 +6067,6 @@ pgtk_set_event_handler(struct frame *f)
   g_signal_connect(G_OBJECT(FRAME_GTK_WIDGET(f)), "selection-clear-event", G_CALLBACK(pgtk_selection_lost), NULL);
   g_signal_connect(G_OBJECT(FRAME_GTK_WIDGET(f)), "configure-event", G_CALLBACK(configure_event), NULL);
   g_signal_connect(G_OBJECT(FRAME_GTK_WIDGET(f)), "map-event", G_CALLBACK(map_event), NULL);
-  g_signal_connect(G_OBJECT(FRAME_GTK_WIDGET(f)), "window-state-event", G_CALLBACK(window_state_event), NULL);
   g_signal_connect(G_OBJECT(FRAME_GTK_WIDGET(f)), "event", G_CALLBACK(pgtk_handle_event), NULL);
   g_signal_connect(G_OBJECT(FRAME_GTK_WIDGET(f)), "draw", G_CALLBACK(pgtk_handle_draw), NULL);
 }

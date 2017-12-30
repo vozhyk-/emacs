@@ -3906,7 +3906,7 @@ kbd_buffer_get_event (KBOARD **kbp,
 #endif
 
 #if defined (HAVE_X11) || defined (HAVE_NTGUI) \
-    || defined (HAVE_NS)
+  || defined (HAVE_NS) || defined (HAVE_PGTK)
       else if (event->kind == DELETE_WINDOW_EVENT)
 	{
 	  /* Make an event (delete-frame (FRAME)).  */
@@ -3925,7 +3925,7 @@ kbd_buffer_get_event (KBOARD **kbp,
 #endif
 
 #if defined (HAVE_X11) || defined (HAVE_NTGUI) \
-    || defined (HAVE_NS)
+  || defined (HAVE_NS) || defined (HAVE_PGTK)
       else if (event->kind == ICONIFY_EVENT)
 	{
 	  /* Make an event (iconify-frame (FRAME)).  */
@@ -4061,7 +4061,7 @@ kbd_buffer_get_event (KBOARD **kbp,
 	  kbd_fetch_ptr = event + 1;
 	}
 #endif
-#if defined (HAVE_X11) || defined (HAVE_NTGUI) || defined (HAVE_NS)
+#if defined (HAVE_X11) || defined (HAVE_NTGUI) || defined (HAVE_NS) || defined (HAVE_PGTK)
       else if (event->kind == MOVE_FRAME_EVENT)
 	{
 	  /* Make an event (move-frame (FRAME)).  */
