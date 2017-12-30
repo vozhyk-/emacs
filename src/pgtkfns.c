@@ -2576,10 +2576,12 @@ Internal use only, use `display-monitor-attributes-list' instead.  */)
 	  GtkWidget *widget = FRAME_GTK_WIDGET(f);
 	  GdkMonitor *gmon = gdk_display_get_monitor_at_window(gdpy, gtk_widget_get_window(widget));
 
-          for (i = 0; i < n_monitors; i++) {
-	    if (gmons[i] == gmon) {
-	      ASET (monitor_frames, i, Fcons (frame, AREF (monitor_frames, i)));
-	      break;
+	  if (gmon != NULL) {
+	    for (i = 0; i < n_monitors; i++) {
+	      if (gmons[i] == gmon) {
+		ASET (monitor_frames, i, Fcons (frame, AREF (monitor_frames, i)));
+		break;
+	      }
 	    }
 	  }
 	}
@@ -2587,7 +2589,7 @@ Internal use only, use `display-monitor-attributes-list' instead.  */)
 
   primary_index = -1;
   for (i = 0; i < n_monitors; i++) {
-    if (gdk_monitor_is_primary(gmons[i])) {
+    if (gmons[i] != NULL && gdk_monitor_is_primary(gmons[i])) {
       primary_index = i;
       break;
     }
