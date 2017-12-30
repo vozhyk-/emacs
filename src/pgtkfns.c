@@ -61,12 +61,6 @@ static const char *pgtk_app_name = "pgtk_app_name:Emacs";
 
    ========================================================================== */
 
-
-/* Let the user specify a Nextstep display with a Lisp object.
-   OBJECT may be nil, a frame or a terminal object.
-   nil stands for the selected frame--or, if that is not a Nextstep frame,
-   the first Nextstep display on the list.  */
-
 static struct pgtk_display_info *
 check_pgtk_display_info (Lisp_Object object)
 {
@@ -81,14 +75,14 @@ check_pgtk_display_info (Lisp_Object object)
       else if (x_display_list != 0)
 	dpyinfo = x_display_list;
       else
-        error ("Nextstep windows are not in use or not initialized");
+        error ("Frames are not in use or not initialized");
     }
   else if (TERMINALP (object))
     {
       struct terminal *t = decode_live_terminal (object);
 
-      if (t->type != output_ns)
-        error ("Terminal %d is not a Nextstep display", t->id);
+      if (t->type != output_pgtk)
+        error ("Terminal %d is not a display", t->id);
 
       dpyinfo = t->display_info.pgtk;
     }
@@ -135,7 +129,7 @@ pgtk_display_info_for_name (Lisp_Object name)
     if (!NILP (Fstring_equal (XCAR (dpyinfo->name_list_element), name)))
       return dpyinfo;
 
-  error ("Emacs for Nextstep does not yet support multi-display");
+  error ("Emacs for PGTK does not yet support multi-display");
 
   Fx_open_connection (name, Qnil, Qnil);
   dpyinfo = x_display_list;
@@ -856,9 +850,6 @@ x_set_cursor_type (struct frame *f, Lisp_Object arg, Lisp_Object oldval)
 static void
 x_set_mouse_color (struct frame *f, Lisp_Object arg, Lisp_Object oldval)
 {
-#if 0
-  /* don't think we can do this on Nextstep */
-#endif
 }
 
 
@@ -2060,14 +2051,14 @@ DEFUN ("x-server-max-request-size", Fx_server_max_request_size,
      (Lisp_Object terminal)
 {
   check_pgtk_display_info (terminal);
-  /* This function has no real equivalent under NeXTstep.  Return nil to
+  /* This function has no real equivalent under PGTK.  Return nil to
      indicate this. */
   return Qnil;
 }
 
 
 DEFUN ("x-server-vendor", Fx_server_vendor, Sx_server_vendor, 0, 1, 0,
-       doc: /* Return the "vendor ID" string of Nextstep display server TERMINAL.
+       doc: /* Return the "vendor ID" string of the display server TERMINAL.
 \(Labeling every distributor as a "vendor" embodies the false assumption
 that operating systems cannot be developed and distributed noncommercially.)
 The optional argument TERMINAL specifies which display to ask about.
@@ -2107,14 +2098,13 @@ If omitted or nil, that stands for the selected frame's display.  */)
 
 
 DEFUN ("x-display-screens", Fx_display_screens, Sx_display_screens, 0, 1, 0,
-       doc: /* Return the number of screens on Nextstep display server TERMINAL.
+       doc: /* Return the number of screens on the display server TERMINAL.
 The optional argument TERMINAL specifies which display to ask about.
 TERMINAL should be a terminal object, a frame or a display name (a string).
 If omitted or nil, that stands for the selected frame's display.
 
-Note: "screen" here is not in Nextstep terminology but in X11's.  For
-the number of physical monitors, use `(length
-\(display-monitor-attributes-list TERMINAL))' instead.  */)
+Note: "screen" here is not in X11's.  For the number of physical monitors,
+ use `(length \(display-monitor-attributes-list TERMINAL))' instead.  */)
   (Lisp_Object terminal)
 {
   check_pgtk_display_info (terminal);
@@ -2123,7 +2113,7 @@ the number of physical monitors, use `(length
 
 
 DEFUN ("x-display-mm-height", Fx_display_mm_height, Sx_display_mm_height, 0, 1, 0,
-       doc: /* Return the height in millimeters of the Nextstep display TERMINAL.
+       doc: /* Return the height in millimeters of the the display TERMINAL.
 The optional argument TERMINAL specifies which display to ask about.
 TERMINAL should be a terminal object, a frame or a display name (a string).
 If omitted or nil, that stands for the selected frame's display.
@@ -2140,7 +2130,7 @@ for each physical monitor, use `display-monitor-attributes-list'.  */)
 
 
 DEFUN ("x-display-mm-width", Fx_display_mm_width, Sx_display_mm_width, 0, 1, 0,
-       doc: /* Return the width in millimeters of the Nextstep display TERMINAL.
+       doc: /* Return the width in millimeters of the the display TERMINAL.
 The optional argument TERMINAL specifies which display to ask about.
 TERMINAL should be a terminal object, a frame or a display name (a string).
 If omitted or nil, that stands for the selected frame's display.
@@ -2158,7 +2148,7 @@ for each physical monitor, use `display-monitor-attributes-list'.  */)
 
 DEFUN ("x-display-backing-store", Fx_display_backing_store,
        Sx_display_backing_store, 0, 1, 0,
-       doc: /* Return an indication of whether the Nextstep display TERMINAL does backing store.
+       doc: /* Return an indication of whether the the display TERMINAL does backing store.
 The value may be `buffered', `retained', or `non-retained'.
 The optional argument TERMINAL specifies which display to ask about.
 TERMINAL should be a terminal object, a frame or a display name (a string).
@@ -2185,36 +2175,18 @@ If omitted or nil, that stands for the selected frame's display.  */)
 
 DEFUN ("x-display-visual-class", Fx_display_visual_class,
        Sx_display_visual_class, 0, 1, 0,
-       doc: /* Return the visual class of the Nextstep display TERMINAL.
+       doc: /* Return the visual class of the the display TERMINAL.
 The value is one of the symbols `static-gray', `gray-scale',
 `static-color', `pseudo-color', `true-color', or `direct-color'.
 
 The optional argument TERMINAL specifies which display to ask about.
 TERMINAL should a terminal object, a frame or a display name (a string).
-If omitted or nil, that stands for the selected frame's display.  */)
+If omitted or nil, that stands for the selected frame's display.
+
+On PGTK, always return true-color.  */)
   (Lisp_Object terminal)
 {
-#if 0
-  PGTKWindowDepth depth;
-
-  check_pgtk_display_info (terminal);
-  depth = [[[NSScreen screens] objectAtIndex:0] depth];
-
-  if ( depth == NSBestDepth (NSCalibratedWhiteColorSpace, 2, 2, YES, NULL))
-    return intern ("static-gray");
-  else if (depth == NSBestDepth (NSCalibratedWhiteColorSpace, 8, 8, YES, NULL))
-    return intern ("gray-scale");
-  else if ( depth == NSBestDepth (NSCalibratedRGBColorSpace, 8, 8, YES, NULL))
-    return intern ("pseudo-color");
-  else if ( depth == NSBestDepth (NSCalibratedRGBColorSpace, 4, 12, NO, NULL))
-    return intern ("true-color");
-  else if ( depth == NSBestDepth (NSCalibratedRGBColorSpace, 8, 24, NO, NULL))
-    return intern ("direct-color");
-  else
-    /* color mgmt as far as we do it is really handled by Nextstep itself anyway */
-    return intern ("direct-color");
-#endif
-  return intern ("direct-color");
+  return intern ("true-color");
 }
 
 
@@ -2251,8 +2223,7 @@ DEFUN ("x-open-connection", Fx_open_connection, Sx_open_connection,
 DISPLAY is the name of the display to connect to.
 Optional second arg XRM-STRING is a string of resources in xrdb format.
 If the optional third arg MUST-SUCCEED is non-nil,
-terminate Emacs if we can't open the connection.
-\(In the Nextstep version, the last two arguments are currently ignored.)  */)
+terminate Emacs if we can't open the connection.  */)
      (Lisp_Object display, Lisp_Object resource_string, Lisp_Object must_succeed)
 {
   struct pgtk_display_info *dpyinfo;
@@ -2277,7 +2248,7 @@ terminate Emacs if we can't open the connection.
 
 DEFUN ("x-close-connection", Fx_close_connection, Sx_close_connection,
        1, 1, 0,
-       doc: /* Close the connection to TERMINAL's Nextstep display server.
+       doc: /* Close the connection to TERMINAL's display server.
 For TERMINAL, specify a terminal object, a frame or a display name (a
 string).  If TERMINAL is nil, that stands for the selected frame's
 terminal.  */)
@@ -2372,67 +2343,6 @@ font descriptor.  If string contains `fontset' and not
   return name;
 }
 
-
-DEFUN ("pgtk-list-services", Fpgtk_list_services, Spgtk_list_services, 0, 0, 0,
-       doc: /* List available Nextstep services by querying NSApp.  */)
-     (void)
-{
-#ifdef PGTK_IMPL_COCOA
-  /* You can't get services like this in 10.6+.  */
-  return Qnil;
-#else
-  Lisp_Object ret = Qnil;
-#if 0
-  NSMenu *svcs;
-
-  check_window_system (NULL);
-  svcs = [[NSMenu alloc] initWithTitle: @"Services"];
-  [NSApp setServicesMenu: svcs];
-  [NSApp registerServicesMenuSendTypes: pgtk_send_types
-                           returnTypes: pgtk_return_types];
-
-  [svcs setAutoenablesItems: NO];
-
-  ret = interpret_services_menu (svcs, Qnil, ret);
-#endif
-  return ret;
-#endif
-}
-
-
-DEFUN ("pgtk-perform-service", Fpgtk_perform_service, Spgtk_perform_service,
-       2, 2, 0,
-       doc: /* Perform Nextstep SERVICE on SEND.
-SEND should be either a string or nil.
-The return value is the result of the service, as string, or nil if
-there was no result.  */)
-     (Lisp_Object service, Lisp_Object send)
-{
-#if 0
-  id pb;
-  NSString *svcName;
-  char *utfStr;
-
-  CHECK_STRING (service);
-  check_window_system (NULL);
-
-  utfStr = SSDATA (service);
-  svcName = [NSString stringWithUTF8String: utfStr];
-
-  pb =[NSPasteboard pasteboardWithUniqueName];
-  pgtk_string_to_pasteboard (pb, send);
-
-  if (NSPerformService (svcName, pb) == NO)
-    Fsignal (Qquit, list1 (build_string ("service not available")));
-
-  if ([[pb types] count] == 0)
-    return build_string ("");
-  return pgtk_string_from_pasteboard (pb);
-#endif
-  return build_string ("");
-}
-
-
 /* ==========================================================================
 
     Miscellaneous functions not called through hooks
@@ -2509,8 +2419,7 @@ x_get_focus_frame (struct frame *frame)
 
 
 DEFUN ("xw-color-defined-p", Fxw_color_defined_p, Sxw_color_defined_p, 1, 2, 0,
-       doc: /* Internal function called by `color-defined-p', which see.
-\(Note that the Nextstep version of this function ignores FRAME.)  */)
+       doc: /* Internal function called by `color-defined-p', which see.  */)
      (Lisp_Object color, Lisp_Object frame)
 {
   XColor col;
@@ -2551,7 +2460,7 @@ DEFUN ("xw-display-color-p", Fxw_display_color_p, Sxw_display_color_p, 0, 1, 0,
 
 DEFUN ("x-display-grayscale-p", Fx_display_grayscale_p, Sx_display_grayscale_p,
        0, 1, 0,
-       doc: /* Return t if the Nextstep display supports shades of gray.
+       doc: /* Return t if the display supports shades of gray.
 Note that color displays do support shades of gray.
 The optional argument TERMINAL specifies which display to ask about.
 TERMINAL should be a terminal object, a frame or a display name (a string).
@@ -2564,7 +2473,7 @@ If omitted or nil, that stands for the selected frame's display.  */)
 
 DEFUN ("x-display-pixel-width", Fx_display_pixel_width, Sx_display_pixel_width,
        0, 1, 0,
-       doc: /* Return the width in pixels of the Nextstep display TERMINAL.
+       doc: /* Return the width in pixels of the display TERMINAL.
 The optional argument TERMINAL specifies which display to ask about.
 TERMINAL should be a terminal object, a frame or a display name (a string).
 If omitted or nil, that stands for the selected frame's display.
@@ -2582,7 +2491,7 @@ each physical monitor, use `display-monitor-attributes-list'.  */)
 
 DEFUN ("x-display-pixel-height", Fx_display_pixel_height,
        Sx_display_pixel_height, 0, 1, 0,
-       doc: /* Return the height in pixels of the Nextstep display TERMINAL.
+       doc: /* Return the height in pixels of the display TERMINAL.
 The optional argument TERMINAL specifies which display to ask about.
 TERMINAL should be a terminal object, a frame or a display name (a string).
 If omitted or nil, that stands for the selected frame's display.
@@ -2759,7 +2668,7 @@ If omitted or nil, that stands for the selected frame's display.  */)
 
 DEFUN ("x-display-color-cells", Fx_display_color_cells, Sx_display_color_cells,
        0, 1, 0,
-       doc: /* Returns the number of color cells of the Nextstep display TERMINAL.
+       doc: /* Returns the number of color cells of the display TERMINAL.
 The optional argument TERMINAL specifies which display to ask about.
 TERMINAL should be a terminal object, a frame or a display name (a string).
 If omitted or nil, that stands for the selected frame's display.  */)
@@ -3372,8 +3281,6 @@ be used as the image of the icon representing the frame.  */);
   defsubr (&Spgtk_hide_others);
   defsubr (&Spgtk_hide_emacs);
   defsubr (&Spgtk_emacs_info_panel);
-  defsubr (&Spgtk_list_services);
-  defsubr (&Spgtk_perform_service);
 #if 0
   defsubr (&Spgtk_popup_font_panel);
   defsubr (&Spgtk_popup_color_panel);
