@@ -53,7 +53,7 @@ static ptrdiff_t image_cache_refcount;
 static struct pgtk_display_info *pgtk_display_info_for_name (Lisp_Object);
 static void pgtk_set_name_as_filename (struct frame *);
 
-static const char *pgtk_app_name = "pgtk_app_name:Emacs";
+static const char *pgtk_app_name = "Emacs";
 
 /* ==========================================================================
 
@@ -318,9 +318,8 @@ x_set_cursor_color (struct frame *f, Lisp_Object arg, Lisp_Object oldval)
 static void
 x_set_icon_name (struct frame *f, Lisp_Object arg, Lisp_Object oldval)
 {
-#if 0
-  NSView *view = FRAME_PGTK_VIEW (f);
-  NSTRACE ("x_set_icon_name");
+  GtkWidget *widget = FRAME_GTK_OUTER_WIDGET(f);
+  PGTK_TRACE ("x_set_icon_name");
 
   /* see if it's changed */
   if (STRINGP (arg))
@@ -345,60 +344,34 @@ x_set_icon_name (struct frame *f, Lisp_Object arg, Lisp_Object oldval)
           {
             /* No explicit name and no icon-name ->
                name has to be rebuild from icon_title_format.  */
-            windows_or_buffers_changed = 62;
+            windows_or_buffers_changed = 67;
             return;
           }
     }
 
-  /* Don't change the name if it's already NAME.  */
-  if ([[view window] miniwindowTitle]
-      && ([[[view window] miniwindowTitle]
-             isEqualToString: [NSString stringWithUTF8String:
-					  SSDATA (arg)]]))
-    return;
-
-  [[view window] setMiniwindowTitle:
-        [NSString stringWithUTF8String: SSDATA (arg)]];
-#endif
+  gtk_window_set_icon_name(GTK_WINDOW(widget), SSDATA(arg));
 }
 
 static void
 pgtk_set_name_internal (struct frame *f, Lisp_Object name)
 {
-#if 0
   Lisp_Object encoded_name, encoded_icon_name;
-  NSString *str;
-  NSView *view = FRAME_PGTK_VIEW (f);
-
+  GtkWidget *widget = FRAME_GTK_OUTER_WIDGET (f);
 
   encoded_name = ENCODE_UTF_8 (name);
-
-  str = [NSString stringWithUTF8String: SSDATA (encoded_name)];
-
-
-  /* Don't change the name if it's already NAME.  */
-  if (! [[[view window] title] isEqualToString: str])
-    [[view window] setTitle: str];
+  gtk_window_set_title(GTK_WINDOW(widget), SSDATA (encoded_name));
 
   if (!STRINGP (f->icon_name))
     encoded_icon_name = encoded_name;
   else
     encoded_icon_name = ENCODE_UTF_8 (f->icon_name);
-
-  str = [NSString stringWithUTF8String: SSDATA (encoded_icon_name)];
-
-  if ([[view window] miniwindowTitle]
-      && ! [[[view window] miniwindowTitle] isEqualToString: str])
-    [[view window] setMiniwindowTitle: str];
-
-#endif
+  gtk_window_set_icon_name(GTK_WINDOW(widget), SSDATA (encoded_name));
 }
 
 static void
 pgtk_set_name (struct frame *f, Lisp_Object name, int explicit)
 {
-#if 0
-  NSTRACE ("pgtk_set_name");
+  PGTK_TRACE ("pgtk_set_name");
 
   /* Make sure that requests from lisp code override requests from
      Emacs redisplay code.  */
@@ -407,7 +380,7 @@ pgtk_set_name (struct frame *f, Lisp_Object name, int explicit)
       /* If we're switching from explicit to implicit, we had better
          update the mode lines and thereby update the title.  */
       if (f->explicit_name && NILP (name))
-        update_mode_lines = 21;
+        update_mode_lines = 12;
 
       f->explicit_name = ! NILP (name);
     }
@@ -430,7 +403,6 @@ pgtk_set_name (struct frame *f, Lisp_Object name, int explicit)
     name = f->title;
 
   pgtk_set_name_internal (f, name);
-#endif
 }
 
 
@@ -440,10 +412,8 @@ pgtk_set_name (struct frame *f, Lisp_Object name, int explicit)
 static void
 x_explicitly_set_name (struct frame *f, Lisp_Object arg, Lisp_Object oldval)
 {
-#if 0
-  NSTRACE ("x_explicitly_set_name");
+  PGTK_TRACE ("x_explicitly_set_name");
   pgtk_set_name (f, arg, 1);
-#endif
 }
 
 
@@ -453,8 +423,7 @@ x_explicitly_set_name (struct frame *f, Lisp_Object arg, Lisp_Object oldval)
 void
 x_implicitly_set_name (struct frame *f, Lisp_Object arg, Lisp_Object oldval)
 {
-#if 0
-  NSTRACE ("x_implicitly_set_name");
+  PGTK_TRACE ("x_implicitly_set_name");
 
   Lisp_Object frame_title = buffer_local_value
     (Qframe_title_format, XWINDOW (f->selected_window)->contents);
@@ -467,7 +436,6 @@ x_implicitly_set_name (struct frame *f, Lisp_Object arg, Lisp_Object oldval)
     pgtk_set_name_as_filename (f);
   else
     pgtk_set_name (f, arg, 0);
-#endif
 }
 
 
@@ -477,8 +445,7 @@ x_implicitly_set_name (struct frame *f, Lisp_Object arg, Lisp_Object oldval)
 static void
 x_set_title (struct frame *f, Lisp_Object name, Lisp_Object old_name)
 {
-#if 0
-  NSTRACE ("x_set_title");
+  PGTK_TRACE ("x_set_title");
   /* Don't change the title if it's already NAME.  */
   if (EQ (name, f->title))
     return;
@@ -493,28 +460,24 @@ x_set_title (struct frame *f, Lisp_Object name, Lisp_Object old_name)
     CHECK_STRING (name);
 
   pgtk_set_name_internal (f, name);
-#endif
 }
 
 
 static void
 pgtk_set_name_as_filename (struct frame *f)
 {
-#if 0
-  NSView *view;
+  GtkWidget *widget;
   Lisp_Object name, filename;
   Lisp_Object buf = XWINDOW (f->selected_window)->contents;
   const char *title;
-  NSAutoreleasePool *pool;
   Lisp_Object encoded_name, encoded_filename;
-  NSString *str;
-  NSTRACE ("pgtk_set_name_as_filename");
+  const char *str;
+  PGTK_TRACE ("pgtk_set_name_as_filename");
 
   if (f->explicit_name || ! NILP (f->title))
     return;
 
   block_input ();
-  pool = [[NSAutoreleasePool alloc] init];
   filename = BVAR (XBUFFER (buf), filename);
   name = BVAR (XBUFFER (buf), name);
 
@@ -528,45 +491,41 @@ pgtk_set_name_as_filename (struct frame *f)
 
   encoded_name = ENCODE_UTF_8 (name);
 
-  view = FRAME_PGTK_VIEW (f);
+  widget = FRAME_GTK_OUTER_WIDGET (f);
 
-  title = FRAME_ICONIFIED_P (f) ? [[[view window] miniwindowTitle] UTF8String]
-                                : [[[view window] title] UTF8String];
+  title = FRAME_ICONIFIED_P (f) ? gtk_window_get_icon_name(GTK_WINDOW(widget))
+				: gtk_window_get_title(GTK_WINDOW(widget));
 
   if (title && (! strcmp (title, SSDATA (encoded_name))))
     {
-      [pool release];
       unblock_input ();
       return;
     }
 
-  str = [NSString stringWithUTF8String: SSDATA (encoded_name)];
-  if (str == nil) str = @"Bad coding";
+  str = SSDATA (encoded_name);
+  if (str == NULL) str = "Bad coding";
 
   if (FRAME_ICONIFIED_P (f))
-    [[view window] setMiniwindowTitle: str];
+    gtk_window_set_icon_name(GTK_WINDOW(widget), str);
   else
     {
-      NSString *fstr;
+      const char *fstr;
 
       if (! NILP (filename))
         {
           encoded_filename = ENCODE_UTF_8 (filename);
 
-          fstr = [NSString stringWithUTF8String: SSDATA (encoded_filename)];
-          if (fstr == nil) fstr = @"";
+          fstr = SSDATA (encoded_filename);
+          if (fstr == NULL) fstr = "";
         }
       else
-        fstr = @"";
+        fstr = "";
 
-      pgtk_set_represented_filename (fstr, f);
-      [[view window] setTitle: str];
+      gtk_window_set_title(GTK_WINDOW(widget), str);
       fset_name (f, name);
     }
 
-  [pool release];
   unblock_input ();
-#endif
 }
 
 
