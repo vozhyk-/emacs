@@ -97,25 +97,6 @@ check_pgtk_display_info (Lisp_Object object)
   return dpyinfo;
 }
 
-#if 0
-
-static id
-pgtk_get_window (Lisp_Object maybeFrame)
-{
-  id view =nil, window =nil;
-
-  if (!FRAMEP (maybeFrame) || !FRAME_PGTK_P (XFRAME (maybeFrame)))
-    maybeFrame = selected_frame;/*wrong_type_argument (Qframep, maybeFrame); */
-
-  if (!NILP (maybeFrame))
-    view = FRAME_PGTK_VIEW (XFRAME (maybeFrame));
-  if (view) window =[view window];
-
-  return window;
-}
-
-#endif
-
 /* Return the X display structure for the display named NAME.
    Open a new connection if necessary.  */
 static struct pgtk_display_info *
@@ -2073,20 +2054,7 @@ If omitted or nil, that stands for the selected frame's display.  */)
   (Lisp_Object terminal)
 {
   check_pgtk_display_info (terminal);
-#if 0
-  switch ([pgtk_get_window (terminal) backingType])
-    {
-    case NSBackingStoreBuffered:
-      return intern ("buffered");
-    case NSBackingStoreRetained:
-      return intern ("retained");
-    case NSBackingStoreNonretained:
-      return intern ("non-retained");
-    default:
-      error ("Strange value for backingType parameter of frame");
-    }
-#endif
-  return Qnil;  /* not reached, shut compiler up */
+  return Qnil;
 }
 
 
@@ -2116,21 +2084,7 @@ If omitted or nil, that stands for the selected frame's display.  */)
   (Lisp_Object terminal)
 {
   check_pgtk_display_info (terminal);
-#if 0
-  switch ([pgtk_get_window (terminal) backingType])
-    {
-    case NSBackingStoreBuffered:
-      return Qt;
-
-    case NSBackingStoreRetained:
-    case NSBackingStoreNonretained:
-      return Qnil;
-
-    default:
-      error ("Strange value for backingType parameter of frame");
-    }
-#endif
-  return Qnil;  /* not reached, shut compiler up */
+  return Qnil;
 }
 
 
@@ -2881,36 +2835,16 @@ The coordinates X and Y are interpreted in pixels relative to a position
 \(0, 0) of the selected frame's display.  */)
        (Lisp_Object x, Lisp_Object y)
 {
-#ifdef PGTK_IMPL_COCOA
-  /* GNUstep doesn't support CGWarpMouseCursorPosition, so none of
-     this will work. */
   struct frame *f = SELECTED_FRAME ();
-  EmacsView *view = FRAME_PGTK_VIEW (f);
-  NSScreen *screen = [[view window] screen];
-  NSRect screen_frame = [screen frame];
-  int mouse_x, mouse_y;
+  GtkWidget *widget = FRAME_GTK_OUTER_WIDGET(f);
+  GdkWindow *window = gtk_widget_get_window(widget);
+  GdkDisplay *gdpy = gdk_window_get_display(window);
+  GdkScreen *gscr = gdk_window_get_screen(window);
+  GdkSeat *seat = gdk_display_get_default_seat(gdpy);
+  GdkDevice *device = gdk_seat_get_pointer(seat);
 
-  NSScreen *primary_screen = [[NSScreen screens] objectAtIndex:0];
-  NSRect primary_screen_frame = [primary_screen frame];
-  CGFloat primary_screen_height = primary_screen_frame.size.height;
-
-  if (FRAME_INITIAL_P (f) || !FRAME_PGTK_P (f))
-    return Qnil;
-
-  CHECK_TYPE_RANGED_INTEGER (int, x);
-  CHECK_TYPE_RANGED_INTEGER (int, y);
-
-  mouse_x = screen_frame.origin.x + XINT (x);
-
-  if (screen == primary_screen)
-    mouse_y = screen_frame.origin.y + XINT (y);
-  else
-    mouse_y = (primary_screen_height - screen_frame.size.height
-               - screen_frame.origin.y) + XINT (y);
-
-  CGPoint mouse_pos = CGPointMake(mouse_x, mouse_y);
-  CGWarpMouseCursorPosition (mouse_pos);
-#endif /* PGTK_IMPL_COCOA */
+  PGTK_TRACE("pgtk-set-mouse-absolute-pixel-position:");
+  gdk_device_warp(device, gscr, XINT(x), XINT(y));  /* No effect on wayland. */
 
   return Qnil;
 }
@@ -2925,16 +2859,17 @@ position (0, 0) of the selected frame's terminal. */)
      (void)
 {
   struct frame *f = SELECTED_FRAME ();
-#if 0
-  EmacsView *view = FRAME_PGTK_VIEW (f);
-  NSScreen *screen = [[view window] screen];
-  NSPoint pt = [NSEvent mouseLocation];
+  GtkWidget *widget = FRAME_GTK_OUTER_WIDGET(f);
+  GdkWindow *window = gtk_widget_get_window(widget);
+  GdkDisplay *gdpy = gdk_window_get_display(window);
+  GdkScreen *gscr;
+  GdkSeat *seat = gdk_display_get_default_seat(gdpy);
+  GdkDevice *device = gdk_seat_get_pointer(seat);
+  int x = 0, y = 0;
 
-  return Fcons(make_number(pt.x - screen.frame.origin.x),
-               make_number(screen.frame.size.height -
-                           (pt.y - screen.frame.origin.y)));
-#endif
-  return Fcons(make_number(0), make_number(0));
+  gdk_device_get_position(device, &gscr, &x, &y);  /* can't get on wayland? */
+
+  return Fcons(make_number(x), make_number(y));
 }
 
 /* ==========================================================================
