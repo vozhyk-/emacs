@@ -2124,8 +2124,9 @@ for each physical monitor, use `display-monitor-attributes-list'.  */)
   (Lisp_Object terminal)
 {
   struct pgtk_display_info *dpyinfo = check_pgtk_display_info (terminal);
-
-  return make_number (x_display_pixel_height (dpyinfo) / (92.0/25.4));
+  GdkDisplay *gdpy = DEFAULT_GDK_DISPLAY();
+  GdkMonitor *gmon = gdk_display_get_monitor_at_point(gdpy, 0, 0);
+  return make_number (gdk_monitor_get_height_mm(gmon));
 }
 
 
@@ -2141,8 +2142,9 @@ for each physical monitor, use `display-monitor-attributes-list'.  */)
   (Lisp_Object terminal)
 {
   struct pgtk_display_info *dpyinfo = check_pgtk_display_info (terminal);
-
-  return make_number (x_display_pixel_width (dpyinfo) / (92.0/25.4));
+  GdkDisplay *gdpy = DEFAULT_GDK_DISPLAY();
+  GdkMonitor *gmon = gdk_display_get_monitor_at_point(gdpy, 0, 0);
+  return make_number (gdk_monitor_get_width_mm(gmon));
 }
 
 
