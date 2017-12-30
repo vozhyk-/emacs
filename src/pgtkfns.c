@@ -812,50 +812,6 @@ x_set_mouse_color (struct frame *f, Lisp_Object arg, Lisp_Object oldval)
 }
 
 
-#define Str(x) #x
-#define Xstr(x) Str(x)
-
-static Lisp_Object
-pgtk_appkit_version_str (void)
-{
-#if 0
-  char tmp[256];
-
-#ifdef PGTK_IMPL_GNUSTEP
-  sprintf(tmp, "gnustep-gui-%s", Xstr(GNUSTEP_GUI_VERSION));
-#elif defined (PGTK_IMPL_COCOA)
-  NSString *osversion
-    = [[NSProcessInfo processInfo] operatingSystemVersionString];
-  sprintf(tmp, "appkit-%.2f %s",
-          NSAppKitVersionNumber,
-          [osversion UTF8String]);
-#else
-  tmp = "ns-unknown";
-#endif
-  return build_string (tmp);
-#else
-  return Qnil;
-#endif
-}
-
-
-/* This is for use by x-server-version and collapses all version info we
-   have into a single int.  For a better picture of the implementation
-   running, use pgtk_appkit_version_str.*/
-static int
-pgtk_appkit_version_int (void)
-{
-#if 0
-#ifdef PGTK_IMPL_GNUSTEP
-  return GNUSTEP_GUI_MAJOR_VERSION * 100 + GNUSTEP_GUI_MINOR_VERSION;
-#elif defined (PGTK_IMPL_COCOA)
-  return (int)NSAppKitVersionNumber;
-#endif
-#endif
-  return 0;
-}
-
-
 static void
 x_icon (struct frame *f, Lisp_Object parms)
 /* --------------------------------------------------------------------------
@@ -2052,7 +2008,7 @@ If omitted or nil, that stands for the selected frame's display.  */)
           The last number is where we distinguish between the Apple
           and GNUstep implementations ("distributor-specific release
           number") and give int'ized versions of major.minor. */
-  return list3i (10, 3, pgtk_appkit_version_int ());
+  return list3i (0, 0, 0);
 }
 
 
@@ -2522,7 +2478,7 @@ Internal use only, use `display-monitor-attributes-list' instead.  */)
       mon->mm_width = gdk_monitor_get_width_mm(gmon);
       mon->mm_height = gdk_monitor_get_height_mm(gmon);
 
-      mon->name = g_strdup(gdk_monitor_get_model(gmon));
+      mon->name = xstrdup(gdk_monitor_get_model(gmon));
     }
   }
 
@@ -3147,9 +3103,40 @@ When you miniaturize a Group, Summary or Article frame, Gnus.tiff will
 be used as the image of the icon representing the frame.  */);
   Vpgtk_icon_type_alist = list1 (Qt);
 
-  DEFVAR_LISP ("pgtk-version-string", Vpgtk_version_string,
-               doc: /* Toolkit version for NS Windowing.  */);
-  Vpgtk_version_string = pgtk_appkit_version_str ();
+
+  /* Provide x-toolkit also for GTK.  Internally GTK does not use Xt so it
+     is not an X toolkit in that sense (USE_X_TOOLKIT is not defined).
+     But for a user it is a toolkit for X, and indeed, configure
+     accepts --with-x-toolkit=gtk.  */
+  Fprovide (intern_c_string ("x-toolkit"), Qnil);
+  Fprovide (intern_c_string ("gtk"), Qnil);
+  Fprovide (intern_c_string ("move-toolbar"), Qnil);
+
+  DEFVAR_LISP ("gtk-version-string", Vgtk_version_string,
+               doc: /* Version info for GTK+.  */);
+  {
+    char *ver = g_strdup_printf("%d.%d.%d",
+				GTK_MAJOR_VERSION, GTK_MINOR_VERSION, GTK_MICRO_VERSION);
+    int len = strlen(ver);
+    Vgtk_version_string = make_pure_string (ver, len, len, false);
+    g_free(ver);
+  }
+
+
+  Fprovide (intern_c_string ("cairo"), Qnil);
+
+  DEFVAR_LISP ("cairo-version-string", Vcairo_version_string,
+               doc: /* Version info for cairo.  */);
+  {
+    char *ver = g_strdup_printf("%d.%d.%d",
+				CAIRO_VERSION_MAJOR, CAIRO_VERSION_MINOR,
+				CAIRO_VERSION_MICRO);
+    int len = strlen(ver);
+    Vcairo_version_string = make_pure_string (ver, len, len, false);
+    g_free(ver);
+  }
+
+
 
 #if 0
   defsubr (&Spgtk_read_file_name);
