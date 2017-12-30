@@ -128,63 +128,10 @@ The properties returned may include `top', `left', `height', and `width'."
 (define-key global-map [pgtk-open-temp-file] [pgtk-open-file])
 (define-key global-map [pgtk-change-font] 'pgtk-respond-to-change-font)
 (define-key global-map [pgtk-open-file-line] 'pgtk-open-file-select-line)
-(define-key global-map [pgtk-spi-service-call] 'pgtk-spi-service-call)
 (define-key global-map [pgtk-new-frame] 'make-frame)
 (define-key global-map [pgtk-toggle-toolbar] 'pgtk-toggle-toolbar)
 (define-key global-map [pgtk-show-prefs] 'customize)
 
-
-;; Set up a number of aliases and other layers to pretend we're using
-;; the Choi/Mitsuharu Carbon port.
-
-(defvaralias 'mac-allow-anti-aliasing 'pgtk-antialias-text)
-(defvaralias 'mac-command-modifier 'pgtk-command-modifier)
-(defvaralias 'mac-right-command-modifier 'pgtk-right-command-modifier)
-(defvaralias 'mac-control-modifier 'pgtk-control-modifier)
-(defvaralias 'mac-right-control-modifier 'pgtk-right-control-modifier)
-(defvaralias 'mac-option-modifier 'pgtk-option-modifier)
-(defvaralias 'mac-right-option-modifier 'pgtk-right-option-modifier)
-(defvaralias 'mac-function-modifier 'pgtk-function-modifier)
-(declare-function pgtk-do-applescript "pgtkfns.c" (script))
-(defalias 'do-applescript 'pgtk-do-applescript)
-
-;;;; Services
-(declare-function pgtk-perform-service "pgtkfns.c" (service send))
-
-(defun pgtk-define-service (path)
-  (let ((mapping [menu-bar services])
-	(service (mapconcat 'identity path "/"))
-	(name (intern
-               (subst-char-in-string
-                ?\s ?-
-                (mapconcat 'identity (cons "pgtk-service" path) "-")))))
-    ;; This defines the function.
-    (defalias name
-      (lambda (arg)
-        (interactive "p")
-        (let* ((in-string
-                (cond ((stringp arg) arg)
-                      (mark-active
-                       (buffer-substring (region-beginning) (region-end)))))
-               (out-string (pgtk-perform-service service in-string)))
-          (cond
-           ((stringp arg) out-string)
-           ((and out-string (or (not in-string)
-                                (not (string= in-string out-string))))
-            (if mark-active (delete-region (region-beginning) (region-end)))
-            (insert out-string)
-            (setq deactivate-mark nil))))))
-    (cond
-     ((lookup-key global-map mapping)
-      (while (cdr path)
-	(setq mapping (vconcat mapping (list (intern (car path)))))
-	(if (not (keymapp (lookup-key global-map mapping)))
-	    (define-key global-map mapping
-	      (cons (car path) (make-sparse-keymap (car path)))))
-	(setq path (cdr path)))
-      (setq mapping (vconcat mapping (list (intern (car path)))))
-      (define-key global-map mapping (cons (car path) name))))
-    name))
 
 ;; pgtkterm.c
 (defvar pgtk-input-spi-name)
@@ -199,24 +146,6 @@ The properties returned may include `top', `left', `height', and `width'."
     ;; The path strings are trimmed for spaces, nbsp and tabs.
     (dolist (filestring filelist)
       (dnd-open-file filestring nil))))
-
-
-(defun pgtk-spi-service-call ()
-  "Respond to a service request."
-  (interactive)
-  (cond ((string-equal pgtk-input-spi-name "open-selection")
-	 (switch-to-buffer (generate-new-buffer "*untitled*"))
-	 (insert pgtk-input-spi-arg))
-	((string-equal pgtk-input-spi-name "open-file")
-	 (pgtk-open-file-service pgtk-input-spi-arg))
-	((string-equal pgtk-input-spi-name "mail-selection")
-	 (compose-mail)
-	 (rfc822-goto-eoh)
-	 (forward-line 1)
-	 (insert pgtk-input-spi-arg))
-	((string-equal pgtk-input-spi-name "mail-to")
-	 (compose-mail pgtk-input-spi-arg))
-	(t (error "Service %s not recognized" pgtk-input-spi-name))))
 
 
 ;; Composed key sequence handling for Nextstep system input methods.
@@ -770,7 +699,6 @@ See the documentation of `create-fontset-from-fontset-spec' for the format.")
   "Non-nil if Nextstep windowing has been initialized.")
 
 (declare-function x-handle-args "common-win" (args))
-(declare-function pgtk-list-services "pgtkfns.c" ())
 (declare-function x-open-connection "pgtkfns.c"
                   (display &optional xrm-string must-succeed))
 (declare-function pgtk-set-resource "pgtkfns.c" (owner name value))
@@ -808,45 +736,8 @@ See the documentation of `create-fontset-from-fontset-spec' for the format.")
   ; (x-open-connection (system-name) x-command-line-resources t)
   (x-open-connection (or (getenv "WAYLAND_DISPLAY") (getenv "DISPLAY")) x-command-line-resources t)
 
-  ;; Add GNUstep menu items Services, Hide and Quit.  Rename Help to Info
-  ;; and put it first (i.e. omit from menu-bar-final-items.
-  (if (featurep 'gnustep)
-      (progn
-	(setq menu-bar-final-items '(buffer services hide-app quit))
-
-	;; If running under GNUstep, "Help" is moved and renamed "Info".
-	(bindings--define-key global-map [menu-bar help-menu]
-	  (cons "Info" menu-bar-help-menu))
-	(bindings--define-key global-map [menu-bar quit]
-	  '(menu-item "Quit" save-buffers-kill-emacs
-		      :help "Save unsaved buffers, then exit"))
-	(bindings--define-key global-map [menu-bar hide-app]
-	  '(menu-item "Hide" pgtk-do-hide-emacs
-		      :help "Hide Emacs"))
-	(bindings--define-key global-map [menu-bar services]
-	  (cons "Services" (make-sparse-keymap "Services")))))
-
-
-  (dolist (service (pgtk-list-services))
-      (if (eq (car service) 'undefined)
-	  (pgtk-define-service (cdr service))
-	(define-key global-map (vector (car service))
-	  (pgtk-define-service (cdr service)))))
-
-  (if (and (eq (get-lisp-resource nil "NXAutoLaunch") t)
-	   (eq (get-lisp-resource nil "HideOnAutoLaunch") t))
-      (add-hook 'after-init-hook 'pgtk-do-hide-emacs))
-
   ;; FIXME: This will surely lead to "MODIFIED OUTSIDE CUSTOM" warnings.
   (menu-bar-mode (if (get-lisp-resource nil "Menus") 1 -1))
-
-  ;; For Darwin nothing except UTF-8 makes sense.
-  (when (eq system-type 'darwin)
-      (add-hook 'before-init-hook
-                #'(lambda ()
-                    (setq locale-coding-system 'utf-8-unix)
-                    (setq default-process-coding-system
-                          '(utf-8-unix . utf-8-unix)))))
 
   ;; Mac OS X Lion introduces PressAndHold, which is unsupported by this port.
   ;; See this thread for more details:
