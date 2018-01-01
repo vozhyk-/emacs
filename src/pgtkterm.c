@@ -186,59 +186,174 @@ x_destroy_window (struct frame *f)
   x_free_frame_resources (f);
 }
 
+/* Calculate the absolute position in frame F
+   from its current recorded position values and gravity.  */
+
+static void
+x_calc_absolute_position (struct frame *f)
+{
+  int flags = f->size_hint_flags;
+  struct frame *p = FRAME_PARENT_FRAME (f);
+
+  /* We have nothing to do if the current position
+     is already for the top-left corner.  */
+  if (! ((flags & XNegative) || (flags & YNegative)))
+    return;
+
+  /* Treat negative positions as relative to the leftmost bottommost
+     position that fits on the screen.  */
+  if ((flags & XNegative) && (f->left_pos <= 0))
+    {
+      int width = FRAME_PIXEL_WIDTH (f);
+
+      /* A frame that has been visible at least once should have outer
+	 edges.  */
+      if (f->output_data.pgtk->has_been_visible && !p)
+	{
+	  Lisp_Object frame;
+	  Lisp_Object edges = Qnil;
+
+	  XSETFRAME (frame, f);
+	  edges = Fpgtk_frame_edges (frame, Qouter_edges);
+	  if (!NILP (edges))
+	    width = (XINT (Fnth (make_number (2), edges))
+		     - XINT (Fnth (make_number (0), edges)));
+	}
+
+      if (p)
+	f->left_pos = (FRAME_PIXEL_WIDTH (p) - width - 2 * f->border_width
+		       + f->left_pos);
+      else
+	f->left_pos = (x_display_pixel_width (FRAME_DISPLAY_INFO (f))
+		       - width + f->left_pos);
+
+    }
+
+  if ((flags & YNegative) && (f->top_pos <= 0))
+    {
+      int height = FRAME_PIXEL_HEIGHT (f);
+
+      if (f->output_data.pgtk->has_been_visible && !p)
+	{
+	  Lisp_Object frame;
+	  Lisp_Object edges = Qnil;
+
+	  XSETFRAME (frame, f);
+	  if (NILP (edges))
+	    edges = Fpgtk_frame_edges (frame, Qouter_edges);
+	  if (!NILP (edges))
+	    height = (XINT (Fnth (make_number (3), edges))
+		      - XINT (Fnth (make_number (1), edges)));
+	}
+
+      if (p)
+	f->top_pos = (FRAME_PIXEL_HEIGHT (p) - height - 2 * f->border_width
+		       + f->top_pos);
+      else
+	f->top_pos = (x_display_pixel_height (FRAME_DISPLAY_INFO (f))
+		      - height + f->top_pos);
+  }
+
+  /* The left_pos and top_pos
+     are now relative to the top and left screen edges,
+     so the flags should correspond.  */
+  f->size_hint_flags &= ~ (XNegative | YNegative);
+}
+
+/* CHANGE_GRAVITY is 1 when calling from Fset_frame_position,
+   to really change the position, and 0 when calling from
+   x_make_frame_visible (in that case, XOFF and YOFF are the current
+   position values).  It is -1 when calling from x_set_frame_parameters,
+   which means, do adjust for borders but don't change the gravity.  */
+
 void
-x_set_offset (struct frame *f, int xoff, int yoff, int change_grav)
+x_set_offset (struct frame *f, int xoff, int yoff, int change_gravity)
 /* --------------------------------------------------------------------------
      External: Position the window
    -------------------------------------------------------------------------- */
 {
-  PGTK_TRACE("x_set_offset");
-#if 0
-  NSView *view = FRAME_NS_VIEW (f);
-  NSArray *screens = [NSScreen screens];
-  NSScreen *fscreen = [screens objectAtIndex: 0];
-  NSScreen *screen = [[view window] screen];
+  /* not working on wayland. */
 
-  NSTRACE ("x_set_offset");
+  int modified_top, modified_left;
 
-  block_input ();
+  PGTK_TRACE("x_set_offset: %d,%d,%d.", xoff, yoff, change_gravity);
 
-  f->left_pos = xoff;
-  f->top_pos = yoff;
-
-  if (view != nil && screen && fscreen)
+  if (change_gravity > 0)
     {
-      f->left_pos = f->size_hint_flags & XNegative
-        ? [screen visibleFrame].size.width + f->left_pos - FRAME_PIXEL_WIDTH (f)
-        : f->left_pos;
-      /* We use visibleFrame here to take menu bar into account.
-	 Ideally we should also adjust left/top with visibleFrame.origin.  */
-
-      f->top_pos = f->size_hint_flags & YNegative
-        ? ([screen visibleFrame].size.height + f->top_pos
-           - FRAME_PIXEL_HEIGHT (f) - FRAME_NS_TITLEBAR_HEIGHT (f)
-           - FRAME_TOOLBAR_HEIGHT (f))
-        : f->top_pos;
-#ifdef NS_IMPL_GNUSTEP
-      if (FRAME_PARENT_FRAME (f) == NULL)
-	{
-	  if (f->left_pos < 100)
-	    f->left_pos = 100;  /* don't overlap menu */
-	}
-#endif
-      /* Constrain the setFrameTopLeftPoint so we don't move behind the
-         menu bar.  */
-      NSPoint pt = NSMakePoint (SCREENMAXBOUND (f->left_pos
-                                                + NS_PARENT_WINDOW_LEFT_POS (f)),
-                                SCREENMAXBOUND (NS_PARENT_WINDOW_TOP_POS (f)
-                                                - f->top_pos));
-      NSTRACE_POINT ("setFrameTopLeftPoint", pt);
-      [[view window] setFrameTopLeftPoint: pt];
-      f->size_hint_flags &= ~(XNegative|YNegative);
+      PGTK_TRACE("x_set_offset: change_gravity > 0");
+      f->top_pos = yoff;
+      f->left_pos = xoff;
+      f->size_hint_flags &= ~ (XNegative | YNegative);
+      if (xoff < 0)
+	f->size_hint_flags |= XNegative;
+      if (yoff < 0)
+	f->size_hint_flags |= YNegative;
+      f->win_gravity = NorthWestGravity;
     }
 
-  unblock_input ();
+  x_calc_absolute_position (f);
+
+  block_input ();
+  x_wm_set_size_hint (f, 0, false);
+
+  if (x_gtk_use_window_move)
+    {
+      PGTK_TRACE("x_set_offset: x_gtk_use_window_move");
+      /* When a position change was requested and the outer GTK widget
+	 has been realized already, leave it to gtk_window_move to DTRT
+	 and return.  Used for Bug#25851 and Bug#25943.  */
+      if (change_gravity != 0 && FRAME_GTK_OUTER_WIDGET (f)) {
+	PGTK_TRACE("x_set_offset: move to %d,%d.", f->left_pos, f->top_pos);
+	gtk_window_move (GTK_WINDOW (FRAME_GTK_OUTER_WIDGET (f)),
+			 f->left_pos, f->top_pos);
+      }
+      unblock_input ();
+      return;
+    }
+
+  modified_left = f->left_pos;
+  modified_top = f->top_pos;
+
+#if 0
+  if (change_gravity != 0 && FRAME_DISPLAY_INFO (f)->wm_type == X_WMTYPE_A)
+    {
+      /* Some WMs (twm, wmaker at least) has an offset that is smaller
+         than the WM decorations.  So we use the calculated offset instead
+         of the WM decoration sizes here (x/y_pixels_outer_diff).  */
+      modified_left += FRAME_X_OUTPUT (f)->move_offset_left;
+      modified_top += FRAME_X_OUTPUT (f)->move_offset_top;
+    }
 #endif
+
+  gtk_window_move (GTK_WINDOW (FRAME_GTK_OUTER_WIDGET (f)),
+		   modified_left, modified_top);
+
+#if 0
+  x_sync_with_move (f, f->left_pos, f->top_pos,
+                    FRAME_DISPLAY_INFO (f)->wm_type == X_WMTYPE_UNKNOWN);
+#endif
+
+  /* change_gravity is non-zero when this function is called from Lisp to
+     programmatically move a frame.  In that case, we call
+     x_check_expected_move to discover if we have a "Type A" or "Type B"
+     window manager, and, for a "Type A" window manager, adjust the position
+     of the frame.
+
+     We call x_check_expected_move if a programmatic move occurred, and
+     either the window manager type (A/B) is unknown or it is Type A but we
+     need to compute the top/left offset adjustment for this frame.  */
+
+#if 0  /* Don't fight with window managers. */
+  if (change_gravity != 0
+      && !FRAME_PARENT_FRAME (f)
+      && (FRAME_DISPLAY_INFO (f)->wm_type == X_WMTYPE_UNKNOWN
+	  || (FRAME_DISPLAY_INFO (f)->wm_type == X_WMTYPE_A
+	      && (FRAME_X_OUTPUT (f)->move_offset_left == 0
+		  && FRAME_X_OUTPUT (f)->move_offset_top == 0))))
+    x_check_expected_move (f, modified_left, modified_top);
+#endif
+
+  unblock_input ();
 }
 
 void
@@ -1444,7 +1559,7 @@ x_erase_corners_for_relief (struct frame *f, unsigned long color, int x, int y,
    string S.  RELIEF is a pointer to a struct relief containing the GC
    with which lines will be drawn.  Use a color that is FACTOR or
    DELTA lighter or darker than the relief's background which is found
-   in S->f->output_data.x->relief_background.  If such a color cannot
+   in S->f->output_data.pgtk->relief_background.  If such a color cannot
    be allocated, use DEFAULT_PIXEL, instead.  */
 
 static void
@@ -2579,9 +2694,9 @@ pgtk_define_frame_cursor (struct frame *f, Cursor cursor)
 {
 #if 0
   if (!f->pointer_invisible
-      && f->output_data.x->current_cursor != cursor)
+      && f->output_data.pgtk->current_cursor != cursor)
     XDefineCursor (FRAME_X_DISPLAY (f), FRAME_X_WINDOW (f), cursor);
-  f->output_data.x->current_cursor = cursor;
+  f->output_data.pgtk->current_cursor = cursor;
 #endif
 }
 
@@ -4612,6 +4727,14 @@ pgtk_judge_scroll_bars (struct frame *f)
      and they should get garbage-collected.  */
 }
 
+static Lisp_Object
+pgtk_menu_show (struct frame *f, int x, int y, int menuflags,
+	     Lisp_Object title, const char **error_name)
+{
+  // not implemented.
+  return Qnil;
+}
+
 static struct terminal *
 pgtk_create_terminal (struct pgtk_display_info *dpyinfo)
 /* --------------------------------------------------------------------------
@@ -4635,7 +4758,7 @@ pgtk_create_terminal (struct pgtk_display_info *dpyinfo)
   // terminal->frame_rehighlight_hook = pgtk_frame_rehighlight;
   // terminal->frame_raise_lower_hook = pgtk_frame_raise_lower;
   // terminal->fullscreen_hook = pgtk_fullscreen_hook;
-  // terminal->menu_show_hook = pgtk_menu_show;
+  terminal->menu_show_hook = pgtk_menu_show;
   // terminal->popup_dialog_hook = pgtk_popup_dialog;
   terminal->set_vertical_scroll_bar_hook = pgtk_set_vertical_scroll_bar;
   terminal->set_horizontal_scroll_bar_hook = pgtk_set_horizontal_scroll_bar;
@@ -5391,7 +5514,7 @@ frame_highlight (struct frame *f)
 #if 0
   x_catch_errors (FRAME_X_DISPLAY (f));
   XSetWindowBorder (FRAME_X_DISPLAY (f), FRAME_X_WINDOW (f),
-		    f->output_data.x->border_pixel);
+		    f->output_data.pgtk->border_pixel);
   x_uncatch_errors ();
 #endif
   unblock_input ();
@@ -5413,7 +5536,7 @@ frame_unhighlight (struct frame *f)
 #if 0
   x_catch_errors (FRAME_X_DISPLAY (f));
   XSetWindowBorderPixmap (FRAME_X_DISPLAY (f), FRAME_X_WINDOW (f),
-			  f->output_data.x->border_tile);
+			  f->output_data.pgtk->border_tile);
   x_uncatch_errors ();
 #endif
   unblock_input ();
