@@ -4727,6 +4727,51 @@ pgtk_judge_scroll_bars (struct frame *f)
      and they should get garbage-collected.  */
 }
 
+static void set_fullscreen_state(struct frame *f)
+{
+  switch (f->want_fullscreen) {
+  case FULLSCREEN_NONE:
+    PGTK_TRACE("pgtk_fullscreen_hook: none.");
+    gtk_window_unfullscreen(FRAME_GTK_OUTER_WIDGET(f));
+    gtk_window_unmaximize(FRAME_GTK_OUTER_WIDGET(f));
+    store_frame_param(f, Qfullscreen, Qnil);
+    break;
+
+  case FULLSCREEN_BOTH:
+    PGTK_TRACE("pgtk_fullscreen_hook: both.");
+    gtk_window_unmaximize(FRAME_GTK_OUTER_WIDGET(f));
+    gtk_window_fullscreen(FRAME_GTK_OUTER_WIDGET(f));
+    store_frame_param(f, Qfullscreen, Qfullboth);
+    break;
+
+  case FULLSCREEN_MAXIMIZED:
+    PGTK_TRACE("pgtk_fullscreen_hook: maximized.");
+    gtk_window_unfullscreen(FRAME_GTK_OUTER_WIDGET(f));
+    gtk_window_maximize(FRAME_GTK_OUTER_WIDGET(f));
+    store_frame_param(f, Qfullscreen, Qmaximized);
+    break;
+
+  case FULLSCREEN_WIDTH:
+  case FULLSCREEN_HEIGHT:
+    PGTK_TRACE("pgtk_fullscreen_hook: width or height.");
+    /* Not supported by gtk. Ignore them.*/
+  }
+
+  f->want_fullscreen = FULLSCREEN_NONE;
+}
+
+static void
+pgtk_fullscreen_hook (struct frame *f)
+{
+  PGTK_TRACE("pgtk_fullscreen_hook:");
+  if (FRAME_VISIBLE_P (f))
+    {
+      block_input ();
+      set_fullscreen_state(f);
+      unblock_input ();
+    }
+}
+
 static Lisp_Object
 pgtk_menu_show (struct frame *f, int x, int y, int menuflags,
 	     Lisp_Object title, const char **error_name)
@@ -4757,7 +4802,7 @@ pgtk_create_terminal (struct pgtk_display_info *dpyinfo)
   terminal->mouse_position_hook = pgtk_mouse_position;
   // terminal->frame_rehighlight_hook = pgtk_frame_rehighlight;
   // terminal->frame_raise_lower_hook = pgtk_frame_raise_lower;
-  // terminal->fullscreen_hook = pgtk_fullscreen_hook;
+  terminal->fullscreen_hook = pgtk_fullscreen_hook;
   terminal->menu_show_hook = pgtk_menu_show;
   // terminal->popup_dialog_hook = pgtk_popup_dialog;
   terminal->set_vertical_scroll_bar_hook = pgtk_set_vertical_scroll_bar;
@@ -5408,14 +5453,12 @@ static gboolean map_event(GtkWidget *widget, GdkEvent *event, gpointer *user_dat
     {
       bool iconified = FRAME_ICONIFIED_P (f);
 
-#if 0
       /* Check if fullscreen was specified before we where mapped the
 	 first time, i.e. from the command line.  */
       if (!f->output_data.pgtk->has_been_visible)
 	{
-	  x_check_fullscreen (f);
+	  set_fullscreen_state(f);
 	}
-#endif
 
       if (!iconified)
 	{

@@ -2694,11 +2694,7 @@ frame_geometry (Lisp_Object frame, Lisp_Object attribute)
   bool fullscreen = (EQ (fullscreen_symbol, Qfullboth)
 		     || EQ (fullscreen_symbol, Qfullscreen));
   int border = fullscreen ? 0 : f->border_width;
-#if 0
-  int title_height = fullscreen ? 0 : FRAME_PGTK_TITLEBAR_HEIGHT (f);
-#else
   int title_height = 0;
-#endif
   int native_width = FRAME_PIXEL_WIDTH (f);
   int native_height = FRAME_PIXEL_HEIGHT (f);
   int outer_width = native_width + 2 * border;
