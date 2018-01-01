@@ -36,7 +36,6 @@ Low priority:
 - tooltip.
 - toolbar.
 - menubar.
-- fullscreen?
 - not works on pure gtk+-3 with X11.
 - so many features not supported.
 
