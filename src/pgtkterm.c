@@ -4081,127 +4081,31 @@ pgtk_select (int fds_lim, fd_set *rfds, fd_set *wfds, fd_set *efds,
 }
 
 
-static void x_send_scroll_bar_event (Lisp_Object, enum scroll_bar_part,
-                                     int, int, bool);
-
 /* Lisp window being scrolled.  Set when starting to interact with
    a toolkit scroll bar, reset to nil when ending the interaction.  */
 
 static Lisp_Object window_being_scrolled;
 
-/* Send a client message with message type Xatom_Scrollbar for a
-   scroll action to the frame of WINDOW.  PART is a value identifying
-   the part of the scroll bar that was clicked on.  PORTION is the
-   amount to scroll of a whole of WHOLE.  */
-
 static void
-x_send_scroll_bar_event (Lisp_Object window, enum scroll_bar_part part,
-			 int portion, int whole, bool horizontal)
+pgtk_send_scroll_bar_event (Lisp_Object window, enum scroll_bar_part part,
+			    int portion, int whole, bool horizontal)
 {
-#if 0
-  XEvent event;
-  XClientMessageEvent *ev = &event.xclient;
-  struct window *w = XWINDOW (window);
-  struct frame *f = XFRAME (w->frame);
-  intptr_t iw = (intptr_t) w;
-  verify (INTPTR_WIDTH <= 64);
-  int sign_shift = INTPTR_WIDTH - 32;
+  union buffered_input_event inev;
 
-  block_input ();
+  EVENT_INIT (inev.ie);
 
-  /* Construct a ClientMessage event to send to the frame.  */
-  ev->type = ClientMessage;
-  ev->message_type = (horizontal
-		      ? FRAME_DISPLAY_INFO (f)->Xatom_Horizontal_Scrollbar
-		      : FRAME_DISPLAY_INFO (f)->Xatom_Scrollbar);
-  ev->display = FRAME_X_DISPLAY (f);
-  ev->window = FRAME_X_WINDOW (f);
-  ev->format = 32;
+  inev.ie.kind = horizontal ? HORIZONTAL_SCROLL_BAR_CLICK_EVENT : SCROLL_BAR_CLICK_EVENT;
+  inev.ie.frame_or_window = window;
+  inev.ie.arg = Qnil;
+  inev.ie.timestamp = 0;
+  inev.ie.code = 0;
+  inev.ie.part = part;
+  inev.ie.x = make_number(portion);
+  inev.ie.y = make_number(whole);
+  inev.ie.modifiers = 0;
 
-  /* A 32-bit X client on a 64-bit X server can pass a window pointer
-     as-is.  A 64-bit client on a 32-bit X server is in trouble
-     because a pointer does not fit and would be truncated while
-     passing through the server.  So use two slots and hope that X12
-     will resolve such issues someday.  */
-  ev->data.l[0] = iw >> 31 >> 1;
-  ev->data.l[1] = sign_shift <= 0 ? iw : iw << sign_shift >> sign_shift;
-  ev->data.l[2] = part;
-  ev->data.l[3] = portion;
-  ev->data.l[4] = whole;
-
-  /* Setting the event mask to zero means that the message will
-     be sent to the client that created the window, and if that
-     window no longer exists, no event will be sent.  */
-  XSendEvent (FRAME_X_DISPLAY (f), FRAME_X_WINDOW (f), False, 0, &event);
-  unblock_input ();
-#endif
+  evq_enqueue(&inev);
 }
-
-
-/* Transform a scroll bar ClientMessage EVENT to an Emacs input event
-   in *IEVENT.  */
-
-static void
-x_scroll_bar_to_input_event (const GdkEvent *event,
-			     struct input_event *ievent)
-{
-#if 0
-  const XClientMessageEvent *ev = &event->xclient;
-  Lisp_Object window;
-  struct window *w;
-
-  /* See the comment in the function above.  */
-  intptr_t iw0 = ev->data.l[0];
-  intptr_t iw1 = ev->data.l[1];
-  intptr_t iw = (iw0 << 31 << 1) + (iw1 & 0xffffffffu);
-  w = (struct window *) iw;
-
-  XSETWINDOW (window, w);
-
-  ievent->kind = SCROLL_BAR_CLICK_EVENT;
-  ievent->frame_or_window = window;
-  ievent->arg = Qnil;
-  ievent->timestamp = CurrentTime;
-  ievent->code = 0;
-  ievent->part = ev->data.l[2];
-  ievent->x = make_number (ev->data.l[3]);
-  ievent->y = make_number (ev->data.l[4]);
-  ievent->modifiers = 0;
-#endif
-}
-
-/* Transform a horizontal scroll bar ClientMessage EVENT to an Emacs
-   input event in *IEVENT.  */
-
-static void
-x_horizontal_scroll_bar_to_input_event (const GdkEvent *event,
-					struct input_event *ievent)
-{
-#if 0
-  const XClientMessageEvent *ev = &event->xclient;
-  Lisp_Object window;
-  struct window *w;
-
-  /* See the comment in the function above.  */
-  intptr_t iw0 = ev->data.l[0];
-  intptr_t iw1 = ev->data.l[1];
-  intptr_t iw = (iw0 << 31 << 1) + (iw1 & 0xffffffffu);
-  w = (struct window *) iw;
-
-  XSETWINDOW (window, w);
-
-  ievent->kind = HORIZONTAL_SCROLL_BAR_CLICK_EVENT;
-  ievent->frame_or_window = window;
-  ievent->arg = Qnil;
-  ievent->timestamp = CurrentTime;
-  ievent->code = 0;
-  ievent->part = ev->data.l[2];
-  ievent->x = make_number (ev->data.l[3]);
-  ievent->y = make_number (ev->data.l[4]);
-  ievent->modifiers = 0;
-#endif
-}
-
 
 
 /* Scroll bar callback for GTK scroll bars.  WIDGET is the scroll
@@ -4218,15 +4122,20 @@ xg_scroll_callback (GtkRange     *range,
   enum scroll_bar_part part = scroll_bar_nowhere;
   GtkAdjustment *adj = GTK_ADJUSTMENT (gtk_range_get_adjustment (range));
   struct frame *f = g_object_get_data (G_OBJECT (range), XG_FRAME_DATA);
+  PGTK_TRACE("xg_scroll_callback:");
 
   if (xg_ignore_gtk_scrollbar) return false;
+  PGTK_TRACE("xg_scroll_callback: not ignored.");
 
+  PGTK_TRACE("xg_scroll_callback: scroll=%d.", scroll);
   switch (scroll)
     {
     case GTK_SCROLL_JUMP:
+#if 0
       /* Buttons 1 2 or 3 must be grabbed.  */
       if (FRAME_DISPLAY_INFO (f)->grabbed != 0
           && FRAME_DISPLAY_INFO (f)->grabbed < (1 << 4))
+#endif
         {
 	  if (bar->horizontal)
 	    {
@@ -4270,11 +4179,12 @@ xg_scroll_callback (GtkRange     *range,
       break;
     }
 
+  PGTK_TRACE("xg_scroll_callback: part=%d, scroll_bar_nowhere=%d.", part, scroll_bar_nowhere);
   if (part != scroll_bar_nowhere)
     {
       window_being_scrolled = bar->window;
-      x_send_scroll_bar_event (bar->window, part, portion, whole,
-			       bar->horizontal);
+      pgtk_send_scroll_bar_event (bar->window, part, portion, whole,
+				  bar->horizontal);
     }
 
   return false;
@@ -4288,11 +4198,12 @@ xg_end_scroll_callback (GtkWidget *widget,
                         gpointer user_data)
 {
   struct scroll_bar *bar = user_data;
+  PGTK_TRACE("xg_end_scroll_callback:");
   bar->dragging = -1;
   if (WINDOWP (window_being_scrolled))
     {
-      x_send_scroll_bar_event (window_being_scrolled,
-                               scroll_bar_end_scroll, 0, 0, bar->horizontal);
+      pgtk_send_scroll_bar_event (window_being_scrolled,
+				  scroll_bar_end_scroll, 0, 0, bar->horizontal);
       window_being_scrolled = Qnil;
     }
 
@@ -6808,7 +6719,8 @@ A value of nil means Emacs doesn't use toolkit scroll bars.
 With the X Window system, the value is a symbol describing the
 X toolkit.  Possible values are: gtk, motif, xaw, or xaw3d.
 With MS Windows or Nextstep, the value is t.  */);
-  Vx_toolkit_scroll_bars = Qt;
+  // Vx_toolkit_scroll_bars = Qt;
+  Vx_toolkit_scroll_bars = intern_c_string ("gtk");
 
   DEFVAR_BOOL ("x-use-underline-position-properties",
 	       x_use_underline_position_properties,

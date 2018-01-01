@@ -7,8 +7,10 @@
            (invocation-name)))
 
 ;; Documentation-purposes only: actually loaded in loadup.el.
+(require 'term/common-win)
 (require 'frame)
 (require 'mouse)
+(require 'scroll-bar)
 (require 'faces)
 (require 'menu-bar)
 (require 'fontset)
@@ -614,37 +616,6 @@ See the documentation of `create-fontset-from-fontset-spec' for the format.")
 (defun pgtk-paste-secondary ()
   (interactive)
   (insert (gui-get-selection 'SECONDARY)))
-
-
-;;;; Scrollbar handling.
-
-(global-set-key [vertical-scroll-bar down-mouse-1] 'scroll-bar-toolkit-scroll)
-(global-set-key [horizontal-scroll-bar down-mouse-1] 'scroll-bar-toolkit-horizontal-scroll)
-(global-unset-key [vertical-scroll-bar mouse-1])
-(global-unset-key [vertical-scroll-bar drag-mouse-1])
-(global-unset-key [horizontal-scroll-bar mouse-1])
-(global-unset-key [horizontal-scroll-bar drag-mouse-1])
-
-
-;;;; macOS-like defaults for trackpad and mouse wheel scrolling on
-;;;; macOS 10.7+.
-
-;; FIXME: This doesn't look right.  Is there a better way to do this
-;; that keeps customize happy?
-(when (featurep 'cocoa)
-  (let ((appkit-version
-         (progn (string-match "^appkit-\\([^\s-]*\\)" pgtk-version-string)
-                (string-to-number (match-string 1 pgtk-version-string)))))
-    ;; Appkit 1138 ~= macOS 10.7.
-    (when (>= appkit-version 1138)
-      (setq mouse-wheel-scroll-amount '(1 ((shift) . 5) ((control))))
-      (put 'mouse-wheel-scroll-amount 'customized-value
-           (list (custom-quote (symbol-value 'mouse-wheel-scroll-amount))))
-
-      (setq mouse-wheel-progressive-speed nil)
-      (put 'mouse-wheel-progressive-speed 'customized-value
-           (list (custom-quote
-                  (symbol-value 'mouse-wheel-progressive-speed)))))))
 
 
 ;;;; Color support.
