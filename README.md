@@ -29,14 +29,10 @@ GDK_BACKEND=wayland ./emacs  (or ./emacs -Q if you have problems.)
 
 ## TODO
 
-High priority:
-- sometimes segmentation fault while garbage collection.
-
 Low priority:
 - tooltip.
 - toolbar.
 - menubar.
-- not works on pure gtk+-3 with X11.
 - so many features not supported.
 
 Those may not be developed because I don't use them.
