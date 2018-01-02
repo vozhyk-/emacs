@@ -3677,7 +3677,7 @@ pgtk_show_hourglass(struct frame *f)
     gtk_widget_destroy(x->hourglass_widget);
   x->hourglass_widget = gtk_event_box_new();   /* gtk_event_box is GDK_INPUT_ONLY. */
   gtk_widget_set_has_window(x->hourglass_widget, true);
-  gtk_fixed_put(FRAME_GTK_WIDGET(f), x->hourglass_widget, 0, 0);
+  gtk_fixed_put(GTK_FIXED(FRAME_GTK_WIDGET(f)), x->hourglass_widget, 0, 0);
   gtk_widget_show(x->hourglass_widget);
   gtk_widget_set_size_request(x->hourglass_widget, 30000, 30000);
   gdk_window_raise(gtk_widget_get_window(x->hourglass_widget));
@@ -4127,7 +4127,7 @@ xg_scroll_callback (GtkRange     *range,
   if (xg_ignore_gtk_scrollbar) return false;
   PGTK_TRACE("xg_scroll_callback: not ignored.");
 
-  PGTK_TRACE("xg_scroll_callback: scroll=%d.", scroll);
+  PGTK_TRACE("xg_scroll_callback: scroll=%u.", scroll);
   switch (scroll)
     {
     case GTK_SCROLL_JUMP:
@@ -4179,7 +4179,7 @@ xg_scroll_callback (GtkRange     *range,
       break;
     }
 
-  PGTK_TRACE("xg_scroll_callback: part=%d, scroll_bar_nowhere=%d.", part, scroll_bar_nowhere);
+  PGTK_TRACE("xg_scroll_callback: part=%u, scroll_bar_nowhere=%d.", part, scroll_bar_nowhere);
   if (part != scroll_bar_nowhere)
     {
       window_being_scrolled = bar->window;
@@ -4640,25 +4640,26 @@ pgtk_judge_scroll_bars (struct frame *f)
 
 static void set_fullscreen_state(struct frame *f)
 {
+  GtkWindow *widget = GTK_WINDOW(FRAME_GTK_OUTER_WIDGET(f));
   switch (f->want_fullscreen) {
   case FULLSCREEN_NONE:
     PGTK_TRACE("pgtk_fullscreen_hook: none.");
-    gtk_window_unfullscreen(FRAME_GTK_OUTER_WIDGET(f));
-    gtk_window_unmaximize(FRAME_GTK_OUTER_WIDGET(f));
+    gtk_window_unfullscreen(widget);
+    gtk_window_unmaximize(widget);
     store_frame_param(f, Qfullscreen, Qnil);
     break;
 
   case FULLSCREEN_BOTH:
     PGTK_TRACE("pgtk_fullscreen_hook: both.");
-    gtk_window_unmaximize(FRAME_GTK_OUTER_WIDGET(f));
-    gtk_window_fullscreen(FRAME_GTK_OUTER_WIDGET(f));
+    gtk_window_unmaximize(widget);
+    gtk_window_fullscreen(widget);
     store_frame_param(f, Qfullscreen, Qfullboth);
     break;
 
   case FULLSCREEN_MAXIMIZED:
     PGTK_TRACE("pgtk_fullscreen_hook: maximized.");
-    gtk_window_unfullscreen(FRAME_GTK_OUTER_WIDGET(f));
-    gtk_window_maximize(FRAME_GTK_OUTER_WIDGET(f));
+    gtk_window_unfullscreen(widget);
+    gtk_window_maximize(widget);
     store_frame_param(f, Qfullscreen, Qmaximized);
     break;
 
