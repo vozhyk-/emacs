@@ -1247,6 +1247,9 @@ xg_create_frame_widgets (struct frame *f)
   else
 #endif
     wtop = gtk_window_new (GTK_WINDOW_TOPLEVEL);
+#ifdef HAVE_PGTK
+  gtk_widget_add_events(wtop, GDK_ALL_EVENTS_MASK);
+#endif
 
   /* gtk_window_set_has_resize_grip is a Gtk+ 3.0 function but Ubuntu
      has backported it to Gtk+ 2.0 and they add the resize grip for

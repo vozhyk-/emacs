@@ -4812,6 +4812,7 @@ pgtk_any_window_to_frame (GdkWindow *window)
 static gboolean
 pgtk_handle_event(GtkWidget *widget, GdkEvent *event, gpointer *data)
 {
+  const char *type_name = G_OBJECT_TYPE_NAME(widget);
   switch (event->type) {
   case GDK_NOTHING:               PGTK_TRACE("GDK_NOTHING"); break;
   case GDK_DELETE:                PGTK_TRACE("GDK_DELETE"); break;
@@ -4863,6 +4864,7 @@ pgtk_handle_event(GtkWidget *widget, GdkEvent *event, gpointer *data)
   case GDK_PAD_GROUP_MODE:        PGTK_TRACE("GDK_PAD_GROUP_MODE"); break;
   default:                        PGTK_TRACE("GDK_EVENT %d", event->type);
   }
+  PGTK_TRACE(" Widget is %s", type_name);
   return FALSE;
 }
 
@@ -6129,6 +6131,8 @@ pgtk_set_event_handler(struct frame *f)
 {
   g_signal_connect(G_OBJECT(FRAME_GTK_OUTER_WIDGET(f)), "window-state-event", G_CALLBACK(window_state_event), NULL);
   g_signal_connect(G_OBJECT(FRAME_GTK_OUTER_WIDGET(f)), "delete-event", G_CALLBACK(delete_event), NULL);
+  g_signal_connect(G_OBJECT(FRAME_GTK_OUTER_WIDGET(f)), "map-event", G_CALLBACK(map_event), NULL);
+  g_signal_connect(G_OBJECT(FRAME_GTK_OUTER_WIDGET(f)), "event", G_CALLBACK(pgtk_handle_event), NULL);
 
   g_signal_connect(G_OBJECT(FRAME_GTK_WIDGET(f)), "size-allocate", G_CALLBACK(size_allocate), NULL);
   g_signal_connect(G_OBJECT(FRAME_GTK_WIDGET(f)), "key-press-event", G_CALLBACK(key_press_event), NULL);
@@ -6143,9 +6147,8 @@ pgtk_set_event_handler(struct frame *f)
   g_signal_connect(G_OBJECT(FRAME_GTK_WIDGET(f)), "scroll-event", G_CALLBACK(scroll_event), NULL);
   g_signal_connect(G_OBJECT(FRAME_GTK_WIDGET(f)), "selection-clear-event", G_CALLBACK(pgtk_selection_lost), NULL);
   g_signal_connect(G_OBJECT(FRAME_GTK_WIDGET(f)), "configure-event", G_CALLBACK(configure_event), NULL);
-  g_signal_connect(G_OBJECT(FRAME_GTK_WIDGET(f)), "map-event", G_CALLBACK(map_event), NULL);
-  g_signal_connect(G_OBJECT(FRAME_GTK_WIDGET(f)), "event", G_CALLBACK(pgtk_handle_event), NULL);
   g_signal_connect(G_OBJECT(FRAME_GTK_WIDGET(f)), "draw", G_CALLBACK(pgtk_handle_draw), NULL);
+  g_signal_connect(G_OBJECT(FRAME_GTK_WIDGET(f)), "event", G_CALLBACK(pgtk_handle_event), NULL);
 }
 
 static void
