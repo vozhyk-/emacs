@@ -42,8 +42,12 @@ GNUstep port and post-20 update by Adrian Robert (arobert@cogsci.ucsd.edu)
 static Lisp_Object Vselection_alist;
 #endif
 
-static GQuark quark_data = 0;
-static GQuark quark_size = 0;
+static GQuark quark_primary_data = 0;
+static GQuark quark_primary_size = 0;
+static GQuark quark_secondary_data = 0;
+static GQuark quark_secondary_size = 0;
+static GQuark quark_clipboard_data = 0;
+static GQuark quark_clipboard_size = 0;
 
 /* ==========================================================================
 
@@ -121,13 +125,36 @@ static GtkClipboard *symbol_to_gtk_clipboard(GtkWidget *widget, Lisp_Object symb
   return gtk_widget_get_clipboard(widget, atom);
 }
 
+static void selection_type_to_quarks(GdkAtom type, GQuark *quark_data, GQuark *quark_size)
+{
+  if (type == GDK_SELECTION_PRIMARY) {
+    *quark_data = quark_primary_data;
+    *quark_size = quark_primary_size;
+  } else if (type == GDK_SELECTION_SECONDARY) {
+    *quark_data = quark_secondary_data;
+    *quark_size = quark_secondary_size;
+  } else if (type == GDK_SELECTION_CLIPBOARD) {
+    *quark_data = quark_clipboard_data;
+    *quark_size = quark_clipboard_size;
+  } else {
+    /* fixme: Is it safe to use 'error' here? */
+    error("Unknown selection type.");
+  }
+}
+
 static void
 get_func(GtkClipboard *cb, GtkSelectionData *data, guint info, gpointer user_data_or_owner)
 {
   PGTK_TRACE("get_func:");
   GObject *obj = G_OBJECT(user_data_or_owner);
-  const char *str = g_object_get_qdata(obj, quark_data);
-  int size = GPOINTER_TO_SIZE(g_object_get_qdata(obj, quark_size));
+  const char *str;
+  int size;
+  GQuark quark_data, quark_size;
+
+  selection_type_to_quarks(gtk_clipboard_get_selection(cb), &quark_data, &quark_size);
+
+  str = g_object_get_qdata(obj, quark_data);
+  size = GPOINTER_TO_SIZE(g_object_get_qdata(obj, quark_size));
   PGTK_TRACE("get_func: str: %s", str);
   gtk_selection_data_set_text(data, str, size);
 }
@@ -137,6 +164,10 @@ clear_func(GtkClipboard *cb, gpointer user_data_or_owner)
 {
   PGTK_TRACE("clear_func:");
   GObject *obj = G_OBJECT(user_data_or_owner);
+  GQuark quark_data, quark_size;
+
+  selection_type_to_quarks(gtk_clipboard_get_selection(cb), &quark_data, &quark_size);
+
   g_object_set_qdata(obj, quark_data, NULL);
   g_object_set_qdata(obj, quark_size, 0);
 }
@@ -150,11 +181,22 @@ clear_func(GtkClipboard *cb, gpointer user_data_or_owner)
 
 void pgtk_selection_init(struct pgtk_display_info *dpyinfo)
 {
+  if (quark_primary_data == 0) {
+    quark_primary_data = g_quark_from_static_string("pgtk-primary-data");
+    quark_primary_size = g_quark_from_static_string("pgtk-primary-size");
+    quark_secondary_data = g_quark_from_static_string("pgtk-secondary-data");
+    quark_secondary_size = g_quark_from_static_string("pgtk-secondary-size");
+    quark_clipboard_data = g_quark_from_static_string("pgtk-clipboard-data");
+    quark_clipboard_size = g_quark_from_static_string("pgtk-clipboard-size");
+  }
 }
 
 void pgtk_selection_lost(GtkWidget *widget, GdkEventSelection *event, gpointer user_data)
 {
+  GQuark quark_data, quark_size;
   PGTK_TRACE("pgtk_selection_lost:");
+
+  selection_type_to_quarks(event->selection, &quark_data, &quark_size);
 
   g_object_set_qdata(G_OBJECT(widget), quark_data, NULL);
   g_object_set_qdata(G_OBJECT(widget), quark_size, 0);
@@ -185,11 +227,7 @@ nil, it defaults to the selected frame.*/)
   GtkClipboard *cb;
   struct pgtk_display_info *dpyinfo;
   struct frame *f;
-
-  if (quark_data == 0) {
-    quark_data = g_quark_from_static_string("pgtk-selection-data");
-    quark_size = g_quark_from_static_string("pgtk-selection-size");
-  }
+  GQuark quark_data, quark_size;
 
   check_window_system (NULL);
 
@@ -201,6 +239,7 @@ nil, it defaults to the selected frame.*/)
   dpyinfo = FRAME_DISPLAY_INFO (f);
 
   cb = symbol_to_gtk_clipboard(FRAME_GTK_WIDGET(f), selection);
+  selection_type_to_quarks(gtk_clipboard_get_selection(cb), &quark_data, &quark_size);
 
 #if 0
   {
@@ -350,8 +389,10 @@ On Nextstep, TERMINAL is unused.  */)
   struct frame *f = frame_for_pgtk_selection (terminal);
   GtkClipboard *cb;
   GObject *obj;
+  GQuark quark_data, quark_size;
 
   cb = symbol_to_gtk_clipboard(FRAME_GTK_WIDGET(f), selection);
+  selection_type_to_quarks(gtk_clipboard_get_selection(cb), &quark_data, &quark_size);
 
   obj = gtk_clipboard_get_owner(cb);
 
