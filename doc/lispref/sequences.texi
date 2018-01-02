@@ -1,6 +1,6 @@
 @c -*-texinfo-*-
 @c This is part of the GNU Emacs Lisp Reference Manual.
-@c Copyright (C) 1990-1995, 1998-1999, 2001-2017 Free Software
+@c Copyright (C) 1990-1995, 1998-1999, 2001-2018 Free Software
 @c Foundation, Inc.
 @c See the file elisp.texi for copying conditions.
 @node Sequences Arrays Vectors
@@ -1634,7 +1634,7 @@ argument @var{b} is given, the result of this operation is stored into
 @end defun
 
 @defun bool-vector-subsetp a b
-Return @code{t} if every @code{t} value in @var{a} is also t in
+Return @code{t} if every @code{t} value in @var{a} is also @code{t} in
 @var{b}, @code{nil} otherwise.  All arguments should be bool vectors of the
 same length.
 @end defun

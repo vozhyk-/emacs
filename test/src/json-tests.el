@@ -1,6 +1,6 @@
 ;;; json-tests.el --- unit tests for json.c          -*- lexical-binding: t; -*-
 
-;; Copyright (C) 2017 Free Software Foundation, Inc.
+;; Copyright (C) 2017-2018 Free Software Foundation, Inc.
 
 ;; This file is part of GNU Emacs.
 
@@ -108,13 +108,11 @@
 
 (ert-deftest json-serialize/invalid-unicode ()
   (skip-unless (fboundp 'json-serialize))
-  ;; FIXME: "out of memory" is the wrong error signal, but we don't
-  ;; currently distinguish between error types when serializing.
-  (should-error (json-serialize ["a\uDBBBb"]) :type 'json-out-of-memory)
-  (should-error (json-serialize ["u\x110000v"]) :type 'json-out-of-memory)
-  (should-error (json-serialize ["u\x3FFFFFv"]) :type 'json-out-of-memory)
-  (should-error (json-serialize ["u\xCCv"]) :type 'json-out-of-memory)
-  (should-error (json-serialize ["u\u00C4\xCCv"]) :type 'json-out-of-memory))
+  (should-error (json-serialize ["a\uDBBBb"]) :type 'wrong-type-argument)
+  (should-error (json-serialize ["u\x110000v"]) :type 'wrong-type-argument)
+  (should-error (json-serialize ["u\x3FFFFFv"]) :type 'wrong-type-argument)
+  (should-error (json-serialize ["u\xCCv"]) :type 'wrong-type-argument)
+  (should-error (json-serialize ["u\u00C4\xCCv"]) :type 'wrong-type-argument))
 
 (ert-deftest json-parse-string/null ()
   (skip-unless (fboundp 'json-parse-string))

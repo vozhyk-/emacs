@@ -1,6 +1,6 @@
 /* Display generation from window structure and buffer text.
 
-Copyright (C) 1985-1988, 1993-1995, 1997-2017 Free Software Foundation,
+Copyright (C) 1985-1988, 1993-1995, 1997-2018 Free Software Foundation,
 Inc.
 
 This file is part of GNU Emacs.
@@ -23712,6 +23712,14 @@ display_mode_element (struct it *it, int depth, int field_width, int precision,
 	      {
 		Lisp_Object spec;
 		spec = safe__eval (true, XCAR (XCDR (elt)));
+		/* The :eval form could delete the frame stored in the
+		   iterator, which will cause a crash if we try to
+		   access faces and other fields (e.g., FRAME_KBOARD)
+		   on that frame.  This is a nonsensical thing to do,
+		   and signaling an error from redisplay might be
+		   dangerous, but we cannot continue with an invalid frame.  */
+		if (!FRAME_LIVE_P (it->f))
+		  signal_error (":eval deleted the frame being displayed", elt);
 		n += display_mode_element (it, depth, field_width - n,
 					   precision - n, spec, props,
 					   risky);
