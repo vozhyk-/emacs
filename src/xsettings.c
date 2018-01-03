@@ -101,7 +101,6 @@ dpyinfo_valid (Display_Info *dpyinfo)
 static void
 store_monospaced_changed (const char *newfont)
 {
-  PGTK_TRACE("store_monospaced_changed: %s", newfont);
   if (current_mono_font != NULL && strcmp (newfont, current_mono_font) == 0)
     return; /* No change. */
 
@@ -121,7 +120,6 @@ store_monospaced_changed (const char *newfont)
 static void
 store_font_name_changed (const char *newfont)
 {
-  PGTK_TRACE("store_font_name_changed: %s", newfont);
   if (current_font != NULL && strcmp (newfont, current_font) == 0)
     return; /* No change. */
 
@@ -795,7 +793,7 @@ read_and_apply_settings (Display_Info *dpyinfo, bool send_event_p)
 }
 #endif
 
-#if 0
+#ifndef HAVE_PGTK
 /* Check if EVENT for the display in DPYINFO is XSettings related.  */
 
 void
@@ -1002,7 +1000,6 @@ init_xsettings (Display_Info *dpyinfo)
 void
 xsettings_initialize (Display_Info *dpyinfo)
 {
-  PGTK_TRACE("xsettings_initialize.");
   if (first_dpyinfo == NULL) first_dpyinfo = dpyinfo;
   init_gconf ();
 #ifndef HAVE_PGTK
