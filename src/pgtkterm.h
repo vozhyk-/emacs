@@ -597,27 +597,10 @@ extern void pgtk_run_ascript (void);
 #define PGTKAPP_DATA2_RUNFILEDIALOG 11
 extern void pgtk_run_file_dialog (void);
 
-extern const char *pgtk_etc_directory (void);
-extern const char *pgtk_exec_path (void);
-extern const char *pgtk_load_path (void);
 extern void syms_of_pgtkterm (void);
 extern void syms_of_pgtkfns (void);
 extern void syms_of_pgtkmenu (void);
 extern void syms_of_pgtkselect (void);
-
-/* From pgtkimage.m, needed in image.c */
-struct image;
-extern void *pgtk_image_from_XBM (char *bits, int width, int height,
-                                unsigned long fg, unsigned long bg);
-extern void *pgtk_image_for_XPM (int width, int height, int depth);
-extern void *pgtk_image_from_file (Lisp_Object file);
-extern bool pgtk_load_image (struct frame *f, struct image *img,
-			   Lisp_Object spec_file, Lisp_Object spec_data);
-extern int pgtk_image_width (void *img);
-extern int pgtk_image_height (void *img);
-extern unsigned long pgtk_get_pixel (void *img, int x, int y);
-extern void pgtk_put_pixel (void *img, int x, int y, unsigned long argb);
-extern void pgtk_set_alpha (void *img, int x, int y, unsigned char a);
 
 extern int x_display_pixel_height (struct pgtk_display_info *);
 extern int x_display_pixel_width (struct pgtk_display_info *);
@@ -635,42 +618,15 @@ extern void x_set_no_accept_focus (struct frame *f, Lisp_Object new_value,
                                    Lisp_Object old_value);
 extern void x_set_z_group (struct frame *f, Lisp_Object new_value,
                            Lisp_Object old_value);
-#ifdef PGTK_IMPL_COCOA
-extern void pgtk_set_appearance (struct frame *f, Lisp_Object new_value,
-                               Lisp_Object old_value);
-extern void pgtk_set_trapgtkparent_titlebar (struct frame *f,
-                                         Lisp_Object new_value,
-                                         Lisp_Object old_value);
-#endif
 extern int pgtk_select (int nfds, fd_set *readfds, fd_set *writefds,
 		      fd_set *exceptfds, struct timespec *timeout,
 		      sigset_t *sigmask);
-#ifdef HAVE_PTHREAD
-extern void pgtk_run_loop_break (void);
-#endif
-extern unsigned long pgtk_get_rgb_color (struct frame *f,
-                                       float r, float g, float b, float a);
-
-struct input_event;
-extern void pgtk_init_events (struct input_event *);
-extern void pgtk_finish_events (void);
 
 extern cairo_t *pgtk_begin_cr_clip (struct frame *f, XGCValues *gc);
 extern void pgtk_end_cr_clip (struct frame *f);
 extern void pgtk_set_cr_source_with_gc_foreground (struct frame *f, XGCValues *gc);
 extern void pgtk_set_cr_source_with_gc_background (struct frame *f, XGCValues *gc);
 extern void pgtk_set_cr_source_with_color (struct frame *f, unsigned long color);
-
-#ifdef __OBJC__
-/* Needed in pgtkfpgtk.m.  */
-extern void
-pgtk_set_represented_filename (PGTKString *fstr, struct frame *f);
-
-#endif
-
-#ifdef PGTK_IMPL_GNUSTEP
-extern char gnustep_base_version[];  /* version tracking */
-#endif
 
 #define MINWIDTH 10
 #define MINHEIGHT 10
