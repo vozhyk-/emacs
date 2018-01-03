@@ -1825,7 +1825,7 @@ x_draw_horizontal_wave (struct frame *f, unsigned long color, int x, int y,
   int xoffset, n;
 
   cr = pgtk_begin_cr_clip (f, NULL);
-  pgtk_set_cr_source_with_gc_foreground (f, NULL);
+  pgtk_set_cr_source_with_color (f, color);
   cairo_rectangle (cr, x, y, width, height);
   cairo_clip (cr);
 
