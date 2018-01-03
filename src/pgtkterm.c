@@ -1075,7 +1075,7 @@ x_set_glyph_string_clipping_exactly (struct glyph_string *src, struct glyph_stri
    Compute left and right overhang of glyph string S.  */
 
 static void
-x_compute_glyph_string_overhangs (struct glyph_string *s)
+pgtk_compute_glyph_string_overhangs (struct glyph_string *s)
 {
   if (s->cmp == NULL
       && (s->first_glyph->type == CHAR_GLYPH
@@ -3703,6 +3703,15 @@ pgtk_hide_hourglass(struct frame *f)
   }
 }
 
+/* Flushes changes to display.  */
+static void
+pgtk_flush_display (struct frame *f)
+{
+  block_input ();
+  gdk_flush();
+  unblock_input ();
+}
+
 extern frame_parm_handler pgtk_frame_parm_handlers[];
 
 static struct redisplay_interface pgtk_redisplay_interface =
@@ -3716,20 +3725,20 @@ static struct redisplay_interface pgtk_redisplay_interface =
   pgtk_after_update_window_line,
   pgtk_update_window_begin,
   pgtk_update_window_end,
-  0, /* flush_display */
+  pgtk_flush_display,
   x_clear_window_mouse_face,
   x_get_glyph_overhangs,
   x_fix_overlapping_area,
   pgtk_draw_fringe_bitmap,
   pgtk_define_fringe_bitmap,
   pgtk_destroy_fringe_bitmap,
-  NULL, // pgtk_compute_glyph_string_overhangs,
+  pgtk_compute_glyph_string_overhangs,
   pgtk_draw_glyph_string,
   pgtk_define_frame_cursor,
   pgtk_clear_frame_area,
   pgtk_draw_window_cursor,
-  NULL, // pgtk_draw_vertical_window_border,
-  NULL, // pgtk_draw_window_divider,
+  pgtk_draw_vertical_window_border,
+  pgtk_draw_window_divider,
   NULL, // pgtk_shift_glyphs_for_insert,
   pgtk_show_hourglass,
   pgtk_hide_hourglass
