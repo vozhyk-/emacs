@@ -28,11 +28,9 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #ifdef HAVE_PGTK
 #include "pgtkterm.h"
 #define EVENT GdkEvent
-#define wx pgtk
 #else
 #include "xterm.h"
 #define EVENT XEvent
-#define wx x
 #endif
 
 /* Minimum and maximum values used for GTK scroll bars  */

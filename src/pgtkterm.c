@@ -860,8 +860,6 @@ pgtk_initialize_display_info (struct pgtk_display_info *dpyinfo)
     dpyinfo->resy = 72.27;
     dpyinfo->color_p = 1;
     dpyinfo->n_planes = 32;
-    dpyinfo->color_table = xmalloc (sizeof *dpyinfo->color_table);
-    // dpyinfo->color_table->colors = NULL;
     dpyinfo->root_window = 42; /* a placeholder.. */
     dpyinfo->x_highlight_frame = dpyinfo->x_focus_frame = NULL;
     dpyinfo->n_fonts = 0;

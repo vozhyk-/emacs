@@ -32,6 +32,9 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include "systime.h"
 #ifndef HAVE_PGTK
 #include "xterm.h"
+#define wx x
+#else
+#define wx pgtk
 #endif
 #include "blockinput.h"
 #include "window.h"
@@ -668,9 +671,9 @@ hierarchy_ch_cb (GtkWidget *widget,
 {
   struct frame *f = user_data;
 #ifndef HAVE_PGTK
-  struct x_output *x = f->output_data.wx;
+  struct x_output *x = f->output_data.x;
 #else
-  struct pgtk_output *x = f->output_data.wx;
+  struct pgtk_output *x = f->output_data.pgtk;
 #endif
   GtkWidget *top = gtk_widget_get_toplevel (x->ttip_lbl);
 
@@ -694,9 +697,9 @@ qttip_cb (GtkWidget  *widget,
 {
   struct frame *f = user_data;
 #ifndef HAVE_PGTK
-  struct x_output *x = f->output_data.wx;
+  struct x_output *x = f->output_data.x;
 #else
-  struct pgtk_output *x = f->output_data.wx;
+  struct pgtk_output *x = f->output_data.pgtk;
 #endif
   if (x->ttip_widget == NULL)
     {
@@ -749,9 +752,9 @@ xg_prepare_tooltip (struct frame *f,
   return 0;
 #else
 #ifndef HAVE_PGTK
-  struct x_output *x = f->output_data.wx;
+  struct x_output *x = f->output_data.x;
 #else
-  struct pgtk_output *x = f->output_data.wx;
+  struct pgtk_output *x = f->output_data.pgtk;
 #endif
   GtkWidget *widget;
   GdkWindow *gwin;
@@ -805,9 +808,9 @@ xg_show_tooltip (struct frame *f, int root_x, int root_y)
 {
 #ifdef USE_GTK_TOOLTIP
 #ifndef HAVE_PGTK
-  struct x_output *x = f->output_data.wx;
+  struct x_output *x = f->output_data.x;
 #else
-  struct pgtk_output *x = f->output_data.wx;
+  struct pgtk_output *x = f->output_data.pgtk;
 #endif
   if (x->ttip_window)
     {
@@ -1442,9 +1445,9 @@ xg_free_frame_widgets (struct frame *f)
     {
 #ifdef USE_GTK_TOOLTIP
 #ifndef HAVE_PGTK
-      struct x_output *x = f->output_data.wx;
+      struct x_output *x = f->output_data.x;
 #else
-      struct pgtk_output *x = f->output_data.wx;
+      struct pgtk_output *x = f->output_data.pgtk;
 #endif
 #endif
       struct xg_frame_tb_info *tbinfo
@@ -3575,9 +3578,9 @@ void
 xg_update_frame_menubar (struct frame *f)
 {
 #ifndef HAVE_PGTK
-  struct x_output *x = f->output_data.wx;
+  struct x_output *x = f->output_data.x;
 #else
-  struct pgtk_output *x = f->output_data.wx;
+  struct pgtk_output *x = f->output_data.pgtk;
 #endif
   GtkRequisition req;
 
@@ -3612,9 +3615,9 @@ void
 free_frame_menubar (struct frame *f)
 {
 #ifndef HAVE_PGTK
-  struct x_output *x = f->output_data.wx;
+  struct x_output *x = f->output_data.x;
 #else
-  struct pgtk_output *x = f->output_data.wx;
+  struct pgtk_output *x = f->output_data.pgtk;
 #endif
 
   if (x->menubar_widget)
@@ -3636,9 +3639,9 @@ bool
 xg_event_is_for_menubar (struct frame *f, const EVENT *event)
 {
 #ifndef HAVE_PGTK
-  struct x_output *x = f->output_data.wx;
+  struct x_output *x = f->output_data.x;
 #else
-  struct pgtk_output *x = f->output_data.wx;
+  struct pgtk_output *x = f->output_data.pgtk;
 #endif
   GList *iter;
   GdkRectangle rec;
@@ -4689,9 +4692,9 @@ static void
 xg_pack_tool_bar (struct frame *f, Lisp_Object pos)
 {
 #ifndef HAVE_PGTK
-  struct x_output *x = f->output_data.wx;
+  struct x_output *x = f->output_data.x;
 #else
-  struct pgtk_output *x = f->output_data.wx;
+  struct pgtk_output *x = f->output_data.pgtk;
 #endif
   bool into_hbox = EQ (pos, Qleft) || EQ (pos, Qright);
   GtkWidget *top_widget = x->toolbar_widget;
@@ -4752,9 +4755,9 @@ static void
 xg_create_tool_bar (struct frame *f)
 {
 #ifndef HAVE_PGTK
-  struct x_output *x = f->output_data.wx;
+  struct x_output *x = f->output_data.x;
 #else
-  struct pgtk_output *x = f->output_data.wx;
+  struct pgtk_output *x = f->output_data.pgtk;
 #endif
 #if GTK_CHECK_VERSION (3, 3, 6)
   GtkStyleContext *gsty;
@@ -4992,9 +4995,9 @@ static bool
 xg_update_tool_bar_sizes (struct frame *f)
 {
 #ifndef HAVE_PGTK
-  struct x_output *x = f->output_data.wx;
+  struct x_output *x = f->output_data.x;
 #else
-  struct pgtk_output *x = f->output_data.wx;
+  struct pgtk_output *x = f->output_data.pgtk;
 #endif
   GtkRequisition req;
   int nl = 0, nr = 0, nt = 0, nb = 0;
@@ -5390,9 +5393,9 @@ void
 free_frame_tool_bar (struct frame *f)
 {
 #ifndef HAVE_PGTK
-  struct x_output *x = f->output_data.wx;
+  struct x_output *x = f->output_data.x;
 #else
-  struct pgtk_output *x = f->output_data.wx;
+  struct pgtk_output *x = f->output_data.pgtk;
 #endif
 
   if (x->toolbar_widget)
@@ -5440,9 +5443,9 @@ void
 xg_change_toolbar_position (struct frame *f, Lisp_Object pos)
 {
 #ifndef HAVE_PGTK
-  struct x_output *x = f->output_data.wx;
+  struct x_output *x = f->output_data.x;
 #else
-  struct pgtk_output *x = f->output_data.wx;
+  struct pgtk_output *x = f->output_data.pgtk;
 #endif
   GtkWidget *top_widget = x->toolbar_widget;
 

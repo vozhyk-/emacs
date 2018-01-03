@@ -51,16 +51,6 @@ struct pgtk_bitmap_record
   int height, width, depth;
 };
 
-/* this to map between emacs color indices and NSColor objects */
-struct pgtk_color_table
-{
-  ptrdiff_t size;
-  ptrdiff_t avail;
-  void **items;
-  void *availIndices;
-};
-#define PGTK_COLOR_CAPACITY 256
-
 #define RGB_TO_ULONG(r, g, b) (((r) << 16) | ((g) << 8) | (b))
 #define ARGB_TO_ULONG(a, r, g, b) (((a) << 24) | ((r) << 16) | ((g) << 8) | (b))
 
@@ -128,31 +118,6 @@ struct scroll_bar
   bool horizontal;
 };
 
-/* this extends font backend font */
-struct pgtkfont_info
-{
-  struct font font;
-
-  char *name;  /* PostScript name, uniquely identifies on PGTK systems */
-
-  /* The following metrics are stored as float rather than int. */
-
-  float width;  /* Maximum advance for the font.  */
-  float height;
-  float underpos;
-  float underwidth;
-  float size;
-  void *pgtkfont;
-  void *cgfont;
-  char bold, ital;  /* convenience flags */
-  char synthItal;
-  XCharStruct max_bounds;
-  /* we compute glyph codes and metrics on-demand in blocks of 256 indexed
-     by hibyte, lobyte */
-  unsigned short **glyphs; /* map Unicode index to glyph */
-  struct font_metrics **metrics;
-};
-
 
 /* init'd in pgtk_initialize_display_info () */
 struct pgtk_display_info
@@ -187,8 +152,6 @@ struct pgtk_display_info
   struct pgtk_bitmap_record *bitmaps;
   ptrdiff_t bitmaps_size;
   ptrdiff_t bitmaps_last;
-
-  struct pgtk_color_table *color_table;
 
   /* DPI resolution of this screen */
   double resx, resy;
@@ -418,7 +381,6 @@ enum
 #define FRAME_X_WINDOW(f) ((f)->output_data.pgtk->window_desc)
 
 /* This is the `Display *' which frame F is on.  */
-#define FRAME_PGTK_DISPLAY(f) (0)
 #define FRAME_X_DISPLAY(f) (0)
 #define FRAME_X_SCREEN(f) (0)
 #define FRAME_X_VISUAL(f) FRAME_DISPLAY_INFO(f)->visual
@@ -432,9 +394,8 @@ enum
 /* Turning a lisp vector value into a pointer to a struct scroll_bar.  */
 #define XSCROLL_BAR(vec) ((struct scroll_bar *) XVECTOR (vec))
 
-// `wx` defined in gtkutil.h
-#define FRAME_GTK_OUTER_WIDGET(f) ((f)->output_data.wx->widget)
-#define FRAME_GTK_WIDGET(f) ((f)->output_data.wx->edit_widget)
+#define FRAME_GTK_OUTER_WIDGET(f) ((f)->output_data.pgtk->widget)
+#define FRAME_GTK_WIDGET(f) ((f)->output_data.pgtk->edit_widget)
 #define FRAME_OUTER_WINDOW(f)                                   \
        (FRAME_GTK_OUTER_WIDGET (f) ?                            \
         GTK_WIDGET_TO_X_WIN (FRAME_GTK_OUTER_WIDGET (f)) :      \
@@ -510,7 +471,7 @@ enum
    (FRAME_SCROLL_BAR_LINES (f) * FRAME_LINE_HEIGHT (f)	\
     - PGTK_SCROLL_BAR_HEIGHT (f)) : 0)
 
-#define FRAME_MENUBAR_HEIGHT(f) ((f)->output_data.wx->menubar_height)
+#define FRAME_MENUBAR_HEIGHT(f) ((f)->output_data.pgtk->menubar_height)
 
 /* Calculate system coordinates of the left and top of the parent
    window or, if there is no parent window, the screen. */
@@ -526,11 +487,11 @@ enum
 
 #define FRAME_PGTK_FONT_TABLE(f) (FRAME_DISPLAY_INFO (f)->font_table)
 
-#define FRAME_TOOLBAR_TOP_HEIGHT(f) ((f)->output_data.wx->toolbar_top_height)
+#define FRAME_TOOLBAR_TOP_HEIGHT(f) ((f)->output_data.pgtk->toolbar_top_height)
 #define FRAME_TOOLBAR_BOTTOM_HEIGHT(f) \
-  ((f)->output_data.wx->toolbar_bottom_height)
-#define FRAME_TOOLBAR_LEFT_WIDTH(f) ((f)->output_data.wx->toolbar_left_width)
-#define FRAME_TOOLBAR_RIGHT_WIDTH(f) ((f)->output_data.wx->toolbar_right_width)
+  ((f)->output_data.pgtk->toolbar_bottom_height)
+#define FRAME_TOOLBAR_LEFT_WIDTH(f) ((f)->output_data.pgtk->toolbar_left_width)
+#define FRAME_TOOLBAR_RIGHT_WIDTH(f) ((f)->output_data.pgtk->toolbar_right_width)
 #define FRAME_TOOLBAR_WIDTH(f) \
   (FRAME_TOOLBAR_LEFT_WIDTH (f) + FRAME_TOOLBAR_RIGHT_WIDTH (f))
 

@@ -40,8 +40,6 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 
 #ifdef HAVE_PGTK
 
-#define wx pgtk
-
 //static EmacsTooltip *pgtk_tooltip = nil;
 
 /* Static variables to handle applescript execution.  */

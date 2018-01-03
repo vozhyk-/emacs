@@ -36,8 +36,6 @@ GNUstep port and post-20 update by Adrian Robert (arobert@cogsci.ucsd.edu)
 #include "pgtkselect.h"
 #include <gdk/gdk.h>
 
-#define wx pgtk
-
 #if 0
 static Lisp_Object Vselection_alist;
 #endif
