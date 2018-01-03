@@ -1405,9 +1405,6 @@ This function is an internal primitive--use `make-frame' instead.  */)
   tem = x_get_arg (dpyinfo, parms, Qunsplittable, 0, 0, RES_TYPE_BOOLEAN);
   f->no_split = minibuffer_only || EQ (tem, Qt);
 
-  f->output_data.pgtk->hourglass_cursor = gdk_cursor_new(GDK_WATCH);
-  // f->output_data.pgtk->hourglass_cursor = gdk_cursor_new(GDK_CLOCK);
-
 #if 0
   x_icon_verify (f, parms);
 #endif
@@ -1416,6 +1413,28 @@ This function is an internal primitive--use `make-frame' instead.  */)
   // x_window (f);
   xg_create_frame_widgets (f);
   pgtk_set_event_handler(f);
+
+
+#define INSTALL_CURSOR(FIELD, NAME) \
+  f->output_data.pgtk->FIELD = gdk_cursor_new_for_display(FRAME_DISPLAY_INFO(f)->gdpy, GDK_ ## NAME)
+
+  INSTALL_CURSOR(text_cursor, XTERM);
+  INSTALL_CURSOR(nontext_cursor, LEFT_PTR);
+  INSTALL_CURSOR(modeline_cursor, XTERM);
+  INSTALL_CURSOR(hand_cursor, HAND2);
+  INSTALL_CURSOR(hourglass_cursor, WATCH);
+  INSTALL_CURSOR(horizontal_drag_cursor, SB_H_DOUBLE_ARROW);
+  INSTALL_CURSOR(vertical_drag_cursor, SB_V_DOUBLE_ARROW);
+  INSTALL_CURSOR(left_edge_cursor, LEFT_SIDE);
+  INSTALL_CURSOR(right_edge_cursor, RIGHT_SIDE);
+  INSTALL_CURSOR(top_edge_cursor, TOP_SIDE);
+  INSTALL_CURSOR(bottom_edge_cursor, BOTTOM_SIDE);
+  INSTALL_CURSOR(top_left_corner_cursor, TOP_LEFT_CORNER);
+  INSTALL_CURSOR(top_right_corner_cursor, TOP_RIGHT_CORNER);
+  INSTALL_CURSOR(bottom_right_corner_cursor, BOTTOM_RIGHT_CORNER);
+  INSTALL_CURSOR(bottom_left_corner_cursor, BOTTOM_LEFT_CORNER);
+
+#undef INSTALL_CURSOR
 
   x_icon (f, parms);
 #if 0

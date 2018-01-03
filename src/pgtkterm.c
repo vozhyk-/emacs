@@ -2690,12 +2690,10 @@ static void pgtk_draw_glyph_string(struct glyph_string *s)
 static void
 pgtk_define_frame_cursor (struct frame *f, Cursor cursor)
 {
-#if 0
   if (!f->pointer_invisible
       && f->output_data.pgtk->current_cursor != cursor)
-    XDefineCursor (FRAME_X_DISPLAY (f), FRAME_X_WINDOW (f), cursor);
+    gdk_window_set_cursor(gtk_widget_get_window(FRAME_GTK_WIDGET(f)), cursor);
   f->output_data.pgtk->current_cursor = cursor;
-#endif
 }
 
 static void pgtk_after_update_window_line(struct window *w, struct glyph_row *desired_row)

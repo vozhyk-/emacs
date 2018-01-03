@@ -227,12 +227,13 @@ struct pgtk_output
   unsigned long background_color;
   void *toolbar;
 
-  /* PGTKCursors init'ed in initFrameFromEmacs */
+  /* Cursors */
+  Cursor current_cursor;
   Cursor text_cursor;
   Cursor nontext_cursor;
   Cursor modeline_cursor;
   Cursor hand_cursor;
-  GdkCursor *hourglass_cursor;
+  Cursor hourglass_cursor;
   Cursor horizontal_drag_cursor;
   Cursor vertical_drag_cursor;
   Cursor left_edge_cursor;
