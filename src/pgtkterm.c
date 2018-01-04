@@ -82,6 +82,9 @@ static void pgtk_clear_frame_area(struct frame *f, int x, int y, int width, int 
 static void pgtk_fill_rectangle(struct frame *f, unsigned long color, int x, int y, int width, int height);
 static void pgtk_clip_to_row (struct window *w, struct glyph_row *row,
 				enum glyph_row_area area, cairo_t *cr);
+static struct frame *
+pgtk_any_window_to_frame (GdkWindow *window);
+
 
 static void evq_enqueue(union buffered_input_event *ev)
 {
@@ -3269,202 +3272,60 @@ pgtk_mouse_position (struct frame **fp, int insist, Lisp_Object *bar_window,
 {
   struct frame *f1;
   struct pgtk_display_info *dpyinfo = FRAME_DISPLAY_INFO (*fp);
+  int win_x, win_y;
+  GdkSeat *seat;
+  GdkDevice *device;
 
   block_input ();
 
-#if 0
-  if (dpyinfo->last_mouse_scroll_bar && insist == 0)
-    {
-      struct scroll_bar *bar = dpyinfo->last_mouse_scroll_bar;
+  Lisp_Object frame, tail;
 
-      if (bar->horizontal)
-	x_horizontal_scroll_bar_report_motion (fp, bar_window, part, x, y, timestamp);
-      else
-	x_scroll_bar_report_motion (fp, bar_window, part, x, y, timestamp);
-    }
-  else
-#endif
-    {
-      Window root;
-      int root_x, root_y;
+  /* Clear the mouse-moved flag for every frame on this display.  */
+  FOR_EACH_FRAME (tail, frame)
+    if (FRAME_PGTK_P (XFRAME (frame))
+	&& FRAME_X_DISPLAY (XFRAME (frame)) == FRAME_X_DISPLAY (*fp))
+      XFRAME (frame)->mouse_moved = false;
 
-      Window dummy_window;
-      int dummy;
+  dpyinfo->last_mouse_scroll_bar = NULL;
 
-      Lisp_Object frame, tail;
+  seat = gdk_display_get_default_seat(dpyinfo->gdpy);
+  device = gdk_seat_get_pointer(seat);
 
-      /* Clear the mouse-moved flag for every frame on this display.  */
-      FOR_EACH_FRAME (tail, frame)
-	if (FRAME_PGTK_P (XFRAME (frame))
-            && FRAME_X_DISPLAY (XFRAME (frame)) == FRAME_X_DISPLAY (*fp))
-	  XFRAME (frame)->mouse_moved = false;
+  if (x_mouse_grabbed (dpyinfo)) {
+    GdkWindow *win;
+    GdkModifierType mask;
+    /* get x, y relative to edit window of f1. */
+    f1 = dpyinfo->last_mouse_frame;
+    win = gtk_widget_get_window(FRAME_GTK_WIDGET(f1));
+    win = gdk_window_get_device_position(win, device, &win_x, &win_y, &mask);
+  } else {
+    GdkWindow *win;
+    GdkModifierType mask;
+    /* 1. get frame where the pointer is on. */
+    win = gtk_widget_get_window(FRAME_GTK_WIDGET(*fp));
+    win = gdk_window_get_device_position(win, device, &win_x, &win_y, &mask);
+    if (win != NULL)
+      f1 = pgtk_any_window_to_frame(win);
+    else
+      f1 = SELECTED_FRAME();
 
-      dpyinfo->last_mouse_scroll_bar = NULL;
+    /* 2. get x, y relative to edit window of the frame. */
+    win = gtk_widget_get_window(FRAME_GTK_WIDGET(f1));
+    win = gdk_window_get_device_position(win, device, &win_x, &win_y, &mask);
+  }
 
-#if 0
-      /* Figure out which root window we're on.  */
-      XQueryPointer (FRAME_X_DISPLAY (*fp),
-		     DefaultRootWindow (FRAME_X_DISPLAY (*fp)),
+  if (f1 != NULL) {
+    dpyinfo = FRAME_DISPLAY_INFO (f1);
+    remember_mouse_glyph (f1, win_x, win_y, &dpyinfo->last_mouse_glyph);
+    dpyinfo->last_mouse_glyph_frame = f1;
 
-		     /* The root window which contains the pointer.  */
-		     &root,
-
-		     /* Trash which we can't trust if the pointer is on
-			a different screen.  */
-		     &dummy_window,
-
-		     /* The position on that root window.  */
-		     &root_x, &root_y,
-
-		     /* More trash we can't trust.  */
-		     &dummy, &dummy,
-
-		     /* Modifier keys and pointer buttons, about which
-			we don't care.  */
-		     (unsigned int *) &dummy);
-
-      /* Now we have a position on the root; find the innermost window
-	 containing the pointer.  */
-      {
-	Window win, child;
-	Window first_win = 0;
-	int win_x, win_y;
-	int parent_x = 0, parent_y = 0;
-
-	win = root;
-
-	/* XTranslateCoordinates can get errors if the window
-	   structure is changing at the same time this function
-	   is running.  So at least we must not crash from them.  */
-
-	x_catch_errors (FRAME_X_DISPLAY (*fp));
-
-	if (x_mouse_grabbed (dpyinfo))
-	  {
-	    /* If mouse was grabbed on a frame, give coords for that frame
-	       even if the mouse is now outside it.  */
-	    XTranslateCoordinates (FRAME_X_DISPLAY (*fp),
-
-				   /* From-window.  */
-				   root,
-
-				   /* To-window.  */
-				   FRAME_X_WINDOW (dpyinfo->last_mouse_frame),
-
-				   /* From-position, to-position.  */
-				   root_x, root_y, &win_x, &win_y,
-
-				   /* Child of win.  */
-				   &child);
-	    f1 = dpyinfo->last_mouse_frame;
-	  }
-	else
-	  {
-	    while (true)
-	      {
-		XTranslateCoordinates (FRAME_X_DISPLAY (*fp),
-
-				       /* From-window, to-window.  */
-				       root, win,
-
-				       /* From-position, to-position.  */
-				       root_x, root_y, &win_x, &win_y,
-
-				       /* Child of win.  */
-				       &child);
-
-		if (child == None || child == win)
-		  {
-		    /* On GTK we have not inspected WIN yet.  If it has
-		       a frame and that frame has a parent, use it.  */
-		    struct frame *f = x_window_to_frame (dpyinfo, win);
-
-		    if (f && FRAME_PARENT_FRAME (f))
-		      first_win = win;
-		    break;
-		  }
-		/* We don't wan't to know the innermost window.  We
-		   want the edit window.  For non-Gtk+ the innermost
-		   window is the edit window.  For Gtk+ it might not
-		   be.  It might be the tool bar for example.  */
-		if (x_window_to_frame (dpyinfo, win))
-		  /* But don't hurry.  We might find a child frame
-		     beneath.  */
-		  first_win = win;
-		win = child;
-		parent_x = win_x;
-		parent_y = win_y;
-	      }
-
-	    if (first_win)
-	      win = first_win;
-
-	    /* Now we know that:
-	       win is the innermost window containing the pointer
-	       (XTC says it has no child containing the pointer),
-	       win_x and win_y are the pointer's position in it
-	       (XTC did this the last time through), and
-	       parent_x and parent_y are the pointer's position in win's parent.
-	       (They are what win_x and win_y were when win was child.
-	       If win is the root window, it has no parent, and
-	       parent_{x,y} are invalid, but that's okay, because we'll
-	       never use them in that case.)  */
-
-	    /* We don't wan't to know the innermost window.  We
-	       want the edit window.  */
-	    f1 = x_window_to_frame (dpyinfo, win);
-	  }
-
-	if (x_had_errors_p (FRAME_X_DISPLAY (*fp)))
-	  f1 = 0;
-
-	x_uncatch_errors_after_check ();
-
-#if 0
-	/* If not, is it one of our scroll bars?  */
-	if (! f1)
-	  {
-	    struct scroll_bar *bar;
-
-            bar = x_window_to_scroll_bar (FRAME_X_DISPLAY (*fp), win, 2);
-
-	    if (bar)
-	      {
-		f1 = XFRAME (WINDOW_FRAME (XWINDOW (bar->window)));
-		win_x = parent_x;
-		win_y = parent_y;
-	      }
-	  }
-#endif
-
-	if (f1 == 0 && insist > 0)
-	  f1 = SELECTED_FRAME ();
-
-	if (f1)
-	  {
-	    /* Ok, we found a frame.  Store all the values.
-	       last_mouse_glyph is a rectangle used to reduce the
-	       generation of mouse events.  To not miss any motion
-	       events, we must divide the frame into rectangles of the
-	       size of the smallest character that could be displayed
-	       on it, i.e. into the same rectangles that matrices on
-	       the frame are divided into.  */
-
-	    /* FIXME: what if F1 is not an X frame?  */
-	    dpyinfo = FRAME_DISPLAY_INFO (f1);
-	    remember_mouse_glyph (f1, win_x, win_y, &dpyinfo->last_mouse_glyph);
-	    dpyinfo->last_mouse_glyph_frame = f1;
-
-	    *bar_window = Qnil;
-	    *part = 0;
-	    *fp = f1;
-	    XSETINT (*x, win_x);
-	    XSETINT (*y, win_y);
-	    *timestamp = dpyinfo->last_mouse_movement_time;
-	  }
-      }
-#endif
-    }
+    *bar_window = Qnil;
+    *part = 0;
+    *fp = f1;
+    XSETINT (*x, win_x);
+    XSETINT (*y, win_y);
+    *timestamp = dpyinfo->last_mouse_movement_time;
+  }
 
   unblock_input ();
 }
