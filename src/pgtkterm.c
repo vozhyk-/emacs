@@ -5993,9 +5993,71 @@ scroll_event(GtkWidget *widget, GdkEvent *event, gpointer *user_data)
   return TRUE;
 }
 
+static gboolean drag_drop(GtkWidget *widget,
+			  GdkDragContext *context,
+			  gint x, gint y,
+			  guint time_,
+			  gpointer user_data)
+{
+  PGTK_TRACE("drag_drop");
+  GdkAtom target = gtk_drag_dest_find_target(widget, context, NULL);
+  PGTK_TRACE("drag_drop: target: %p", (void *) target);
+
+  if (target == GDK_NONE) {
+    gtk_drag_finish(context, TRUE, FALSE, time_);
+    return FALSE;
+  }
+
+  gtk_drag_get_data(widget, context, target, time_);
+
+  return TRUE;
+}
+
+static void drag_data_received(GtkWidget *widget, GdkDragContext *context,
+			       gint x, gint y,
+			       GtkSelectionData *data,
+			       guint info, guint time_,
+			       gpointer user_data)
+{
+  PGTK_TRACE("drag_data_received:");
+  struct frame *f = pgtk_any_window_to_frame(gtk_widget_get_window(widget));
+  gchar **uris = gtk_selection_data_get_uris(data);
+
+  if (uris != NULL) {
+    for (int i = 0; uris[i] != NULL; i++) {
+      union buffered_input_event inev;
+      Lisp_Object arg = Qnil;
+
+      PGTK_TRACE("drag_data_received: uri: %s", uris[i]);
+
+      EVENT_INIT (inev.ie);
+      inev.ie.kind = NO_EVENT;
+      inev.ie.arg = Qnil;
+
+      arg = list2(Qurl, make_string(uris[i], strlen(uris[i])));
+
+      inev.ie.kind = DRAG_N_DROP_EVENT;
+      inev.ie.modifiers = 0;
+      XSETINT(inev.ie.x, x);
+      XSETINT(inev.ie.y, y);
+      XSETFRAME(inev.ie.frame_or_window, f);
+      inev.ie.arg = arg;
+      inev.ie.timestamp = 0;
+
+      evq_enqueue (&inev);
+    }
+  }
+  PGTK_TRACE("drag_data_received: that's all.");
+
+  gtk_drag_finish(context, TRUE, FALSE, time_);
+}
+
 void
 pgtk_set_event_handler(struct frame *f)
 {
+  gtk_drag_dest_set(FRAME_GTK_WIDGET(f), GTK_DEST_DEFAULT_ALL, NULL, 0, GDK_ACTION_COPY);
+  gtk_drag_dest_add_uri_targets(FRAME_GTK_WIDGET(f));
+
   g_signal_connect(G_OBJECT(FRAME_GTK_OUTER_WIDGET(f)), "window-state-event", G_CALLBACK(window_state_event), NULL);
   g_signal_connect(G_OBJECT(FRAME_GTK_OUTER_WIDGET(f)), "delete-event", G_CALLBACK(delete_event), NULL);
   g_signal_connect(G_OBJECT(FRAME_GTK_OUTER_WIDGET(f)), "map-event", G_CALLBACK(map_event), NULL);
@@ -6014,6 +6076,8 @@ pgtk_set_event_handler(struct frame *f)
   g_signal_connect(G_OBJECT(FRAME_GTK_WIDGET(f)), "scroll-event", G_CALLBACK(scroll_event), NULL);
   g_signal_connect(G_OBJECT(FRAME_GTK_WIDGET(f)), "selection-clear-event", G_CALLBACK(pgtk_selection_lost), NULL);
   g_signal_connect(G_OBJECT(FRAME_GTK_WIDGET(f)), "configure-event", G_CALLBACK(configure_event), NULL);
+  g_signal_connect(G_OBJECT(FRAME_GTK_WIDGET(f)), "drag-drop", G_CALLBACK(drag_drop), NULL);
+  g_signal_connect(G_OBJECT(FRAME_GTK_WIDGET(f)), "drag-data-received", G_CALLBACK(drag_data_received), NULL);
   g_signal_connect(G_OBJECT(FRAME_GTK_WIDGET(f)), "draw", G_CALLBACK(pgtk_handle_draw), NULL);
   g_signal_connect(G_OBJECT(FRAME_GTK_WIDGET(f)), "event", G_CALLBACK(pgtk_handle_event), NULL);
 }
