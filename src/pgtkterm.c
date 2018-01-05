@@ -41,6 +41,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include "gtkutil.h"
 #include "systime.h"
 #include "character.h"
+#include "xwidget.h"
 #include "fontset.h"
 #include "composite.h"
 #include "ccl.h"
@@ -2465,9 +2466,7 @@ static void pgtk_draw_glyph_string(struct glyph_string *s)
 
     case XWIDGET_GLYPH:
       PGTK_TRACE("pgtk_draw_glyph_string: 2.5.");
-#if 0
       x_draw_xwidget_glyph_string (s);
-#endif
       break;
 
     case STRETCH_GLYPH:

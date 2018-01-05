@@ -1593,6 +1593,7 @@ Using an Emacs configured with --with-x-toolkit=lucid does not have this problem
       syms_of_pgtkselect ();
       syms_of_fontset ();
       syms_of_xsettings ();
+      syms_of_xwidget ();
 #endif
 
       syms_of_gnutls ();
