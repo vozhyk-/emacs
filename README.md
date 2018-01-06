@@ -29,8 +29,9 @@ GDK_BACKEND=wayland ./emacs  (or ./emacs -Q if you have problems.)
 
 ## TODO
 
+- sometimes can't send selection data
+
 Low priority:
-- tooltip.
 - toolbar.
 - menubar.
 - so many features not supported.
