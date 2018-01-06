@@ -59,7 +59,6 @@ xg_select (int fds_lim, fd_set *rfds, fd_set *wfds, fd_set *efds,
   int i, nfds, tmo_in_millisec, must_free = 0;
   bool need_to_dispatch;
 
-  fprintf(stderr, "xg_select: enter.\n");
   context = g_main_context_default ();
   context_acquired = g_main_context_acquire (context);
   /* FIXME: If we couldn't acquire the context, we just silently proceed
@@ -156,19 +155,12 @@ xg_select (int fds_lim, fd_set *rfds, fd_set *wfds, fd_set *efds,
   if (need_to_dispatch && context_acquired)
     {
       int pselect_errno = errno;
-      fprintf(stderr, "retval=%d.\n", retval);
-      fprintf(stderr, "need_to_dispatch=%d.\n", need_to_dispatch);
-      fprintf(stderr, "context_acquired=%d.\n", context_acquired);
-      fprintf(stderr, "pselect_errno=%d.\n", pselect_errno);
       /* Prevent g_main_dispatch recursion, that would occur without
          block_input wrapper, because event handlers call
          unblock_input.  Event loop recursion was causing Bug#15801.  */
       block_input ();
-      while (g_main_context_pending (context)) {
-	fprintf(stderr, "dispatch...\n");
+      while (g_main_context_pending (context))
         g_main_context_dispatch (context);
-	fprintf(stderr, "dispatch... done.\n");
-      }
       unblock_input ();
       errno = pselect_errno;
     }
@@ -183,7 +175,6 @@ xg_select (int fds_lim, fd_set *rfds, fd_set *wfds, fd_set *efds,
       errno = EINTR;
     }
 
-  fprintf(stderr, "xg_select: leave.\n");
   return retval;
 }
 #endif /* HAVE_GLIB */
