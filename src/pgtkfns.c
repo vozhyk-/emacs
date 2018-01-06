@@ -883,28 +883,24 @@ frame_parm_handler pgtk_frame_parm_handlers[] =
 };
 
 
-/* Handler for signals raised during x_create_frame.
-   FRAME is the frame which is partially constructed.  */
+/* Handler for signals raised during x_create_frame and
+   x_create_tip_frame.  FRAME is the frame which is partially
+   constructed.  */
 
-static void
+static Lisp_Object
 unwind_create_frame (Lisp_Object frame)
 {
-#if 0
   struct frame *f = XFRAME (frame);
 
   /* If frame is already dead, nothing to do.  This can happen if the
      display is disconnected after the frame has become official, but
      before x_create_frame removes the unwind protect.  */
   if (!FRAME_LIVE_P (f))
-    return;
+    return Qnil;
 
   /* If frame is ``official'', nothing to do.  */
   if (NILP (Fmemq (frame, Vframe_list)))
     {
-#if defined GLYPH_DEBUG && defined ENABLE_CHECKING
-      struct pgtk_display_info *dpyinfo = FRAME_DISPLAY_INFO (f);
-#endif
-
       /* If the frame's image cache refcount is still the same as our
 	 private shadow variable, it means we are unwinding a frame
 	 for which we didn't yet call init_frame_faces, where the
@@ -918,13 +914,16 @@ unwind_create_frame (Lisp_Object frame)
 
       x_free_frame_resources (f);
       free_glyphs (f);
-
-#if defined GLYPH_DEBUG && defined ENABLE_CHECKING
-      /* Check that reference counts are indeed correct.  */
-      eassert (dpyinfo->terminal->image_cache->refcount == image_cache_refcount);
-#endif
+      return Qt;
     }
-#endif
+
+  return Qnil;
+}
+
+static void
+do_unwind_create_frame (Lisp_Object frame)
+{
+  unwind_create_frame (frame);
 }
 
 /*
@@ -1188,7 +1187,7 @@ This function is an internal primitive--use `make-frame' instead.  */)
   FRAME_DISPLAY_INFO (f) = dpyinfo;
 
   /* With FRAME_DISPLAY_INFO set up, this unwind-protect is safe.  */
-  record_unwind_protect (unwind_create_frame, frame);
+  record_unwind_protect (do_unwind_create_frame, frame);
 
   /* These colors will be set anyway later, but it's important
      to get the color reference counts right, so initialize them!  */
@@ -2517,94 +2516,179 @@ If omitted or nil, that stands for the selected frame's display.  */)
   return make_number (1 << min (dpyinfo->n_planes, 24));
 }
 
+/***********************************************************************
+				Tool tips
+ ***********************************************************************/
 
-/* Unused dummy def needed for compatibility. */
+/* The frame of a currently visible tooltip.  */
+
 Lisp_Object tip_frame;
 
-#if 0
-/* TODO: move to xdisp or similar */
+/* If non-nil, a timer started that hides the last tooltip when it
+   fires.  */
+
+static Lisp_Object tip_timer;
+
+/* Compute where to display tip frame F.  PARMS is the list of frame
+   parameters for F.  DX and DY are specified offsets from the current
+   location of the mouse.  WIDTH and HEIGHT are the width and height
+   of the tooltip.  Return coordinates relative to the root window of
+   the display in *ROOT_X, and *ROOT_Y.  */
+
 static void
-compute_tip_xy (struct frame *f,
-                Lisp_Object parms,
-                Lisp_Object dx,
-                Lisp_Object dy,
-                int width,
-                int height,
-                int *root_x,
-                int *root_y)
+compute_tip_xy (struct frame *f, Lisp_Object parms, Lisp_Object dx, Lisp_Object dy, int width, int height, int *root_x, int *root_y)
 {
   Lisp_Object left, top, right, bottom;
-  NSPoint pt;
-  NSScreen *screen;
+  int min_x, min_y, max_x, max_y = -1;
 
-  /* Start with user-specified or mouse position.  */
+  /* User-specified position?  */
   left = Fcdr (Fassq (Qleft, parms));
-  top = Fcdr (Fassq (Qtop, parms));
+  top  = Fcdr (Fassq (Qtop, parms));
   right = Fcdr (Fassq (Qright, parms));
   bottom = Fcdr (Fassq (Qbottom, parms));
 
+  /* Move the tooltip window where the mouse pointer is.  Resize and
+     show it.  */
   if ((!INTEGERP (left) && !INTEGERP (right))
       || (!INTEGERP (top) && !INTEGERP (bottom)))
-    pt = [NSEvent mouseLocation];
-  else
     {
-      /* Absolute coordinates.  */
-      pt.x = INTEGERP (left) ? XINT (left) : XINT (right);
-      pt.y = (x_display_pixel_height (FRAME_DISPLAY_INFO (f))
-	      - (INTEGERP (top) ? XINT (top) : XINT (bottom))
-	      - height);
+      Lisp_Object frame, attributes, monitor, geometry;
+      GdkSeat *seat = gdk_display_get_default_seat(FRAME_DISPLAY_INFO(f)->gdpy);
+      GdkDevice *dev = gdk_seat_get_pointer(seat);
+      GdkScreen *scr;
+
+      block_input ();
+      gdk_device_get_position(dev, &scr, root_x, root_y);
+      unblock_input ();
+
+      XSETFRAME(frame, f);
+      attributes = Fpgtk_display_monitor_attributes_list (frame);
+
+      /* Try to determine the monitor where the mouse pointer is and
+         its geometry.  See bug#22549.  */
+      while (CONSP (attributes))
+	{
+          monitor = XCAR (attributes);
+          geometry = Fassq (Qgeometry, monitor);
+          if (CONSP (geometry))
+            {
+              min_x = XINT (Fnth (make_number (1), geometry));
+              min_y = XINT (Fnth (make_number (2), geometry));
+              max_x = min_x + XINT (Fnth (make_number (3), geometry));
+              max_y = min_y + XINT (Fnth (make_number (4), geometry));
+              if (min_x <= *root_x && *root_x < max_x
+                  && min_y <= *root_y && *root_y < max_y)
+                {
+                  break;
+                }
+              max_y = -1;
+            }
+
+          attributes = XCDR (attributes);
+	}
     }
 
-  /* Find the screen that pt is on. */
-  for (screen in [NSScreen screens])
-    if (pt.x >= screen.frame.origin.x
-        && pt.x < screen.frame.origin.x + screen.frame.size.width
-        && pt.y >= screen.frame.origin.y
-        && pt.y < screen.frame.origin.y + screen.frame.size.height)
-      break;
+  /* It was not possible to determine the monitor's geometry, so we
+     assign some sane defaults here: */
+  if ( max_y < 0 )
+    {
+      min_x = 0;
+      min_y = 0;
+      max_x = x_display_pixel_width (FRAME_DISPLAY_INFO (f));
+      max_y = x_display_pixel_height (FRAME_DISPLAY_INFO (f));
+    }
 
-  /* We could use this instead of the if above:
-
-         if (CGRectContainsPoint ([screen frame], pt))
-
-     which would be neater, but it causes problems building on old
-     versions of macOS and in GNUstep. */
-
-  /* Ensure in bounds.  (Note, screen origin = lower left.) */
-  if (INTEGERP (left) || INTEGERP (right))
-    *root_x = pt.x;
-  else if (pt.x + XINT (dx) <= screen.frame.origin.x)
-    *root_x = screen.frame.origin.x; /* Can happen for negative dx */
-  else if (pt.x + XINT (dx) + width
-	   <= screen.frame.origin.x + screen.frame.size.width)
-    /* It fits to the right of the pointer.  */
-    *root_x = pt.x + XINT (dx);
-  else if (width + XINT (dx) <= pt.x)
-    /* It fits to the left of the pointer.  */
-    *root_x = pt.x - width - XINT (dx);
-  else
-    /* Put it left justified on the screen -- it ought to fit that way.  */
-    *root_x = screen.frame.origin.x;
-
-  if (INTEGERP (top) || INTEGERP (bottom))
-    *root_y = pt.y;
-  else if (pt.y - XINT (dy) - height >= screen.frame.origin.y)
-    /* It fits below the pointer.  */
-    *root_y = pt.y - height - XINT (dy);
-  else if (pt.y + XINT (dy) + height
-	   <= screen.frame.origin.y + screen.frame.size.height)
-    /* It fits above the pointer */
-      *root_y = pt.y + XINT (dy);
+  if (INTEGERP (top))
+    *root_y = XINT (top);
+  else if (INTEGERP (bottom))
+    *root_y = XINT (bottom) - height;
+  else if (*root_y + XINT (dy) <= min_y)
+    *root_y = min_y; /* Can happen for negative dy */
+  else if (*root_y + XINT (dy) + height <= max_y)
+    /* It fits below the pointer */
+    *root_y += XINT (dy);
+  else if (height + XINT (dy) + min_y <= *root_y)
+    /* It fits above the pointer.  */
+    *root_y -= height + XINT (dy);
   else
     /* Put it on the top.  */
-    *root_y = screen.frame.origin.y + screen.frame.size.height - height;
-}
-#endif
+    *root_y = min_y;
 
+  if (INTEGERP (left))
+    *root_x = XINT (left);
+  else if (INTEGERP (right))
+    *root_x = XINT (right) - width;
+  else if (*root_x + XINT (dx) <= min_x)
+    *root_x = 0; /* Can happen for negative dx */
+  else if (*root_x + XINT (dx) + width <= max_x)
+    /* It fits to the right of the pointer.  */
+    *root_x += XINT (dx);
+  else if (width + XINT (dx) + min_x <= *root_x)
+    /* It fits to the left of the pointer.  */
+    *root_x -= width + XINT (dx);
+  else
+    /* Put it left justified on the screen -- it ought to fit that way.  */
+    *root_x = min_x;
+}
+
+
+/* Hide tooltip.  Delete its frame if DELETE is true.  */
+static Lisp_Object
+x_hide_tip (bool delete)
+{
+  if (!NILP (tip_timer))
+    {
+      call1 (Qcancel_timer, tip_timer);
+      tip_timer = Qnil;
+    }
+
+  if (NILP (tip_frame)
+      || (!delete && FRAMEP (tip_frame)
+	  && !FRAME_VISIBLE_P (XFRAME (tip_frame))))
+    return Qnil;
+  else
+    {
+      ptrdiff_t count;
+      Lisp_Object was_open = Qnil;
+
+      count = SPECPDL_INDEX ();
+      specbind (Qinhibit_redisplay, Qt);
+      specbind (Qinhibit_quit, Qt);
+
+      {
+	/* When using system tooltip, tip_frame is the Emacs frame on
+	   which the tip is shown.  */
+	struct frame *f = XFRAME (tip_frame);
+
+	if (FRAME_LIVE_P (f) && xg_hide_tooltip (f))
+	  {
+	    tip_frame = Qnil;
+	    was_open = Qt;
+	  }
+      }
+
+      if (FRAMEP (tip_frame))
+	{
+	  if (delete)
+	    {
+	      delete_frame (tip_frame, Qnil);
+	      tip_frame = Qnil;
+	    }
+	  else
+	    x_make_frame_invisible (XFRAME (tip_frame));
+
+	  was_open = Qt;
+	}
+      else
+	tip_frame = Qnil;
+
+      return unbind_to (count, was_open);
+    }
+}
 
 DEFUN ("x-show-tip", Fx_show_tip, Sx_show_tip, 1, 6, 0,
-       doc: /* Show STRING in a \"tooltip\" window on frame FRAME.
-A tooltip window is a small window displaying a string.
+       doc: /* Show STRING in a "tooltip" window on frame FRAME.
+A tooltip window is a small X window displaying a string.
 
 This is an internal function; Lisp code should call `tooltip-show'.
 
@@ -2632,19 +2716,23 @@ with offset DY added (default is -10).
 
 A tooltip's maximum size is specified by `x-max-tooltip-size'.
 Text larger than the specified size is clipped.  */)
-     (Lisp_Object string, Lisp_Object frame, Lisp_Object parms, Lisp_Object timeout, Lisp_Object dx, Lisp_Object dy)
+  (Lisp_Object string, Lisp_Object frame, Lisp_Object parms, Lisp_Object timeout, Lisp_Object dx, Lisp_Object dy)
 {
-#if 0
+  struct frame *f, *tip_f;
+  struct window *w;
   int root_x, root_y;
+  struct buffer *old_buffer;
+  struct text_pos pos;
+  int width, height;
+  int old_windows_or_buffers_changed = windows_or_buffers_changed;
   ptrdiff_t count = SPECPDL_INDEX ();
-  struct frame *f;
-  char *str;
-  NSSize size;
 
   specbind (Qinhibit_redisplay, Qt);
 
   CHECK_STRING (string);
-  str = SSDATA (string);
+  if (SCHARS (string) == 0)
+    string = make_unibyte_string (" ", 1);
+
   f = decode_window_system_frame (frame);
   if (NILP (timeout))
     timeout = make_number (5);
@@ -2661,41 +2749,40 @@ Text larger than the specified size is clipped.  */)
   else
     CHECK_NUMBER (dy);
 
-  block_input ();
-  if (pgtk_tooltip == nil)
-    pgtk_tooltip = [[EmacsTooltip alloc] init];
-  else
+  {
+    bool ok;
+
+    /* Hide a previous tip, if any.  */
     Fx_hide_tip ();
 
-  [pgtk_tooltip setText: str];
-  size = [pgtk_tooltip frame].size;
+    block_input ();
+    ok = xg_prepare_tooltip (f, string, &width, &height);
+    if (ok)
+      {
+	compute_tip_xy (f, parms, dx, dy, width, height, &root_x, &root_y);
+	xg_show_tooltip (f, root_x, root_y);
+	/* This is used in Fx_hide_tip.  */
+	XSETFRAME (tip_frame, f);
+      }
+    unblock_input ();
+    if (ok) goto start_timer;
+  }
 
-  /* Move the tooltip window where the mouse pointer is.  Resize and
-     show it.  */
-  compute_tip_xy (f, parms, dx, dy, (int)size.width, (int)size.height,
-		  &root_x, &root_y);
-
-  [pgtk_tooltip showAtX: root_x Y: root_y for: XINT (timeout)];
-  unblock_input ();
+ start_timer:
+  /* Let the tip disappear after timeout seconds.  */
+  tip_timer = call3 (intern ("run-at-time"), timeout, Qnil,
+		     intern ("x-hide-tip"));
 
   return unbind_to (count, Qnil);
-#endif
-  return Qnil;
 }
 
 
 DEFUN ("x-hide-tip", Fx_hide_tip, Sx_hide_tip, 0, 0, 0,
        doc: /* Hide the current tooltip window, if there is any.
 Value is t if tooltip was open, nil otherwise.  */)
-     (void)
+  (void)
 {
-#if 0
-  if (pgtk_tooltip == nil || ![pgtk_tooltip isActive])
-    return Qnil;
-  [pgtk_tooltip hide];
-  return Qt;
-#endif
-  return Qnil;
+  return x_hide_tip (!tooltip_reuse_hidden_frame);
 }
 
 /* Return geometric attributes of FRAME.  According to the value of
@@ -3026,6 +3113,7 @@ syms_of_pgtkfns (void)
 {
   DEFSYM (Qfont_parameter, "font-parameter");
   DEFSYM (Qfontsize, "fontsize");
+  DEFSYM (Qcancel_timer, "cancel-timer");
   DEFSYM (Qframe_title_format, "frame-title-format");
   DEFSYM (Qicon_title_format, "icon-title-format");
   DEFSYM (Qdark, "dark");
@@ -3139,6 +3227,10 @@ be used as the image of the icon representing the frame.  */);
   as_script = Qnil;
   as_result = 0;
 
+  tip_frame = Qnil;
+  staticpro(&tip_frame);
+  tip_timer = Qnil;
+  staticpro(&tip_timer);
 
 /* This is not ifdef:ed, so other builds than GTK can customize it.  */
   DEFVAR_BOOL ("x-gtk-use-old-file-dialog", x_gtk_use_old_file_dialog,

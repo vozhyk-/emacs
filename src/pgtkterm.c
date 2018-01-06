@@ -5713,16 +5713,34 @@ motion_notify_event(GtkWidget *widget, GdkEvent *event, gpointer *user_data)
       clear_mouse_face (hlinfo);
     }
 
-#if 0
   /* If the contents of the global variable help_echo_string
      has changed, generate a HELP_EVENT.  */
+  int do_help = 0;
   if (!NILP (help_echo_string)
       || !NILP (previous_help_echo_string))
     do_help = 1;
-#endif
 
   if (inev.ie.kind != NO_EVENT)
     evq_enqueue (&inev);
+
+  if (do_help > 0) {
+    Lisp_Object frame;
+    union buffered_input_event inev;
+
+    if (f)
+      XSETFRAME (frame, f);
+    else
+      frame = Qnil;
+
+    inev.ie.kind = HELP_EVENT;
+    inev.ie.frame_or_window = frame;
+    inev.ie.arg = help_echo_object;
+    inev.ie.x = help_echo_window;
+    inev.ie.y = help_echo_string;
+    inev.ie.timestamp = help_echo_pos;
+    evq_enqueue(&inev);
+  }
+
   return TRUE;
 }
 
