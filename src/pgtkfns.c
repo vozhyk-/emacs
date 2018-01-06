@@ -119,85 +119,6 @@ pgtk_display_info_for_name (Lisp_Object name)
   return dpyinfo;
 }
 
-#if 0
-
-static NSString *
-pgtk_filename_from_panel (NSSavePanel *panel)
-{
-#ifdef PGTK_IMPL_COCOA
-  NSURL *url = [panel URL];
-  NSString *str = [url path];
-  return str;
-#else
-  return [panel filename];
-#endif
-}
-
-static NSString *
-pgtk_directory_from_panel (NSSavePanel *panel)
-{
-#ifdef PGTK_IMPL_COCOA
-  NSURL *url = [panel directoryURL];
-  NSString *str = [url path];
-  return str;
-#else
-  return [panel directory];
-#endif
-}
-
-#ifndef PGTK_IMPL_COCOA
-static Lisp_Object
-interpret_services_menu (NSMenu *menu, Lisp_Object prefix, Lisp_Object old)
-/* --------------------------------------------------------------------------
-   Turn the input menu (an NSMenu) into a lisp list for tracking on lisp side
-   -------------------------------------------------------------------------- */
-{
-  int i, count;
-  NSMenuItem *item;
-  const char *name;
-  Lisp_Object nameStr;
-  unsigned short key;
-  NSString *keys;
-  Lisp_Object res;
-
-  count = [menu numberOfItems];
-  for (i = 0; i<count; i++)
-    {
-      item = [menu itemAtIndex: i];
-      name = [[item title] UTF8String];
-      if (!name) continue;
-
-      nameStr = build_string (name);
-
-      if ([item hasSubmenu])
-        {
-          old = interpret_services_menu ([item submenu],
-                                        Fcons (nameStr, prefix), old);
-        }
-      else
-        {
-          keys = [item keyEquivalent];
-          if (keys && [keys length] )
-            {
-              key = [keys characterAtIndex: 0];
-              res = make_number (key|super_modifier);
-            }
-          else
-            {
-              res = Qundefined;
-            }
-          old = Fcons (Fcons (res,
-                            Freverse (Fcons (nameStr,
-                                           prefix))),
-                    old);
-        }
-    }
-  return old;
-}
-#endif
-
-#endif
-
 /* ==========================================================================
 
     Frame parameter setters
@@ -511,30 +432,6 @@ pgtk_set_name_as_filename (struct frame *f)
 void
 pgtk_set_doc_edited (void)
 {
-#if 0
-  NSAutoreleasePool *pool;
-  Lisp_Object tail, frame;
-  block_input ();
-  pool = [[NSAutoreleasePool alloc] init];
-  FOR_EACH_FRAME (tail, frame)
-    {
-      BOOL edited = NO;
-      struct frame *f = XFRAME (frame);
-      struct window *w;
-      NSView *view;
-
-      if (! FRAME_PGTK_P (f)) continue;
-      w = XWINDOW (FRAME_SELECTED_WINDOW (f));
-      view = FRAME_PGTK_VIEW (f);
-      if (!MINI_WINDOW_P (w))
-        edited = ! NILP (Fbuffer_modified_p (w->contents)) &&
-          ! NILP (Fbuffer_file_name (w->contents));
-      [[view window] setDocumentEdited: edited];
-    }
-
-  [pool release];
-  unblock_input ();
-#endif
 }
 
 
@@ -864,11 +761,7 @@ frame_parm_handler pgtk_frame_parm_handlers[] =
   0, /* x_set_sticky */
   0, /* x_set_tool_bar_position */
   0, /* x_set_inhibit_double_buffering */
-#ifdef PGTK_IMPL_COCOA
-  x_set_undecorated,
-#else
   0, /*x_set_undecorated */
-#endif
   x_set_parent_frame,
   0, /* x_set_skip_taskbar */
   x_set_no_focus_on_map,
@@ -876,10 +769,6 @@ frame_parm_handler pgtk_frame_parm_handlers[] =
   x_set_z_group, /* x_set_z_group */
   0, /* x_set_override_redirect */
   x_set_no_special_glyphs,
-#ifdef PGTK_IMPL_COCOA
-  pgtk_set_appearance,
-  pgtk_set_transparent_titlebar,
-#endif
 };
 
 
@@ -1293,11 +1182,7 @@ This function is an internal primitive--use `make-frame' instead.  */)
 		       parms);
     }
   x_default_parameter (f, parms, Qinternal_border_width,
-#ifdef USE_GTK /* We used to impose 0 in xg_create_frame_widgets.  */
 		       make_number (0),
-#else
-		       make_number (1),
-#endif
 		       "internalBorderWidth", "internalBorderWidth",
 		       RES_TYPE_NUMBER);
   x_default_parameter (f, parms, Qright_divider_width, make_number (0),
@@ -1305,11 +1190,7 @@ This function is an internal primitive--use `make-frame' instead.  */)
   x_default_parameter (f, parms, Qbottom_divider_width, make_number (0),
 		       NULL, NULL, RES_TYPE_NUMBER);
   x_default_parameter (f, parms, Qvertical_scroll_bars,
-#if defined (USE_GTK) && defined (USE_TOOLKIT_SCROLL_BARS)
 		       Qright,
-#else
-		       Qleft,
-#endif
 		       "verticalScrollBars", "ScrollBars",
 		       RES_TYPE_SYMBOL);
   x_default_parameter (f, parms, Qhorizontal_scroll_bars, Qnil,
@@ -1699,209 +1580,9 @@ Some window managers may refuse to restack windows.  */)
     }
 }
 
-#if 0
-DEFUN ("pgtk-popup-font-panel", Fpgtk_popup_font_panel, Spgtk_popup_font_panel,
-       0, 1, "",
-       doc: /* Pop up the font panel. */)
-     (Lisp_Object frame)
-{
-  struct frame *f = decode_window_system_frame (frame);
-  id fm = [NSFontManager sharedFontManager];
-  struct font *font = f->output_data.pgtk->font;
-  NSFont *nsfont;
-#ifdef PGTK_IMPL_GNUSTEP
-  nsfont = ((struct nsfont_info *)font)->nsfont;
-#endif
-#ifdef PGTK_IMPL_COCOA
-  nsfont = (NSFont *) macfont_get_nsctfont (font);
-#endif
-  [fm setSelectedFont: nsfont isMultiple: NO];
-  [fm orderFrontFontPanel: NSApp];
-  return Qnil;
-}
-#endif
-
-
-#if 0
-DEFUN ("pgtk-popup-color-panel", Fpgtk_popup_color_panel, Spgtk_popup_color_panel,
-       0, 1, "",
-       doc: /* Pop up the color panel.  */)
-     (Lisp_Object frame)
-{
-  check_window_system (NULL);
-  [NSApp orderFrontColorPanel: NSApp];
-  return Qnil;
-}
-#endif
-
-#if 0
-static struct
-{
-  id panel;
-  BOOL ret;
-#ifdef PGTK_IMPL_GNUSTEP
-  NSString *dirS, *initS;
-  BOOL no_types;
-#endif
-} pgtk_fd_data;
-#endif
-
-void
-pgtk_run_file_dialog (void)
-{
-#if 0
-  if (pgtk_fd_data.panel == nil) return;
-#ifdef PGTK_IMPL_COCOA
-  pgtk_fd_data.ret = [pgtk_fd_data.panel runModal];
-#else
-  if (pgtk_fd_data.no_types)
-    {
-      pgtk_fd_data.ret = [pgtk_fd_data.panel
-                           runModalForDirectory: pgtk_fd_data.dirS
-                           file: pgtk_fd_data.initS];
-    }
-  else
-    {
-      pgtk_fd_data.ret = [pgtk_fd_data.panel
-                           runModalForDirectory: pgtk_fd_data.dirS
-                           file: pgtk_fd_data.initS
-                           types: nil];
-    }
-#endif
-  pgtk_fd_data.panel = nil;
-#endif
-}
-
-#if 0
-
-#ifdef PGTK_IMPL_COCOA
-#if MAC_OS_X_VERSION_MAX_ALLOWED > 1090
-#define MODAL_OK_RESPONSE NSModalResponseOK
-#endif
-#endif
-#ifndef MODAL_OK_RESPONSE
-#define MODAL_OK_RESPONSE NSOKButton
-#endif
-
-DEFUN ("pgtk-read-file-name", Fpgtk_read_file_name, Spgtk_read_file_name, 1, 5, 0,
-       doc: /* Use a graphical panel to read a file name, using prompt PROMPT.
-Optional arg DIR, if non-nil, supplies a default directory.
-Optional arg MUSTMATCH, if non-nil, means the returned file or
-directory must exist.
-Optional arg INIT, if non-nil, provides a default file name to use.
-Optional arg DIR_ONLY_P, if non-nil, means choose only directories.  */)
-  (Lisp_Object prompt, Lisp_Object dir, Lisp_Object mustmatch,
-   Lisp_Object init, Lisp_Object dir_only_p)
-{
-  static id fileDelegate = nil;
-  BOOL isSave = NILP (mustmatch) && NILP (dir_only_p);
-  id panel;
-  Lisp_Object fname = Qnil;
-
-  NSString *promptS = NILP (prompt) || !STRINGP (prompt) ? nil :
-    [NSString stringWithUTF8String: SSDATA (prompt)];
-  NSString *dirS = NILP (dir) || !STRINGP (dir) ?
-    [NSString stringWithUTF8String: SSDATA (BVAR (current_buffer, directory))] :
-    [NSString stringWithUTF8String: SSDATA (dir)];
-  NSString *initS = NILP (init) || !STRINGP (init) ? nil :
-    [NSString stringWithUTF8String: SSDATA (init)];
-  NSEvent *nxev;
-
-  check_window_system (NULL);
-
-  if (fileDelegate == nil)
-    fileDelegate = [EmacsFileDelegate new];
-
-  [NSCursor setHiddenUntilMouseMoves: NO];
-
-  if ([dirS characterAtIndex: 0] == '~')
-    dirS = [dirS stringByExpandingTildeInPath];
-
-  panel = isSave ?
-    (id)[EmacsSavePanel savePanel] : (id)[EmacsOpenPanel openPanel];
-
-  [panel setTitle: promptS];
-
-  [panel setAllowsOtherFileTypes: YES];
-  [panel setTreatsFilePackagesAsDirectories: YES];
-  [panel setDelegate: fileDelegate];
-
-  if (! NILP (dir_only_p))
-    {
-      [panel setCanChooseDirectories: YES];
-      [panel setCanChooseFiles: NO];
-    }
-  else if (! isSave)
-    {
-      /* This is not quite what the documentation says, but it is compatible
-         with the Gtk+ code.  Also, the menu entry says "Open File...".  */
-      [panel setCanChooseDirectories: NO];
-      [panel setCanChooseFiles: YES];
-    }
-
-  block_input ();
-  pgtk_fd_data.panel = panel;
-  pgtk_fd_data.ret = NO;
-#ifdef PGTK_IMPL_COCOA
-  if (! NILP (mustmatch) || ! NILP (dir_only_p))
-    [panel setAllowedFileTypes: nil];
-  if (dirS) [panel setDirectoryURL: [NSURL fileURLWithPath: dirS]];
-  if (initS && NILP (Ffile_directory_p (init)))
-    [panel setNameFieldStringValue: [initS lastPathComponent]];
-  else
-    [panel setNameFieldStringValue: @""];
-
-#else
-  pgtk_fd_data.no_types = NILP (mustmatch) && NILP (dir_only_p);
-  pgtk_fd_data.dirS = dirS;
-  pgtk_fd_data.initS = initS;
-#endif
-
-  /* runModalForDirectory/runModal restarts the main event loop when done,
-     so we must start an event loop and then pop up the file dialog.
-     The file dialog may pop up a confirm dialog after Ok has been pressed,
-     so we can not simply pop down on the Ok/Cancel press.
-   */
-  nxev = [NSEvent otherEventWithType: NSEventTypeApplicationDefined
-                            location: NSMakePoint (0, 0)
-                       modifierFlags: 0
-                           timestamp: 0
-                        windowNumber: [[NSApp mainWindow] windowNumber]
-                             context: [NSApp context]
-                             subtype: 0
-                               data1: 0
-                               data2: NSAPP_DATA2_RUNFILEDIALOG];
-
-  [NSApp postEvent: nxev atStart: NO];
-  while (pgtk_fd_data.panel != nil)
-    [NSApp run];
-
-  if (pgtk_fd_data.ret == MODAL_OK_RESPONSE)
-    {
-      NSString *str = pgtk_filename_from_panel (panel);
-      if (! str) str = pgtk_directory_from_panel (panel);
-      if (str) fname = build_string ([str UTF8String]);
-    }
-
-  [[FRAME_PGTK_VIEW (SELECTED_FRAME ()) window] makeKeyWindow];
-  unblock_input ();
-
-  return fname;
-}
-
-#endif
-
 const char *
 pgtk_get_defaults_value (const char *key)
 {
-#if 0
-  NSObject *obj = [[NSUserDefaults standardUserDefaults]
-                    objectForKey: [NSString stringWithUTF8String: key]];
-
-  if (!obj) return NULL;
-
-  return [[NSString stringWithFormat: @"%@", obj] UTF8String];
-#endif
   return NULL;
 }
 
@@ -1936,21 +1617,6 @@ If VALUE is nil, the default is removed.  */)
   if (NILP (owner))
     owner = build_string (pgtk_app_name);
   CHECK_STRING (name);
-#if 0
-  if (NILP (value))
-    {
-      [[NSUserDefaults standardUserDefaults] removeObjectForKey:
-                         [NSString stringWithUTF8String: SSDATA (name)]];
-    }
-  else
-    {
-      CHECK_STRING (value);
-      [[NSUserDefaults standardUserDefaults] setObject:
-                [NSString stringWithUTF8String: SSDATA (value)]
-                                        forKey: [NSString stringWithUTF8String:
-                                                         SSDATA (name)]];
-    }
-#endif
 
   return Qnil;
 }
@@ -1979,11 +1645,7 @@ If omitted or nil, that stands for the selected frame's display.  */)
   (Lisp_Object terminal)
 {
   check_pgtk_display_info (terminal);
-#ifdef PGTK_IMPL_GNUSTEP
-  return build_string ("GNU");
-#else
-  return build_string ("Apple");
-#endif
+  return Qnil;
 }
 
 
@@ -2142,7 +1804,6 @@ terminal.  */)
      (Lisp_Object terminal)
 {
   check_pgtk_display_info (terminal);
-  // [NSApp terminate: NSApp];
   return Qnil;
 }
 
@@ -2167,7 +1828,6 @@ DEFUN ("pgtk-hide-others", Fpgtk_hide_others, Spgtk_hide_others,
      (void)
 {
   check_window_system (NULL);
-  // [NSApp hideOtherApplications: NSApp];
   return Qnil;
 }
 
@@ -2180,30 +1840,6 @@ the active application.  */)
      (Lisp_Object on)
 {
   check_window_system (NULL);
-#if 0
-  if (EQ (on, intern ("activate")))
-    {
-      [NSApp unhide: NSApp];
-      [NSApp activateIgnoringOtherApps: YES];
-    }
-  else if (NILP (on))
-    [NSApp unhide: NSApp];
-  else
-    [NSApp hide: NSApp];
-#endif
-  return Qnil;
-}
-
-
-DEFUN ("pgtk-emacs-info-panel", Fpgtk_emacs_info_panel, Spgtk_emacs_info_panel,
-       0, 0, 0,
-       doc: /* Shows the 'Info' or 'About' panel for Emacs.  */)
-     (void)
-{
-  check_window_system (NULL);
-#if 0
-  [NSApp orderFrontStandardAboutPanel: nil];
-#endif
   return Qnil;
 }
 
@@ -2289,13 +1925,13 @@ Lisp_Object
 x_get_focus_frame (struct frame *frame)
 {
   struct pgtk_display_info *dpyinfo = FRAME_DISPLAY_INFO (frame);
-  Lisp_Object nsfocus;
+  Lisp_Object focus;
 
   if (!dpyinfo->x_focus_frame)
     return Qnil;
 
-  XSETFRAME (nsfocus, dpyinfo->x_focus_frame);
-  return nsfocus;
+  XSETFRAME (focus, dpyinfo->x_focus_frame);
+  return focus;
 }
 
 /* ==========================================================================
@@ -2972,141 +2608,12 @@ position (0, 0) of the selected frame's terminal. */)
   return Fcons(make_number(x), make_number(y));
 }
 
-/* ==========================================================================
-
-    Class implementations
-
-   ========================================================================== */
-
-#if 0
-/*
-  Handle arrow/function/control keys and copy/paste/cut in file dialogs.
-  Return YES if handled, NO if not.
- */
-static BOOL
-handlePanelKeys (NSSavePanel *panel, NSEvent *theEvent)
-{
-  NSString *s;
-  int i;
-  BOOL ret = NO;
-
-  if ([theEvent type] != NSEventTypeKeyDown) return NO;
-  s = [theEvent characters];
-
-  for (i = 0; i < [s length]; ++i)
-    {
-      int ch = (int) [s characterAtIndex: i];
-      switch (ch)
-        {
-        case NSHomeFunctionKey:
-        case NSDownArrowFunctionKey:
-        case NSUpArrowFunctionKey:
-        case NSLeftArrowFunctionKey:
-        case NSRightArrowFunctionKey:
-        case NSPageUpFunctionKey:
-        case NSPageDownFunctionKey:
-        case NSEndFunctionKey:
-          /* Don't send command modified keys, as those are handled in the
-             performKeyEquivalent method of the super class.
-          */
-          if (! ([theEvent modifierFlags] & NSEventModifierFlagCommand))
-            {
-              [panel sendEvent: theEvent];
-              ret = YES;
-            }
-          break;
-          /* As we don't have the standard key commands for
-             copy/paste/cut/select-all in our edit menu, we must handle
-             them here.  TODO: handle Emacs key bindings for copy/cut/select-all
-             here, paste works, because we have that in our Edit menu.
-             I.e. refactor out code in nsterm.m, keyDown: to figure out the
-             correct modifier.
-          */
-        case 'x': // Cut
-        case 'c': // Copy
-        case 'v': // Paste
-        case 'a': // Select all
-          if ([theEvent modifierFlags] & NSEventModifierFlagCommand)
-            {
-              [NSApp sendAction:
-                       (ch == 'x'
-                        ? @selector(cut:)
-                        : (ch == 'c'
-                           ? @selector(copy:)
-                           : (ch == 'v'
-                              ? @selector(paste:)
-                              : @selector(selectAll:))))
-                             to:nil from:panel];
-              ret = YES;
-            }
-        default:
-          // Send all control keys, as the text field supports C-a, C-f, C-e
-          // C-b and more.
-          if ([theEvent modifierFlags] & NSEventModifierFlagControl)
-            {
-              [panel sendEvent: theEvent];
-              ret = YES;
-            }
-          break;
-        }
-    }
-
-
-  return ret;
-}
-
-@implementation EmacsSavePanel
-- (BOOL)performKeyEquivalent:(NSEvent *)theEvent
-{
-  BOOL ret = handlePanelKeys (self, theEvent);
-  if (! ret)
-    ret = [super performKeyEquivalent:theEvent];
-  return ret;
-}
-@end
-
-
-@implementation EmacsOpenPanel
-- (BOOL)performKeyEquivalent:(NSEvent *)theEvent
-{
-  // NSOpenPanel inherits NSSavePanel, so passing self is OK.
-  BOOL ret = handlePanelKeys (self, theEvent);
-  if (! ret)
-    ret = [super performKeyEquivalent:theEvent];
-  return ret;
-}
-@end
-
-
-@implementation EmacsFileDelegate
-/* --------------------------------------------------------------------------
-   Delegate methods for Open/Save panels
-   -------------------------------------------------------------------------- */
-- (BOOL)panel: (id)sender isValidFilename: (NSString *)filename
-{
-  return YES;
-}
-- (BOOL)panel: (id)sender shouldShowFilename: (NSString *)filename
-{
-  return YES;
-}
-- (NSString *)panel: (id)sender userEnteredFilename: (NSString *)filename
-          confirmed: (BOOL)okFlag
-{
-  return filename;
-}
-@end
-#endif
-
-#endif
-
 
 /* ==========================================================================
 
     Lisp interface declaration
 
    ========================================================================== */
-
 
 void
 syms_of_pgtkfns (void)
@@ -3130,8 +2637,8 @@ Emacs folder.  You have to restart Emacs after installing new icons.
 
 Example: Install an icon Gnus.tiff and execute the following code
 
-  (setq ns-icon-type-alist
-        (append ns-icon-type-alist
+  (setq pgtk-icon-type-alist
+        (append pgtk-icon-type-alist
                 \\='((\"^\\\\*\\\\(Group\\\\*$\\\\|Summary \\\\|Article\\\\*$\\\\)\"
                    . \"Gnus\"))))
 
@@ -3173,18 +2680,11 @@ be used as the image of the icon representing the frame.  */);
   }
 
 
-
-#if 0
-  defsubr (&Spgtk_read_file_name);
-#endif
   defsubr (&Spgtk_get_resource);
   defsubr (&Spgtk_set_resource);
   defsubr (&Sxw_display_color_p); /* this and next called directly by C code */
   defsubr (&Sx_display_grayscale_p);
   defsubr (&Spgtk_font_name);
-#ifdef PGTK_IMPL_COCOA
-  defsubr (&Spgtk_do_applescript);
-#endif
   defsubr (&Sxw_color_defined_p);
   defsubr (&Sxw_color_values);
   defsubr (&Sx_server_max_request_size);
@@ -3214,11 +2714,6 @@ be used as the image of the icon representing the frame.  */);
 
   defsubr (&Spgtk_hide_others);
   defsubr (&Spgtk_hide_emacs);
-  defsubr (&Spgtk_emacs_info_panel);
-#if 0
-  defsubr (&Spgtk_popup_font_panel);
-  defsubr (&Spgtk_popup_color_panel);
-#endif
 
   defsubr (&Sx_show_tip);
   defsubr (&Sx_hide_tip);
@@ -3261,7 +2756,6 @@ When using Gtk+ tooltips, the tooltip face is not used.  */);
 
   DEFSYM (Qmono, "mono");
 
-#ifdef USE_CAIRO
   DEFSYM (Qpdf, "pdf");
 
   DEFSYM (Qorientation, "orientation");
@@ -3271,7 +2765,6 @@ When using Gtk+ tooltips, the tooltip face is not used.  */);
   DEFSYM (Qlandscape, "landscape");
   DEFSYM (Qreverse_portrait, "reverse-portrait");
   DEFSYM (Qreverse_landscape, "reverse-landscape");
-#endif
 }
 
 #ifdef PGTK_DEBUG
@@ -3326,5 +2819,7 @@ void pgtk_backtrace(const char *file, int lineno)
 
   fprintf(stderr, "%s %.10s:%04d ********\n", timestr, file, lineno);
 }
+
+#endif
 
 #endif

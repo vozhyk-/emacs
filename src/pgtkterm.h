@@ -395,8 +395,6 @@ enum
 
 #define GDK_DISPLAY_XDISPLAY(gdpy) 0
 
-#define FRAME_X_DOUBLE_BUFFERED_P(f) 0
-
 /* Turning a lisp vector value into a pointer to a struct scroll_bar.  */
 #define XSCROLL_BAR(vec) ((struct scroll_bar *) XVECTOR (vec))
 
@@ -513,109 +511,41 @@ enum
   (! (FRAME_HAS_VERTICAL_SCROLL_BARS_ON_LEFT (f)) ? 0	\
    : FRAME_SCROLL_BAR_COLS (f))
 
+
+/* Display init/shutdown functions implemented in pgtkterm.c */
 extern struct pgtk_display_info *pgtk_term_init (Lisp_Object display_name, char *resource_name);
 extern void pgtk_term_shutdown (int sig);
 
-/* constants for text rendering */
-#define PGTK_DUMPGLYPH_NORMAL             0
-#define PGTK_DUMPGLYPH_CURSOR             1
-#define PGTK_DUMPGLYPH_FOREGROUND         2
-#define PGTK_DUMPGLYPH_MOUSEFACE          3
-
-
-
-/* In pgtkfont, called from fontset.c */
-extern void pgtkfont_make_fontset_for_font (Lisp_Object name,
-                                         Lisp_Object font_object);
-
-/* In pgtkfont, for debugging */
-struct glyph_string;
-void pgtk_dump_glyphstring (struct glyph_string *s) EXTERNALLY_VISIBLE;
-
 /* Implemented in pgtkterm, published in or needed from pgtkfns. */
-extern Lisp_Object pgtk_list_fonts (struct frame *f, Lisp_Object pattern,
-                                  int size, int maxnames);
 extern void pgtk_clear_frame (struct frame *f);
-
 extern char *pgtk_xlfd_to_fontname (const char *xlfd);
 
-extern Lisp_Object pgtk_map_event_to_object (void);
-#ifdef __OBJC__
-extern Lisp_Object pgtk_string_from_pasteboard (id pb);
-extern void pgtk_string_to_pasteboard (id pb, Lisp_Object str);
-#endif
-extern Lisp_Object pgtk_get_local_selection (Lisp_Object selection_name,
-                                           Lisp_Object target_type);
-extern void nxatoms_of_pgtkselect (void);
+/* Implemented in pgtkfns. */
 extern void pgtk_set_doc_edited (void);
+extern const char *pgtk_get_defaults_value (const char *key);
 
-extern bool
-pgtk_defined_color (struct frame *f,
-                  const char *name,
-                  XColor *color_def, bool alloc,
-                  bool makeIndex);
-#if 0
-extern void
-pgtk_query_color (void *col, XColor *color_def, int setPixel);
-#endif
-void
-pgtk_query_color (struct frame *f, XColor *color);
-void
-pgtk_query_colors (struct frame *f, XColor *colors, int ncolors);
-
-int pgtk_parse_color (const char *color_name, XColor *color);
-
+/* Color management implemented in pgtkterm. */
+extern bool pgtk_defined_color (struct frame *f,
+				const char *name,
+				XColor *color_def, bool alloc,
+				bool makeIndex);
+extern void pgtk_query_color (struct frame *f, XColor *color);
+extern void pgtk_query_colors (struct frame *f, XColor *colors, int ncolors);
+extern int pgtk_parse_color (const char *color_name, XColor *color);
 extern int pgtk_lisp_to_color (Lisp_Object color, XColor *col);
-#ifdef __OBJC__
-extern PGTKColor *pgtk_lookup_indexed_color (unsigned long idx, struct frame *f);
-extern unsigned long pgtk_index_color (PGTKColor *color, struct frame *f);
-extern const char *pgtk_get_pending_menu_title (void);
-extern void pgtk_check_menu_open (PGTKMenu *menu);
-extern void pgtk_check_pending_open_menu (void);
-#endif
 
+/* Implemented in pgtkterm.c */
 extern void pgtk_clear_area (struct frame *f, int x, int y, int width, int height);
 extern int pgtk_gtk_to_emacs_modifiers (int state);
+extern void pgtk_clear_under_internal_border (struct frame *f);
+extern void pgtk_set_event_handler(struct frame *f);
 
-/* C access to ObjC functionality */
-extern void  pgtk_release_object (void *obj);
-extern void  pgtk_retain_object (void *obj);
-extern void *pgtk_alloc_autorelease_pool (void);
-extern void pgtk_release_autorelease_pool (void *);
-extern const char *pgtk_get_defaults_value (const char *key);
-extern void pgtk_init_locale (void);
-
-
-/* in pgtkmenu */
-#if 0
-extern void update_frame_tool_bar (struct frame *f);
-extern void free_frame_tool_bar (struct frame *f);
-#endif
-extern Lisp_Object find_and_return_menu_selection (struct frame *f,
-                                                   bool keymaps,
-                                                   void *client_data);
-extern Lisp_Object pgtk_popup_dialog (struct frame *, Lisp_Object header,
-                                    Lisp_Object contents);
-
-#define PGTKAPP_DATA2_RUNASSCRIPT 10
-extern void pgtk_run_ascript (void);
-
-#define PGTKAPP_DATA2_RUNFILEDIALOG 11
-extern void pgtk_run_file_dialog (void);
-
-extern void syms_of_pgtkterm (void);
-extern void syms_of_pgtkfns (void);
-extern void syms_of_pgtkmenu (void);
-extern void syms_of_pgtkselect (void);
-
+/* Implemented in pgtkterm.c */
 extern int x_display_pixel_height (struct pgtk_display_info *);
 extern int x_display_pixel_width (struct pgtk_display_info *);
 
-/* This in pgtkterm.c */
-extern float pgtk_antialias_threshold;
+/* Implemented in pgtkterm.c */
 extern void x_destroy_window (struct frame *f);
-extern void x_set_undecorated (struct frame *f, Lisp_Object new_value,
-                               Lisp_Object old_value);
 extern void x_set_parent_frame (struct frame *f, Lisp_Object new_value,
                                 Lisp_Object old_value);
 extern void x_set_no_focus_on_map (struct frame *f, Lisp_Object new_value,
@@ -625,43 +555,29 @@ extern void x_set_no_accept_focus (struct frame *f, Lisp_Object new_value,
 extern void x_set_z_group (struct frame *f, Lisp_Object new_value,
                            Lisp_Object old_value);
 extern int pgtk_select (int nfds, fd_set *readfds, fd_set *writefds,
-		      fd_set *exceptfds, struct timespec *timeout,
-		      sigset_t *sigmask);
+			fd_set *exceptfds, struct timespec *timeout,
+			sigset_t *sigmask);
 
+/* Cairo related functions implemented in pgtkterm.c */
 extern cairo_t *pgtk_begin_cr_clip (struct frame *f, XGCValues *gc);
 extern void pgtk_end_cr_clip (struct frame *f);
 extern void pgtk_set_cr_source_with_gc_foreground (struct frame *f, XGCValues *gc);
 extern void pgtk_set_cr_source_with_gc_background (struct frame *f, XGCValues *gc);
 extern void pgtk_set_cr_source_with_color (struct frame *f, unsigned long color);
-
-#define MINWIDTH 10
-#define MINHEIGHT 10
-
-/* Screen max coordinate
- Using larger coordinates causes movewindow/placewindow to abort */
-#define SCREENMAX 16000
-
-#define PGTK_SCROLL_BAR_WIDTH_DEFAULT     [EmacsScroller scrollerWidth]
-#define PGTK_SCROLL_BAR_HEIGHT_DEFAULT    [EmacsScroller scrollerHeight]
-/* This is to match emacs on other platforms, ugly though it is. */
-#define PGTK_SELECTION_BG_COLOR_DEFAULT	@"LightGoldenrod2";
-#define PGTK_SELECTION_FG_COLOR_DEFAULT	@"Black";
-#define RESIZE_HANDLE_SIZE 12
-
-/* Little utility macros */
-#define IN_BOUND(min, x, max) (((x) < (min)) \
-                                ? (min) : (((x)>(max)) ? (max) : (x)))
-#define SCREENMAXBOUND(x) (IN_BOUND (-SCREENMAX, x, SCREENMAX))
-
-extern void
-pgtk_clear_under_internal_border (struct frame *f);
-
-extern void init_pgtkterm (void);
-
 extern void pgtk_cr_draw_frame (cairo_t *cr, struct frame *f);
-extern void pgtk_set_event_handler(struct frame *f);
 extern void pgtk_cr_destroy_surface(struct frame *f);
 
+/* Symbol initializations implemented in each pgtk sources. */
+extern void syms_of_pgtkterm (void);
+extern void syms_of_pgtkfns (void);
+extern void syms_of_pgtkmenu (void);
+extern void syms_of_pgtkselect (void);
+
+/* Implemented in pgtkselect. */
+extern void nxatoms_of_pgtkselect (void);
+
+/* Initialization and marking implemented in pgtkterm.c */
+extern void init_pgtkterm (void);
 extern void mark_pgtkterm(void);
 
 #endif	/* HAVE_PGTK */
