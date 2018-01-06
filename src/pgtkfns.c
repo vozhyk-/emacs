@@ -2609,6 +2609,87 @@ position (0, 0) of the selected frame's terminal. */)
 }
 
 
+DEFUN ("pgtk-page-setup-dialog", Fpgtk_page_setup_dialog, Spgtk_page_setup_dialog, 0, 0, 0,
+       doc: /* Pop up a page setup dialog.
+The current page setup can be obtained using `x-get-page-setup'.  */)
+     (void)
+{
+  block_input ();
+  xg_page_setup_dialog ();
+  unblock_input ();
+
+  return Qnil;
+}
+
+DEFUN ("pgtk-get-page-setup", Fpgtk_get_page_setup, Spgtk_get_page_setup, 0, 0, 0,
+       doc: /* Return the value of the current page setup.
+The return value is an alist containing the following keys:
+
+  orientation: page orientation (symbol `portrait', `landscape',
+	`reverse-portrait', or `reverse-landscape').
+  width, height: page width/height in points not including margins.
+  left-margin, right-margin, top-margin, bottom-margin: print margins,
+	which is the parts of the page that the printer cannot print
+	on, in points.
+
+The paper width can be obtained as the sum of width, left-margin, and
+right-margin values if the page orientation is `portrait' or
+`reverse-portrait'.  Otherwise, it is the sum of width, top-margin,
+and bottom-margin values.  Likewise, the paper height is the sum of
+height, top-margin, and bottom-margin values if the page orientation
+is `portrait' or `reverse-portrait'.  Otherwise, it is the sum of
+height, left-margin, and right-margin values.  */)
+     (void)
+{
+  Lisp_Object result;
+
+  block_input ();
+  result = xg_get_page_setup ();
+  unblock_input ();
+
+  return result;
+}
+
+DEFUN ("pgtk-print-frames-dialog", Fpgtk_print_frames_dialog, Spgtk_print_frames_dialog, 0, 1, "",
+       doc: /* Pop up a print dialog to print the current contents of FRAMES.
+FRAMES should be nil (the selected frame), a frame, or a list of
+frames (each of which corresponds to one page).  Each frame should be
+visible.  */)
+     (Lisp_Object frames)
+{
+  Lisp_Object rest, tmp;
+  int count;
+
+  if (!CONSP (frames))
+    frames = list1 (frames);
+
+  tmp = Qnil;
+  for (rest = frames; CONSP (rest); rest = XCDR (rest))
+    {
+      struct frame *f = decode_window_system_frame (XCAR (rest));
+      Lisp_Object frame;
+
+      XSETFRAME (frame, f);
+      if (!FRAME_VISIBLE_P (f))
+	error ("Frames to be printed must be visible.");
+      tmp = Fcons (frame, tmp);
+    }
+  frames = Fnreverse (tmp);
+
+  /* Make sure the current matrices are up-to-date.  */
+  count = SPECPDL_INDEX ();
+  specbind (Qredisplay_dont_pause, Qt);
+  redisplay_preserve_echo_area (32);
+  unbind_to (count, Qnil);
+
+  block_input ();
+  xg_print_frames_dialog (frames);
+  unblock_input ();
+
+  return Qnil;
+}
+
+
 /* ==========================================================================
 
     Lisp interface declaration
@@ -2717,6 +2798,11 @@ be used as the image of the icon representing the frame.  */);
 
   defsubr (&Sx_show_tip);
   defsubr (&Sx_hide_tip);
+
+  // defsubr (&Spgtk_export_frames);
+  defsubr (&Spgtk_page_setup_dialog);
+  defsubr (&Spgtk_get_page_setup);
+  defsubr (&Spgtk_print_frames_dialog);
 
   as_status = 0;
   as_script = Qnil;

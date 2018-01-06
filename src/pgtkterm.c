@@ -6808,20 +6808,8 @@ void
 pgtk_cr_draw_frame (cairo_t *cr, struct frame *f)
 {
   PGTK_TRACE("pgtk_cr_draw_frame");
-#if 0
-  int width, height;
-
-  width = FRAME_PIXEL_WIDTH (f);
-  height = FRAME_PIXEL_HEIGHT (f);
-
-#if 0
-  x_free_cr_resources (f);
-#endif
-  FRAME_CR_CONTEXT (f) = cr;
-  pgtk_clear_area (f, 0, 0, width, height);
-  expose_frame (f, 0, 0, width, height);
-  FRAME_CR_CONTEXT (f) = NULL;
-#endif
+  cairo_set_source_surface(cr, FRAME_CR_SURFACE(f), 0, 0);
+  cairo_paint(cr);
 }
 
 void
