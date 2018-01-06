@@ -71,7 +71,6 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #ifdef HAVE_WINDOW_SYSTEM
 #include TERM_HEADER
 #endif /* HAVE_WINDOW_SYSTEM */
-#undef wx
 
 /* Work around GCC bug 54561.  */
 #if GNUC_PREREQ (4, 3, 0)
