@@ -3519,6 +3519,7 @@ pgtk_draw_fringe_bitmap (struct window *w, struct glyph_row *row, struct draw_fr
 }
 
 static struct atimer *hourglass_atimer = NULL;
+static int hourglass_enter_count = 0;
 
 static void hourglass_cb(struct atimer *timer)
 {
@@ -3539,10 +3540,13 @@ pgtk_show_hourglass(struct frame *f)
   gdk_window_raise(gtk_widget_get_window(x->hourglass_widget));
   gdk_window_set_cursor(gtk_widget_get_window(x->hourglass_widget), x->hourglass_cursor);
 
-  struct timespec ts = make_timespec(0, 50 * 1000 * 1000);
-  if (hourglass_atimer != NULL)
-    cancel_atimer(hourglass_atimer);
-  hourglass_atimer = start_atimer(ATIMER_CONTINUOUS, ts, hourglass_cb, NULL);
+  /* For cursor animation, we receive signals, set pending_signals, and dispatch. */
+  if (hourglass_enter_count++ == 0) {
+    struct timespec ts = make_timespec(0, 50 * 1000 * 1000);
+    if (hourglass_atimer != NULL)
+      cancel_atimer(hourglass_atimer);
+    hourglass_atimer = start_atimer(ATIMER_CONTINUOUS, ts, hourglass_cb, NULL);
+  }
 
   /* Cursor frequently stops animation. gtk's bug? */
 }
@@ -3551,9 +3555,11 @@ static void
 pgtk_hide_hourglass(struct frame *f)
 {
   struct pgtk_output *x = f->output_data.pgtk;
-  if (hourglass_atimer != NULL) {
-    cancel_atimer(hourglass_atimer);
-    hourglass_atimer = NULL;
+  if (--hourglass_enter_count == 0) {
+    if (hourglass_atimer != NULL) {
+      cancel_atimer(hourglass_atimer);
+      hourglass_atimer = NULL;
+    }
   }
   if (x->hourglass_widget != NULL) {
     gtk_widget_destroy(x->hourglass_widget);
