@@ -41,6 +41,11 @@ extern void pgtk_backtrace(const char *file, int lineno);
 #define PGTK_BACKTRACE() ((void) 0)
 #endif
 
+/* The GtkTooltip API came in 2.12, but gtk-enable-tooltips in 2.14. */
+#if GTK_CHECK_VERSION (2, 14, 0)
+#define USE_GTK_TOOLTIP
+#endif
+
 /* could use list to store these, but rest of emacs has a big infrastructure
    for managing a table of bitmap "records" */
 struct pgtk_bitmap_record
