@@ -36,7 +36,7 @@ M17N="YES"        # Enable m17n international table input support.
 OTF=              # OTF font support. Also a secondary dependency
                   # by pulling m17n-lib. Not needed in that case.
 CAIRO="YES"       # Highly experimental. Maintaner dissapeared.
-XWIDGETS=         # Use GTK+ widgets pulled from webkit2gtk. Usable.
+XWIDGETS="YES"    # Use GTK+ widgets pulled from webkit2gtk. Usable.
 DOCS_HTML=        # Generate and install html documentation.
 DOCS_PDF=         # Generate and install pdf documentation.
 MAGICK="YES"      # Imagemagick, like flash, is bug ridden and won't die.
