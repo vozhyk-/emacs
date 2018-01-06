@@ -5994,6 +5994,9 @@ garbage_collect_1 (void *end)
   mark_terminals ();
   mark_kboards ();
   mark_threads ();
+#ifndef HAVE_PGTK
+  mark_pgtkterm();
+#endif
 
 #if defined(USE_GTK)
   xg_mark_data ();

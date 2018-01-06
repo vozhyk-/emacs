@@ -662,4 +662,6 @@ extern void pgtk_cr_draw_frame (cairo_t *cr, struct frame *f);
 extern void pgtk_set_event_handler(struct frame *f);
 extern void pgtk_cr_destroy_surface(struct frame *f);
 
+extern void mark_pgtkterm(void);
+
 #endif	/* HAVE_PGTK */

@@ -114,6 +114,20 @@ static int evq_flush(struct input_event *hold_quit)
   return n;
 }
 
+void
+mark_pgtkterm(void)
+{
+  struct event_queue_t *evq = &event_q;
+  int i, n = evq->nr;
+  for (i = 0; i < n; i++) {
+    union buffered_input_event *ev = &evq->q[i];
+    mark_object (ev->ie.x);
+    mark_object (ev->ie.y);
+    mark_object (ev->ie.frame_or_window);
+    mark_object (ev->ie.arg);
+  }
+}
+
 char *
 x_get_keysym_name (int keysym)
 /* --------------------------------------------------------------------------
