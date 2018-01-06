@@ -29,6 +29,7 @@ GDK_BACKEND=wayland ./emacs  (or ./emacs -Q if you have problems.)
 
 ## TODO
 
+- open and close display.
 - sometimes can't send selection data
 
 Low priority:
