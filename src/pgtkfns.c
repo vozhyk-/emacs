@@ -1807,7 +1807,15 @@ string).  If TERMINAL is nil, that stands for the selected frame's
 terminal.  */)
      (Lisp_Object terminal)
 {
-  check_pgtk_display_info (terminal);
+  struct pgtk_display_info *dpyinfo = check_pgtk_display_info (terminal);
+
+#if 0  // fixme:
+  if (dpyinfo->reference_count > 0)
+    error ("Display still has frames on it");
+#endif
+
+  pgtk_delete_terminal (dpyinfo->terminal);
+
   return Qnil;
 }
 

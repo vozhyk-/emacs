@@ -79,6 +79,7 @@ static struct event_queue_t {
 
 static Time ignore_next_mouse_click_timeout;
 
+static void pgtk_delete_display (struct pgtk_display_info *dpyinfo);
 static void pgtk_clear_frame_area(struct frame *f, int x, int y, int width, int height);
 static void pgtk_fill_rectangle(struct frame *f, unsigned long color, int x, int y, int width, int height);
 static void pgtk_clip_to_row (struct window *w, struct glyph_row *row,
@@ -4581,6 +4582,47 @@ pgtk_menu_show (struct frame *f, int x, int y, int menuflags,
   return Qnil;
 }
 
+/* This function is called when the last frame on a display is deleted. */
+void
+pgtk_delete_terminal (struct terminal *terminal)
+{
+  struct pgtk_display_info *dpyinfo = terminal->display_info.pgtk;
+
+  /* Protect against recursive calls.  delete_frame in
+     delete_terminal calls us back when it deletes our last frame.  */
+  if (!terminal->name)
+    return;
+
+  block_input ();
+
+  /* Normally, the display is available...  */
+  if (dpyinfo->gdpy)
+    {
+      x_destroy_all_bitmaps (dpyinfo);
+
+      xg_display_close (dpyinfo->gdpy);
+
+      /* Do not close the connection here because it's already closed
+	 by X(t)CloseDisplay (Bug#18403).  */
+      dpyinfo->gdpy = NULL;
+    }
+
+  /* ...but if called from x_connection_closed, the display may already
+     be closed and dpyinfo->display was set to 0 to indicate that.  Since
+     X server is most likely gone, explicit close is the only reliable
+     way to continue and avoid Bug#19147.  */
+  else if (dpyinfo->connection >= 0)
+    emacs_close (dpyinfo->connection);
+
+  /* No more input on this descriptor.  */
+  delete_keyboard_wait_descriptor (dpyinfo->connection);
+  /* Mark as dead. */
+  dpyinfo->connection = -1;
+
+  pgtk_delete_display (dpyinfo);
+  unblock_input ();
+}
+
 static struct terminal *
 pgtk_create_terminal (struct pgtk_display_info *dpyinfo)
 /* --------------------------------------------------------------------------
@@ -4612,7 +4654,7 @@ pgtk_create_terminal (struct pgtk_display_info *dpyinfo)
   terminal->redeem_scroll_bar_hook = pgtk_redeem_scroll_bar;
   terminal->judge_scroll_bars_hook = pgtk_judge_scroll_bars;
   terminal->delete_frame_hook = x_destroy_window;
-  // terminal->delete_terminal_hook = pgtk_delete_terminal;
+  terminal->delete_terminal_hook = pgtk_delete_terminal;
   /* Other hooks are NULL by default.  */
 
   return terminal;
@@ -6531,6 +6573,37 @@ pgtk_term_init (Lisp_Object display_name, char *resource_name)
   unblock_input ();
 
   return dpyinfo;
+}
+
+/* Get rid of display DPYINFO, deleting all frames on it,
+   and without sending any more commands to the X server.  */
+
+static void
+pgtk_delete_display (struct pgtk_display_info *dpyinfo)
+{
+  struct terminal *t;
+
+  /* Close all frames and delete the generic struct terminal for this
+     X display.  */
+  for (t = terminal_list; t; t = t->next_terminal)
+    if (t->type == output_pgtk && t->display_info.pgtk == dpyinfo)
+      {
+        delete_terminal (t);
+        break;
+      }
+
+  if (x_display_list == dpyinfo)
+    x_display_list = dpyinfo->next;
+  else
+    {
+      struct pgtk_display_info *tail;
+
+      for (tail = x_display_list; tail; tail = tail->next)
+	if (tail->next == dpyinfo)
+	  tail->next = tail->next->next;
+    }
+
+  xfree (dpyinfo);
 }
 
 char *
