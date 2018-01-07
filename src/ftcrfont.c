@@ -24,8 +24,6 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include "lisp.h"
 #ifndef HAVE_PGTK
 #include "xterm.h"
-#define PGTK_TRACE(fmt, ...) ((void) 0)
-#define PGTK_BACKTRACE() ((void) 0)
 #else
 #include "pgtkterm.h"
 #endif
@@ -244,7 +242,6 @@ ftcrfont_draw (struct glyph_string *s,
 
   if (with_background)
     {
-      PGTK_TRACE("with background.");
 #ifndef HAVE_PGTK
       x_set_cr_source_with_gc_background (f, s->gc);
 #else

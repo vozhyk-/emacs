@@ -320,10 +320,6 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #ifdef HAVE_WINDOW_SYSTEM
 #include TERM_HEADER
 #endif /* HAVE_WINDOW_SYSTEM */
-#ifndef PGTK_TRACE
-#define PGTK_TRACE(fmt, ...) ((void) 0)
-#define PGTK_BACKTRACE() ((void) 0)
-#endif
 
 #ifndef FRAME_X_OUTPUT
 #define FRAME_X_OUTPUT(f) ((f)->output_data.x)
@@ -11475,7 +11471,6 @@ clear_garbaged_frames (void)
 
 	  if (FRAME_VISIBLE_P (f) && FRAME_GARBAGED_P (f))
 	    {
-	      PGTK_TRACE("resized_p = %d.", f->resized_p);
 	      if (f->resized_p
 		  /* It makes no sense to redraw a non-selected TTY
 		     frame, since that will actually clear the
@@ -11498,7 +11493,6 @@ clear_garbaged_frames (void)
 	      fset_redisplay (f);
 	      f->garbaged = false;
 	      f->resized_p = false;
-	      PGTK_TRACE("resized_p = FALSE.");
             }
 	}
 
@@ -14252,7 +14246,6 @@ redisplay_internal (void)
 
     cancel:
       /* Text changed drastically or point moved off of line.  */
-      PGTK_TRACE("[%d].enabled_p=false.", this_line_vpos),
       SET_MATRIX_ROW_ENABLED_P (w->desired_matrix, this_line_vpos, false);
     }
 
@@ -17875,7 +17868,6 @@ try_window_reusing_current_matrix (struct window *w)
 
 	  /* Disable lines that must be updated.  */
 	  for (i = 0; i < nrows_scrolled; ++i)
-	    PGTK_TRACE("[%d].enabled_p=false.", i),
 	    (start_row + i)->enabled_p = false;
 
 	  /* Re-compute Y positions.  */
@@ -17906,7 +17898,6 @@ try_window_reusing_current_matrix (struct window *w)
 	  /* Disable lines in the current matrix which are now
 	     below the window.  */
 	  for (++row; row < bottom_row; ++row)
-	    PGTK_TRACE("[%ld].enabled_p=false.", row - start_row),
 	    row->enabled_p = row->mode_line_p = false;
 	}
 
@@ -18057,7 +18048,6 @@ try_window_reusing_current_matrix (struct window *w)
 
       /* Disable rows not reused.  */
       for (row -= nrows_scrolled; row < bottom_row; ++row)
-	PGTK_TRACE("[%ld].enabled_p=false.", row - start_row),
 	row->enabled_p = false;
 
       /* Point may have moved to a different line, so we cannot assume that
@@ -18343,7 +18333,6 @@ sync_frame_with_window_matrix_rows (struct window *w)
       /* Disable frame rows whose corresponding window rows have
 	 been disabled in try_window_id.  */
       if (!window_row->enabled_p)
-	PGTK_TRACE("[%ld].enabled_p=false.", frame_row - f->current_matrix->rows),
 	frame_row->enabled_p = false;
 
       ++window_row, ++frame_row;
@@ -19128,7 +19117,6 @@ try_window_id (struct window *w)
 	     the current matrix?  I don't think so, so we mark rows
 	     displayed invalid in the current matrix by setting their
 	     enabled_p flag to false.  */
-	  PGTK_TRACE("[%d].enabled_p=false.", it.vpos),
 	  SET_MATRIX_ROW_ENABLED_P (w->current_matrix, it.vpos, false);
 	  if (display_line (&it, w->cursor.vpos))
 	    last_text_row_at_end = it.glyph_row - 1;
@@ -21284,7 +21272,6 @@ display_line (struct it *it, int cursor_vpos)
     }
 
   /* Clear the result glyph row and enable it.  */
-  PGTK_TRACE("display_line: [%ld]", MATRIX_ROW_VPOS (row, it->w->desired_matrix));
   prepare_desired_row (it->w, row, false);
 
   row->y = it->current_y;
@@ -26789,7 +26776,6 @@ static int draw_glyphs_debug(const char *file, int lineno,
 			     enum glyph_row_area area, ptrdiff_t start, ptrdiff_t end,
 			     enum draw_glyphs_face hl, int overlaps)
 {
-  PGTK_TRACE("draw_glyphs: from %s:%d", file, lineno);
   return draw_glyphs(w, x, row, area, start, end, hl, overlaps);
 }
 #define draw_glyphs(w, x, r, a, s, e, h, o) \
@@ -29452,7 +29438,6 @@ void
 display_and_set_cursor (struct window *w, bool on,
 			int hpos, int vpos, int x, int y)
 {
-  PGTK_TRACE("display_and_set_cursor.");
   struct frame *f = XFRAME (w->frame);
   int new_cursor_type;
   int new_cursor_width;
@@ -29655,11 +29640,9 @@ draw_row_with_mouse_face (struct window *w, int start_x, struct glyph_row *row,
 static void
 show_mouse_face (Mouse_HLInfo *hlinfo, enum draw_glyphs_face draw)
 {
-  PGTK_TRACE("show_mouse_face: hlinfo=%p, draw=%u.", hlinfo, draw);
   struct window *w = XWINDOW (hlinfo->mouse_face_window);
   struct frame *f = XFRAME (WINDOW_FRAME (w));
 
-  PGTK_TRACE("show_mouse_face: 1.");
   if (/* If window is in the process of being destroyed, don't bother
 	 to do anything.  */
       w->current_matrix != NULL
@@ -29672,7 +29655,6 @@ show_mouse_face (Mouse_HLInfo *hlinfo, enum draw_glyphs_face draw)
       bool phys_cursor_on_p = w->phys_cursor_on_p;
       struct glyph_row *row, *first, *last;
 
-      PGTK_TRACE("show_mouse_face: 2.");
       first = MATRIX_ROW (w->current_matrix, hlinfo->mouse_face_beg_row);
       last = MATRIX_ROW (w->current_matrix, hlinfo->mouse_face_end_row);
 
@@ -29746,7 +29728,6 @@ show_mouse_face (Mouse_HLInfo *hlinfo, enum draw_glyphs_face draw)
 	    }
 	}
 
-      PGTK_TRACE("show_mouse_face: 3.");
       /* When we've written over the cursor, arrange for it to
 	 be displayed again.  */
       if (FRAME_WINDOW_P (f)
@@ -29770,29 +29751,23 @@ show_mouse_face (Mouse_HLInfo *hlinfo, enum draw_glyphs_face draw)
 #endif	/* HAVE_WINDOW_SYSTEM */
 	}
     }
-  PGTK_TRACE("show_mouse_face: 4.");
 
 #ifdef HAVE_WINDOW_SYSTEM
   /* Change the mouse cursor.  */
   if (FRAME_WINDOW_P (f) && NILP (do_mouse_tracking))
     {
-      PGTK_TRACE("show_mouse_face: 5.");
 #if ! defined (USE_GTK) && ! defined (HAVE_NS)
       if (draw == DRAW_NORMAL_TEXT
 	  && !EQ (hlinfo->mouse_face_window, f->tool_bar_window))
-	PGTK_TRACE("show_mouse_face: 5."),
 	FRAME_RIF (f)->define_frame_cursor (f, FRAME_X_OUTPUT (f)->text_cursor);
       else
 #endif
       if (draw == DRAW_MOUSE_FACE)
-	PGTK_TRACE("show_mouse_face: 6."),
 	FRAME_RIF (f)->define_frame_cursor (f, FRAME_X_OUTPUT (f)->hand_cursor);
       else
-	PGTK_TRACE("show_mouse_face: 7."),
 	FRAME_RIF (f)->define_frame_cursor (f, FRAME_X_OUTPUT (f)->nontext_cursor);
     }
 #endif	/* HAVE_WINDOW_SYSTEM */
-  PGTK_TRACE("show_mouse_face: done.");
 }
 
 /* EXPORT:
@@ -30367,9 +30342,7 @@ mouse_face_from_buffer_pos (Lisp_Object window,
     = face_at_buffer_position (w, mouse_charpos, &ignore,
 			       mouse_charpos + 1,
 			       !hlinfo->mouse_face_hidden, -1);
-  PGTK_TRACE("enter show_mouse_face.");
   show_mouse_face (hlinfo, DRAW_MOUSE_FACE);
-  PGTK_TRACE("leave show_mouse_face.");
 }
 
 /* The following function is not used anymore (replaced with

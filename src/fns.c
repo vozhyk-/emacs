@@ -3953,31 +3953,19 @@ hash_lookup (struct Lisp_Hash_Table *h, Lisp_Object key, EMACS_UINT *hash)
   EMACS_UINT hash_code;
   ptrdiff_t start_of_bucket, i;
 
-  // PGTK_TRACE("hash_lookup: 0");
   hash_code = h->test.hashfn (&h->test, key);
-  // PGTK_TRACE("hash_lookup: 1");
   eassert ((hash_code & ~INTMASK) == 0);
   if (hash)
     *hash = hash_code;
-  // PGTK_TRACE("hash_lookup: 2");
 
-  // PGTK_TRACE("hash_lookup: 2.0: %ld", (long) hash_code);
-  // PGTK_TRACE("hash_lookup: 2.1: %p", h);
-  // PGTK_TRACE("hash_lookup: 2.2: %ld", (long) h->index.i);
-  // PGTK_TRACE("hash_lookup: 2.3: %ld", (long) ASIZE(h->index));
   start_of_bucket = hash_code % ASIZE (h->index);
 
-  // PGTK_TRACE("hash_lookup: 3");
-  // PGTK_TRACE("hash_lookup: 3.0: %p", h);
-  // PGTK_TRACE("hash_lookup: 3.1: %ld", (long) start_of_bucket);
-  // PGTK_TRACE("hash_lookup: 3.2: %ld", (long) HASH_INDEX(h, start_of_bucket));
   for (i = HASH_INDEX (h, start_of_bucket); 0 <= i; i = HASH_NEXT (h, i))
     if (EQ (key, HASH_KEY (h, i))
 	|| (h->test.cmpfn
 	    && hash_code == XUINT (HASH_HASH (h, i))
 	    && h->test.cmpfn (&h->test, key, HASH_KEY (h, i))))
       break;
-  // PGTK_TRACE("hash_lookup: 4");
 
   return i;
 }
