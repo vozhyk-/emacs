@@ -1,4 +1,16 @@
 #######################################################################
+# CAVEAT LECTOR: This PKGBUILD is highly opinionated. I give you
+#                enough rope to hang yourself, but by default it
+#                only enables the features I use.
+#
+#        TLDR: yaourt users, cry me a river.
+#
+#        Everyone else: do not update blindly this PKGBUILD. At least
+#        make sure to compare and understand the changes.
+#
+#######################################################################
+
+#######################################################################
 # Track a maintenance branch or, by default, track master.
 #
 # Pick a branch from the output of "git branch" ran on your local copy
@@ -50,7 +62,7 @@ if [[ BRANCH = "emacs-26" ]]; then
 else
   pkgname=emacs-pgtk
 fi
-pkgver=27.0.50.131782
+pkgver=27.0.50.131872
 pkgrel=1
 pkgdesc="GNU Emacs. PGTK Development."
 arch=('x86_64') # Arch Linux only. Users of derivatives are on their own.
@@ -152,11 +164,11 @@ build() {
   cd "$srcdir/emacs-pgtk"
 
   local _conf=(
-    --prefix=/opt/emacs-pgtk
+    --prefix=/usr
     --sysconfdir=/etc
-    --libexecdir=/opt/emacs-pgtk/lib
+    --libexecdir=/usr/lib
     --localstatedir=/var
-    --mandir=/opt/emacs-pgtk/share/man
+    --mandir=/usr/share/man
     --without-x
     --with-gameuser=:games
     --with-sound=alsa
@@ -269,16 +281,16 @@ package() {
   if [[ $DOCS_PDF = "YES" ]]; then make DESTDIR="$pkgdir/" install-pdf; fi
 
   # remove conflict with ctags package
-  mv "$pkgdir"/opt/emacs-pgtk/bin/{ctags,ctags.emacs}
+  mv "$pkgdir"/usr/bin/{ctags,ctags.emacs}
 
   if [[ $NOGZ = "YES" ]]; then
-    mv "$pkgdir"/opt/emacs-pgtk/share/man/man1/{ctags.1,ctags.emacs.1};
+    mv "$pkgdir"/usr/share/man/man1/{ctags.1,ctags.emacs.1};
   else
-    mv "$pkgdir"/opt/emacs-pgtk/share/man/man1/{ctags.1.gz,ctags.emacs.1.gz}
+    mv "$pkgdir"/usr/share/man/man1/{ctags.1.gz,ctags.emacs.1.gz}
   fi
 
   # fix user/root permissions on usr/share files
-  find "$pkgdir"/opt/emacs-pgtk/share/emacs/ | xargs chown root:root
+  find "$pkgdir"/usr/share/emacs/ | xargs chown root:root
 
   # fix permssions on /var/games
   mkdir -p "$pkgdir"/var/games/emacs
@@ -290,10 +302,10 @@ package() {
   # under Arch Linux model, because it adds $DESTDIR as prefix to the
   # final Exec targets. The fix is to hack it with an axe.
   install -Dm644 etc/emacs.service \
-    "$pkgdir"/opt/emacs-pgtk/lib/systemd/user/emacs.service
-  sed -i -e 's#\(ExecStart\=\)#\1\/opt/emacs-pgtk\/bin\/#' \
-    -e 's#\(ExecStop\=\)#\1\/opt/emacs-pgtk\/bin\/#' \
-    "$pkgdir"/opt/emacs-pgtk/lib/systemd/user/emacs.service
+    "$pkgdir"/usr/lib/systemd/user/emacs.service
+  sed -i -e 's#\(ExecStart\=\)#\1\/usr\/bin\/#' \
+    -e 's#\(ExecStop\=\)#\1\/usr\/bin\/#' \
+    "$pkgdir"/usr/lib/systemd/user/emacs.service
 }
 
 # vim:set ft=sh ts=2 sw=2 et:
