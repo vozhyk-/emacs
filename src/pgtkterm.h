@@ -381,46 +381,31 @@ enum
 };
 
 /* This gives the pgtk_display_info structure for the display F is on.  */
-#define FRAME_DISPLAY_INFO(f) ((f)->output_data.pgtk->display_info)
-#define FRAME_X_OUTPUT(f) ((f)->output_data.pgtk)
-#define FRAME_PGTK_WINDOW(f) ((f)->output_data.pgtk->window_desc)
-#define FRAME_X_WINDOW(f) ((f)->output_data.pgtk->window_desc)
+#define FRAME_X_OUTPUT(f)         ((f)->output_data.pgtk)
 
-/* This is the `Display *' which frame F is on.  */
-#define FRAME_X_DISPLAY(f) (0)
-#define FRAME_X_SCREEN(f) (0)
-#define FRAME_X_VISUAL(f) FRAME_DISPLAY_INFO(f)->visual
+#define FRAME_DISPLAY_INFO(f)     (FRAME_X_OUTPUT(f)->display_info)
+#define FRAME_FOREGROUND_COLOR(f) (FRAME_X_OUTPUT(f)->foreground_color)
+#define FRAME_BACKGROUND_COLOR(f) (FRAME_X_OUTPUT(f)->background_color)
+#define FRAME_CURSOR_COLOR(f)     (FRAME_X_OUTPUT(f)->cursor_color)
+#define FRAME_POINTER_TYPE(f)     (FRAME_X_OUTPUT(f)->current_pointer)
+#define FRAME_FONT(f)             (FRAME_X_OUTPUT(f)->font)
+#define FRAME_GTK_OUTER_WIDGET(f) (FRAME_X_OUTPUT(f)->widget)
+#define FRAME_GTK_WIDGET(f)       (FRAME_X_OUTPUT(f)->edit_widget)
+
+/* aliases */
+#define FRAME_PGTK_VIEW(f)         FRAME_GTK_WIDGET(f)
+#define FRAME_X_WINDOW(f)          FRAME_GTK_WIDGET(f)
+
+#define FRAME_X_DISPLAY(f)        (FRAME_DISPLAY_INFO(f)->gdpy)
 
 #define DEFAULT_GDK_DISPLAY() gdk_display_get_default()
-
-#define GDK_DISPLAY_XDISPLAY(gdpy) 0
 
 /* Turning a lisp vector value into a pointer to a struct scroll_bar.  */
 #define XSCROLL_BAR(vec) ((struct scroll_bar *) XVECTOR (vec))
 
-#define FRAME_GTK_OUTER_WIDGET(f) ((f)->output_data.pgtk->widget)
-#define FRAME_GTK_WIDGET(f) ((f)->output_data.pgtk->edit_widget)
-#define FRAME_OUTER_WINDOW(f)                                   \
-       (FRAME_GTK_OUTER_WIDGET (f) ?                            \
-        GTK_WIDGET_TO_X_WIN (FRAME_GTK_OUTER_WIDGET (f)) :      \
-         FRAME_X_WINDOW (f))
-#define GTK_WIDGET_TO_X_WIN(w) 0
-
-#define FRAME_FOREGROUND_COLOR(f) ((f)->output_data.pgtk->foreground_color)
-#define FRAME_BACKGROUND_COLOR(f) ((f)->output_data.pgtk->background_color)
-
 #define PGTK_FACE_FOREGROUND(f) ((f)->foreground)
 #define PGTK_FACE_BACKGROUND(f) ((f)->background)
-
 #define FRAME_DEFAULT_FACE(f) FACE_FROM_ID_OR_NULL (f, DEFAULT_FACE_ID)
-
-#define FRAME_PGTK_VIEW(f) ((f)->output_data.pgtk->view)
-#define FRAME_CURSOR_COLOR(f) ((f)->output_data.pgtk->cursor_color)
-#define FRAME_POINTER_TYPE(f) ((f)->output_data.pgtk->current_pointer)
-
-#define FRAME_FONT(f) ((f)->output_data.pgtk->font)
-
-#define XPGTK_SCROLL_BAR(vec) XSAVE_POINTER (vec, 0)
 
 /* Compute pixel height of the frame's titlebar. */
 #define FRAME_PGTK_TITLEBAR_HEIGHT(f)                                     0
@@ -475,7 +460,7 @@ enum
    (FRAME_SCROLL_BAR_LINES (f) * FRAME_LINE_HEIGHT (f)	\
     - PGTK_SCROLL_BAR_HEIGHT (f)) : 0)
 
-#define FRAME_MENUBAR_HEIGHT(f) ((f)->output_data.pgtk->menubar_height)
+#define FRAME_MENUBAR_HEIGHT(f) (FRAME_X_OUTPUT(f)->menubar_height)
 
 /* Calculate system coordinates of the left and top of the parent
    window or, if there is no parent window, the screen. */
@@ -491,17 +476,17 @@ enum
 
 #define FRAME_PGTK_FONT_TABLE(f) (FRAME_DISPLAY_INFO (f)->font_table)
 
-#define FRAME_TOOLBAR_TOP_HEIGHT(f) ((f)->output_data.pgtk->toolbar_top_height)
+#define FRAME_TOOLBAR_TOP_HEIGHT(f) (FRAME_X_OUTPUT(f)->toolbar_top_height)
 #define FRAME_TOOLBAR_BOTTOM_HEIGHT(f) \
-  ((f)->output_data.pgtk->toolbar_bottom_height)
-#define FRAME_TOOLBAR_LEFT_WIDTH(f) ((f)->output_data.pgtk->toolbar_left_width)
-#define FRAME_TOOLBAR_RIGHT_WIDTH(f) ((f)->output_data.pgtk->toolbar_right_width)
+  (FRAME_X_OUTPUT(f)->toolbar_bottom_height)
+#define FRAME_TOOLBAR_LEFT_WIDTH(f) (FRAME_X_OUTPUT(f)->toolbar_left_width)
+#define FRAME_TOOLBAR_RIGHT_WIDTH(f) (FRAME_X_OUTPUT(f)->toolbar_right_width)
 #define FRAME_TOOLBAR_WIDTH(f) \
   (FRAME_TOOLBAR_LEFT_WIDTH (f) + FRAME_TOOLBAR_RIGHT_WIDTH (f))
 
-#define FRAME_FONTSET(f) ((f)->output_data.pgtk->fontset)
+#define FRAME_FONTSET(f) (FRAME_X_OUTPUT(f)->fontset)
 
-#define FRAME_BASELINE_OFFSET(f) ((f)->output_data.pgtk->baseline_offset)
+#define FRAME_BASELINE_OFFSET(f) (FRAME_X_OUTPUT(f)->baseline_offset)
 #define BLACK_PIX_DEFAULT(f) 0x000000
 #define WHITE_PIX_DEFAULT(f) 0xFFFFFF
 
@@ -579,5 +564,6 @@ extern void nxatoms_of_pgtkselect (void);
 /* Initialization and marking implemented in pgtkterm.c */
 extern void init_pgtkterm (void);
 extern void mark_pgtkterm(void);
+extern void pgtk_delete_terminal (struct terminal *terminal);
 
 #endif	/* HAVE_PGTK */

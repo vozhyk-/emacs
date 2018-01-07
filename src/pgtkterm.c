@@ -173,26 +173,35 @@ x_free_frame_resources (struct frame *f)
   free_frame_menubar (f);
   free_frame_faces (f);
 
-  if (f == dpyinfo->x_focus_frame)
-    dpyinfo->x_focus_frame = 0;
-  if (f == dpyinfo->x_highlight_frame)
-    dpyinfo->x_highlight_frame = 0;
+#define CLEAR_IF_EQ(FIELD)	\
+  do { if (f == dpyinfo->FIELD) dpyinfo->FIELD = 0; } while (false)
+
+  CLEAR_IF_EQ(x_focus_frame);
+  CLEAR_IF_EQ(x_highlight_frame);
+  CLEAR_IF_EQ(x_focus_event_frame);
+  CLEAR_IF_EQ(last_mouse_frame);
+  CLEAR_IF_EQ(last_mouse_motion_frame);
+  CLEAR_IF_EQ(last_mouse_glyph_frame);
+
+#undef CLEAR_IF_EQ
+
   if (f == hlinfo->mouse_face_mouse_frame)
     reset_mouse_highlight (hlinfo);
 
   gtk_widget_destroy(FRAME_GTK_OUTER_WIDGET(f));
 
-  if (f->output_data.pgtk->cr_surface_visible_bell != NULL) {
-    cairo_surface_destroy(f->output_data.pgtk->cr_surface_visible_bell);
-    f->output_data.pgtk->cr_surface_visible_bell = NULL;
+  if (FRAME_X_OUTPUT(f)->cr_surface_visible_bell != NULL) {
+    cairo_surface_destroy(FRAME_X_OUTPUT(f)->cr_surface_visible_bell);
+    FRAME_X_OUTPUT(f)->cr_surface_visible_bell = NULL;
   }
 
-  if (f->output_data.pgtk->atimer_visible_bell != NULL) {
-    cancel_atimer(f->output_data.pgtk->atimer_visible_bell);
-    f->output_data.pgtk->atimer_visible_bell = NULL;
+  if (FRAME_X_OUTPUT(f)->atimer_visible_bell != NULL) {
+    cancel_atimer(FRAME_X_OUTPUT(f)->atimer_visible_bell);
+    FRAME_X_OUTPUT(f)->atimer_visible_bell = NULL;
   }
 
   xfree (f->output_data.pgtk);
+  f->output_data.pgtk = NULL;
 
   unblock_input ();
 }
@@ -231,7 +240,7 @@ x_calc_absolute_position (struct frame *f)
 
       /* A frame that has been visible at least once should have outer
 	 edges.  */
-      if (f->output_data.pgtk->has_been_visible && !p)
+      if (FRAME_X_OUTPUT(f)->has_been_visible && !p)
 	{
 	  Lisp_Object frame;
 	  Lisp_Object edges = Qnil;
@@ -256,7 +265,7 @@ x_calc_absolute_position (struct frame *f)
     {
       int height = FRAME_PIXEL_HEIGHT (f);
 
-      if (f->output_data.pgtk->has_been_visible && !p)
+      if (FRAME_X_OUTPUT(f)->has_been_visible && !p)
 	{
 	  Lisp_Object frame;
 	  Lisp_Object edges = Qnil;
@@ -904,14 +913,14 @@ x_set_cursor_gc (struct glyph_string *s)
       && s->face->foreground == FRAME_FOREGROUND_PIXEL (s->f)
       && !s->cmp)
     PGTK_TRACE("x_set_cursor_gc: 1."),
-    s->xgcv = s->f->output_data.pgtk->cursor_xgcv;
+    s->xgcv = FRAME_X_OUTPUT(s->f)->cursor_xgcv;
   else
     {
       /* Cursor on non-default face: must merge.  */
       XGCValues xgcv;
 
       PGTK_TRACE("x_set_cursor_gc: 2.");
-      xgcv.background = s->f->output_data.pgtk->cursor_color;
+      xgcv.background = FRAME_X_OUTPUT(s->f)->cursor_color;
       xgcv.foreground = s->face->background;
       PGTK_TRACE("x_set_cursor_gc: 3. %08lx, %08lx.", xgcv.background, xgcv.foreground);
 
@@ -921,7 +930,7 @@ x_set_cursor_gc (struct glyph_string *s)
       PGTK_TRACE("x_set_cursor_gc: 4. %08lx, %08lx.", xgcv.background, xgcv.foreground);
 #if 0
       if (xgcv.foreground == xgcv.background)
-	xgcv.foreground = s->f->output_data.pgtk->cursor_foreground_pixel;
+	xgcv.foreground = FRAME_X_OUTPUT(s->f)->cursor_foreground_pixel;
 #endif
       if (xgcv.foreground == xgcv.background)
 	xgcv.foreground = s->face->foreground;
@@ -1588,11 +1597,10 @@ x_setup_relief_color (struct frame *f, struct relief *relief, double factor,
 		      int delta, unsigned long default_pixel)
 {
   XGCValues xgcv;
-  struct pgtk_output *di = f->output_data.pgtk;
+  struct pgtk_output *di = FRAME_X_OUTPUT(f);
   unsigned long pixel;
   unsigned long background = di->relief_background;
   struct pgtk_display_info *dpyinfo = FRAME_DISPLAY_INFO (f);
-  Display *dpy = FRAME_X_DISPLAY (f);
 
   // xgcv.line_width = 1;
 
@@ -1610,7 +1618,7 @@ x_setup_relief_color (struct frame *f, struct relief *relief, double factor,
 static void
 x_setup_relief_colors (struct glyph_string *s)
 {
-  struct pgtk_output *di = s->f->output_data.pgtk;
+  struct pgtk_output *di = FRAME_X_OUTPUT(s->f);
   unsigned long color;
 
   if (s->face->use_box_color_for_shadows_p)
@@ -1673,13 +1681,13 @@ x_draw_relief_rect (struct frame *f,
 
   if (raised_p)
     {
-      top_left_color = f->output_data.pgtk->white_relief.xgcv.foreground;
-      bottom_right_color = f->output_data.pgtk->black_relief.xgcv.foreground;
+      top_left_color = FRAME_X_OUTPUT(f)->white_relief.xgcv.foreground;
+      bottom_right_color = FRAME_X_OUTPUT(f)->black_relief.xgcv.foreground;
     }
   else
     {
-      top_left_color = f->output_data.pgtk->black_relief.xgcv.foreground;
-      bottom_right_color = f->output_data.pgtk->white_relief.xgcv.foreground;
+      top_left_color = FRAME_X_OUTPUT(f)->black_relief.xgcv.foreground;
+      bottom_right_color = FRAME_X_OUTPUT(f)->white_relief.xgcv.foreground;
     }
 
   x_set_clip_rectangles (f, cr, clip_rect, 1);
@@ -2712,9 +2720,9 @@ static void
 pgtk_define_frame_cursor (struct frame *f, Cursor cursor)
 {
   if (!f->pointer_invisible
-      && f->output_data.pgtk->current_cursor != cursor)
+      && FRAME_X_OUTPUT(f)->current_cursor != cursor)
     gdk_window_set_cursor(gtk_widget_get_window(FRAME_GTK_WIDGET(f)), cursor);
-  f->output_data.pgtk->current_cursor = cursor;
+  FRAME_X_OUTPUT(f)->current_cursor = cursor;
 }
 
 static void pgtk_after_update_window_line(struct window *w, struct glyph_row *desired_row)
@@ -2764,7 +2772,6 @@ x_draw_hollow_cursor (struct window *w, struct glyph_row *row)
 {
   struct frame *f = XFRAME (WINDOW_FRAME (w));
   struct pgtk_display_info *dpyinfo = FRAME_DISPLAY_INFO (f);
-  Display *dpy = FRAME_X_DISPLAY (f);
   int x, y, wd, h;
   XGCValues xgcv;
   struct glyph *cursor_glyph;
@@ -2782,7 +2789,7 @@ x_draw_hollow_cursor (struct window *w, struct glyph_row *row)
   /* The foreground of cursor_gc is typically the same as the normal
      background color, which can cause the cursor box to be invisible.  */
   cairo_t *cr = pgtk_begin_cr_clip(f, NULL);
-  pgtk_set_cr_source_with_color(f, f->output_data.pgtk->cursor_color);
+  pgtk_set_cr_source_with_color(f, FRAME_X_OUTPUT(f)->cursor_color);
 
   /* When on R2L character, show cursor at the right edge of the
      glyph, unless the cursor box is as wide as the glyph or wider
@@ -2796,7 +2803,7 @@ x_draw_hollow_cursor (struct window *w, struct glyph_row *row)
     }
   /* Set clipping, draw the rectangle, and reset clipping again.  */
   pgtk_clip_to_row (w, row, TEXT_AREA, cr);
-  pgtk_draw_rectangle (f, f->output_data.pgtk->cursor_color, x, y, wd, h - 1);
+  pgtk_draw_rectangle (f, FRAME_X_OUTPUT(f)->cursor_color, x, y, wd, h - 1);
   pgtk_end_cr_clip(f);
 }
 
@@ -2845,10 +2852,10 @@ x_draw_bar_cursor (struct window *w, struct glyph_row *row, int width, enum text
 	 invisible.  Use the glyph's foreground color instead in this
 	 case, on the assumption that the glyph's colors are chosen so
 	 that the glyph is legible.  */
-      if (face->background == f->output_data.pgtk->cursor_color)
+      if (face->background == FRAME_X_OUTPUT(f)->cursor_color)
 	color = face->foreground;
       else
-	color = f->output_data.pgtk->cursor_color;
+	color = FRAME_X_OUTPUT(f)->cursor_color;
 
       pgtk_clip_to_row (w, row, TEXT_AREA, cr);
 
@@ -3523,11 +3530,11 @@ pgtk_draw_fringe_bitmap (struct window *w, struct glyph_row *row, struct draw_fr
       PGTK_TRACE("cursor_p=%d.", p->cursor_p);
       PGTK_TRACE("overlay_p_p=%d.", p->overlay_p);
       PGTK_TRACE("background=%08lx.", face->background);
-      PGTK_TRACE("cursor_color=%08lx.", f->output_data.pgtk->cursor_color);
+      PGTK_TRACE("cursor_color=%08lx.", FRAME_X_OUTPUT(f)->cursor_color);
       PGTK_TRACE("foreground=%08lx.", face->foreground);
       gcv.foreground = (p->cursor_p
 		       ? (p->overlay_p ? face->background
-			  : f->output_data.pgtk->cursor_color)
+			  : FRAME_X_OUTPUT(f)->cursor_color)
 		       : face->foreground);
       gcv.background = face->background;
       pgtk_cr_draw_image (f, &gcv, fringe_bmp[p->which], 0, p->dh,
@@ -3548,7 +3555,7 @@ static void hourglass_cb(struct atimer *timer)
 static void
 pgtk_show_hourglass(struct frame *f)
 {
-  struct pgtk_output *x = f->output_data.pgtk;
+  struct pgtk_output *x = FRAME_X_OUTPUT(f);
   if (x->hourglass_widget != NULL)
     gtk_widget_destroy(x->hourglass_widget);
   x->hourglass_widget = gtk_event_box_new();   /* gtk_event_box is GDK_INPUT_ONLY. */
@@ -3573,7 +3580,7 @@ pgtk_show_hourglass(struct frame *f)
 static void
 pgtk_hide_hourglass(struct frame *f)
 {
-  struct pgtk_output *x = f->output_data.pgtk;
+  struct pgtk_output *x = FRAME_X_OUTPUT(f);
   if (--hourglass_enter_count == 0) {
     if (hourglass_atimer != NULL) {
       cancel_atimer(hourglass_atimer);
@@ -3663,13 +3670,13 @@ recover_from_visible_bell(struct atimer *timer)
 {
   struct frame *f = timer->client_data;
 
-  if (f->output_data.pgtk->cr_surface_visible_bell != NULL) {
-    cairo_surface_destroy(f->output_data.pgtk->cr_surface_visible_bell);
-    f->output_data.pgtk->cr_surface_visible_bell = NULL;
+  if (FRAME_X_OUTPUT(f)->cr_surface_visible_bell != NULL) {
+    cairo_surface_destroy(FRAME_X_OUTPUT(f)->cr_surface_visible_bell);
+    FRAME_X_OUTPUT(f)->cr_surface_visible_bell = NULL;
   }
 
-  if (f->output_data.pgtk->atimer_visible_bell != NULL)
-    f->output_data.pgtk->atimer_visible_bell = NULL;
+  if (FRAME_X_OUTPUT(f)->atimer_visible_bell != NULL)
+    FRAME_X_OUTPUT(f)->atimer_visible_bell = NULL;
 
   gtk_widget_queue_draw(FRAME_GTK_WIDGET(f));
 }
@@ -3730,16 +3737,16 @@ pgtk_flash (struct frame *f)
 			flash_left, FRAME_INTERNAL_BORDER_WIDTH (f),
 			width, height - 2 * FRAME_INTERNAL_BORDER_WIDTH (f));
 
-      f->output_data.pgtk->cr_surface_visible_bell = surface;
+      FRAME_X_OUTPUT(f)->cr_surface_visible_bell = surface;
       gtk_widget_queue_draw(FRAME_GTK_WIDGET(f));
 
       {
 	struct timespec delay = make_timespec (0, 50 * 1000 * 1000);
-	if (f->output_data.pgtk->atimer_visible_bell != NULL) {
-	  cancel_atimer(f->output_data.pgtk->atimer_visible_bell);
-	  f->output_data.pgtk->atimer_visible_bell = NULL;
+	if (FRAME_X_OUTPUT(f)->atimer_visible_bell != NULL) {
+	  cancel_atimer(FRAME_X_OUTPUT(f)->atimer_visible_bell);
+	  FRAME_X_OUTPUT(f)->atimer_visible_bell = NULL;
 	}
-	f->output_data.pgtk->atimer_visible_bell = start_atimer(ATIMER_RELATIVE, delay, recover_from_visible_bell, f);
+	FRAME_X_OUTPUT(f)->atimer_visible_bell = start_atimer(ATIMER_RELATIVE, delay, recover_from_visible_bell, f);
       }
 
 #undef XFillRectangle
@@ -4721,7 +4728,7 @@ pgtk_any_window_to_frame (GdkWindow *window)
 	    found = f;
 #else
 	  /* This frame matches if the window is any of its widgets.  */
-	  x = f->output_data.pgtk;
+	  x = FRAME_X_OUTPUT(f);
 	  if (x->hourglass_window == wdesc)
 	    found = f;
 	  else if (x->widget)
@@ -4895,7 +4902,7 @@ pgtk_handle_draw(GtkWidget *widget, cairo_t *cr, gpointer *data)
     f = pgtk_any_window_to_frame(win);
     PGTK_TRACE("  f=%p", f);
     if (f != NULL) {
-      src = f->output_data.pgtk->cr_surface_visible_bell;
+      src = FRAME_X_OUTPUT(f)->cr_surface_visible_bell;
       if (src == NULL)
 	src = FRAME_CR_SURFACE(f);
     }
@@ -5300,7 +5307,7 @@ static gboolean map_event(GtkWidget *widget, GdkEvent *event, gpointer *user_dat
 
       /* Check if fullscreen was specified before we where mapped the
 	 first time, i.e. from the command line.  */
-      if (!f->output_data.pgtk->has_been_visible)
+      if (!FRAME_X_OUTPUT(f)->has_been_visible)
 	{
 	  set_fullscreen_state(f);
 	}
@@ -5317,7 +5324,7 @@ static gboolean map_event(GtkWidget *widget, GdkEvent *event, gpointer *user_dat
 
       SET_FRAME_VISIBLE (f, 1);
       SET_FRAME_ICONIFIED (f, false);
-      f->output_data.pgtk->has_been_visible = true;
+      FRAME_X_OUTPUT(f)->has_been_visible = true;
 
       if (iconified)
 	{
@@ -5354,7 +5361,7 @@ static gboolean window_state_event(GtkWidget *widget, GdkEvent *event, gpointer 
 	       hidden anymore, treat it as deiconified.  */
 	    SET_FRAME_VISIBLE (f, 1);
 	    SET_FRAME_ICONIFIED (f, false);
-	    f->output_data.pgtk->has_been_visible = true;
+	    FRAME_X_OUTPUT(f)->has_been_visible = true;
 	    inev.ie.kind = DEICONIFY_EVENT;
 	    XSETFRAME (inev.ie.frame_or_window, f);
 	  }
@@ -5402,7 +5409,7 @@ frame_highlight (struct frame *f)
 #if 0
   x_catch_errors (FRAME_X_DISPLAY (f));
   XSetWindowBorder (FRAME_X_DISPLAY (f), FRAME_X_WINDOW (f),
-		    f->output_data.pgtk->border_pixel);
+		    FRAME_X_OUTPUT(f)->border_pixel);
   x_uncatch_errors ();
 #endif
   unblock_input ();
@@ -5424,7 +5431,7 @@ frame_unhighlight (struct frame *f)
 #if 0
   x_catch_errors (FRAME_X_DISPLAY (f));
   XSetWindowBorderPixmap (FRAME_X_DISPLAY (f), FRAME_X_WINDOW (f),
-			  f->output_data.pgtk->border_tile);
+			  FRAME_X_OUTPUT(f)->border_tile);
   x_uncatch_errors ();
 #endif
   unblock_input ();
@@ -5992,9 +5999,9 @@ button_event(GtkWidget *widget, GdkEvent *event, gpointer *user_data)
       && event->button.y < FRAME_MENUBAR_HEIGHT (f)
       && event->button.same_screen)
     {
-      if (!f->output_data.pgtk->saved_menu_event)
-	f->output_data.pgtk->saved_menu_event = xmalloc (sizeof *event);
-      *f->output_data.pgtk->saved_menu_event = *event;
+      if (!FRAME_X_OUTPUT(f)->saved_menu_event)
+	FRAME_X_OUTPUT(f)->saved_menu_event = xmalloc (sizeof *event);
+      *FRAME_X_OUTPUT(f)->saved_menu_event = *event;
       inev.ie.kind = MENU_BAR_ACTIVATE_EVENT;
       XSETFRAME (inev.ie.frame_or_window, f);
       *finish = X_EVENT_DROP;
@@ -6735,8 +6742,8 @@ pgtk_clear_area (struct frame *f, int x, int y, int width, int height)
   eassert (width > 0 && height > 0);
 
   cr = pgtk_begin_cr_clip (f, NULL);
-  PGTK_TRACE("back color %08lx.", (unsigned long) f->output_data.pgtk->background_color);
-  pgtk_set_cr_source_with_color (f, f->output_data.pgtk->background_color);
+  PGTK_TRACE("back color %08lx.", (unsigned long) FRAME_X_OUTPUT(f)->background_color);
+  pgtk_set_cr_source_with_color (f, FRAME_X_OUTPUT(f)->background_color);
   cairo_rectangle (cr, x, y, width, height);
   cairo_fill (cr);
   pgtk_end_cr_clip (f);

@@ -146,7 +146,7 @@ x_set_foreground_color (struct frame *f, Lisp_Object arg, Lisp_Object oldval)
       error ("Unknown color");
     }
 
-  f->output_data.pgtk->foreground_color = col.pixel;
+  FRAME_X_OUTPUT(f)->foreground_color = col.pixel;
 
   FRAME_FOREGROUND_PIXEL (f) = col.pixel;
 
@@ -181,7 +181,7 @@ x_set_background_color (struct frame *f, Lisp_Object arg, Lisp_Object oldval)
     pgtk_clear_frame (f);
 
   PGTK_TRACE("x_set_background_color: col.pixel=%08lx.", col.pixel);
-  f->output_data.pgtk->background_color = col.pixel;
+  FRAME_X_OUTPUT(f)->background_color = col.pixel;
 
   xg_set_background_color(f, col.pixel);
   update_face_from_frame_parameter (f, Qbackground_color, arg);
@@ -578,9 +578,9 @@ pgtk_implicitly_set_icon_type (struct frame *f)
 
   block_input ();
   pool = [[NSAutoreleasePool alloc] init];
-  if (f->output_data.pgtk->miniimage
+  if (FRAME_X_OUTPUT(f)->miniimage
       && [[NSString stringWithUTF8String: SSDATA (f->name)]
-               isEqualToString: [(NSImage *)f->output_data.pgtk->miniimage name]])
+               isEqualToString: [(NSImage *)FRAME_X_OUTPUT(f)->miniimage name]])
     {
       [pool release];
       unblock_input ();
@@ -627,8 +627,8 @@ pgtk_implicitly_set_icon_type (struct frame *f)
       setMini = NO;
     }
 
-  [f->output_data.pgtk->miniimage release];
-  f->output_data.pgtk->miniimage = image;
+  [FRAME_X_OUTPUT(f)->miniimage release];
+  FRAME_X_OUTPUT(f)->miniimage = image;
   [view setMiniwindowImage: setMini];
   [pool release];
   unblock_input ();
@@ -672,7 +672,7 @@ x_set_icon_type (struct frame *f, Lisp_Object arg, Lisp_Object oldval)
       setMini = NO;
     }
 
-  f->output_data.pgtk->miniimage = image;
+  FRAME_X_OUTPUT(f)->miniimage = image;
   [view setMiniwindowImage: setMini];
 #endif
 }
@@ -705,8 +705,8 @@ x_icon (struct frame *f, Lisp_Object parms)
   Lisp_Object icon_x, icon_y;
   struct pgtk_display_info *dpyinfo = check_pgtk_display_info (Qnil);
 
-  f->output_data.pgtk->icon_top = -1;
-  f->output_data.pgtk->icon_left = -1;
+  FRAME_X_OUTPUT(f)->icon_top = -1;
+  FRAME_X_OUTPUT(f)->icon_left = -1;
 
   /* Set the position of the icon.  */
   icon_x = x_get_arg (dpyinfo, parms, Qicon_left, 0, 0, RES_TYPE_NUMBER);
@@ -715,8 +715,8 @@ x_icon (struct frame *f, Lisp_Object parms)
     {
       CHECK_NUMBER (icon_x);
       CHECK_NUMBER (icon_y);
-      f->output_data.pgtk->icon_top = XINT (icon_y);
-      f->output_data.pgtk->icon_left = XINT (icon_x);
+      FRAME_X_OUTPUT(f)->icon_top = XINT (icon_y);
+      FRAME_X_OUTPUT(f)->icon_left = XINT (icon_x);
     }
   else if (!EQ (icon_x, Qunbound) || !EQ (icon_y, Qunbound))
     error ("Both left and top icon corners of icon must be specified");
@@ -1059,17 +1059,17 @@ This function is an internal primitive--use `make-frame' instead.  */)
   f->terminal = dpyinfo->terminal;
 
   f->output_method = output_pgtk;
-  f->output_data.pgtk = xzalloc (sizeof *f->output_data.pgtk);
+  FRAME_X_OUTPUT(f) = xzalloc (sizeof *FRAME_X_OUTPUT(f));
 #if 0
-  f->output_data.pgtk->icon_bitmap = -1;
+  FRAME_X_OUTPUT(f)->icon_bitmap = -1;
 #endif
   FRAME_FONTSET (f) = -1;
 #if 0
-  f->output_data.pgtk->scroll_bar_foreground_pixel = -1;
-  f->output_data.pgtk->scroll_bar_background_pixel = -1;
+  FRAME_X_OUTPUT(f)->scroll_bar_foreground_pixel = -1;
+  FRAME_X_OUTPUT(f)->scroll_bar_background_pixel = -1;
 #endif
-  f->output_data.pgtk->white_relief.pixel = -1;
-  f->output_data.pgtk->black_relief.pixel = -1;
+  FRAME_X_OUTPUT(f)->white_relief.pixel = -1;
+  FRAME_X_OUTPUT(f)->black_relief.pixel = -1;
 
   fset_icon_name (f,
 		  x_get_arg (dpyinfo, parms, Qicon_name, "iconName", "Title",
@@ -1092,11 +1092,11 @@ This function is an internal primitive--use `make-frame' instead.  */)
        to free colors we haven't allocated.  */
     FRAME_FOREGROUND_PIXEL (f) = -1;
     FRAME_BACKGROUND_PIXEL (f) = -1;
-    f->output_data.pgtk->cursor_color = -1;
+    FRAME_X_OUTPUT(f)->cursor_color = -1;
 #if 0
-    f->output_data.pgtk->cursor_foreground_pixel = -1;
-    f->output_data.pgtk->border_pixel = -1;
-    f->output_data.pgtk->mouse_pixel = -1;
+    FRAME_X_OUTPUT(f)->cursor_foreground_pixel = -1;
+    FRAME_X_OUTPUT(f)->border_pixel = -1;
+    FRAME_X_OUTPUT(f)->mouse_pixel = -1;
 #endif
 
     black = build_string ("black");
@@ -1104,14 +1104,14 @@ This function is an internal primitive--use `make-frame' instead.  */)
       = x_decode_color (f, black, BLACK_PIX_DEFAULT (f));
     FRAME_BACKGROUND_PIXEL (f)
       = x_decode_color (f, black, BLACK_PIX_DEFAULT (f));
-    f->output_data.pgtk->cursor_color
+    FRAME_X_OUTPUT(f)->cursor_color
       = x_decode_color (f, black, BLACK_PIX_DEFAULT (f));
 #if 0
-    f->output_data.pgtk->cursor_foreground_pixel
+    FRAME_X_OUTPUT(f)->cursor_foreground_pixel
       = x_decode_color (f, black, BLACK_PIX_DEFAULT (f));
-    f->output_data.pgtk->border_pixel
+    FRAME_X_OUTPUT(f)->border_pixel
       = x_decode_color (f, black, BLACK_PIX_DEFAULT (f));
-    f->output_data.pgtk->mouse_pixel
+    FRAME_X_OUTPUT(f)->mouse_pixel
       = x_decode_color (f, black, BLACK_PIX_DEFAULT (f));
 #endif
   }
@@ -1119,13 +1119,13 @@ This function is an internal primitive--use `make-frame' instead.  */)
   /* Specify the parent under which to make this X window.  */
   if (!NILP (parent))
     {
-      f->output_data.pgtk->parent_desc = (Window) XFASTINT (parent);
-      f->output_data.pgtk->explicit_parent = true;
+      FRAME_X_OUTPUT(f)->parent_desc = (Window) XFASTINT (parent);
+      FRAME_X_OUTPUT(f)->explicit_parent = true;
     }
   else
     {
-      f->output_data.pgtk->parent_desc = FRAME_DISPLAY_INFO (f)->root_window;
-      f->output_data.pgtk->explicit_parent = false;
+      FRAME_X_OUTPUT(f)->parent_desc = FRAME_DISPLAY_INFO (f)->root_window;
+      FRAME_X_OUTPUT(f)->explicit_parent = false;
     }
 
   /* Set the name; the functions to which we pass f expect the name to
@@ -1300,7 +1300,7 @@ This function is an internal primitive--use `make-frame' instead.  */)
 
 
 #define INSTALL_CURSOR(FIELD, NAME) \
-  f->output_data.pgtk->FIELD = gdk_cursor_new_for_display(FRAME_DISPLAY_INFO(f)->gdpy, GDK_ ## NAME)
+  FRAME_X_OUTPUT(f)->FIELD = gdk_cursor_new_for_display(FRAME_X_DISPLAY(f), GDK_ ## NAME)
 
   INSTALL_CURSOR(text_cursor, XTERM);
   INSTALL_CURSOR(nontext_cursor, LEFT_PTR);
@@ -1382,9 +1382,9 @@ This function is an internal primitive--use `make-frame' instead.  */)
 #ifndef USE_GTK
       /* This is a no-op, except under Motif where it arranges the
 	 main window for the widgets on it.  */
-      lw_set_main_areas (f->output_data.pgtk->column_widget,
-			 f->output_data.pgtk->menubar_widget,
-			 f->output_data.pgtk->edit_widget);
+      lw_set_main_areas (FRAME_X_OUTPUT(f)->column_widget,
+			 FRAME_X_OUTPUT(f)->menubar_widget,
+			 FRAME_X_OUTPUT(f)->edit_widget);
 #endif /* not USE_GTK */
     }
 #endif /* USE_X_TOOLKIT || USE_GTK */
@@ -1416,7 +1416,7 @@ This function is an internal primitive--use `make-frame' instead.  */)
   /* Make the window appear on the frame and enable display, unless
      the caller says not to.  However, with explicit parent, Emacs
      cannot control visibility, so don't try.  */
-  if (!f->output_data.pgtk->explicit_parent)
+  if (!FRAME_X_OUTPUT(f)->explicit_parent)
     {
       Lisp_Object visibility
 	= x_get_arg (dpyinfo, parms, Qvisibility, 0, 0, RES_TYPE_SYMBOL);
@@ -1477,8 +1477,8 @@ This function is an internal primitive--use `make-frame' instead.  */)
     if (CONSP (XCAR (tem)) && !NILP (XCAR (XCAR (tem))))
       fset_param_alist (f, Fcons (XCAR (tem), f->param_alist));
 
-  f->output_data.pgtk->cr_surface_visible_bell = NULL;
-  f->output_data.pgtk->atimer_visible_bell = NULL;
+  FRAME_X_OUTPUT(f)->cr_surface_visible_bell = NULL;
+  FRAME_X_OUTPUT(f)->atimer_visible_bell = NULL;
 
   /* Make sure windows on this frame appear in calls to next-window
      and similar functions.  */

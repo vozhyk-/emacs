@@ -192,9 +192,9 @@ xg_set_screen (GtkWidget *w, struct frame *f)
         gtk_window_set_screen (GTK_WINDOW (w), gscreen);
     }
 #else
-  if (FRAME_DISPLAY_INFO(f)->gdpy != DEFAULT_GDK_DISPLAY ())
+  if (FRAME_X_DISPLAY(f) != DEFAULT_GDK_DISPLAY ())
     {
-      GdkScreen *gscreen = gdk_display_get_default_screen (FRAME_DISPLAY_INFO(f)->gdpy);
+      GdkScreen *gscreen = gdk_display_get_default_screen (FRAME_X_DISPLAY(f));
 
       if (GTK_IS_MENU (w))
         gtk_menu_set_screen (GTK_MENU (w), gscreen);
@@ -1214,7 +1214,11 @@ style_changed_cb (GObject *go,
   struct input_event event;
   GdkDisplay *gdpy = user_data;
   const char *display_name = gdk_display_get_name (gdpy);
+#ifndef HAVE_PGTK
   Display *dpy = GDK_DISPLAY_XDISPLAY (gdpy);
+#else
+  GdkDisplay *dpy = gdpy;
+#endif
 
   EVENT_INIT (event);
   event.kind = CONFIG_CHANGED_EVENT;
@@ -1408,7 +1412,9 @@ xg_create_frame_widgets (struct frame *f)
 #else
   gtk_widget_show_all(wtop);
 #endif
+#ifndef HAVE_PGTK
   FRAME_X_WINDOW (f) = GTK_WIDGET_TO_X_WIN (wfixed);
+#endif
 #ifndef HAVE_PGTK
   initial_set_up_x_back_buffer (f);
 #endif
@@ -1485,7 +1491,9 @@ xg_free_frame_widgets (struct frame *f)
         xfree (tbinfo);
 
       /* x_free_frame_resources should have taken care of it */
+#ifndef HAVE_PGTK
       eassert (!FRAME_X_DOUBLE_BUFFERED_P (f));
+#endif
       gtk_widget_destroy (FRAME_GTK_OUTER_WIDGET (f));
       FRAME_X_WINDOW (f) = 0; /* Set to avoid XDestroyWindow in xterm.c */
 #ifndef HAVE_PGTK
@@ -3944,7 +3952,9 @@ xg_finish_scroll_bar_creation (struct frame *f,
 #ifdef HAVE_PGTK
   gtk_widget_show_all(webox);
 #endif
+#ifndef HAVE_PGTK
   GTK_WIDGET_TO_X_WIN (webox);
+#endif
 
   /* Set the cursor to an arrow.  */
   xg_set_cursor (webox, FRAME_DISPLAY_INFO (f)->xg_cursor);
@@ -4378,7 +4388,7 @@ xg_event_is_for_scrollbar (struct frame *f, const EVENT *event)
 #ifndef HAVE_PGTK
       GdkDisplay *gdpy = gdk_x11_lookup_xdisplay (FRAME_X_DISPLAY (f));
 #else
-      GdkDisplay *gdpy = FRAME_DISPLAY_INFO(f)->gdpy;
+      GdkDisplay *gdpy = FRAME_X_DISPLAY(f);
 #endif
       GdkWindow *gwin;
 #ifdef HAVE_GTK3

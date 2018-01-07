@@ -66,7 +66,7 @@ typedef void *Cursor;
 
 typedef void * Color;
 typedef int Window;
-typedef int Display;
+typedef struct _GdkDisplay Display;
 
 /* Xism */
 typedef Lisp_Object XrmDatabase;
