@@ -84,6 +84,18 @@ On gdb, you may want to do:
 - wayland 1.14.0
 - wayland-protocols 1.12
 
+## For archlinux users
+
+This repository contains PKGBUILD, so you can do to install:
+
+```
+mkdir /tmp/emacs
+cd /tmp/emacs
+wget https://raw.githubusercontent.com/masm11/emacs/master/PKGBUILD
+makepkg -s
+sudo pacman -U emacs-pgtk*.tar.xz
+```
+
 ## Notice
 
 Commit messages are in Japanese.
