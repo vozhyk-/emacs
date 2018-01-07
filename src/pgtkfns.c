@@ -108,13 +108,17 @@ pgtk_display_info_for_name (Lisp_Object name)
     if (!NILP (Fstring_equal (XCAR (dpyinfo->name_list_element), name)))
       return dpyinfo;
 
-  error ("Emacs for PGTK does not yet support multi-display");
+  /* Use this general default value to start with.  */
+  Vx_resource_name = Vinvocation_name;
 
-  Fx_open_connection (name, Qnil, Qnil);
-  dpyinfo = x_display_list;
+  validate_x_resource_name ();
+
+  dpyinfo = pgtk_term_init (name, SSDATA (Vx_resource_name));
 
   if (dpyinfo == 0)
-    error ("Display on %s not responding.\n", SDATA (name));
+    error ("Cannot connect to display server %s", SDATA (name));
+
+  XSETFASTINT (Vwindow_system_version, 11);
 
   return dpyinfo;
 }

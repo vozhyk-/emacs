@@ -126,6 +126,10 @@ mark_pgtkterm(void)
     mark_object (ev->ie.frame_or_window);
     mark_object (ev->ie.arg);
   }
+
+  struct pgtk_display_info *dpyinfo;
+  for (dpyinfo = x_display_list; dpyinfo != NULL; dpyinfo = dpyinfo->next)
+    mark_object (dpyinfo->name_list_element);
 }
 
 char *
@@ -711,10 +715,10 @@ x_display_pixel_height (struct pgtk_display_info *dpyinfo)
 {
   PGTK_TRACE("x_display_pixel_height");
 
-  GdkDisplay *dpy = gdk_display_get_default();
-  GdkScreen *scr = gdk_display_get_default_screen(dpy);
-  PGTK_TRACE(" = %d", gdk_screen_get_height(scr));
-  return gdk_screen_get_height(scr);
+  GdkDisplay *gdpy = dpyinfo->gdpy;
+  GdkScreen *gscr = gdk_display_get_default_screen(gdpy);
+  PGTK_TRACE(" = %d", gdk_screen_get_height(gscr));
+  return gdk_screen_get_height(gscr);
 }
 
 int
@@ -722,10 +726,10 @@ x_display_pixel_width (struct pgtk_display_info *dpyinfo)
 {
   PGTK_TRACE("x_display_pixel_width");
 
-  GdkDisplay *dpy = gdk_display_get_default();
-  GdkScreen *scr = gdk_display_get_default_screen(dpy);
-  PGTK_TRACE(" = %d", gdk_screen_get_width(scr));
-  return gdk_screen_get_width(scr);
+  GdkDisplay *gdpy = dpyinfo->gdpy;
+  GdkScreen *gscr = gdk_display_get_default_screen(gdpy);
+  PGTK_TRACE(" = %d", gdk_screen_get_width(gscr));
+  return gdk_screen_get_width(gscr);
 }
 
 void
@@ -6127,6 +6131,53 @@ my_log_handler (const gchar *log_domain, GLogLevelFlags log_level,
       fprintf (stderr, "%s-WARNING **: %s", log_domain, msg);
 }
 
+/* Test whether two display-name strings agree up to the dot that separates
+   the screen number from the server number.  */
+static bool
+same_x_server (const char *name1, const char *name2)
+{
+  bool seen_colon = false;
+  Lisp_Object sysname = Fsystem_name ();
+  const char *system_name = SSDATA (sysname);
+  ptrdiff_t system_name_length = SBYTES (sysname);
+  ptrdiff_t length_until_period = 0;
+
+  while (system_name[length_until_period] != 0
+	 && system_name[length_until_period] != '.')
+    length_until_period++;
+
+  /* Treat `unix' like an empty host name.  */
+  if (! strncmp (name1, "unix:", 5))
+    name1 += 4;
+  if (! strncmp (name2, "unix:", 5))
+    name2 += 4;
+  /* Treat this host's name like an empty host name.  */
+  if (! strncmp (name1, system_name, system_name_length)
+      && name1[system_name_length] == ':')
+    name1 += system_name_length;
+  if (! strncmp (name2, system_name, system_name_length)
+      && name2[system_name_length] == ':')
+    name2 += system_name_length;
+  /* Treat this host's domainless name like an empty host name.  */
+  if (! strncmp (name1, system_name, length_until_period)
+      && name1[length_until_period] == ':')
+    name1 += length_until_period;
+  if (! strncmp (name2, system_name, length_until_period)
+      && name2[length_until_period] == ':')
+    name2 += length_until_period;
+
+  for (; *name1 != '\0' && *name1 == *name2; name1++, name2++)
+    {
+      if (*name1 == ':')
+	seen_colon = true;
+      if (seen_colon && *name1 == '.')
+	return true;
+    }
+  return (seen_colon
+	  && (*name1 == '.' || *name1 == '\0')
+	  && (*name2 == '.' || *name2 == '\0'));
+}
+
 /***
     Detect socket to display server.
     Don't assume existence of X11 or Wayland specific functions.
@@ -6302,7 +6353,6 @@ pgtk_term_init (Lisp_Object display_name, char *resource_name)
   terminal = pgtk_create_terminal (dpyinfo);
 
   {
-#if 0
     struct pgtk_display_info *share;
 
     for (share = x_display_list; share; share = share->next)
@@ -6312,7 +6362,6 @@ pgtk_term_init (Lisp_Object display_name, char *resource_name)
     if (share)
       terminal->kboard = share->terminal->kboard;
     else
-#endif
       {
 	terminal->kboard = allocate_kboard (Qpgtk);
 
@@ -6378,11 +6427,7 @@ pgtk_term_init (Lisp_Object display_name, char *resource_name)
 
   /* Get the scroll bar cursor.  */
   /* We must create a GTK cursor, it is required for GTK widgets.  */
-#if 0
-  dpyinfo->xg_cursor = xg_create_default_cursor (dpyinfo->display);
-#else
-  dpyinfo->xg_cursor = xg_create_default_cursor (NULL);
-#endif
+  dpyinfo->xg_cursor = xg_create_default_cursor (dpyinfo->gdpy);
 
 #if 0
   dpyinfo->vertical_scroll_bar_cursor

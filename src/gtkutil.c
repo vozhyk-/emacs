@@ -191,6 +191,16 @@ xg_set_screen (GtkWidget *w, struct frame *f)
       else
         gtk_window_set_screen (GTK_WINDOW (w), gscreen);
     }
+#else
+  if (FRAME_DISPLAY_INFO(f)->gdpy != DEFAULT_GDK_DISPLAY ())
+    {
+      GdkScreen *gscreen = gdk_display_get_default_screen (FRAME_DISPLAY_INFO(f)->gdpy);
+
+      if (GTK_IS_MENU (w))
+        gtk_menu_set_screen (GTK_MENU (w), gscreen);
+      else
+        gtk_window_set_screen (GTK_WINDOW (w), gscreen);
+    }
 #endif
 }
 
@@ -257,7 +267,11 @@ xg_get_scale (struct frame *f)
 /* Close display DPY.  */
 
 void
+#ifndef HAVE_PGTK
 xg_display_close (Display *dpy)
+#else
+xg_display_close (GdkDisplay *gdpy)
+#endif
 {
 #ifndef HAVE_PGTK
   GdkDisplay *gdpy = gdk_x11_lookup_xdisplay (dpy);
@@ -292,6 +306,30 @@ xg_display_close (Display *dpy)
   gdk_display_close (gdpy);
 #endif
 
+#else
+
+  /* If this is the default display, try to change it before closing.
+     If there is no other display to use, gdpy_def is set to NULL, and
+     the next call to xg_display_open resets the default display.  */
+  if (gdk_display_get_default () == gdpy)
+    {
+      struct pgtk_display_info *dpyinfo;
+      GdkDisplay *gdpy_new = NULL;
+
+      /* Find another display.  */
+      for (dpyinfo = x_display_list; dpyinfo; dpyinfo = dpyinfo->next)
+        if (dpyinfo->gdpy != gdpy)
+          {
+	    gdpy_new = dpyinfo->gdpy;
+	    gdk_display_manager_set_default_display (gdk_display_manager_get (),
+						     gdpy_new);
+            break;
+          }
+      gdpy_def = gdpy_new;
+    }
+
+  gdk_display_close (gdpy);
+
 #endif
 }
 
@@ -304,12 +342,14 @@ xg_display_close (Display *dpy)
    scroll bars on display DPY.  */
 
 GdkCursor *
+#ifndef HAVE_PGTK
 xg_create_default_cursor (Display *dpy)
+#else
+xg_create_default_cursor (GdkDisplay *gdpy)
+#endif
 {
 #ifndef HAVE_PGTK
   GdkDisplay *gdpy = gdk_x11_lookup_xdisplay (dpy);
-#else
-  GdkDisplay *gdpy = DEFAULT_GDK_DISPLAY();
 #endif
   return gdk_cursor_new_for_display (gdpy, GDK_LEFT_PTR);
 }
@@ -4338,7 +4378,7 @@ xg_event_is_for_scrollbar (struct frame *f, const EVENT *event)
 #ifndef HAVE_PGTK
       GdkDisplay *gdpy = gdk_x11_lookup_xdisplay (FRAME_X_DISPLAY (f));
 #else
-      GdkDisplay *gdpy = DEFAULT_GDK_DISPLAY();
+      GdkDisplay *gdpy = FRAME_DISPLAY_INFO(f)->gdpy;
 #endif
       GdkWindow *gwin;
 #ifdef HAVE_GTK3
