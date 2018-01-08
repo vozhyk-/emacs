@@ -98,7 +98,12 @@ sudo pacman -U emacs-pgtk*.tar.xz
 
 ## Notice
 
-Commit messages are in Japanese.
+- This code is not completely pure.
+
+  It uses backend-specific functions to obtain the socket file
+  descriptor to the display server. It supports X11 and Wayland.
+
+- Commit messages are in Japanese.
 
 ## About me
 
