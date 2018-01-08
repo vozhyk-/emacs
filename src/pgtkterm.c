@@ -6329,8 +6329,7 @@ pgtk_term_init (Lisp_Object display_name, char *resource_name)
 
     if (x_initialized++ > 1)
       {
-	PGTK_TRACE("...1");
-        xg_display_open (SSDATA (display_name), &dpy);
+	xg_display_open (SSDATA (display_name), &dpy);
       }
     else
       {
@@ -6343,7 +6342,7 @@ pgtk_term_init (Lisp_Object display_name, char *resource_name)
         argc = 0;
         argv[argc++] = initial_argv[0];
 
-        if (! NILP (display_name))
+        if (strlen(SSDATA(display_name)) != 0)
           {
             argv[argc++] = display_opt;
             argv[argc++] = SSDATA (display_name);

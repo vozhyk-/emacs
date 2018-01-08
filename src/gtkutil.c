@@ -222,7 +222,11 @@ xg_display_open (char *display_name, GdkDisplay **dpy)
   GdkDisplay *gdpy;
 
   unrequest_sigio ();  /* See comment in x_display_ok, xterm.c.  */
+#ifndef HAVE_PGTK
   gdpy = gdk_display_open (display_name);
+#else
+  gdpy = gdk_display_open (strlen(display_name) == 0 ? NULL : display_name);
+#endif
   request_sigio ();
   if (!gdpy_def && gdpy)
     {
@@ -1218,6 +1222,11 @@ style_changed_cb (GObject *go,
   Display *dpy = GDK_DISPLAY_XDISPLAY (gdpy);
 #else
   GdkDisplay *dpy = gdpy;
+#endif
+
+#ifndef HAVE_PGTK
+  if (display_name == NULL)
+    display_name = "";
 #endif
 
   EVENT_INIT (event);

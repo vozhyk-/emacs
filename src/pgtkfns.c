@@ -1781,6 +1781,9 @@ terminate Emacs if we can't open the connection.  */)
 {
   struct pgtk_display_info *dpyinfo;
 
+  if (NILP(display))
+    display = build_string("");
+
   CHECK_STRING (display);
 
   nxatoms_of_pgtkselect ();

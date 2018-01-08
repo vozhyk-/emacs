@@ -17,7 +17,7 @@
 (require 'dnd)
 
 (defgroup pgtk nil
-  "GNUstep/macOS specific features."
+  "Pure-GTK specific features."
   :group 'environment)
 
 ;;;; Command line argument handling.
@@ -41,75 +41,9 @@
 (defun pgtk-ignore-1-arg (_switch)
   (setq x-invocation-args (cdr x-invocation-args)))
 
-(defun pgtk-parse-geometry (geom)
-  "Parse a Nextstep-style geometry string GEOM.
-Returns an alist of the form ((top . TOP), (left . LEFT) ... ).
-The properties returned may include `top', `left', `height', and `width'."
-  (when (string-match "\\([0-9]+\\)\\( \\([0-9]+\\)\\( \\([0-9]+\\)\
-\\( \\([0-9]+\\) ?\\)?\\)?\\)?"
-		      geom)
-    (apply
-     'append
-     (list
-      (list (cons 'top (string-to-number (match-string 1 geom))))
-      (if (match-string 3 geom)
-	  (list (cons 'left (string-to-number (match-string 3 geom)))))
-      (if (match-string 5 geom)
-	  (list (cons 'height (string-to-number (match-string 5 geom)))))
-      (if (match-string 7 geom)
-	  (list (cons 'width (string-to-number (match-string 7 geom)))))))))
-
 ;;;; Keyboard mapping.
 
 (define-obsolete-variable-alias 'pgtk-alternatives-map 'x-alternatives-map "24.1")
-
-;; Here are some Nextstep-like bindings for command key sequences.
-(define-key global-map [?\s-,] 'customize)
-(define-key global-map [?\s-'] 'next-multiframe-window)
-(define-key global-map [?\s-`] 'other-frame)
-(define-key global-map [?\s-~] 'pgtk-prev-frame)
-(define-key global-map [?\s--] 'center-line)
-(define-key global-map [?\s-:] 'ispell)
-(define-key global-map [?\s-?] 'info)
-(define-key global-map [?\s-^] 'kill-some-buffers)
-(define-key global-map [?\s-&] 'kill-current-buffer)
-(define-key global-map [?\s-C] 'pgtk-popup-color-panel)
-(define-key global-map [?\s-D] 'dired)
-(define-key global-map [?\s-E] 'edit-abbrevs)
-(define-key global-map [?\s-L] 'shell-command)
-(define-key global-map [?\s-M] 'manual-entry)
-(define-key global-map [?\s-S] 'pgtk-write-file-using-panel)
-(define-key global-map [?\s-a] 'mark-whole-buffer)
-(define-key global-map [?\s-c] 'pgtk-copy-including-secondary)
-(define-key global-map [?\s-d] 'isearch-repeat-backward)
-(define-key global-map [?\s-e] 'isearch-yank-kill)
-(define-key global-map [?\s-f] 'isearch-forward)
-(define-key global-map [?\s-g] 'isearch-repeat-forward)
-(define-key global-map [?\s-h] 'pgtk-do-hide-emacs)
-(define-key global-map [?\s-H] 'pgtk-do-hide-others)
-(define-key global-map [?\M-\s-h] 'pgtk-do-hide-others)
-(define-key key-translation-map [?\M-\s-\u02D9] [?\M-\s-h])
-(define-key global-map [?\s-j] 'exchange-point-and-mark)
-(define-key global-map [?\s-k] 'kill-current-buffer)
-(define-key global-map [?\s-l] 'goto-line)
-(define-key global-map [?\s-m] 'iconify-frame)
-(define-key global-map [?\s-n] 'make-frame)
-(define-key global-map [?\s-o] 'pgtk-open-file-using-panel)
-(define-key global-map [?\s-p] 'pgtk-print-buffer)
-(define-key global-map [?\s-q] 'save-buffers-kill-emacs)
-(define-key global-map [?\s-s] 'save-buffer)
-(define-key global-map [?\s-t] 'pgtk-popup-font-panel)
-(define-key global-map [?\s-u] 'revert-buffer)
-(define-key global-map [?\s-v] 'yank)
-(define-key global-map [?\s-w] 'delete-frame)
-(define-key global-map [?\s-x] 'kill-region)
-(define-key global-map [?\s-y] 'pgtk-paste-secondary)
-(define-key global-map [?\s-z] 'undo)
-(define-key global-map [?\s-|] 'shell-command-on-region)
-(define-key global-map [s-kp-bar] 'shell-command-on-region)
-;; (as in Terminal.app)
-(define-key global-map [s-right] 'pgtk-next-frame)
-(define-key global-map [s-left] 'pgtk-prev-frame)
 
 (define-key global-map [home] 'beginning-of-buffer)
 (define-key global-map [end] 'end-of-buffer)
@@ -117,214 +51,6 @@ The properties returned may include `top', `left', `height', and `width'."
 (define-key global-map [kp-end] 'end-of-buffer)
 (define-key global-map [kp-prior] 'scroll-down-command)
 (define-key global-map [kp-next] 'scroll-up-command)
-
-;; Allow shift-clicks to work similarly to under Nextstep.
-(define-key global-map [S-mouse-1] 'mouse-save-then-kill)
-(global-unset-key [S-down-mouse-1])
-
-;; Special Nextstep-generated events are converted to function keys.  Here
-;; are the bindings for them.  Note, these keys are actually declared in
-;; x-setup-function-keys in common-win.
-(define-key global-map [pgtk-power-off] 'save-buffers-kill-emacs)
-(define-key global-map [pgtk-open-file] 'pgtk-find-file)
-(define-key global-map [pgtk-open-temp-file] [pgtk-open-file])
-(define-key global-map [pgtk-change-font] 'pgtk-respond-to-change-font)
-(define-key global-map [pgtk-open-file-line] 'pgtk-open-file-select-line)
-(define-key global-map [pgtk-new-frame] 'make-frame)
-(define-key global-map [pgtk-toggle-toolbar] 'pgtk-toggle-toolbar)
-(define-key global-map [pgtk-show-prefs] 'customize)
-
-
-;; pgtkterm.c
-(defvar pgtk-input-spi-name)
-(defvar pgtk-input-spi-arg)
-
-(declare-function dnd-open-file "dnd" (uri action))
-
-;; Handles multiline strings that are passed to the "open-file" service.
-(defun pgtk-open-file-service (filenames)
-  "Open multiple files when selecting a multiline string FILENAMES."
-  (let ((filelist (split-string filenames "[\n\r]+" t "[ \u00A0\t]+")))
-    ;; The path strings are trimmed for spaces, nbsp and tabs.
-    (dolist (filestring filelist)
-      (dnd-open-file filestring nil))))
-
-
-;; Composed key sequence handling for Nextstep system input methods.
-;; (On Nextstep systems, input methods are provided for CJK
-;; characters, etc. which require multiple keystrokes, and during
-;; entry a partial ("working") result is typically shown in the
-;; editing window.)
-
-(defface pgtk-working-text-face
-  '((t :underline t))
-  "Face used to highlight working text during compose sequence insert."
-  :group 'pgtk)
-
-(defvar pgtk-working-overlay nil
-  "Overlay used to highlight working text during compose sequence insert.
-When text is in th echo area, this just stores the length of the working text.")
-
-(defvar pgtk-working-text)		; pgtkterm.c
-
-;; Test if in echo area, based on mac-win.el 2007/08/26 unicode-2.
-;; This will fail if called from a NONASCII_KEYSTROKE event on the global map.
-(defun pgtk-in-echo-area ()
-  "Whether, for purposes of inserting working composition text, the minibuffer
-is currently being used."
-  (or isearch-mode
-      (and cursor-in-echo-area (current-message))
-      ;; Overlay strings are not shown in some cases.
-      (get-char-property (point) 'invisible)
-      (and (not (bobp))
-	   (or (and (get-char-property (point) 'display)
-		    (eq (get-char-property (1- (point)) 'display)
-			(get-char-property (point) 'display)))
-	       (and (get-char-property (point) 'composition)
-		    (eq (get-char-property (1- (point)) 'composition)
-			(get-char-property (point) 'composition)))))))
-
-;; The 'interactive' here stays for subinvocations, so the pgtk-in-echo-area
-;; always returns nil for some reason.  If this WASN'T the case, we could
-;; map this to [pgtk-insert-working-text] and eliminate Fevals in pgtkterm.c.
-;; These functions test whether in echo area and delegate accordingly.
-(defun pgtk-put-working-text ()
-  (interactive)
-  (if (pgtk-in-echo-area) (pgtk-echo-working-text) (pgtk-insert-working-text)))
-(defun pgtk-unput-working-text ()
-  (interactive)
-  (pgtk-delete-working-text))
-
-(defun pgtk-insert-working-text ()
-  "Insert contents of `pgtk-working-text' as UTF-8 string and mark with
-`pgtk-working-overlay'.  Any previously existing working text is cleared first.
-The overlay is assigned the face `pgtk-working-text-face'."
-  ;; FIXME: if buffer is read-only, don't try to insert anything
-  ;;  and if text is bound to a command, execute that instead (Bug#1453)
-  (interactive)
-  (pgtk-delete-working-text)
-  (let ((start (point)))
-    (insert pgtk-working-text)
-    (overlay-put (setq pgtk-working-overlay (make-overlay start (point)
-							(current-buffer) nil t))
-		 'face 'pgtk-working-text-face)))
-
-(defun pgtk-echo-working-text ()
-  "Echo contents of `pgtk-working-text' in message display area.
-See `pgtk-insert-working-text'."
-  (pgtk-delete-working-text)
-  (let* ((msg (current-message))
-	 (msglen (length msg))
-	 message-log-max)
-    (setq pgtk-working-overlay (length pgtk-working-text))
-    (setq msg (concat msg pgtk-working-text))
-    (put-text-property msglen (+ msglen pgtk-working-overlay)
-		       'face 'pgtk-working-text-face msg)
-    (message "%s" msg)))
-
-(defun pgtk-delete-working-text()
-  "Delete working text and clear `pgtk-working-overlay'."
-  (interactive)
-  (cond
-   ((and (overlayp pgtk-working-overlay)
-         ;; Still alive?
-         (overlay-buffer pgtk-working-overlay))
-    (with-current-buffer (overlay-buffer pgtk-working-overlay)
-      (delete-region (overlay-start pgtk-working-overlay)
-                     (overlay-end pgtk-working-overlay))
-      (delete-overlay pgtk-working-overlay)))
-   ((integerp pgtk-working-overlay)
-    (let ((msg (current-message))
-          message-log-max)
-      (setq msg (substring msg 0 (- (length msg) pgtk-working-overlay)))
-      (message "%s" msg))))
-  (setq pgtk-working-overlay nil))
-
-
-;; macOS file system Unicode UTF-8 NFD (decomposed form) support.
-(when (eq system-type 'darwin)
-  ;; Used prior to Emacs 25.
-  (define-coding-system-alias 'utf-8-nfd 'utf-8-hfs)
-
-  (set-file-name-coding-system 'utf-8-hfs))
-
-;;;; Inter-app communications support.
-
-(defun pgtk-insert-file ()
-  "Insert contents of file `pgtk-input-file' like insert-file but with less
-prompting.  If file is a directory perform a `find-file' on it."
-  (interactive)
-  (let ((f (pop pgtk-input-file)))
-    (if (file-directory-p f)
-        (find-file f)
-      (push-mark (+ (point) (cadr (insert-file-contents f)))))))
-
-(defvar pgtk-select-overlay nil
-  "Overlay used to highlight areas in files requested by Nextstep apps.")
-(make-variable-buffer-local 'pgtk-select-overlay)
-
-(defvar pgtk-input-line) 			; pgtkterm.c
-
-(defun pgtk-open-file-select-line ()
-  "Open a buffer containing the file `pgtk-input-file'.
-Lines are highlighted according to `pgtk-input-line'."
-  (interactive)
-  (pgtk-find-file)
-  (cond
-   ((and pgtk-input-line (buffer-modified-p))
-    (if pgtk-select-overlay
-        (setq pgtk-select-overlay (delete-overlay pgtk-select-overlay)))
-    (deactivate-mark)
-    (goto-char (point-min))
-    (forward-line (1- (if (consp pgtk-input-line)
-                          (min (car pgtk-input-line) (cdr pgtk-input-line))
-                        pgtk-input-line))))
-   (pgtk-input-line
-    (if (not pgtk-select-overlay)
-        (overlay-put (setq pgtk-select-overlay (make-overlay (point-min)
-                                                           (point-min)))
-                     'face 'highlight))
-    (let ((beg (save-excursion
-                 (goto-char (point-min))
-                 (line-beginning-position
-                  (if (consp pgtk-input-line)
-                      (min (car pgtk-input-line) (cdr pgtk-input-line))
-                    pgtk-input-line))))
-          (end (save-excursion
-                 (goto-char (point-min))
-                 (line-beginning-position
-                  (1+ (if (consp pgtk-input-line)
-                          (max (car pgtk-input-line) (cdr pgtk-input-line))
-                        pgtk-input-line))))))
-      (move-overlay pgtk-select-overlay beg end)
-      (deactivate-mark)
-      (goto-char beg)))
-   (t
-    (if pgtk-select-overlay
-        (setq pgtk-select-overlay (delete-overlay pgtk-select-overlay))))))
-
-(defun pgtk-unselect-line ()
-  "Removes any Nextstep highlight a buffer may contain."
-  (if pgtk-select-overlay
-      (setq pgtk-select-overlay (delete-overlay pgtk-select-overlay))))
-
-(add-hook 'first-change-hook 'pgtk-unselect-line)
-
-;;;; Preferences handling.
-(declare-function pgtk-get-resource "pgtkfns.c" (owner name))
-
-(defun get-lisp-resource (arg1 arg2)
-  (let ((res (pgtk-get-resource arg1 arg2)))
-    (cond
-     ((not res) 'unbound)
-     ((string-equal (upcase res) "YES") t)
-     ((string-equal (upcase res) "NO")  nil)
-     (t (read res)))))
-
-;; pgtkterm.c
-
-(declare-function pgtk-read-file-name "pgtkfns.c"
-		  (prompt &optional dir mustmatch init dir_only_p))
 
 ;;;; File handling.
 
@@ -667,18 +393,18 @@ See the documentation of `create-fontset-from-fontset-spec' for the format.")
 
 
 (defvar pgtk-initialized nil
-  "Non-nil if Nextstep windowing has been initialized.")
+  "Non-nil if pure-GTK windowing has been initialized.")
 
 (declare-function x-handle-args "common-win" (args))
 (declare-function x-open-connection "pgtkfns.c"
                   (display &optional xrm-string must-succeed))
 (declare-function pgtk-set-resource "pgtkfns.c" (owner name value))
 
-;; Do the actual Nextstep Windows setup here; the above code just
+;; Do the actual pure-GTK Windows setup here; the above code just
 ;; defines functions and variables that we use now.
 (cl-defmethod window-system-initialization (&context (window-system pgtk)
-                                            &optional _display)
-  "Initialize Emacs for Nextstep (Cocoa / GNUstep) windowing."
+                                            &optional display)
+  "Initialize Emacs for pure-GTK windowing."
   (cl-assert (not pgtk-initialized))
 
   ;; PENDING: not needed?
@@ -704,8 +430,12 @@ See the documentation of `create-fontset-from-fontset-spec' for the format.")
             (format "Creation of the standard fontset failed: %s" err)
             :error)))
 
-  ; (x-open-connection (system-name) x-command-line-resources t)
-  (x-open-connection (or (getenv "WAYLAND_DISPLAY") (getenv "DISPLAY")) x-command-line-resources t)
+  (x-open-connection (or display
+                         x-display-name)
+		     x-command-line-resources
+		     ;; Exit Emacs with fatal error if this fails and we
+		     ;; are the initial display.
+                     (= (length (frame-list)) 0))
 
   ;; FIXME: This will surely lead to "MODIFIED OUTSIDE CUSTOM" warnings.
   (menu-bar-mode (if (get-lisp-resource nil "Menus") 1 -1))
