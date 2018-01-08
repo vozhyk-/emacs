@@ -225,8 +225,10 @@ extern struct pgtk_display_info *x_display_list;
 
 struct pgtk_output
 {
+#if 0
   void *view;
   void *miniimage;
+#endif
   unsigned long cursor_color;
   unsigned long foreground_color;
   unsigned long background_color;
