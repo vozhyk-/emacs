@@ -4753,6 +4753,7 @@ pgtk_any_window_to_frame (GdkWindow *window)
 static gboolean
 pgtk_handle_event(GtkWidget *widget, GdkEvent *event, gpointer *data)
 {
+#ifdef PGTK_DEBUG
   const char *type_name = G_OBJECT_TYPE_NAME(widget);
   switch (event->type) {
   case GDK_NOTHING:               PGTK_TRACE("GDK_NOTHING"); break;
@@ -4806,6 +4807,7 @@ pgtk_handle_event(GtkWidget *widget, GdkEvent *event, gpointer *data)
   default:                        PGTK_TRACE("GDK_EVENT %d", event->type);
   }
   PGTK_TRACE(" Widget is %s", type_name);
+#endif
   return FALSE;
 }
 
