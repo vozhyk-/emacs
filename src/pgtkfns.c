@@ -2704,6 +2704,19 @@ visible.  */)
   return Qnil;
 }
 
+DEFUN ("pgtk-backend-display-class", Fpgtk_backend_display_class, Spgtk_backend_display_class,
+       0, 1, "",
+       doc: /* Returns the name of the Gdk backend display class of the TERMINAL.
+The optional argument TERMINAL specifies which display to ask about.
+TERMINAL should be a terminal object, a frame or a display name (a string).
+If omitted or nil, that stands for the selected frame's display.  */)
+  (Lisp_Object terminal)
+{
+  struct pgtk_display_info *dpyinfo = check_pgtk_display_info (terminal);
+  GdkDisplay *gdpy = dpyinfo->gdpy;
+  const gchar *type_name = G_OBJECT_TYPE_NAME(G_OBJECT(gdpy));
+  return build_string(type_name);
+}
 
 /* ==========================================================================
 
@@ -2818,6 +2831,7 @@ be used as the image of the icon representing the frame.  */);
   defsubr (&Spgtk_page_setup_dialog);
   defsubr (&Spgtk_get_page_setup);
   defsubr (&Spgtk_print_frames_dialog);
+  defsubr (&Spgtk_backend_display_class);
 
   as_status = 0;
   as_script = Qnil;
