@@ -6543,9 +6543,12 @@ pgtk_term_init (Lisp_Object display_name, char *resource_name)
                                      dpyinfo->visual, AllocNone);
 #endif
 
-  // fixme: get dpi from somewhere.
-  dpyinfo->resx = 96;
-  dpyinfo->resy = 96;
+  {
+    GdkScreen *gscr = gdk_display_get_default_screen(dpyinfo->gdpy);
+    gdouble dpi = gdk_screen_get_resolution(gscr);
+    dpyinfo->resx = dpi;
+    dpyinfo->resy = dpi;
+  }
 
 #if 0
   dpyinfo->x_dnd_atoms_size = 8;
