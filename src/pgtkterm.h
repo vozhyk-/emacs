@@ -142,6 +142,9 @@ struct pgtk_display_info
   /* This is a cons cell of the form (NAME . FONT-LIST-CACHE).  */
   Lisp_Object name_list_element;
 
+  /* Logical identifier of this display.  */
+  unsigned x_id;
+
   /* Default name for all frames on this display.  */
   char *x_id_name;
 

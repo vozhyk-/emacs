@@ -6304,6 +6304,7 @@ pgtk_term_init (Lisp_Object display_name, char *resource_name)
   struct terminal *terminal;
   struct pgtk_display_info *dpyinfo;
   static int x_initialized = 0;
+  static unsigned x_display_id = 0;
   int conn_fd;
 
   block_input ();
@@ -6462,9 +6463,7 @@ pgtk_term_init (Lisp_Object display_name, char *resource_name)
   if (INT_ADD_WRAPV (SBYTES (Vinvocation_name), SBYTES (system_name) + 2,
 		     &nbytes))
     memory_full (SIZE_MAX);
-#if 0
   dpyinfo->x_id = ++x_display_id;
-#endif
   dpyinfo->x_id_name = xmalloc (nbytes);
   char *nametail = lispstpcpy (dpyinfo->x_id_name, Vinvocation_name);
   *nametail++ = '@';
