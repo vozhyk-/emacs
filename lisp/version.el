@@ -70,8 +70,6 @@ to the system configuration; look at `system-configuration' instead."
 			(concat ", " (substring motif-version-string 4)))
 		       ((featurep 'gtk)
 			(concat ", GTK+ Version " gtk-version-string))
-		       ((featurep 'pgtk)
-			(concat ", Pure GTK+ Version " pgtk-version-string))
 		       ((featurep 'x-toolkit) ", X toolkit")
 		       ((featurep 'ns)
 			(format ", NS %s" ns-version-string))
