@@ -89,7 +89,7 @@ dpyinfo_valid (Display_Info *dpyinfo)
 #ifndef HAVE_PGTK
         found = d == dpyinfo && d->display == dpyinfo->display;
 #else
-        found = d == dpyinfo;
+        found = d == dpyinfo && d->gdpy == dpyinfo->gdpy;
 #endif
     }
   return found;
