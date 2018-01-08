@@ -723,6 +723,30 @@ x_icon (struct frame *f, Lisp_Object parms)
 #endif
 }
 
+/**
+ * x_set_override_redirect:
+ *
+ * Set frame F's `override_redirect' parameter which, if non-nil, hints
+ * that the window manager doesn't want to deal with F.  Usually, such
+ * frames have no decorations and always appear on top of all frames.
+ *
+ * Some window managers may not honor this parameter.
+ */
+static void
+x_set_override_redirect (struct frame *f, Lisp_Object new_value, Lisp_Object old_value)
+{
+  if (!EQ (new_value, old_value))
+    {
+      /* Here (xfwm) override_redirect can be changed for invisible
+	 frames only.  */
+      x_make_frame_invisible (f);
+
+      xg_set_override_redirect (f, new_value);
+
+      x_make_frame_visible (f);
+      FRAME_OVERRIDE_REDIRECT (f) = !NILP (new_value);
+    }
+}
 
 /* Note: see frame.c for template, also where generic functions are impl */
 frame_parm_handler pgtk_frame_parm_handlers[] =
@@ -771,7 +795,7 @@ frame_parm_handler pgtk_frame_parm_handlers[] =
   x_set_no_focus_on_map,
   x_set_no_accept_focus,
   x_set_z_group, /* x_set_z_group */
-  0, /* x_set_override_redirect */
+  x_set_override_redirect,
   x_set_no_special_glyphs,
 };
 
