@@ -129,8 +129,10 @@ mark_pgtkterm(void)
   }
 
   struct pgtk_display_info *dpyinfo;
-  for (dpyinfo = x_display_list; dpyinfo != NULL; dpyinfo = dpyinfo->next)
+  for (dpyinfo = x_display_list; dpyinfo != NULL; dpyinfo = dpyinfo->next) {
     mark_object (dpyinfo->name_list_element);
+    mark_object (dpyinfo->xrdb);
+  }
 }
 
 char *
@@ -5527,7 +5529,7 @@ x_focus_changed (gboolean is_enter, int state, struct pgtk_display_info *dpyinfo
              for a switch-frame event we don't need.  */
           /* When run as a daemon, Vterminal_frame is always NIL.  */
           bufp->ie.arg = (((NILP (Vterminal_frame)
-                         || ! FRAME_X_P (XFRAME (Vterminal_frame))
+                         || ! FRAME_PGTK_P (XFRAME (Vterminal_frame))
                          || EQ (Fdaemonp (), Qt))
 			&& CONSP (Vframe_list)
 			&& !NILP (XCDR (Vframe_list)))

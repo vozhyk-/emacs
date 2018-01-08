@@ -1248,7 +1248,11 @@ style_changed_cb (GObject *go,
         {
           struct frame *f = XFRAME (frame);
           if (FRAME_LIVE_P (f)
+#ifndef HAVE_PGTK
               && FRAME_X_P (f)
+#else
+              && FRAME_PGTK_P (f)
+#endif
               && FRAME_X_DISPLAY (f) == dpy)
             {
               x_set_scroll_bar_default_width (f);
@@ -2590,7 +2594,7 @@ xg_mark_data (void)
     {
       struct frame *f = XFRAME (frame);
 
-      if (FRAME_X_P (f) && FRAME_GTK_OUTER_WIDGET (f))
+      if ((FRAME_X_P (f) || FRAME_PGTK_P (f)) && FRAME_GTK_OUTER_WIDGET (f))
         {
           struct xg_frame_tb_info *tbinfo
             = g_object_get_data (G_OBJECT (FRAME_GTK_OUTER_WIDGET (f)),
