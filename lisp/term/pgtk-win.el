@@ -438,12 +438,12 @@ See the documentation of `create-fontset-from-fontset-spec' for the format.")
                      (= (length (frame-list)) 0))
 
   ;; FIXME: This will surely lead to "MODIFIED OUTSIDE CUSTOM" warnings.
-  (menu-bar-mode (if (get-lisp-resource nil "Menus") 1 -1))
+  ; (menu-bar-mode (if (get-lisp-resource nil "Menus") 1 -1))
 
   ;; Mac OS X Lion introduces PressAndHold, which is unsupported by this port.
   ;; See this thread for more details:
   ;; https://lists.gnu.org/archive/html/emacs-devel/2011-06/msg00505.html
-  (pgtk-set-resource nil "ApplePressAndHoldEnabled" "NO")
+  ; (pgtk-set-resource nil "ApplePressAndHoldEnabled" "NO")
 
   (x-apply-session-resources)
 
