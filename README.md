@@ -29,6 +29,7 @@ GDK_BACKEND=wayland ./emacs  (or ./emacs -Q if you have problems.)
 
 ## TODO
 
+- segmentation fault while multiple-display.
 - sometimes can't send selection data
 
 Low priority:
