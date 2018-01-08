@@ -6234,23 +6234,18 @@ same_x_server (const char *name1, const char *name2)
     Don't assume existence of X11 or Wayland specific functions.
 ***/
 
-static GType get_type(dynlib_handle_ptr h, const char *funcname)
-{
-  void *fn;
-  if ((fn = dynlib_sym(h, funcname)) == NULL)
-    return G_TYPE_INVALID;
-  return ((GType (*)(void)) fn)();
-}
-
 static int pgtk_detect_wayland_connection(dynlib_handle_ptr h, GdkDisplay *gdpy)
 {
   GType wldpy_type;
   void *(*fn1)(void *);
   int (*fn2)(void *);
-  if ((wldpy_type = get_type(h, "gdk_wayland_display_get_type")) == G_TYPE_INVALID)
+  /* Check gdpy is an instance of GdkWaylandDisplay. */
+  if ((wldpy_type = g_type_from_name("GdkWaylandDisplay")) == G_TYPE_INVALID)
     return -1;
   if (!g_type_check_instance_is_a((void *) gdpy, wldpy_type))
     return -1;
+  /* Obtain Wayland Display from GdkWaylandDisplay,
+     and get file descriptor from it. */
   fn1 = dynlib_sym(h, "gdk_wayland_display_get_wl_display");
   fn2 = dynlib_sym(h, "wl_display_get_fd");
   if (!fn1 || !fn2)
@@ -6263,10 +6258,12 @@ static int pgtk_detect_x11_connection(dynlib_handle_ptr h, GdkDisplay *gdpy)
   GType xdpy_type;
   void *(*fn1)(void *);
   int (*fn2)(void *);
-  if ((xdpy_type = get_type(h, "gdk_x11_display_get_type")) == G_TYPE_INVALID)
+  /* Check gdpy is an instance of GdkX11Display. */
+  if ((xdpy_type = g_type_from_name("GdkX11Display")) == G_TYPE_INVALID)
     return -1;
   if (!g_type_check_instance_is_a((void *) gdpy, xdpy_type))
     return -1;
+  /* Obtain X Display from GdkX11Display, and get file descriptor from it. */
   fn1 = dynlib_sym(h, "gdk_x11_display_get_xdisplay");
   fn2 = dynlib_sym(h, "XConnectionNumber");
   if (!fn1 || !fn2)
@@ -6288,6 +6285,7 @@ static int pgtk_detect_connection(GdkDisplay *gdpy)
     return fd;
   if ((fd = pgtk_detect_wayland_connection(h, gdpy)) != -1)
     return fd;
+  /* I don't know how to detect fd if other backend. */
 
   error("socket detection failed.");
   return -1;
