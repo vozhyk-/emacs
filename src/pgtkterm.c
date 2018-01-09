@@ -6128,7 +6128,7 @@ static void drag_data_received(GtkWidget *widget, GdkDragContext *context,
       inev.ie.kind = NO_EVENT;
       inev.ie.arg = Qnil;
 
-      arg = list2(Qurl, make_string(uris[i], strlen(uris[i])));
+      arg = list2(Qurl, build_string(uris[i]));
 
       inev.ie.kind = DRAG_N_DROP_EVENT;
       inev.ie.modifiers = 0;
