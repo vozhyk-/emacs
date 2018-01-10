@@ -10,7 +10,7 @@ The work is in progress.
 
 You need cairo.
 
-```
+```sh
 git clone https://github.com/masm11/emacs.git
 cd emacs
 ./autogen.sh
@@ -22,10 +22,28 @@ Ignore many warnings.
 
 ## Running
 
-```
+```sh
 cd src
 GDK_BACKEND=wayland ./emacs  (or ./emacs -Q if you have problems.)
 ```
+
+## X11 and Wayland
+
+Of course, PGTK supports X11 and Wayland connections.
+
+You can use `GDK_BACKEND` environment variable and `--display` option,
+and you can do `(make-frame-on-display display-name)` with display-name of
+different backend from the first frame.
+
+You can know which backend is used for a frame:
+
+```elisp
+(pgtk-backend-display-class)
+```
+
+This returns `"GdkWaylandDisplay"` for Wayland, or `"GdkX11Display"` for X11.
+
+Note: Segmentation fault may occur on multiple display environment.
 
 ## TODO
 
