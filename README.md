@@ -20,6 +20,18 @@ make
 
 Ignore many warnings.
 
+#### For archlinux users
+
+This repository contains PKGBUILD, so you can do to install:
+
+```
+mkdir /tmp/emacs
+cd /tmp/emacs
+wget https://raw.githubusercontent.com/masm11/emacs/master/PKGBUILD
+makepkg -s
+sudo pacman -U emacs-pgtk*.tar.xz
+```
+
 ## Running
 
 ```sh
@@ -103,21 +115,9 @@ On gdb, you may want to do:
 - wayland 1.14.0
 - wayland-protocols 1.12
 
-## For archlinux users
-
-This repository contains PKGBUILD, so you can do to install:
-
-```
-mkdir /tmp/emacs
-cd /tmp/emacs
-wget https://raw.githubusercontent.com/masm11/emacs/master/PKGBUILD
-makepkg -s
-sudo pacman -U emacs-pgtk*.tar.xz
-```
-
 ## Notice
 
-- This code is not completely pure.
+- This code is NOT completely pure.
 
   It uses backend-specific functions to obtain the socket file
   descriptor to the display server. It supports X11 and Wayland.
