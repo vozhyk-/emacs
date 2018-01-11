@@ -483,9 +483,14 @@ See the documentation of `create-fontset-from-fontset-spec' for the format.")
                                          &context (window-system pgtk))
   (pgtk-get-selection-internal selection-symbol target-type))
 
-;; If you want to use alt key as alt key:
-;;   (setq x-alt-keysym nil)
-(setq x-alt-keysym 'meta)
+;; Alt key behavior.
+(defcustom pgtk-use-alt-as-meta t
+  "If non-nil, Alt key behaves as Meta key."
+  :type 'boolean
+  :set #'(lambda (var val)
+           (setq pgtk-use-alt-as-meta val)
+           (setq x-alt-keysym (and val 'meta)))
+  )
 
 (provide 'pgtk-win)
 (provide 'term/pgtk-win)
