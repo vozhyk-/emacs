@@ -449,6 +449,7 @@ See the documentation of `create-fontset-from-fontset-spec' for the format.")
   :set #'(lambda (var val)
            (setq pgtk-use-alt-as-meta val)
            (setq x-alt-keysym (and val 'meta)))
+  :group 'pgtk
   )
 
 (provide 'pgtk-win)
