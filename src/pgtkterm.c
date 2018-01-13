@@ -216,10 +216,14 @@ x_destroy_window (struct frame *f)
      External: Delete the window
    -------------------------------------------------------------------------- */
 {
+  struct pgtk_display_info *dpyinfo = FRAME_DISPLAY_INFO (f);
   PGTK_TRACE ("x_destroy_window");
 
   check_window_system (f);
-  x_free_frame_resources (f);
+  if (dpyinfo->gdpy != NULL)
+    x_free_frame_resources (f);
+
+  dpyinfo->reference_count--;
 }
 
 /* Calculate the absolute position in frame F

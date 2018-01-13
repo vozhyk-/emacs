@@ -1417,9 +1417,7 @@ This function is an internal primitive--use `make-frame' instead.  */)
 
   /* Now consider the frame official.  */
   f->terminal->reference_count++;
-#if 0
   FRAME_DISPLAY_INFO (f)->reference_count++;
-#endif
   Vframe_list = Fcons (frame, Vframe_list);
 
   /* We need to do this after creating the X window, so that the
@@ -1902,10 +1900,8 @@ terminal.  */)
 {
   struct pgtk_display_info *dpyinfo = check_pgtk_display_info (terminal);
 
-#if 0  // fixme:
   if (dpyinfo->reference_count > 0)
     error ("Display still has frames on it");
-#endif
 
   pgtk_delete_terminal (dpyinfo->terminal);
 
