@@ -18,7 +18,7 @@ cd emacs
 make
 ```
 
-Ignore many warnings.
+Ignore warnings.
 
 #### For archlinux users
 
@@ -59,13 +59,17 @@ Note: Segmentation fault may occur on multiple display environment.
 
 ## TODO
 
-- segmentation fault while multiple-display.
-- sometimes can't send selection data
+Known problems:
+- Segmentation fault while multiple-display.
+- Can't send selection data sometimes.
+- Only small area is drawn when the frame opens. (You can resize it to be correctly drawn.)
+- Tooltips are stressful.
+- Exits when a connection to display server is closed by peer. (However I may not be able to resolve.)
 
-Low priority:
-- toolbar.
-- menubar.
-- so many features not supported.
+Not implemented:
+- Toolbar.
+- Menubar.
+- Many other features.
 
 Those may not be developed because I don't use them.
 
@@ -97,7 +101,7 @@ Edit src/pgtkterm.h to uncomment:
 #define PGTK_DEBUG 1
 ```
 
-It enables many many debugging outputs.
+It enables so many debugging outputs.
 
 On gdb, you may want to do:
 
