@@ -65,6 +65,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #define FRAME_CR_SURFACE(f)	((f)->output_data.pgtk->cr_surface)
 
 struct pgtk_display_info *x_display_list; /* Chain of existing displays */
+extern Lisp_Object tip_frame;
 
 static struct event_queue_t {
   union buffered_input_event *q;
