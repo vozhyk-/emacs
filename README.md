@@ -62,7 +62,7 @@ Note: Segmentation fault may occur on multiple display environment.
 Known problems:
 - Segmentation fault while multiple-display.
 - Can't send selection data sometimes.
-- Only small area is drawn when the frame opens. (You can resize it to be correctly drawn.)
+- Only small area is drawn when a X11 frame opens. (In the case, you can resize it to be correctly drawn.)
 - Tooltips are stressful.
 - Exits when a connection to display server is closed by peer. (However I may not be able to resolve.)
 
