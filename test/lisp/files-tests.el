@@ -139,18 +139,16 @@ form.")
 
 (ert-deftest files-test-local-variables ()
   "Test the file-local variables implementation."
-  (unwind-protect
-      (progn
-	(defadvice hack-local-variables-confirm (around files-test activate)
-	  (setq files-test-result 'query)
-	  nil)
-	(dolist (test files-test-local-variable-data)
-	  (let ((str (concat "text\n\n;; Local Variables:\n;; "
-			     (mapconcat 'identity (car test) "\n;; ")
-			     "\n;; End:\n")))
-	    (dolist (subtest (cdr test))
-	      (should (file-test--do-local-variables-test str subtest))))))
-    (ad-disable-advice 'hack-local-variables-confirm 'around 'files-test)))
+  (cl-letf (((symbol-function 'hack-local-variables-confirm)
+             (lambda (&rest _)
+               (setq files-test-result 'query)
+               nil)))
+    (dolist (test files-test-local-variable-data)
+      (let ((str (concat "text\n\n;; Local Variables:\n;; "
+                         (mapconcat 'identity (car test) "\n;; ")
+                         "\n;; End:\n")))
+        (dolist (subtest (cdr test))
+          (should (file-test--do-local-variables-test str subtest)))))))
 
 (defvar files-test-bug-18141-file
   (expand-file-name "data/files-bug18141.el.gz" (getenv "EMACS_TEST_DIRECTORY"))
@@ -268,7 +266,14 @@ be $HOME."
     (should (file-name-quoted-p (file-name-quote temporary-file-directory)))
     (should (equal temporary-file-directory
                    (file-name-unquote
-                    (file-name-quote temporary-file-directory))))))
+                    (file-name-quote temporary-file-directory))))
+    ;; It does not hurt to quote/unquote a file several times.
+    (should (equal (file-name-quote temporary-file-directory)
+                   (file-name-quote
+                    (file-name-quote temporary-file-directory))))
+    (should (equal (file-name-unquote temporary-file-directory)
+                   (file-name-unquote
+                    (file-name-unquote temporary-file-directory))))))
 
 (ert-deftest files-tests--file-name-non-special--subprocess ()
   "Check that Bug#25949 is fixed."
@@ -346,7 +351,8 @@ be invoked with the right arguments."
   (declare (indent 1) (debug ((symbolp symbolp &optional form) body)))
   (cl-check-type name symbol)
   (cl-check-type non-special-name symbol)
-  `(let* ((,name (make-temp-file "files-tests" ,dir-flag))
+  `(let* ((temporary-file-directory (file-truename temporary-file-directory))
+          (,name (make-temp-file "files-tests" ,dir-flag))
           (,non-special-name (file-name-quote ,name)))
      (unwind-protect
          (progn ,@body)
@@ -411,10 +417,23 @@ be invoked with the right arguments."
     (should (equal (directory-files nospecial-dir)
                    (directory-files tmpdir)))))
 
+(defun files-tests-file-attributes-equal (attr1 attr2)
+  ;; Element 4 is access time, which may be changed by the act of
+  ;; checking the attributes.
+  (setf (nth 4 attr1) nil)
+  (setf (nth 4 attr2) nil)
+  ;; Element 9 is unspecified.
+  (setf (nth 9 attr1) nil)
+  (setf (nth 9 attr2) nil)
+  (equal attr1 attr2))
+
 (ert-deftest files-tests-file-name-non-special-directory-files-and-attributes ()
   (files-tests--with-temp-non-special (tmpdir nospecial-dir t)
-    (should (equal (directory-files-and-attributes nospecial-dir)
-                   (directory-files-and-attributes tmpdir)))))
+    (cl-loop for (file1 . attr1) in (directory-files-and-attributes nospecial-dir)
+             for (file2 . attr2) in (directory-files-and-attributes tmpdir)
+             do
+             (should (equal file1 file2))
+             (should (files-tests-file-attributes-equal attr1 attr2)))))
 
 (ert-deftest files-tests-file-name-non-special-dired-compress-handler ()
   ;; `dired-compress-file' can get confused by filenames with ":" in
@@ -445,7 +464,8 @@ be invoked with the right arguments."
 
 (ert-deftest files-tests-file-name-non-special-file-attributes ()
   (files-tests--with-temp-non-special (tmpfile nospecial)
-    (should (equal (file-attributes nospecial) (file-attributes tmpfile)))))
+    (should (files-tests-file-attributes-equal
+             (file-attributes nospecial) (file-attributes tmpfile)))))
 
 (ert-deftest files-tests-file-name-non-special-file-directory-p ()
   (files-tests--with-temp-non-special (tmpdir nospecial-dir t)
