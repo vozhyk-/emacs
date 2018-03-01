@@ -1163,6 +1163,7 @@ The Emacs Initialization File
 * Terminal Init::       Each terminal type can have an init file.
 * Find Init::           How Emacs finds the init file.
 * Init Non-ASCII::      Using non-@acronym{ASCII} characters in an init file.
+* Early Init File::     Another init file, which is read early on.
 
 Dealing with Emacs Trouble
 
@@ -1222,8 +1223,8 @@ GTK resources
 
 * GTK Resource Basics::   Basic usage of GTK+ resources.
 * GTK Widget Names::      How GTK+ widgets are named.
-* GTK Names in Emacs::    GTK widgets used by Emacs.
-* GTK styles::            What can be customized in a GTK widget.
+* GTK Names in Emacs::    GTK+ widgets used by Emacs.
+* GTK styles::            What can be customized in a GTK+ widget.
 
 Emacs and macOS / GNUstep
 
