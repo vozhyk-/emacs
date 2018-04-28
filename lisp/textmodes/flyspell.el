@@ -321,14 +321,16 @@ If this variable is nil, all regions are treated as small."
 ;;*    	     (lambda () (setq flyspell-generic-check-word-predicate     */
 ;;*    			       'mail-mode-flyspell-verify)))            */
 ;;*---------------------------------------------------------------------*/
+
+(define-obsolete-variable-alias 'flyspell-generic-check-word-p
+  'flyspell-generic-check-word-predicate "25.1")
+
 (defvar flyspell-generic-check-word-predicate nil
   "Function providing per-mode customization over which words are flyspelled.
 Returns t to continue checking, nil otherwise.
 Flyspell mode sets this variable to whatever is the `flyspell-mode-predicate'
 property of the major mode name.")
 (make-variable-buffer-local 'flyspell-generic-check-word-predicate)
-(define-obsolete-variable-alias 'flyspell-generic-check-word-p
-  'flyspell-generic-check-word-predicate "25.1")
 
 ;;*--- mail mode -------------------------------------------------------*/
 (put 'mail-mode 'flyspell-mode-predicate 'mail-mode-flyspell-verify)
@@ -982,6 +984,11 @@ Mostly we check word delimiters."
       (let ((command this-command)
             ;; Prevent anything we do from affecting the mark.
             deactivate-mark)
+        (if (and (eq command 'transpose-chars)
+                 flyspell-pre-point)
+            (save-excursion
+              (goto-char (- flyspell-pre-point 1))
+              (flyspell-word)))
         (if (flyspell-check-pre-word-p)
             (save-excursion
               '(flyspell-debug-signal-pre-word-checked)
@@ -1945,8 +1952,9 @@ spell-check."
     (let ((pos     (point))
           (old-max (point-max)))
       ;; Flush a possibly stale cache from previous invocations of
-      ;; flyspell-auto-correct-word.
-      (if (not (eq last-command 'flyspell-auto-correct-word))
+      ;; flyspell-auto-correct-word/flyspell-auto-correct-previous-word.
+      (if (not (memq last-command '(flyspell-auto-correct-word
+                                    flyspell-auto-correct-previous-word)))
           (setq flyspell-auto-correct-region nil))
       ;; Use the correct dictionary.
       (flyspell-accept-buffer-local-defs)

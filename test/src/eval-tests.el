@@ -37,8 +37,7 @@
 (ert-deftest eval-tests--bugs-24912-and-24913 ()
   "Check that Emacs doesn't accept weird argument lists.
 Bug#24912 and Bug#24913."
-  (dolist (args '((&optional) (&rest) (&optional &rest) (&rest &optional)
-                  (&optional &rest a) (&optional a &rest)
+  (dolist (args '((&rest &optional)
                   (&rest a &optional) (&rest &optional a)
                   (&optional &optional) (&optional &optional a)
                   (&optional a &optional b)
@@ -47,7 +46,22 @@ Bug#24912 and Bug#24913."
     (should-error (eval `(funcall (lambda ,args)) t) :type 'invalid-function)
     (should-error (byte-compile-check-lambda-list args))
     (let ((byte-compile-debug t))
-      (should-error (eval `(byte-compile (lambda ,args)) t)))))
+      (ert-info ((format "bytecomp: args = %S" args))
+       (should-error (eval `(byte-compile (lambda ,args)) t))))))
+
+(ert-deftest eval-tests-accept-empty-optional-rest ()
+  "Check that Emacs accepts empty &optional and &rest arglists.
+Bug#24912."
+  (dolist (args '((&optional) (&rest) (&optional &rest)
+                  (&optional &rest a) (&optional a &rest)))
+    (let ((fun `(lambda ,args 'ok)))
+      (ert-info ("eval")
+        (should (eq (funcall (eval fun t)) 'ok)))
+      (ert-info ("byte comp check")
+        (byte-compile-check-lambda-list args))
+      (ert-info ("bytecomp")
+        (let ((byte-compile-debug t))
+          (should (eq (funcall (byte-compile fun)) 'ok)))))))
 
 
 (dolist (form '(let let*))
@@ -98,5 +112,9 @@ crash/abort/malloc assert failure on the next test."
   (let ((max-specpdl-size (/ max-lisp-eval-depth 2))
         (signal-hook-function #'ignore))
     (should-error (eval-tests--exceed-specbind-limit))))
+
+(ert-deftest defvar/bug31072 ()
+  "Check that Bug#31072 is fixed."
+  (should-error (eval '(defvar 1) t) :type 'wrong-type-argument))
 
 ;;; eval-tests.el ends here

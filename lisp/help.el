@@ -67,6 +67,7 @@
     (define-key map "\C-n" 'view-emacs-news)
     (define-key map "\C-o" 'describe-distribution)
     (define-key map "\C-p" 'view-emacs-problems)
+    (define-key map "\C-s" 'search-forward-help-for-help)
     (define-key map "\C-t" 'view-emacs-todo)
     (define-key map "\C-w" 'describe-no-warranty)
 
@@ -240,6 +241,7 @@ C-m         How to order printed Emacs manuals.
 C-n         News of recent Emacs changes.
 C-o         Emacs ordering and distribution information.
 C-p         Info about known Emacs problems.
+C-s         Search forward \"help window\".
 C-t         Emacs TODO list.
 C-w         Information on absence of warranty for GNU Emacs."
   help-map)
@@ -965,6 +967,13 @@ documentation for the major and minor modes of that buffer."
   ;; For the sake of IELM and maybe others
   nil)
 
+(defun search-forward-help-for-help ()
+  "Search forward \"help window\"."
+  (interactive)
+  ;; Move cursor to the "help window".
+  (pop-to-buffer " *Metahelp*")
+  ;; Do incremental search forward.
+  (isearch-forward nil t))
 
 (defun describe-minor-mode (minor-mode)
   "Display documentation of a minor mode given as MINOR-MODE.
@@ -1309,15 +1318,14 @@ Return VALUE."
 
 ;; (4) A marker (`help-window-point-marker') to move point in the help
 ;;     window to an arbitrary buffer position.
-(defmacro with-help-window (buffer-name &rest body)
-  "Display buffer named BUFFER-NAME in a help window.
-Evaluate the forms in BODY with standard output bound to a buffer
-called BUFFER-NAME (creating it if it does not exist), put that
-buffer in `help-mode', display the buffer in a window (see
-`with-temp-buffer-window' for details) and issue a message how to
-deal with that \"help\" window when it's no more needed.  Select
-the help window if the current value of the user option
-`help-window-select' says so.  Return last value in BODY."
+(defmacro with-help-window (buffer-or-name &rest body)
+  "Evaluate BODY, send output to BUFFER-OR-NAME and show in a help window.
+This construct is like `with-temp-buffer-window' but unlike that
+puts the buffer specified by BUFFER-OR-NAME in `help-mode' and
+displays a message about how to delete the help window when it's no
+longer needed.  The help window will be selected if
+`help-window-select' is non-nil.  See `help-window-setup' for
+more options."
   (declare (indent 1) (debug t))
   `(progn
      ;; Make `help-window-point-marker' point nowhere.  The only place
@@ -1329,7 +1337,7 @@ the help window if the current value of the user option
 	    (cons 'help-mode-finish temp-buffer-window-show-hook)))
        (setq help-window-old-frame (selected-frame))
        (with-temp-buffer-window
-	,buffer-name nil 'help-window-setup (progn ,@body)))))
+	,buffer-or-name nil 'help-window-setup (progn ,@body)))))
 
 ;; Called from C, on encountering `help-char' when reading a char.
 ;; Don't print to *Help*; that would clobber Help history.

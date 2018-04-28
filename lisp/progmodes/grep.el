@@ -29,6 +29,7 @@
 
 ;;; Code:
 
+(eval-when-compile (require 'cl-lib))
 (require 'compile)
 
 (defgroup grep nil
@@ -352,17 +353,6 @@ See `compilation-error-screen-columns'"
       (append map help))))
 
 (defalias 'kill-grep 'kill-compilation)
-
-;;;; TODO --- refine this!!
-
-;; (defcustom grep-use-compilation-buffer t
-;;   "When non-nil, grep specific commands update `compilation-last-buffer'.
-;; This means that standard compile commands like \\[next-error] and \\[compile-goto-error]
-;; can be used to navigate between grep matches (the default).
-;; Otherwise, the grep specific commands like \\[grep-next-match] must
-;; be used to navigate between grep matches."
-;;   :type 'boolean
-;;   :group 'grep)
 
 ;; override compilation-last-buffer
 (defvar grep-last-buffer nil
@@ -1082,6 +1072,7 @@ This command shares argument histories with \\[rgrep] and \\[grep]."
 				 (concat command " " null-device)
 			       command)
 			     'grep-mode))
+	;; Set default-directory if we started lgrep in the *grep* buffer.
 	(if (eq next-error-last-buffer (current-buffer))
 	    (setq default-directory dir))))))
 

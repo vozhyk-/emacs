@@ -158,7 +158,7 @@
 (defvar secrets-enabled nil
   "Whether there is a daemon offering the Secret Service API.")
 
-(defvar secrets-debug t
+(defvar secrets-debug nil
   "Write debug messages")
 
 (defconst secrets-service "org.freedesktop.secrets"
@@ -331,9 +331,7 @@ It returns t if not."
 	     ;; Properties.
 	     `(:array
 	       (:dict-entry ,(concat secrets-interface-item ".Label")
-			    (:variant "dummy"))
-	       (:dict-entry ,(concat secrets-interface-item ".Type")
-			    (:variant ,secrets-interface-item-type-generic)))
+			    (:variant " ")))
 	     ;; Secret.
 	     `(:struct :object-path ,path
 		       (:array :signature "y")
@@ -539,6 +537,18 @@ For the time being, only the alias \"default\" is supported."
    secrets-interface-service "SetAlias"
    alias :object-path secrets-empty-path))
 
+(defun secrets-lock-collection (collection)
+  "Lock collection labeled COLLECTION.
+If successful, return the object path of the collection."
+  (let ((collection-path (secrets-collection-path collection)))
+    (unless (secrets-empty-path collection-path)
+      (secrets-prompt
+       (cadr
+	(dbus-call-method
+	 :session secrets-service secrets-path secrets-interface-service
+	 "Lock" `(:array :object-path ,collection-path)))))
+    collection-path))
+
 (defun secrets-unlock-collection (collection)
   "Unlock collection labeled COLLECTION.
 If successful, return the object path of the collection."
@@ -612,9 +622,9 @@ The object labels of the found items are returned as list."
           (error 'wrong-type-argument (cadr attributes)))
 	(setq props (append
 		     props
-		     (list :dict-entry
-			   (substring (symbol-name (car attributes)) 1)
-			   (cadr attributes)))
+		     `((:dict-entry
+			,(substring (symbol-name (car attributes)) 1)
+			,(cadr attributes))))
 	      attributes (cddr attributes)))
       ;; Search.  The result is a list of object paths.
       (setq result
@@ -637,11 +647,24 @@ keys are keyword symbols, starting with a colon.  Example:
   (secrets-create-item \"Tramp collection\" \"item\" \"geheim\"
    :method \"sudo\" :user \"joe\" :host \"remote-host\")
 
+The key `:xdg:schema' determines the scope of the item to be
+generated, i.e. for which applications the item is intended for.
+This is just a string like \"org.freedesktop.NetworkManager.Mobile\"
+or \"org.gnome.OnlineAccounts\", the other required keys are
+determined by this.  If no `:xdg:schema' is given,
+\"org.freedesktop.Secret.Generic\" is used by default.
+
 The object path of the created item is returned."
   (unless (member item (secrets-list-items collection))
     (let ((collection-path (secrets-unlock-collection collection))
 	  result props)
       (unless (secrets-empty-path collection-path)
+        ;; Set default type if needed.
+        (unless (member :xdg:schema attributes)
+          (setq attributes
+                (append
+                 attributes
+                 `(:xdg:schema ,secrets-interface-item-type-generic))))
 	;; Create attributes list.
 	(while (consp (cdr attributes))
 	  (unless (keywordp (car attributes))
@@ -650,9 +673,9 @@ The object path of the created item is returned."
             (error 'wrong-type-argument (cadr attributes)))
 	  (setq props (append
 		       props
-		       (list :dict-entry
-			     (substring (symbol-name (car attributes)) 1)
-			     (cadr attributes)))
+		       `((:dict-entry
+			  ,(substring (symbol-name (car attributes)) 1)
+			  ,(cadr attributes))))
 		attributes (cddr attributes)))
 	;; Create the item.
 	(setq result
@@ -663,9 +686,7 @@ The object path of the created item is returned."
 	       (append
 		`(:array
 		  (:dict-entry ,(concat secrets-interface-item ".Label")
-			       (:variant ,item))
-		  (:dict-entry ,(concat secrets-interface-item ".Type")
-			       (:variant ,secrets-interface-item-type-generic)))
+			       (:variant ,item)))
 		(when props
 		  `((:dict-entry ,(concat secrets-interface-item ".Attributes")
 				 (:variant ,(append '(:array) props))))))

@@ -63,6 +63,9 @@ string or function value that this variable has."
   :version "23.1"
   :group 'initialization)
 
+(defvaralias 'inhibit-splash-screen 'inhibit-startup-screen)
+(defvaralias 'inhibit-startup-message 'inhibit-startup-screen)
+
 (defcustom inhibit-startup-screen nil
   "Non-nil inhibits the startup screen.
 
@@ -70,9 +73,6 @@ This is for use in your personal init file (but NOT site-start.el),
 once you are familiar with the contents of the startup screen."
   :type 'boolean
   :group 'initialization)
-
-(defvaralias 'inhibit-splash-screen 'inhibit-startup-screen)
-(defvaralias 'inhibit-startup-message 'inhibit-startup-screen)
 
 (defvar startup-screen-inhibit-startup-screen nil)
 
@@ -120,9 +120,6 @@ Elements look like (SWITCH-STRING . HANDLER-FUNCTION).
 HANDLER-FUNCTION receives the switch string as its sole argument;
 the remaining command-line args are in the variable `command-line-args-left'.")
 
-(defvar command-line-args-left nil
-  "List of command-line args not yet processed.")
-
 (with-no-warnings
   (defvaralias 'argv 'command-line-args-left
     "List of command-line args not yet processed.
@@ -130,6 +127,9 @@ This is a convenience alias, so that one can write (pop argv)
 inside of --eval command line arguments in order to access
 following arguments."))
 (internal-make-var-non-special 'argv)
+
+(defvar command-line-args-left nil
+  "List of command-line args not yet processed.")
 
 (with-no-warnings
   (defvar argi nil
@@ -1115,6 +1115,15 @@ please check its value")
     (and command-line-args
          (setcdr command-line-args args)))
 
+  ;; Re-evaluate predefined variables whose initial value depends on
+  ;; the runtime context.
+  (let (current-load-list) ; c-r-s may call defvar, and hence LOADHIST_ATTACH
+    (mapc 'custom-reevaluate-setting
+          ;; Initialize them in the same order they were loaded, in case there
+          ;; are dependencies between them.
+          (prog1 (nreverse custom-delayed-init-variables)
+            (setq custom-delayed-init-variables nil))))
+
   ;; Warn for invalid user name.
   (when init-file-user
     (if (string-match "[~/:\n]" init-file-user)
@@ -1176,7 +1185,7 @@ please check its value")
                                 (package--description-file subdir)
                                 subdir))))
 		   (throw 'package-dir-found t)))))))
-       (package-initialize))
+       (package-activate-all))
 
   ;; Make sure window system's init file was loaded in loadup.el if
   ;; using a window system.
@@ -1244,15 +1253,6 @@ please check its value")
   (unless noninteractive
     (startup--setup-quote-display)
     (setq internal--text-quoting-flag t))
-
-  ;; Re-evaluate predefined variables whose initial value depends on
-  ;; the runtime context.
-  (let (current-load-list) ; c-r-s may call defvar, and hence LOADHIST_ATTACH
-    (mapc 'custom-reevaluate-setting
-          ;; Initialize them in the same order they were loaded, in case there
-          ;; are dependencies between them.
-          (prog1 (nreverse custom-delayed-init-variables)
-            (setq custom-delayed-init-variables nil))))
 
   (normal-erase-is-backspace-setup-frame)
 
@@ -2506,7 +2506,12 @@ nil default-directory" name)
 	     (insert (substitute-command-keys initial-scratch-message))
 	     (set-buffer-modified-p nil))))
 
-    ;; Prepend `initial-buffer-choice' to `displayable-buffers'.
+    ;; Prepend `initial-buffer-choice' to `displayable-buffers'. If
+    ;; the buffer is already a member of that list then shift the
+    ;; buffer to the head of the list. The shift behavior is intended
+    ;; to prevent the same buffer being displayed in two windows when
+    ;; an `initial-buffer-choice' function happens to return the head
+    ;; of `displayable-buffers'.
     (when initial-buffer-choice
       (let ((buf
              (cond ((stringp initial-buffer-choice)
@@ -2519,7 +2524,7 @@ nil default-directory" name)
                     (error "initial-buffer-choice must be a string, a function, or t.")))))
         (unless (buffer-live-p buf)
           (error "initial-buffer-choice is not a live buffer."))
-        (setq displayable-buffers (cons buf displayable-buffers))))
+        (setq displayable-buffers (cons buf (delq buf displayable-buffers)))))
 
     ;; Display the first two buffers in `displayable-buffers'.  If
     ;; `initial-buffer-choice' is non-nil, its buffer will be the

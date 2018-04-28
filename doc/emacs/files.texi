@@ -991,6 +991,9 @@ Auto-Revert Tail mode works also for remote files.
   When a buffer is auto-reverted, a message is generated.  This can be
 suppressed by setting @code{auto-revert-verbose} to @code{nil}.
 
+  In Dired buffers (@pxref{Dired}), Auto-Revert mode refreshes the
+buffer when a file is created or deleted in the buffer's directory.
+
   @xref{VC Undo}, for commands to revert to earlier versions of files
 under version control.  @xref{VC Mode Line}, for Auto Revert
 peculiarities when visiting files under version control.
@@ -1427,7 +1430,7 @@ remains correct.  To disable automatic line number correction,
 change the variable @code{diff-update-on-the-fly} to @code{nil}.
 
   Diff mode treats each hunk as an error message, similar to
-Compilation mode.  Thus, you can use commands such as @kbd{C-x `} to
+Compilation mode.  Thus, you can use commands such as @kbd{M-g M-n} to
 visit the corresponding source locations.  @xref{Compilation Mode}.
 
   In addition, Diff mode provides the following commands to navigate,

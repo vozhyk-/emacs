@@ -1138,6 +1138,11 @@ Entry to this mode runs the hooks on `term-mode-hook'."
       (setq term-current-row nil)
       (setq term-current-column nil)
       (term-set-scroll-region 0 height)
+      ;; `term-set-scroll-region' causes these to be set, we have to
+      ;; clear them again since we're changing point (Bug#30544).
+      (setq term-start-line-column nil)
+      (setq term-current-row nil)
+      (setq term-current-column nil)
       (goto-char point))))
 
 ;; Recursive routine used to check if any string in term-kill-echo-list
@@ -3648,7 +3653,7 @@ all pending output has been dealt with."))
   (let ((start-column (term-horizontal-column)))
     (when (and check-for-scroll (or term-scroll-with-delete term-pager-count))
       (setq down (term-handle-scroll down)))
-    (unless (and (= term-current-row 0) (< down 0))
+    (unless (and (= (term-current-row) 0) (< down 0))
       (term-adjust-current-row-cache down)
       (when (or (/= (point) (point-max)) (< down 0))
 	(setq down (- down (term-vertical-motion down)))))
@@ -3658,7 +3663,7 @@ all pending output has been dealt with."))
 	   (setq term-current-column 0)
 	   (setq term-start-line-column 0))
 	  (t
-	   (when (= term-current-row 0)
+	   (when (= (term-current-row) 0)
 	     ;; Insert lines if at the beginning.
 	     (save-excursion (term-insert-char ?\n (- down)))
 	     (save-excursion

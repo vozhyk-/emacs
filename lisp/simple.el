@@ -122,11 +122,13 @@ A buffer becomes most recent when its compilation, grep, or
 similar mode is started, or when it is used with \\[next-error]
 or \\[compile-goto-error].")
 
-;; next-error-last-buffer is made buffer-local to keep the reference
+(defvar next-error-buffer nil
+  "The buffer-local value of the most recent `next-error' buffer.")
+;; next-error-buffer is made buffer-local to keep the reference
 ;; to the parent buffer used to navigate to the current buffer, so the
 ;; next call of next-buffer will use the same parent buffer to
 ;; continue navigation from it.
-(make-variable-buffer-local 'next-error-last-buffer)
+(make-variable-buffer-local 'next-error-buffer)
 
 (defvar next-error-function nil
   "Function to use to find the next error in the current buffer.
@@ -176,15 +178,31 @@ rejected, and the function returns nil."
 		(funcall extra-test-inclusive))))))
 
 (defcustom next-error-find-buffer-function #'ignore
-  "Function called to find a `next-error' capable buffer."
-  :type '(choice (const :tag "Single next-error capable buffer on selected frame"
+  "Function called to find a `next-error' capable buffer.
+This functions takes the same three arguments as the function
+`next-error-find-buffer', and should return the buffer to be
+used by the subsequent invocation of the command `next-error'
+and `previous-error'.
+If the function returns nil, `next-error-find-buffer' will
+try to use the buffer it used previously, and failing that
+all other buffers."
+  :type '(choice (const :tag "No default" ignore)
+                 (const :tag "Single next-error capable buffer on selected frame"
                         next-error-buffer-on-selected-frame)
-                 (const :tag "No default" ignore)
                  (function :tag "Other function"))
   :group 'next-error
   :version "27.1")
 
-(defun next-error-buffer-on-selected-frame (&optional avoid-current
+(defcustom next-error-found-function #'ignore
+  "Function called when a next locus is found and displayed.
+Function is called with two arguments: a FROM-BUFFER buffer
+from which next-error navigated, and a target buffer TO-BUFFER."
+  :type '(choice (const :tag "No default" ignore)
+                 (function :tag "Other function"))
+  :group 'next-error
+  :version "27.1")
+
+(defun next-error-buffer-on-selected-frame (&optional _avoid-current
                                                       extra-test-inclusive
                                                       extra-test-exclusive)
   "Return a single visible next-error buffer on the selected frame."
@@ -193,7 +211,7 @@ rejected, and the function returns nil."
           (delq nil (mapcar (lambda (w)
                               (if (next-error-buffer-p
 				   (window-buffer w)
-                                   avoid-current
+                                   t
                                    extra-test-inclusive extra-test-exclusive)
                                   (window-buffer w)))
                             (window-list))))))
@@ -220,16 +238,24 @@ that buffer is rejected."
    (funcall next-error-find-buffer-function avoid-current
                                             extra-test-inclusive
                                             extra-test-exclusive)
-   ;; 2. If next-error-last-buffer is an acceptable buffer, use that.
+   ;; 2. If next-error-buffer has no buffer-local value
+   ;; (i.e. never navigated to the current buffer from another),
+   ;; and the current buffer is a `next-error' capable buffer,
+   ;; use it unconditionally, so next-error will always use it.
+   (if (and (not (local-variable-p 'next-error-buffer))
+            (next-error-buffer-p (current-buffer) avoid-current
+			         extra-test-inclusive extra-test-exclusive))
+       (current-buffer))
+   ;; 3. If next-error-last-buffer is an acceptable buffer, use that.
    (if (and next-error-last-buffer
             (next-error-buffer-p next-error-last-buffer avoid-current
                                  extra-test-inclusive extra-test-exclusive))
        next-error-last-buffer)
-   ;; 3. If the current buffer is acceptable, choose it.
+   ;; 4. If the current buffer is acceptable, choose it.
    (if (next-error-buffer-p (current-buffer) avoid-current
 			    extra-test-inclusive extra-test-exclusive)
        (current-buffer))
-   ;; 4. Look for any acceptable buffer.
+   ;; 5. Look for any acceptable buffer.
    (let ((buffers (buffer-list)))
      (while (and buffers
                  (not (next-error-buffer-p
@@ -237,7 +263,7 @@ that buffer is rejected."
 		       extra-test-inclusive extra-test-exclusive)))
        (setq buffers (cdr buffers)))
      (car buffers))
-   ;; 5. Use the current buffer as a last resort if it qualifies,
+   ;; 6. Use the current buffer as a last resort if it qualifies,
    ;; even despite AVOID-CURRENT.
    (and avoid-current
 	(next-error-buffer-p (current-buffer) nil
@@ -245,7 +271,7 @@ that buffer is rejected."
 	(progn
 	  (message "This is the only buffer with error message locations")
 	  (current-buffer)))
-   ;; 6. Give up.
+   ;; 7. Give up.
    (error "No buffers contain error message locations")))
 
 (defun next-error (&optional arg reset)
@@ -268,8 +294,9 @@ more generally, on any buffer in Compilation mode or with
 Compilation Minor mode enabled, or any buffer in which
 `next-error-function' is bound to an appropriate function.
 To specify use of a particular buffer for error messages, type
-\\[next-error] in that buffer when it is the only one displayed
-in the current frame.
+\\[next-error] in that buffer.  You can also use the command
+`next-error-select-buffer' to select the buffer to use for the subsequent
+invocation of `next-error'.
 
 Once \\[next-error] has chosen the buffer for error messages, it
 runs `next-error-hook' with `run-hooks', and stays with that buffer
@@ -284,46 +311,47 @@ To control which errors are matched, customize the variable
     (when buffer
       ;; We know here that next-error-function is a valid symbol we can funcall
       (with-current-buffer buffer
-        ;; Allow next-error to be used from the next-error capable buffer.
-        (setq next-error-last-buffer buffer)
         (funcall next-error-function (prefix-numeric-value arg) reset)
-        ;; Override possible change of next-error-last-buffer in next-error-function
-        (setq next-error-last-buffer buffer)
-        (setq-default next-error-last-buffer buffer)
-        (when next-error-recenter
-          (recenter next-error-recenter))
-        (message "%s error from %s"
+        (next-error-found buffer (current-buffer))
+        (message "%s locus from %s"
                  (cond (reset                             "First")
                        ((eq (prefix-numeric-value arg) 0) "Current")
                        ((< (prefix-numeric-value arg) 0)  "Previous")
                        (t                                 "Next"))
-                 next-error-last-buffer)
-        (run-hooks 'next-error-hook)))))
+                 next-error-last-buffer)))))
 
 (defun next-error-internal ()
   "Visit the source code corresponding to the `next-error' message at point."
   (let ((buffer (current-buffer)))
     ;; We know here that next-error-function is a valid symbol we can funcall
-    (with-current-buffer buffer
-      ;; Allow next-error to be used from the next-error capable buffer.
-      (setq next-error-last-buffer buffer)
-      (funcall next-error-function 0 nil)
-      ;; Override possible change of next-error-last-buffer in next-error-function
-      (setq next-error-last-buffer buffer)
-      (setq-default next-error-last-buffer buffer)
-      (when next-error-recenter
-        (recenter next-error-recenter))
-      (message "Current error from %s" next-error-last-buffer)
-      (run-hooks 'next-error-hook))))
+    (funcall next-error-function 0 nil)
+    (next-error-found buffer (current-buffer))
+    (message "Current locus from %s" next-error-last-buffer)))
+
+(defun next-error-found (&optional from-buffer to-buffer)
+  "Function to call when the next locus is found and displayed.
+FROM-BUFFER is a buffer from which next-error navigated,
+and TO-BUFFER is a target buffer."
+  (setq next-error-last-buffer (or from-buffer (current-buffer)))
+  (when to-buffer
+    (with-current-buffer to-buffer
+      (setq next-error-buffer from-buffer)))
+  (when next-error-recenter
+    (recenter next-error-recenter))
+  (funcall next-error-found-function from-buffer to-buffer)
+  (run-hooks 'next-error-hook))
 
 (defun next-error-select-buffer (buffer)
-  "Select a `next-error' capable buffer and set it as the last used."
+  "Select a `next-error' capable BUFFER and set it as the last used.
+This means that the selected buffer becomes the source of locations
+for the subsequent invocation of `next-error' or `previous-error'.
+Interactively, this command allows selection only among buffers
+where `next-error-function' is bound to an appropriate function."
   (interactive
    (list (get-buffer
           (read-buffer "Select next-error buffer: " nil nil
                        (lambda (b) (next-error-buffer-p (cdr b)))))))
-  (setq next-error-last-buffer buffer)
-  (setq-default next-error-last-buffer buffer))
+  (setq next-error-last-buffer buffer))
 
 (defalias 'goto-next-locus 'next-error)
 (defalias 'next-match 'next-error)
@@ -334,7 +362,9 @@ To control which errors are matched, customize the variable
 Prefix arg N says how many error messages to move backwards (or
 forwards, if negative).
 
-This operates on the output from the \\[compile] and \\[grep] commands."
+This operates on the output from the \\[compile] and \\[grep] commands.
+
+See `next-error' for the details."
   (interactive "p")
   (next-error (- (or n 1))))
 
@@ -2969,7 +2999,7 @@ that calls `undo-auto-amalgamate'."
 (defun undo-auto--ensure-boundary (cause)
   "Add an `undo-boundary' to the current buffer if needed.
 REASON describes the reason that the boundary is being added; see
-`undo-auto--last-boundary' for more information."
+`undo-auto--last-boundary-cause' for more information."
   (when (and
          (undo-auto--needs-boundary-p))
     (let ((last-amalgamating
@@ -2997,12 +3027,12 @@ REASON describes the reason that the boundary is being added; see
   (setq undo-auto--undoably-changed-buffers nil))
 
 (defun undo-auto--boundary-timer ()
-  "Timer which will run `undo--auto-boundary-timer'."
+  "Timer function run by `undo-auto-current-boundary-timer'."
   (setq undo-auto-current-boundary-timer nil)
   (undo-auto--boundaries 'timer))
 
 (defun undo-auto--boundary-ensure-timer ()
-  "Ensure that the `undo-auto-boundary-timer' is set."
+  "Ensure that the `undo-auto-current-boundary-timer' is set."
   (unless undo-auto-current-boundary-timer
     (setq undo-auto-current-boundary-timer
           (run-at-time 10 nil #'undo-auto--boundary-timer))))
@@ -3018,10 +3048,10 @@ default values.")
   "Add an `undo-boundary' in appropriate buffers."
   (undo-auto--boundaries
    (let ((amal undo-auto--this-command-amalgamating))
-       (setq undo-auto--this-command-amalgamating nil)
-       (if amal
-           'amalgamate
-         'command))))
+     (setq undo-auto--this-command-amalgamating nil)
+     (if amal
+         'amalgamate
+       'command))))
 
 (defun undo-auto-amalgamate ()
   "Amalgamate undo if necessary.
@@ -3034,30 +3064,38 @@ behavior."
   (let ((last-amalgamating-count
          (undo-auto--last-boundary-amalgamating-number)))
     (setq undo-auto--this-command-amalgamating t)
-    (when
-        last-amalgamating-count
-      (if
-          (and
-           (< last-amalgamating-count 20)
-           (eq this-command last-command))
+    (when last-amalgamating-count
+      (if (and (< last-amalgamating-count 20)
+               (eq this-command last-command))
           ;; Amalgamate all buffers that have changed.
+          ;; This may be needed for example if some *-change-functions
+          ;; reflected these changes in some other buffer.
           (dolist (b (cdr undo-auto--last-boundary-cause))
             (when (buffer-live-p b)
               (with-current-buffer
                   b
-                (when
-                    ;; The head of `buffer-undo-list' is nil.
-                    ;; `car-safe' doesn't work because
-                    ;; `buffer-undo-list' need not be a list!
-                    (and (listp buffer-undo-list)
-                         (not (car buffer-undo-list)))
+                (when (and (consp buffer-undo-list)
+                           ;; `car-safe' doesn't work because
+                           ;; `buffer-undo-list' need not be a list!
+                           (null (car buffer-undo-list)))
+                  ;; The head of `buffer-undo-list' is nil.
                   (setq buffer-undo-list
                         (cdr buffer-undo-list))))))
         (setq undo-auto--last-boundary-cause 0)))))
 
 (defun undo-auto--undoable-change ()
   "Called after every undoable buffer change."
-  (add-to-list 'undo-auto--undoably-changed-buffers (current-buffer))
+  (unless (memq (current-buffer) undo-auto--undoably-changed-buffers)
+    (let ((bufs undo-auto--undoably-changed-buffers))
+      ;; Drop dead buffers from the list, to avoid memory leak in
+      ;; (while t (with-temp-buffer (setq buffer-undo-list nil) (insert "a")))
+      (while bufs
+        (let ((next (cdr bufs)))
+          (if (or (buffer-live-p (car bufs)) (null next))
+              (setq bufs next)
+            (setcar bufs (car next))
+            (setcdr bufs (cdr next))))))
+    (push (current-buffer) undo-auto--undoably-changed-buffers))
   (undo-auto--boundary-ensure-timer))
 ;; End auto-boundary section
 
@@ -3170,61 +3208,6 @@ which is defined in the `warnings' library.\n")
     (setq buffer-undo-list nil)
     t))
 
-(defcustom password-word-equivalents
-  '("password" "passcode" "passphrase" "pass phrase"
-    ; These are sorted according to the GNU en_US locale.
-    "암호"		; ko
-    "パスワード"	; ja
-    "ପ୍ରବେଶ ସଙ୍କେତ"	; or
-    "ពាក្យសម្ងាត់"		; km
-    "adgangskode"	; da
-    "contraseña"	; es
-    "contrasenya"	; ca
-    "geslo"		; sl
-    "hasło"		; pl
-    "heslo"		; cs, sk
-    "iphasiwedi"	; zu
-    "jelszó"		; hu
-    "lösenord"		; sv
-    "lozinka"		; hr, sr
-    "mật khẩu"		; vi
-    "mot de passe"	; fr
-    "parola"		; tr
-    "pasahitza"		; eu
-    "passord"		; nb
-    "passwort"		; de
-    "pasvorto"		; eo
-    "salasana"		; fi
-    "senha"		; pt
-    "slaptažodis"	; lt
-    "wachtwoord"	; nl
-    "كلمة السر"		; ar
-    "ססמה"		; he
-    "лозинка"		; sr
-    "пароль"		; kk, ru, uk
-    "गुप्तशब्द"		; mr
-    "शब्दकूट"		; hi
-    "પાસવર્ડ"		; gu
-    "సంకేతపదము"		; te
-    "ਪਾਸਵਰਡ"		; pa
-    "ಗುಪ್ತಪದ"		; kn
-    "கடவுச்சொல்"		; ta
-    "അടയാളവാക്ക്"		; ml
-    "গুপ্তশব্দ"		; as
-    "পাসওয়ার্ড"		; bn_IN
-    "රහස්පදය"		; si
-    "密码"		; zh_CN
-    "密碼"		; zh_TW
-    )
-  "List of words equivalent to \"password\".
-This is used by Shell mode and other parts of Emacs to recognize
-password prompts, including prompts in languages other than
-English.  Different case choices should not be assumed to be
-included; callers should bind `case-fold-search' to t."
-  :type '(repeat string)
-  :version "24.4"
-  :group 'processes)
-
 (defvar shell-command-history nil
   "History list for some commands that read shell commands.
 
@@ -4416,7 +4399,8 @@ argument should still be a \"useful\" string for such uses."
                                    (funcall interprogram-paste-function))))
       (when interprogram-paste
         (dolist (s (if (listp interprogram-paste)
-		       (nreverse interprogram-paste)
+                       ;; Use `reverse' to avoid modifying external data.
+                       (reverse interprogram-paste)
 		     (list interprogram-paste)))
 	  (unless (and kill-do-not-save-duplicates
 		       (equal-including-properties s (car kill-ring)))
@@ -4493,9 +4477,13 @@ move the yanking point; just return the Nth kill forward."
 	  ;; Disable the interprogram cut function when we add the new
 	  ;; text to the kill ring, so Emacs doesn't try to own the
 	  ;; selection, with identical text.
-	  (let ((interprogram-cut-function nil))
+          ;; Also disable the interprogram paste function, so that
+          ;; `kill-new' doesn't call it repeatedly.
+          (let ((interprogram-cut-function nil)
+                (interprogram-paste-function nil))
 	    (if (listp interprogram-paste)
-	      (mapc 'kill-new (nreverse interprogram-paste))
+                ;; Use `reverse' to avoid modifying external data.
+                (mapc #'kill-new (reverse interprogram-paste))
 	      (kill-new interprogram-paste)))
 	  (car kill-ring))
       (or kill-ring (error "Kill ring is empty"))
@@ -7080,11 +7068,13 @@ current object."
 With argument ARG, do this that many times.
 If ARG is omitted or nil, move point backward one word.
 
-The word boundaries are normally determined by the buffer's syntax
-table, but `find-word-boundary-function-table', such as set up
-by `subword-mode', can change that.  If a Lisp program needs to
-move by words determined strictly by the syntax table, it should
-use `backward-word-strictly' instead."
+The word boundaries are normally determined by the buffer's
+syntax table and character script (according to
+`char-script-table'), but `find-word-boundary-function-table',
+such as set up by `subword-mode', can change that.  If a Lisp
+program needs to move by words determined strictly by the syntax
+table, it should use `backward-word-strictly' instead.  See Info
+node `(elisp) Word Motion' for details."
   (interactive "^p")
   (forward-word (- (or arg 1))))
 
@@ -7938,6 +7928,8 @@ To disable this warning, set `compose-mail-user-agent-warnings' to nil."
 					       warn-vars " "))))))
 
   (let ((function (get mail-user-agent 'composefunc)))
+    (unless function
+      (error "Invalid value for `mail-user-agent'"))
     (funcall function to subject other-headers continue switch-function
 	     yank-action send-actions return-action)))
 

@@ -26,10 +26,10 @@
 ;;; Commentary:
 
 ;; Please send bug reports and bug fixes to the mailing list at
-;; help-gnu-emacs@gnu.org.  If you want to subscribe to the mailing
-;; list, see the web page at
-;; https://lists.gnu.org/mailman/listinfo/help-gnu-emacs for
-;; instructions.  I monitor this list actively.  If you send an e-mail
+;; bug-gnu-emacs@gnu.org.
+;; See also the general help list at
+;; https://lists.gnu.org/mailman/listinfo/help-gnu-emacs
+;; I monitor this list actively.  If you send an e-mail
 ;; to Alex Schroeder it usually makes it to me when Alex has a chance
 ;; to forward them along (Thanks, Alex).
 
@@ -292,6 +292,9 @@ file.  Since that is a plaintext file, this could be dangerous."
 
 ;; Login parameter type
 
+;; This seems too prescriptive.  It probably fails to match some of
+;; the possible combinations.  It would probably be better to just use
+;; plist for most of it.
 (define-widget 'sql-login-params 'lazy
   "Widget definition of the login parameters list"
   :tag "Login Parameters"
@@ -331,13 +334,17 @@ file.  Since that is a plaintext file, this could be dangerous."
                       (list :tag "file"
                             (const :format "" database)
                             (const :format "" :file)
-                            regexp)
+                            (choice (const nil) regexp)
+                            (const :format "" :must-match)
+                            (symbol :tag ":must-match"))
                       (list :tag "completion"
                             (const :format "" database)
+                            (const :format "" :default)
+                            (string :tag ":default")
                             (const :format "" :completion)
+                            (sexp :tag ":completion")
                             (const :format "" :must-match)
-                            (restricted-sexp
-                             :match-alternatives (listp stringp))))
+                            (symbol :tag ":must-match")))
               (const port)))
 
 ;; SQL Product support
@@ -684,6 +691,8 @@ making new SQLi sessions."
   :version "24.1"
   :group 'SQL)
 
+(defvaralias 'sql-dialect 'sql-product)
+
 (defcustom sql-product 'ansi
   "Select the SQL database product used.
 This allows highlighting buffers properly when you open them."
@@ -696,7 +705,6 @@ This allows highlighting buffers properly when you open them."
                     sql-product-alist))
   :group 'SQL
   :safe 'symbolp)
-(defvaralias 'sql-dialect 'sql-product)
 
 ;; misc customization of sql.el behavior
 
@@ -1088,7 +1096,7 @@ add your name with a \"-U\" prefix (such as \"-Umark\") to the list."
     server)
   "List of login parameters needed to connect to Postgres."
   :type 'sql-login-params
-  :version "24.1"
+  :version "26.1"
   :group 'SQL)
 
 (defun sql-postgres-list-databases ()
@@ -2707,17 +2715,6 @@ adds a fontification pattern to fontify identifiers ending in
   (sql-highlight-product))
 
 
-;;; Compatibility functions
-
-(if (not (fboundp 'comint-line-beginning-position))
-    ;; comint-line-beginning-position is defined in Emacs 21
-    (defun comint-line-beginning-position ()
-      "Return the buffer position of the beginning of the line, after any prompt.
-The prompt is assumed to be any text at the beginning of the line
-matching the regular expression `comint-prompt-regexp', a buffer
-local variable."
-      (save-excursion (comint-bol nil) (point))))
-
 ;;; SMIE support
 
 ;; Needs a lot more love than I can provide.  --Stef
@@ -4024,15 +4021,16 @@ Writes the input history to a history file using
 
 This function is a sentinel watching the SQL interpreter process.
 Sentinels will always get the two parameters PROCESS and EVENT."
-  (with-current-buffer (process-buffer process)
-    (let
-        ((comint-input-ring-separator sql-input-ring-separator)
-         (comint-input-ring-file-name sql-input-ring-file-name))
-      (comint-write-input-ring))
+  (when (buffer-live-p (process-buffer process))
+    (with-current-buffer (process-buffer process)
+      (let
+          ((comint-input-ring-separator sql-input-ring-separator)
+           (comint-input-ring-file-name sql-input-ring-file-name))
+        (comint-write-input-ring))
 
-    (if (not buffer-read-only)
-        (insert (format "\nProcess %s %s\n" process event))
-      (message "Process %s %s" process event))))
+      (if (not buffer-read-only)
+          (insert (format "\nProcess %s %s\n" process event))
+        (message "Process %s %s" process event)))))
 
 
 

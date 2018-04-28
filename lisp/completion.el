@@ -518,6 +518,9 @@ Used to decide whether to save completions.")
 	(modify-syntax-entry char "w" table)))
     table))
 
+;; Old name, non-namespace-clean.
+(defvaralias 'cmpl-syntax-table 'completion-syntax-table)
+
 (defvar completion-syntax-table completion-standard-syntax-table
   "This variable holds the current completion syntax table.")
 (make-variable-buffer-local 'completion-syntax-table)
@@ -2225,7 +2228,10 @@ TYPE is the type of the wrapper to be added.  Can be :before or :under."
       (modify-syntax-entry char "_" table))
     table))
 
+(declare-function cl-set-difference "cl-seq" (cl-list1 cl-list2 &rest cl-keys))
+
 (defun completion-lisp-mode-hook ()
+  (require 'cl-lib)
   (setq completion-syntax-table completion-lisp-syntax-table)
   ;; Lisp Mode diffs
   (setq-local completion-separator-chars
@@ -2357,8 +2363,7 @@ if ARG is omitted or nil."
 (completion-def-wrapper 'delete-backward-char :backward)
 (completion-def-wrapper 'delete-backward-char-untabify :backward)
 
-;; Old names, non-namespace-clean.
-(defvaralias 'cmpl-syntax-table 'completion-syntax-table)
+;; Old name, non-namespace-clean.
 (defalias 'initialize-completions 'completion-initialize)
 
 (provide 'completion)
