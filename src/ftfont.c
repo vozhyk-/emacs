@@ -762,7 +762,7 @@ ftfont_spec_pattern (Lisp_Object spec, char *otlayout, struct OpenTypeSpec **ots
   if (scalable >= 0
       && ! FcPatternAddBool (pattern, FC_SCALABLE, scalable ? FcTrue : FcFalse))
     goto err;
-#if defined HAVE_XFT && defined FC_COLOR
+#if (defined HAVE_XFT || defined USE_CAIRO) && defined FC_COLOR
   /* We really don't like color fonts, they cause Xft crashes.  See
      Bug#30874.  */
   if (Vxft_ignore_color_fonts
