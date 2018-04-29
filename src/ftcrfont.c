@@ -48,6 +48,8 @@ struct ftcrfont_info
   FT_Size ft_size;
   int index;
   FT_Matrix matrix;
+  bool is_color_font;
+  double scale;
 
   cairo_font_face_t *cr_font_face;
   /* To prevent cairo from cluttering the activated FT_Size maintained
@@ -157,7 +159,7 @@ ftcrfont_open (struct frame *f, Lisp_Object entity, int pixel_size)
   FT_Activate_Size (ftcrfont_info->ft_size_draw);
   FT_Set_Pixel_Sizes (ft_face, 0, font->pixel_size);
   ftcrfont_info->cr_font_face =
-    cairo_ft_font_face_create_for_ft_face (ft_face, 0);
+    cairo_ft_font_face_create_for_ft_face (ft_face, ftcrfont_info->is_color_font ? FT_LOAD_COLOR : 0);
   ftcrfont_info->metrics = NULL;
   ftcrfont_info->metrics_nrows = 0;
   unblock_input ();

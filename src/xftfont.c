@@ -51,6 +51,9 @@ struct xftfont_info
   FT_Size ft_size;
   int index;
   FT_Matrix matrix;
+  bool is_color_font;
+  double scale;
+
   Display *display;
   XftFont *xftfont;
   unsigned x_display_id;

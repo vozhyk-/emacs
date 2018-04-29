@@ -62,6 +62,8 @@ struct ftfont_info
   FT_Size ft_size;
   int index;
   FT_Matrix matrix;
+  bool is_color_font;
+  double scale;
 };
 
 size_t ftfont_info_size = sizeof (struct ftfont_info);
@@ -1088,6 +1090,20 @@ ftfont_list_family (struct frame *f)
 }
 
 
+static bool
+is_color_font (FT_Face face)
+{
+  static unsigned int tag = FT_MAKE_TAG('C', 'B', 'D', 'T');
+  unsigned long length = 0;
+  FT_Load_Sfnt_Table(face, tag, 0, NULL, &length);
+  if (length)
+    {
+      return true;
+    }
+  return false;
+}
+
+
 Lisp_Object
 ftfont_open2 (struct frame *f,
               Lisp_Object entity,
@@ -1105,6 +1121,8 @@ ftfont_open2 (struct frame *f,
   int spacing;
   int i;
   double upEM;
+  bool color;
+  double scale = 1.0;
 
   val = assq_no_quit (QCfont_entity, AREF (entity, FONT_EXTRA_INDEX));
   if (! CONSP (val))
@@ -1133,11 +1151,25 @@ ftfont_open2 (struct frame *f,
   size = XINT (AREF (entity, FONT_SIZE_INDEX));
   if (size == 0)
     size = pixel_size;
-  if (FT_Set_Pixel_Sizes (ft_face, size, size) != 0)
+
+  color = is_color_font(ft_face);
+  if (!color)
     {
-      if (XSAVE_INTEGER (val, 1) == 0)
-	FT_Done_Face (ft_face);
-      return Qnil;
+      if (FT_Set_Pixel_Sizes (ft_face, size, size) != 0)
+	{
+	  if (XSAVE_INTEGER (val, 1) == 0)
+	    FT_Done_Face (ft_face);
+	  return Qnil;
+	}
+    }
+  else
+    {
+      if (ft_face->num_fixed_sizes == 0 || FT_Select_Size(ft_face, 0) != 0)
+	{
+	  if (XSAVE_INTEGER (val, 1) == 0)
+	    FT_Done_Face (ft_face);
+	  return Qnil;
+	}
     }
 
   ASET (font_object, FONT_FILE_INDEX, filename);
@@ -1151,6 +1183,7 @@ ftfont_open2 (struct frame *f,
 #endif	/* HAVE_LIBOTF */
   /* This means that there's no need of transformation.  */
   ftfont_info->matrix.xx = 0;
+  ftfont_info->is_color_font = color;
   font->pixel_size = size;
   font->driver = &ftfont_driver;
   font->encoding_charset = font->repertory_charset = -1;
@@ -1160,9 +1193,22 @@ ftfont_open2 (struct frame *f,
 	      && XINT (AREF (entity, FONT_AVGWIDTH_INDEX)) == 0);
   if (scalable)
     {
-      font->ascent = ft_face->ascender * size / upEM + 0.5;
-      font->descent = - ft_face->descender * size / upEM + 0.5;
-      font->height = ft_face->height * size / upEM + 0.5;
+      if (upEM != 0)
+	{
+	  font->ascent = ft_face->ascender * size / upEM + 0.5;
+	  font->descent = - ft_face->descender * size / upEM + 0.5;
+	  font->height = ft_face->height * size / upEM + 0.5;
+	}
+      else
+	{
+	  font->ascent = ft_face->size->metrics.ascender >> 6;
+	  font->descent = - ft_face->size->metrics.descender >> 6;
+	  font->height = ft_face->size->metrics.height >> 6;
+	  scale = (double) size / font->height;
+	  font->ascent *= scale;
+	  font->descent *= scale;
+	  font->height *= scale;
+	}
     }
   else
     {
@@ -1179,12 +1225,22 @@ ftfont_open2 (struct frame *f,
       && spacing != FC_DUAL
 #endif	/* FC_DUAL */
       )
-    font->min_width = font->average_width = font->space_width
-      = (scalable ? ft_face->max_advance_width * size / upEM + 0.5
-	 : ft_face->size->metrics.max_advance >> 6);
+    {
+      int adv = 0;
+      if (scalable && upEM != 0)
+	adv = ft_face->max_advance_width * size / upEM + 0.5;
+      if (adv == 0)
+	adv = ft_face->size->metrics.max_advance >> 6;
+      adv *= scale;
+      font->min_width = font->average_width = font->space_width = adv;
+    }
   else
     {
       int n;
+      int load_flag = FT_LOAD_DEFAULT;
+
+      if (color)
+	load_flag |= FT_LOAD_COLOR;
 
       font->min_width = font->average_width = font->space_width = 0;
       for (i = 32, n = 0; i < 127; i++)
@@ -1208,7 +1264,7 @@ ftfont_open2 (struct frame *f,
   font->relative_compose = 0;
   font->default_ascent = 0;
   font->vertical_centering = 0;
-  if (scalable)
+  if (scalable && upEM != 0)
     {
       font->underline_position = (-ft_face->underline_position * size / upEM
 				  + 0.5);
@@ -1220,6 +1276,8 @@ ftfont_open2 (struct frame *f,
       font->underline_position = -1;
       font->underline_thickness = 0;
     }
+
+  ftfont_info->scale = scale;
 
   return font_object;
 }
@@ -1315,13 +1373,18 @@ ftfont_text_extents (struct font *font, unsigned int *code,
   FT_Face ft_face = ftfont_info->ft_size->face;
   int i, width = 0;
   bool first;
+  int load_flag;
 
   if (ftfont_info->ft_size != ft_face->size)
     FT_Activate_Size (ftfont_info->ft_size);
 
+  load_flag = FT_LOAD_DEFAULT;
+  if (ftfont_info->is_color_font)
+    load_flag |= FT_LOAD_COLOR;
+
   for (i = 0, first = 1; i < nglyphs; i++)
     {
-      if (FT_Load_Glyph (ft_face, code[i], FT_LOAD_DEFAULT) == 0)
+      if (FT_Load_Glyph (ft_face, code[i], load_flag) == 0)
 	{
 	  FT_Glyph_Metrics *m = &ft_face->glyph->metrics;
 
@@ -1349,6 +1412,10 @@ ftfont_text_extents (struct font *font, unsigned int *code,
 	width += font->space_width;
     }
   metrics->width = width;
+
+  metrics->width *= ftfont_info->scale;
+  metrics->lbearing *= ftfont_info->scale;
+  metrics->rbearing *= ftfont_info->scale;
 }
 
 int
@@ -1400,10 +1467,15 @@ ftfont_anchor_point (struct font *font, unsigned int code, int idx,
 {
   struct ftfont_info *ftfont_info = (struct ftfont_info *) font;
   FT_Face ft_face = ftfont_info->ft_size->face;
+  int load_flag;
+
+  load_flag = FT_LOAD_DEFAULT;
+  if (ftfont_info->is_color_font)
+    load_flag |= FT_LOAD_COLOR;
 
   if (ftfont_info->ft_size != ft_face->size)
     FT_Activate_Size (ftfont_info->ft_size);
-  if (FT_Load_Glyph (ft_face, code, FT_LOAD_DEFAULT) != 0)
+  if (FT_Load_Glyph (ft_face, code, load_flag) != 0)
     return -1;
   if (ft_face->glyph->format != FT_GLYPH_FORMAT_OUTLINE)
     return -1;
