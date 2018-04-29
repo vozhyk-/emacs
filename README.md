@@ -36,7 +36,7 @@ sudo pacman -U emacs-pgtk*.tar.xz
 
 ```sh
 cd src
-GDK_BACKEND=wayland ./emacs  (or ./emacs -Q if you have problems.)
+GDK_BACKEND=wayland ./emacs  (or try ./emacs -Q if you have problems.)
 ```
 
 ## X11 and Wayland
@@ -109,15 +109,30 @@ On gdb, you may want to do:
 (gdb) handle SIGPIPE nostop noprint
 ```
 
+## Supporting Color Emoji Fonts
+
+By default, color fonts are ignored for stability.
+
+To use them, you can write this code in `~/.emacs`:
+
+```elisp
+(if (featurep 'pgtk)
+    (setq xft-ignore-color-fonts nil))
+```
+
+Changing this variable on the fly may not work.
+
 ## My Environment
 
 - archlinux
-- gtk+-3.22.26
-- glib-2.54.2
-- gnome-shell 3.26.2
-- gcc 7.2.1
+- gtk+-3.22.30
+- glib-2.56.1
+- gnome-shell 3.28.1
+- gcc 7.3.1
 - wayland 1.14.0
-- wayland-protocols 1.12
+- wayland-protocols 1.13
+- cairo 1.15.12
+- freetype2 2.9
 
 ## Notice
 
