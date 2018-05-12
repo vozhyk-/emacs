@@ -8947,7 +8947,6 @@ imagemagick_load_image (struct frame *f, struct image *img,
       data = xmalloc (width * height * 4);
       color_scale /= 256;
 #else
-// ifndef
       /* Try to create a x pixmap to hold the imagemagick pixmap.  */
       if (!image_create_x_image_and_pixmap (f, img, width, height, 0,
 					    &ximg, 0))
@@ -9016,7 +9015,6 @@ imagemagick_load_image (struct frame *f, struct image *img,
   free_color_table ();
 #endif /* COLOR_TABLE_SUPPORT */
 
-#ifndef USE_CAIRO
   img->width  = width;
   img->height = height;
 
