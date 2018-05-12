@@ -6310,6 +6310,9 @@ pgtk_term_init (Lisp_Object display_name, char *resource_name)
   struct pgtk_display_info *dpyinfo;
   static int x_initialized = 0;
   static unsigned x_display_id = 0;
+  static const char *initial_display = NULL;
+  const char *dpy_name;
+  Lisp_Object lisp_dpy_name = Qnil;
   int conn_fd;
 
   block_input ();
@@ -6328,6 +6331,11 @@ pgtk_term_init (Lisp_Object display_name, char *resource_name)
     error ("Display %s can't be opened", SSDATA (display_name));
 #endif
 
+  dpy_name = SSDATA (display_name);
+  if (strlen(dpy_name) == 0 && initial_display != NULL)
+    dpy_name = initial_display;
+  lisp_dpy_name = build_string (dpy_name);
+
   {
 #define NUM_ARGV 10
     int argc;
@@ -6337,7 +6345,7 @@ pgtk_term_init (Lisp_Object display_name, char *resource_name)
 
     if (x_initialized++ > 1)
       {
-	xg_display_open (SSDATA (display_name), &dpy);
+	xg_display_open (dpy_name, &dpy);
       }
     else
       {
@@ -6350,10 +6358,10 @@ pgtk_term_init (Lisp_Object display_name, char *resource_name)
         argc = 0;
         argv[argc++] = initial_argv[0];
 
-        if (strlen(SSDATA(display_name)) != 0)
+        if (strlen(dpy_name) != 0)
           {
             argv[argc++] = display_opt;
-            argv[argc++] = SSDATA (display_name);
+            argv[argc++] = dpy_name;
           }
 
         argv[argc++] = name_opt;
@@ -6386,6 +6394,10 @@ pgtk_term_init (Lisp_Object display_name, char *resource_name)
         xg_initialize ();
 
         dpy = DEFAULT_GDK_DISPLAY ();
+
+	initial_display = gdk_display_get_name(dpy);
+	dpy_name = initial_display;
+	lisp_dpy_name = build_string(dpy_name);
       }
   }
 
@@ -6412,8 +6424,7 @@ pgtk_term_init (Lisp_Object display_name, char *resource_name)
     struct pgtk_display_info *share;
 
     for (share = x_display_list; share; share = share->next)
-      if (same_x_server (SSDATA (XCAR (share->name_list_element)),
-			 SSDATA (display_name)))
+      if (same_x_server (SSDATA (XCAR (share->name_list_element)), dpy_name))
 	break;
     if (share)
       terminal->kboard = share->terminal->kboard;
@@ -6452,7 +6463,7 @@ pgtk_term_init (Lisp_Object display_name, char *resource_name)
   dpyinfo->next = x_display_list;
   x_display_list = dpyinfo;
 
-  dpyinfo->name_list_element = Fcons (display_name, Qnil);
+  dpyinfo->name_list_element = Fcons (lisp_dpy_name, Qnil);
   dpyinfo->gdpy = dpy;
   dpyinfo->connection = conn_fd;
 
@@ -6461,7 +6472,7 @@ pgtk_term_init (Lisp_Object display_name, char *resource_name)
   dpyinfo->smallest_char_width = 1;
 
   /* Set the name of the terminal. */
-  terminal->name = xlispstrdup (display_name);
+  terminal->name = xlispstrdup (lisp_dpy_name);
 
   Lisp_Object system_name = Fsystem_name ();
   ptrdiff_t nbytes;
