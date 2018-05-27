@@ -143,8 +143,7 @@
 			 (const "owncloud")
 			 (const "sftp")
 			 (const "smb")
-			 (const "synce")))
-  :require 'tramp)
+			 (const "synce"))))
 
 (defconst tramp-goa-methods '("gdrive" "owncloud")
   "List of methods which require registration at GNOME Online Accounts.")
@@ -171,8 +170,7 @@
   "Zeroconf domain to be used for discovering services, like host names."
   :group 'tramp
   :version "23.2"
-  :type 'string
-  :require 'tramp)
+  :type 'string)
 
 ;; Add the methods to `tramp-methods', in order to allow minibuffer
 ;; completion.
@@ -569,8 +567,7 @@ completion, nil means to use always cached values for discovered
 devices."
   :group 'tramp
   :version "23.2"
-  :type '(choice (const nil) integer)
-  :require 'tramp)
+  :type '(choice (const nil) integer))
 
 (defvar tramp-bluez-discovery nil
   "Indicator for a running bluetooth device discovery.
@@ -1057,8 +1054,7 @@ file names."
       ;; No tilde characters in file name, do normal
       ;; `expand-file-name' (this does "/./" and "/../").
       (tramp-make-tramp-file-name
-       method user domain host port
-       (tramp-run-real-handler 'expand-file-name (list localname))))))
+       v (tramp-run-real-handler 'expand-file-name (list localname))))))
 
 (defun tramp-gvfs-get-directory-attributes (directory)
   "Return GVFS attributes association list of all files in DIRECTORY."
@@ -1888,20 +1884,15 @@ It was \"a(say)\", but has changed to \"a{sv})\"."
   "The uid of the remote connection VEC, in ID-FORMAT.
 ID-FORMAT valid values are `string' and `integer'."
   (with-tramp-connection-property vec (format "uid-%s" id-format)
-    (let ((method (tramp-file-name-method vec))
-	  (user (tramp-file-name-user vec))
-	  (domain (tramp-file-name-domain vec))
-	  (host (tramp-file-name-host vec))
-	  (port (tramp-file-name-port vec))
+    (let ((user (tramp-file-name-user vec))
 	  (localname
 	   (tramp-get-connection-property vec "default-location" nil)))
       (cond
-       ((and user (equal id-format 'string)) user)
+       ((and (equal id-format 'string) user))
        (localname
 	(tramp-compat-file-attribute-user-id
 	 (file-attributes
-	  (tramp-make-tramp-file-name method user domain host port localname)
-	  id-format)))
+	  (tramp-make-tramp-file-name vec localname) id-format)))
        ((equal id-format 'integer) tramp-unknown-id-integer)
        ((equal id-format 'string) tramp-unknown-id-string)))))
 
@@ -1909,19 +1900,13 @@ ID-FORMAT valid values are `string' and `integer'."
   "The gid of the remote connection VEC, in ID-FORMAT.
 ID-FORMAT valid values are `string' and `integer'."
   (with-tramp-connection-property vec (format "gid-%s" id-format)
-    (let ((method (tramp-file-name-method vec))
-	  (user (tramp-file-name-user vec))
-	  (domain (tramp-file-name-domain vec))
-	  (host (tramp-file-name-host vec))
-	  (port (tramp-file-name-port vec))
-	  (localname
+    (let ((localname
 	   (tramp-get-connection-property vec "default-location" nil)))
       (cond
        (localname
 	(tramp-compat-file-attribute-group-id
 	 (file-attributes
-	  (tramp-make-tramp-file-name method user domain host port localname)
-	  id-format)))
+	  (tramp-make-tramp-file-name vec localname) id-format)))
        ((equal id-format 'integer) tramp-unknown-id-integer)
        ((equal id-format 'string) tramp-unknown-id-string)))))
 
@@ -1963,15 +1948,12 @@ connection if a previous connection has died for some reason."
       (set-process-query-on-exit-flag p nil)))
 
   (unless (tramp-gvfs-connection-mounted-p vec)
-    (let* ((method (tramp-file-name-method vec))
-	   (user (tramp-file-name-user vec))
-	   (domain (tramp-file-name-domain vec))
-	   (host (tramp-file-name-host vec))
-	   (port (tramp-file-name-port vec))
-	   (localname (tramp-file-name-unquote-localname vec))
-	   (object-path
-	    (tramp-gvfs-object-path
-	     (tramp-make-tramp-file-name method user domain host port ""))))
+    (let ((method (tramp-file-name-method vec))
+	  (user (tramp-file-name-user vec))
+	  (host (tramp-file-name-host vec))
+	  (localname (tramp-file-name-unquote-localname vec))
+	  (object-path
+	   (tramp-gvfs-object-path (tramp-make-tramp-file-name vec 'noloc))))
 
       (when (and (string-equal method "afp")
 		 (string-equal localname "/"))

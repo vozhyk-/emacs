@@ -753,7 +753,7 @@ Try sending a bounced message a second time (@code{rmail-retry-failure}).
 to the message you are reading.  To do this, type @kbd{r}
 (@code{rmail-reply}).  This displays a mail composition buffer in
 another window, much like @kbd{C-x 4 m}, but preinitializes the
-@samp{Subject}, @samp{To}, @samp{CC}, @samp{In-reply-to} and
+@samp{Subject}, @samp{To}, @samp{CC}, @samp{In-Reply-To} and
 @samp{References} header fields based on the message you are replying
 to.  The @samp{To} field starts out as the address of the person who
 sent the message you received, and the @samp{CC} field starts out with
@@ -999,8 +999,8 @@ summary buffer using @key{SPC} and @key{DEL}.  However, in the summary
 buffer scrolling past the end or the beginning of a message with
 @key{SPC} or @key{DEL} goes, respectively, to the next or previous
 undeleted message.  Customize the
-@code{rmail-summary-scroll-between-messages} option to nil to disable
-scrolling to next/previous messages.
+@code{rmail-summary-scroll-between-messages} option to @code{nil} to
+disable scrolling to next/previous messages.
 
 @findex rmail-summary-undelete-many
 @kbd{M-u} (@code{rmail-summary-undelete-many}) undeletes all deleted

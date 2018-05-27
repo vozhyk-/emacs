@@ -233,12 +233,19 @@ and its value has been changed to Duck Duck Go.
 'shr-selected-link' face to give the user feedback that the command
 has been executed.
 
-
 ** Htmlfontify
 *** The functions 'hfy-color', 'hfy-color-vals' and
 'hfy-fallback-color-values' and the variables 'hfy-fallback-color-map'
 and 'hfy-rgb-txt-color-map' have been renamed from names that used
 'colour' instead of 'color'.
+
++++
+** Enriched mode supports the 'charset' text property.
+You can add or modify the 'charset' text properties of text using the
+Edit->Text Properties->Special Properties menu, or by invoking the
+'facemenu-set-charset' command.  Documents in Enriched mode will be
+saved with the charset properties, and those properties will be
+restored when the file is visited.
 
 ** Smtpmail
 Authentication mechanisms can be added via external packages, by
@@ -415,6 +422,10 @@ or NextCloud hosted files and directories.
 +++
 *** Validated passwords are saved by auth-source backends which support this.
 
++++
+*** The user option 'tramp-ignored-file-name-regexp' allows to disable
+Tramp for some look-alike remote file names.
+
 ---
 ** The options.el library has been removed.
 It was obsolete since Emacs 22.1, replaced by customize.
@@ -441,6 +452,18 @@ are formatted as MIME digests.
 +++
 *** 'message-forward-included-headers' has changed its default to
 exclude most headers when forwarding.
+
+** EasyPG
+
+---
+*** 'epa-pinentry-mode' is renamed to 'epg-pinentry-mode'.
+It now applies to epg functions as well as epa functions.
+
+---
+*** The alias functions 'epa--encode-coding-string',
+'epa--decode-coding-string', and 'epa--select-safe-coding-system' have
+been removed.  Use 'encode-coding-string', 'decode-coding-string', and
+'select-safe-coding-system' instead.
 
 * New Modes and Packages in Emacs 27.1
 

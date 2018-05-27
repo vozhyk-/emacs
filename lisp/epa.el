@@ -56,27 +56,8 @@ If neither t nor nil, ask user for confirmation."
   :type 'integer
   :group 'epa)
 
-;; In the doc string below, we say "symbol `error'" to avoid producing
-;; a hyperlink for `error' the function.
-(defcustom epa-pinentry-mode nil
-  "The pinentry mode.
-
-GnuPG 2.1 or later has an option to control the behavior of
-Pinentry invocation.  The value should be the symbol `error',
-`ask', `cancel', or `loopback'.  See the GnuPG manual for the
-meanings.
-
-In epa commands, a particularly useful mode is `loopback', which
-redirects all Pinentry queries to the caller, so Emacs can query
-passphrase through the minibuffer, instead of external Pinentry
-program."
-  :type '(choice (const nil)
-		 (const ask)
-		 (const cancel)
-		 (const error)
-		 (const loopback))
-  :group 'epa
-  :version "25.1")
+(define-obsolete-variable-alias
+  'epa-pinentry-mode 'epg-pinentry-mode "27.1")
 
 (defgroup epa-faces nil
   "Faces for epa-mode."
@@ -306,12 +287,6 @@ You should bind this variable with `let', but do not set it globally.")
   (format "Show %s"
 	  (epg-sub-key-id (car (epg-key-sub-key-list
 				(widget-get widget :value))))))
-
-(defalias 'epa--encode-coding-string
-  (if (fboundp 'encode-coding-string) #'encode-coding-string #'identity))
-
-(defalias 'epa--decode-coding-string
-  (if (fboundp 'decode-coding-string) #'decode-coding-string #'identity))
 
 (define-derived-mode epa-key-list-mode special-mode "Keys"
   "Major mode for `epa-list-keys'."
@@ -701,7 +676,6 @@ If you do not specify PLAIN-FILE, this functions prompts for the value to use."
 					#'epa-progress-callback-function
 					(format "Decrypting %s..."
 						(file-name-nondirectory decrypt-file))))
-    (setf (epg-context-pinentry-mode context) epa-pinentry-mode)
     (message "Decrypting %s..." (file-name-nondirectory decrypt-file))
     (condition-case error
 	(epg-decrypt-file context decrypt-file plain-file)
@@ -797,7 +771,6 @@ If no one is selected, default secret key is used.  "
 					#'epa-progress-callback-function
 					(format "Signing %s..."
 						(file-name-nondirectory file))))
-    (setf (epg-context-pinentry-mode context) epa-pinentry-mode)
     (message "Signing %s..." (file-name-nondirectory file))
     (condition-case error
 	(epg-sign-file context file signature mode)
@@ -828,7 +801,6 @@ If no one is selected, symmetric encryption will be performed.  ")))
 					#'epa-progress-callback-function
 					(format "Encrypting %s..."
 						(file-name-nondirectory file))))
-    (setf (epg-context-pinentry-mode context) epa-pinentry-mode)
     (message "Encrypting %s..." (file-name-nondirectory file))
     (condition-case error
 	(epg-encrypt-file context file recipients cipher)
@@ -871,7 +843,6 @@ For example:
 					 (cons
 					  #'epa-progress-callback-function
 					  "Decrypting..."))
-      (setf (epg-context-pinentry-mode context) epa-pinentry-mode)
       (message "Decrypting...")
       (condition-case error
 	  (setq plain (epg-decrypt-string context (buffer-substring start end)))
@@ -879,7 +850,7 @@ For example:
 	 (epa-display-error context)
 	 (signal (car error) (cdr error))))
       (message "Decrypting...done")
-      (setq plain (epa--decode-coding-string
+      (setq plain (decode-coding-string
 		   plain
 		   (or coding-system-for-read
 		       (get-text-property start 'epa-coding-system-used)
@@ -973,7 +944,7 @@ For example:
     (condition-case error
 	(setq plain (epg-verify-string
 		     context
-		     (epa--encode-coding-string
+		     (encode-coding-string
 		      (buffer-substring start end)
 		      (or coding-system-for-write
 			  (get-text-property start 'epa-coding-system-used)))))
@@ -981,7 +952,7 @@ For example:
        (epa-display-error context)
        (signal (car error) (cdr error))))
     (message "Verifying...done")
-    (setq plain (epa--decode-coding-string
+    (setq plain (decode-coding-string
 		 plain
 		 (or coding-system-for-read
 		     (get-text-property start 'epa-coding-system-used)
@@ -1029,12 +1000,6 @@ See the reason described in the `epa-verify-region' documentation."
 	    (error "No cleartext tail"))
 	  (epa-verify-region cleartext-start cleartext-end))))))
 
-(defalias 'epa--select-safe-coding-system
-  (if (fboundp 'select-safe-coding-system)
-      #'select-safe-coding-system
-    (lambda (_from _to)
-      buffer-file-coding-system)))
-
 ;;;###autoload
 (defun epa-sign-region (start end signers mode)
   "Sign the current region between START and END by SIGNERS keys selected.
@@ -1057,7 +1022,7 @@ For example:
    (let ((verbose current-prefix-arg))
      (setq epa-last-coding-system-specified
 	   (or coding-system-for-write
-	       (epa--select-safe-coding-system
+	       (select-safe-coding-system
 		(region-beginning) (region-end))))
      (list (region-beginning) (region-end)
 	   (if verbose
@@ -1082,11 +1047,10 @@ If no one is selected, default secret key is used.  "
 					 (cons
 					  #'epa-progress-callback-function
 					  "Signing..."))
-      (setf (epg-context-pinentry-mode context) epa-pinentry-mode)
       (message "Signing...")
       (condition-case error
 	  (setq signature (epg-sign-string context
-					   (epa--encode-coding-string
+					   (encode-coding-string
 					    (buffer-substring start end)
 					    epa-last-coding-system-specified)
 					   mode))
@@ -1098,7 +1062,7 @@ If no one is selected, default secret key is used.  "
       (goto-char start)
       (add-text-properties (point)
 			   (progn
-			     (insert (epa--decode-coding-string
+			     (insert (decode-coding-string
 				      signature
 				      (or coding-system-for-read
 					  epa-last-coding-system-specified)))
@@ -1146,7 +1110,7 @@ For example:
 	 sign)
      (setq epa-last-coding-system-specified
 	   (or coding-system-for-write
-	       (epa--select-safe-coding-system
+	       (select-safe-coding-system
 		(region-beginning) (region-end))))
      (list (region-beginning) (region-end)
 	   (epa-select-keys context
@@ -1171,11 +1135,10 @@ If no one is selected, symmetric encryption will be performed.  ")
 					 (cons
 					  #'epa-progress-callback-function
 					  "Encrypting..."))
-      (setf (epg-context-pinentry-mode context) epa-pinentry-mode)
       (message "Encrypting...")
       (condition-case error
 	  (setq cipher (epg-encrypt-string context
-					   (epa--encode-coding-string
+					   (encode-coding-string
 					    (buffer-substring start end)
 					    epa-last-coding-system-specified)
 					   recipients
@@ -1340,7 +1303,6 @@ If no one is selected, default public key is exported.  ")))
 ;; 	                                  (cons
 ;; 	                                    #'epa-progress-callback-function
 ;; 	                                    "Signing keys..."))
-;;     (setf (epg-context-pinentry-mode context) epa-pinentry-mode)
 ;;     (message "Signing keys...")
 ;;     (epg-sign-keys context keys local)
 ;;     (message "Signing keys...done")))

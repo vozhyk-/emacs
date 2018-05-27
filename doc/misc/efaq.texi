@@ -4562,7 +4562,7 @@ these systems, you should configure @code{movemail} to use @code{flock}.
 
 @c isaacson@@seas.upenn.edu
 Ron Isaacson says: When you hit
-@kbd{r} to reply in Rmail, by default it CCs all of the original
+@kbd{r} to reply in Rmail, by default it Ccs all of the original
 recipients (everyone on the original @samp{To} and @samp{CC}
 lists). With a prefix argument (i.e., typing @kbd{C-u} before @kbd{r}),
 it replies only to the sender.  However, going through the whole
