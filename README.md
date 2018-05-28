@@ -122,6 +122,8 @@ To use them, you can write this code in `~/.emacs`:
 
 Changing this variable on the fly may not work.
 
+You may need build and install cairo from git repo. 1.15.12 is insufficient.
+
 ## My Environment
 
 - archlinux
