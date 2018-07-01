@@ -58,6 +58,13 @@ is initialized.  The primary purpose is to allow customizing how the
 package system is initialized given that initialization now happens
 before loading the regular init file (see below).
 
+We recommend against putting any customizations in this file that
+don't need to be set up before initializing installed add-on packages,
+because the early init file is read too early into the startup
+process, and some important parts of the Emacs session, such as
+window-system and other GUI features, are not yet set up, which could
+make some customization fail to work.
+
 +++
 ** Installed packages are now activated *before* loading the init file.
 This is part of a change intended to eliminate the behavior of
@@ -124,6 +131,15 @@ used to remove comments before calling the libxml functions to parse
 the data.
 
 +++
+** The Network Security Manager now allows more fine-grained control
+of what checks to run via the `network-security-protocol-checks'
+variable.
+
++++
+** Most of the checks for outdated, believed-to-be-weak TLS algorithms
+and ciphers are now switched on by default.
+
++++
 ** New function 'fill-polish-nobreak-p', to be used in 'fill-nobreak-predicate'.
 It blocks line breaking after a one-letter word, also in the case when
 this word is preceded by a non-space, but non-alphanumeric character.
@@ -137,6 +153,17 @@ regular expression was previously invalid, but is now accepted:
 
 ---
 ** The German prefix and postfix input methods now support Capital sharp S.
+
++++
+** New function 'exec-path'.
+This function by default returns the value of the corresponding
+variable, but can optionally return the equivalent of 'exec-path'
+from a remote host.
+
++++
+** The function 'executable-find' supports an optional argument REMOTE.
+This triggers to search the program on the remote host as indicated by
+'default-directory'.
 
 
 * Editing Changes in Emacs 27.1
@@ -168,15 +195,57 @@ interface that's more like functions like @code{search-forward}.
 ** More commands support noncontiguous rectangular regions, namely
 'upcase-dwim', 'downcase-dwim', 'replace-string', 'replace-regexp'.
 
++++
+** When asked to visit a large file, Emacs now offers visiting it literally.
+Previously, Emacs would only ask for confirmation before visiting
+large files.  Now it also offers a third alternative: to visit the
+file literally, as in 'find-file-literally', which speeds up
+navigation and editing of large files.
+
 
 * Changes in Specialized Modes and Packages in Emacs 27.1
 
 ** Browse-url
+
 *** The function 'browse-url-emacs' can now visit a URL in selected window.
 It now treats the optional 2nd argument to mean that the URL should be
 shown in the currently selected window.
 
+** Comint
+
++++
+*** 'C-c .' (comint-insert-previous-argument) no longer interprets '&'.
+This feature caused problems when '&&' was present in the previous
+command.  Since this command emulates 'M-.' in Bash and zsh, neither
+of which treats '&' specially, the feature was removed for
+compatibility with these shells.
+
++++
+*** 'comint-insert-previous-argument' can now count arguments from the end.
+By default, invoking 'C-c .' with a numeric argument N would copy the
+Nth argument, counting from the first one.  But if the new option
+'comint-insert-previous-argument-from-end' is non-nil, it will copy
+the Nth argument counting from the last one.  Thus 'C-c .' can now
+better emulate 'M-.' in both Bash and zsh, since the former counts
+from the beginning of the arguments, while the latter counts from the
+end.
+
+** Flymake
+
++++
+*** The variable 'flymake-diagnostic-types-alist' is obsolete
+You should instead set properties on known diagnostic symbols, like
+':error' and ':warning', as demonstrated in the Flymake manual.
+
+*** New customizable variable 'flymake-start-on-save-buffer'
+Control whether Flymake starts checking the buffer on save.
+
+*** Flymake and backend functions may exchange hints about buffer changes
+This enables more efficient backends.  See the docstring of
+'flymake-diagnostic-functions' or the Flymake manual for details.
+
 ** Package
+
 *** New 'package-quickstart' feature
 When 'package-quickstart' is non-nil, package.el precomputes a big autoloads
 file so that activation of packages can be done much faster, which can speed up
@@ -187,7 +256,17 @@ you don't need to set them in your early init file.
 
 *** New function 'package-activate-all'.
 
+** Info
+
+---
+*** Info can now follow 'file://' protocol URLs.
+The 'file://' URLs in Info documents can now be followed by passing
+them to the 'browse-url' function, like the other protocols: ftp,
+http, and https.  This allows to have references to local HTML files,
+for example.
+
 ** Ecomplete
+
 *** The ecomplete sorting has changed to a decay-based algorithm.
 This can be controlled by the new 'ecomplete-sort-predicate' variable.
 
@@ -234,6 +313,7 @@ and its value has been changed to Duck Duck Go.
 has been executed.
 
 ** Htmlfontify
+
 *** The functions 'hfy-color', 'hfy-color-vals' and
 'hfy-fallback-color-values' and the variables 'hfy-fallback-color-map'
 and 'hfy-rgb-txt-color-map' have been renamed from names that used
@@ -252,6 +332,7 @@ Authentication mechanisms can be added via external packages, by
 defining new cl-defmethod of smtpmail-try-auth-method.
 
 ** Footnote-mode
+
 *** Support Hebrew-style footnotes
 *** Footnote text lines are now aligned.
 Can be controlled via the new variable 'footnote-align-to-fn-text'.
@@ -262,6 +343,9 @@ Can be controlled via the new variable 'footnote-align-to-fn-text'.
 *** A new command 'css-cycle-color-format' for cycling between color
 formats (e.g. "black" => "#000000" => "rgb(0, 0, 0)") has been added,
 bound to 'C-c C-f'.
+
+---
+*** CSS mode, SCSS mode, and Less CSS mode now have support for Imenu.
 
 ** SGML mode
 
@@ -385,7 +469,6 @@ It can be used to set any buffer as the next one to be used by
 This means that pressing C-M-SPACE now selects the entire tree by
 default, and not just the opening element.
 
-
 ** Eshell
 
 ---
@@ -403,10 +486,14 @@ To restore the old behavior, use
 Previously eshell/kill would fail if provided a kill signal to send to the
 process.  It now accepts signals specified either by name or by its number.
 
+** Shell
+
+---
+*** Program name completion inside remote shells works now as expected.
+
 ** Pcomplete
 *** The function 'pcomplete-uniquify-list' has been renamed from
 'pcomplete-uniqify-list'.
-
 
 ** Auth-source
 
@@ -420,6 +507,10 @@ process.  It now accepts signals specified either by name or by its number.
 or NextCloud hosted files and directories.
 
 +++
+*** Connection methods "obex" and "synce" are removed, because they
+are obsoleted in GVFS.
+
++++
 *** Validated passwords are saved by auth-source backends which support this.
 
 +++
@@ -429,6 +520,10 @@ Tramp for some look-alike remote file names.
 ---
 ** The options.el library has been removed.
 It was obsolete since Emacs 22.1, replaced by customize.
+
+** The tls.el and starttls.el libraries are now marked obsolete.
+Use of built-in libgnutls based functionality (described in the Emacs
+GnuTLS manual) is recommended instead.
 
 
 ** Message
@@ -465,6 +560,17 @@ It now applies to epg functions as well as epa functions.
 been removed.  Use 'encode-coding-string', 'decode-coding-string', and
 'select-safe-coding-system' instead.
 
+** Rmail
+
++++
+*** New user option 'rmail-output-reset-deleted-flag'.
+If this option is non-nil, messages appended to an output file by the
+'rmail-output' command have their Deleted flag reset.
+
+*** The command 'rmail-summary-by-senders' with an empty argument
+selects the messages to summarize with a regexp that matches the
+sender of the current message.
+
 * New Modes and Packages in Emacs 27.1
 
 +++
@@ -473,8 +579,33 @@ This feature uses Tramp and works only on systems which support GVFS,
 i.e. GNU/Linux, roughly spoken.  See the chapter "(tramp) Archive file
 names" in the Tramp manual for full documentation of these facilities.
 
++++
+** New library for writing JSONRPC applications (https://jsonrpc.org)
+The 'jsonrpc' library enables writing Emacs Lisp applications that
+rely on this protocol.  Since the protocol is designed to be
+transport-agnostic, the library provides an API to implement new
+transport strategies as well as a separate API to use them.  A
+transport implementation for process-based communication, such as is
+used by the Language Server Protocol (LSP), is readily available.
+
 
 * Incompatible Lisp Changes in Emacs 27.1
+
+---
+** Just loading a theme's file no longer activates the theme's settings.
+Loading a theme with 'M-x load-theme' still activates the theme, as it
+did before.  However, loading the theme's file with "M-x load-file",
+or using 'require' or 'load' in a Lisp program, doesn't actually apply
+the theme's settings until you either invoke 'M-x enable-theme' or
+type 'M-x load-theme'.  (In a Lisp program, calling 'enable-theme' or
+invoking 'load-theme' with NO-ENABLE argument omitted or nil has the
+same effect of activating a theme whose file has been loaded.)  The
+special case of the 'user' theme is an exception: it is frequently
+used for ad-hoc customizations, so the settings of that theme are by
+default applied immediately.
+
+The variable 'custom--inhibit-theme-enable' controls this behavior;
+its default value changed in Emacs 27.1.
 
 ** The 'repetitions' argument of 'benchmark-run' can now also be a variable.
 ** The FILENAME argument to 'file-name-base' is now mandatory and no
@@ -559,6 +690,39 @@ manual for more details.
 * Lisp Changes in Emacs 27.1
 
 +++
+** New functions 'major-mode-suspend' and 'major-mode-restore'.
+Use them when switching temporarily to another major mode, e.g. for
+'hexl-mode', or to switch between 'c-mode' and 'image-mode' in XPM.
+
++++
+** New macro 'dolist-with-progress-reporter'.
+This works like 'dolist', but reports progress similar to
+'dotimes-with-progress-reporter'.
+
++++
+** New hook 'after-delete-frame-functions'.
+This works like 'delete-frame-functions', but runs after the frame to
+be deleted has been made dead and removed from the frame list.
+
++++
+** New frame focus state inspection interface.
+The hooks 'focus-in-hook' and 'focus-out-hook' are now obsolete.
+Instead, attach to 'after-focus-change-function' using 'add-function'
+and inspect the focus state of each frame using 'frame-focus-state'.
+
++++
+** Emacs now requests and recognizes focus-change notifications from TTYs.
+On terminal emulators that support the feature, Emacs can now support
+'focus-in-hook' and 'focus-out-hook' for TTY frames.
+
++++
+** Window-specific face remapping.
+Face specifications (of the kind used in 'face-remapping-alist')
+now support filters, allowing faces to vary between different windows
+displaying the same buffer.  See the Info node "Face Remapping" of the
+Emacs Lisp Reference manual for more detail.
+
++++
 ** New function assoc-delete-all.
 
 +++
@@ -581,7 +745,7 @@ backslash.  For example:
 ** Omitting variables after '&optional' and '&rest' is now allowed.
 For example (defun foo (&optional)) is no longer an error.  This is
 sometimes convenient when writing macros.  See the ChangeLog entry
-titled "Allow `&rest' or `&optional' without following variable
+titled "Allow '&rest' or '&optional' without following variable
 (Bug#29165)" for a full listing of which arglists are accepted across
 versions.
 
@@ -598,6 +762,9 @@ socket has been passed to Emacs (Bug#24218).
 ** The 'file-system-info' function is now available on all platforms.
 instead of just Microsoft platforms.  This fixes a 'get-free-disk-space'
 bug on OS X 10.8 and later (Bug#28639).
+
++++
+** 'memory-limit' now returns a better estimate of memory consumption.
 
 +++
 ** New macro 'combine-change-calls' arranges to call the change hooks
@@ -638,7 +805,6 @@ will be chosen even if you have an entry for image/* in your
 overrides all system and Emacs-provided defaults.  To get the old
 method back, set 'mailcap-prefer-mailcap-viewers' to nil.
 
-
 ** URL
 
 *** The file: handler no longer looks for index.html in directories if
@@ -646,13 +812,11 @@ you ask it for a file:///dir URL.  Since this is a low-level library,
 such decisions (if they are to be made at all) are left to
 higher-level functions.
 
-
 ** image-mode
 
 *** image-mode started using ImageMagick by default for all images
 some years back.  It now respects 'imagemagick-types-inhibit' as a way
 to disable that.
-
 
 +++
 ** The new function 'read-answer' accepts either long or short answers
@@ -666,6 +830,13 @@ loading messages if requested, and protects against recursive loads.
 ** The function 'read-variable' now uses its own history list.
 The history of variable names read by 'read-variable' is recorded in
 the new variable 'custom-variable-history'.
+
+---
+** The function 'string-to-unibyte' is no longer declared obsolete.
+We have found that there are legitimate use cases for this function,
+where there's no better alternative.  We believe that the incorrect
+uses of this function all but disappeared by now, so we are
+un-obsoleting it.
 
 
 * Changes in Emacs 27.1 on Non-Free Operating Systems
@@ -681,6 +852,24 @@ and "option" modifier keys more correctly.
 to 't' would enable the macOS proxy icon has been replaced with a
 separate variable, 'ns-use-proxy-icon'.  'frame-title-format' will now
 work as on other platforms.
+
+---
+** New primitive 'w32-read-registry'.
+This primitive lets Lisp programs access the MS-Windows Registry by
+retrieving values stored under a given key.  It is intended to be used
+for supporting features such as XDG-like location of important files
+and directories.
+
++++
+** The default value of 'w32-pipe-read-delay' is now zero.
+This speeds up reading output from sub-processes that produce a lot of
+data.
+
+This variable may need to be non-zero only when running DOS programs
+as Emacs subprocesses, which by now is not supported on modern
+versions of MS-Windows.  Set this variable to 50 if for some reason
+you need the old behavior (and please report such situations to Emacs
+developers).
 
 
 ----------------------------------------------------------------------

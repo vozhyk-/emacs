@@ -47,6 +47,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include <errno.h>
 #include <float.h>
 #include <limits.h>
+#include <math.h>
 
 #ifdef HAVE_TIMEZONE_T
 # include <sys/param.h>
@@ -995,58 +996,46 @@ This function does not move point.  */)
 			      Qnil, Qt, Qnil);
 }
 
-/* Save current buffer state for `save-excursion' special form.
-   We (ab)use Lisp_Misc_Save_Value to allow explicit free and so
-   offload some work from GC.  */
+/* Save current buffer state for save-excursion special form.  */
 
-Lisp_Object
-save_excursion_save (void)
+void
+save_excursion_save (union specbinding *pdl)
 {
-  return make_save_obj_obj_obj_obj
-    (Fpoint_marker (),
-     Qnil,
-     /* Selected window if current buffer is shown in it, nil otherwise.  */
-     (EQ (XWINDOW (selected_window)->contents, Fcurrent_buffer ())
-      ? selected_window : Qnil),
-     Qnil);
+  eassert (pdl->unwind_excursion.kind == SPECPDL_UNWIND_EXCURSION);
+  pdl->unwind_excursion.marker = Fpoint_marker ();
+  /* Selected window if current buffer is shown in it, nil otherwise.  */
+  pdl->unwind_excursion.window
+    = (EQ (XWINDOW (selected_window)->contents, Fcurrent_buffer ())
+       ? selected_window : Qnil);
 }
 
 /* Restore saved buffer before leaving `save-excursion' special form.  */
 
 void
-save_excursion_restore (Lisp_Object info)
+save_excursion_restore (Lisp_Object marker, Lisp_Object window)
 {
-  Lisp_Object tem, tem1;
-
-  tem = Fmarker_buffer (XSAVE_OBJECT (info, 0));
+  Lisp_Object buffer = Fmarker_buffer (marker);
   /* If we're unwinding to top level, saved buffer may be deleted.  This
-     means that all of its markers are unchained and so tem is nil.  */
-  if (NILP (tem))
-    goto out;
+     means that all of its markers are unchained and so BUFFER is nil.  */
+  if (NILP (buffer))
+    return;
 
-  Fset_buffer (tem);
+  Fset_buffer (buffer);
 
   /* Point marker.  */
-  tem = XSAVE_OBJECT (info, 0);
-  Fgoto_char (tem);
-  unchain_marker (XMARKER (tem));
+  Fgoto_char (marker);
+  unchain_marker (XMARKER (marker));
 
   /* If buffer was visible in a window, and a different window was
      selected, and the old selected window is still showing this
      buffer, restore point in that window.  */
-  tem = XSAVE_OBJECT (info, 2);
-  if (WINDOWP (tem)
-      && !EQ (tem, selected_window)
-      && (tem1 = XWINDOW (tem)->contents,
-	  (/* Window is live...  */
-	   BUFFERP (tem1)
-	   /* ...and it shows the current buffer.  */
-	   && XBUFFER (tem1) == current_buffer)))
-    Fset_window_point (tem, make_number (PT));
-
- out:
-
-  free_misc (info);
+  if (WINDOWP (window) && !EQ (window, selected_window))
+    {
+      /* Set window point if WINDOW is live and shows the current buffer.  */
+      Lisp_Object contents = XWINDOW (window)->contents;
+      if (BUFFERP (contents) && XBUFFER (contents) == current_buffer)
+	Fset_window_point (window, make_number (PT));
+    }
 }
 
 DEFUN ("save-excursion", Fsave_excursion, Ssave_excursion, 0, UNEVALLED, 0,
@@ -1068,7 +1057,7 @@ usage: (save-excursion &rest BODY)  */)
   register Lisp_Object val;
   ptrdiff_t count = SPECPDL_INDEX ();
 
-  record_unwind_protect (save_excursion_restore, save_excursion_save ());
+  record_unwind_protect_excursion ();
 
   val = Fprogn (args);
   return unbind_to (count, val);
@@ -3170,7 +3159,9 @@ SOURCE can be a buffer or a string that names a buffer.
 Interactively, prompt for SOURCE.
 As far as possible the replacement is non-destructive, i.e. existing
 buffer contents, markers, properties, and overlays in the current
-buffer stay intact.  */)
+buffer stay intact.
+Warning: this function can be slow if there's a large number of small
+differences between the two buffers.  */)
   (Lisp_Object source)
 {
   struct buffer *a = current_buffer;
@@ -3207,6 +3198,8 @@ buffer stay intact.  */)
       return Qnil;
     }
 
+  ptrdiff_t count = SPECPDL_INDEX ();
+
   /* FIXME: It is not documented how to initialize the contents of the
      context structure.  This code cargo-cults from the existing
      caller in src/analyze.c of GNU Diffutils, which appears to
@@ -3238,11 +3231,9 @@ buffer stay intact.  */)
   /* Since we didn’t define EARLY_ABORT, we should never abort
      early.  */
   eassert (! early_abort);
-  SAFE_FREE ();
 
   Fundo_boundary ();
-  ptrdiff_t count = SPECPDL_INDEX ();
-  record_unwind_protect (save_excursion_restore, save_excursion_save ());
+  record_unwind_protect_excursion ();
 
   ptrdiff_t i = size_a;
   ptrdiff_t j = size_b;
@@ -3251,11 +3242,16 @@ buffer stay intact.  */)
      walk backwards, we don’t have to keep the positions in sync.  */
   while (i >= 0 || j >= 0)
     {
+      /* Allow the user to quit if this gets too slow.  */
+      maybe_quit ();
+
       /* Check whether there is a change (insertion or deletion)
          before the current position.  */
       if ((i > 0 && bit_is_set (ctx.deletions, i - 1)) ||
           (j > 0 && bit_is_set (ctx.insertions, j - 1)))
 	{
+	  maybe_quit ();
+
           ptrdiff_t end_a = min_a + i;
           ptrdiff_t end_b = min_b + j;
           /* Find the beginning of the current change run.  */
@@ -3285,7 +3281,7 @@ buffer stay intact.  */)
       --j;
     }
 
-  return unbind_to (count, Qnil);
+  return SAFE_FREE_UNBIND_TO (count, Qnil);
 }
 
 static void
@@ -3327,8 +3323,23 @@ buffer_chars_equal (struct context *ctx,
   eassert (pos_b >= BUF_BEGV (ctx->buffer_b));
   eassert (pos_b < BUF_ZV (ctx->buffer_b));
 
-  return BUF_FETCH_CHAR_AS_MULTIBYTE (ctx->buffer_a, pos_a)
-    == BUF_FETCH_CHAR_AS_MULTIBYTE (ctx->buffer_b, pos_b);
+  bool a_unibyte = BUF_ZV (ctx->buffer_a) == BUF_ZV_BYTE (ctx->buffer_a);
+  bool b_unibyte = BUF_ZV (ctx->buffer_b) == BUF_ZV_BYTE (ctx->buffer_b);
+
+  /* Allow the user to escape out of a slow compareseq call.  */
+  maybe_quit ();
+
+  ptrdiff_t bpos_a =
+    a_unibyte ? pos_a : buf_charpos_to_bytepos (ctx->buffer_a, pos_a);
+  ptrdiff_t bpos_b =
+    b_unibyte ? pos_b : buf_charpos_to_bytepos (ctx->buffer_b, pos_b);
+
+  if (a_unibyte && b_unibyte)
+    return BUF_FETCH_BYTE (ctx->buffer_a, bpos_a)
+      == BUF_FETCH_BYTE (ctx->buffer_b, bpos_b);
+
+  return BUF_FETCH_CHAR_AS_MULTIBYTE (ctx->buffer_a, bpos_a)
+    == BUF_FETCH_CHAR_AS_MULTIBYTE (ctx->buffer_b, bpos_b);
 }
 
 
@@ -3520,8 +3531,7 @@ Both characters must have the same length of multi-byte form.  */)
       update_compositions (changed, last_changed, CHECK_ALL);
     }
 
-  unbind_to (count, Qnil);
-  return Qnil;
+  return unbind_to (count, Qnil);
 }
 
 
@@ -4105,7 +4115,8 @@ the next available argument, or the argument explicitly specified:
 
 %s means print a string argument.  Actually, prints any object, with `princ'.
 %d means print as signed number in decimal.
-%o means print as unsigned number in octal, %x as unsigned number in hex.
+%o means print as unsigned number in octal.
+%x means print as unsigned number in hex.
 %X is like %x, but uses upper case.
 %e means print a number in exponential notation.
 %f means print a number in decimal-point notation.
@@ -4659,6 +4670,12 @@ styled_format (ptrdiff_t nargs, Lisp_Object *args, bool message)
 		    {
 		      strcpy (f - pMlen - 1, "f");
 		      double x = XFLOAT_DATA (arg);
+
+		      /* Truncate and then convert -0 to 0, to be more
+			 consistent with %x etc.; see Bug#31938.  */
+		      x = trunc (x);
+		      x = x ? x : 0;
+
 		      sprintf_bytes = sprintf (sprintf_buf, convspec, 0, x);
 		      char c0 = sprintf_buf[0];
 		      bool signedp = ! ('0' <= c0 && c0 <= '9');
@@ -4866,7 +4883,6 @@ styled_format (ptrdiff_t nargs, Lisp_Object *args, bool message)
       if (buf == initial_buffer)
 	{
 	  buf = xmalloc (bufsize);
-	  sa_must_free = true;
 	  buf_save_value_index = SPECPDL_INDEX ();
 	  record_unwind_protect_ptr (xfree, buf);
 	  memcpy (buf, initial_buffer, used);

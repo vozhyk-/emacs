@@ -1110,13 +1110,6 @@ Since Google Drive uses cryptic blob file names internally,
 could produce unexpected behavior in case two files in the same
 directory have the same @code{display-name}, such a situation must be avoided.
 
-@item @option{obex}
-@cindex method @option{obex}
-@cindex @option{obex} method
-
-OBEX is an FTP-like access protocol for cell phones and similar simple
-devices.  @value{tramp} supports OBEX over Bluetooth.
-
 @item @option{owncloud}
 @cindex @acronym{GNOME} Online Accounts
 @cindex method @option{owncloud}
@@ -1137,24 +1130,16 @@ This method uses @command{sftp} in order to securely access remote
 hosts.  @command{sftp} is a more secure option for connecting to hosts
 that for security reasons refuse @command{ssh} connections.
 
-@item @option{synce}
-@cindex method @option{synce}
-@cindex @option{synce} method
-
-@option{synce} method allows connecting to MS Windows Mobile devices.
-It uses GVFS for mounting remote files and directories via FUSE and
-requires the SYNCE-GVFS plugin.
-
 @end table
 
 @defopt tramp-gvfs-methods
 This user option is a list of external methods for GVFS@.  By default,
 this list includes @option{afp}, @option{dav}, @option{davs},
-@option{gdrive}, @option{obex}, @option{owncloud}, @option{sftp} and
-@option{synce}.  Other methods to include are @option{ftp},
-@option{http}, @option{https} and @option{smb}.  These methods are not
-intended to be used directly as GVFS based method.  Instead, they are
-added here for the benefit of @ref{Archive file names}.
+@option{gdrive}, @option{owncloud} and @option{sftp}.  Other methods
+to include are @option{ftp}, @option{http}, @option{https} and
+@option{smb}.  These methods are not intended to be used directly as
+GVFS based method.  Instead, they are added here for the benefit of
+@ref{Archive file names}.
 @end defopt
 
 
@@ -1831,9 +1816,9 @@ shell supports the login argument @samp{-l}.
 @end defopt
 
 When remote search paths are changed, local @value{tramp} caches must
-be recomputed.  To force @value{tramp} to recompute afresh, exit
-Emacs, remove the persistent file (@pxref{Connection caching}), and
-restart Emacs.
+be recomputed.  To force @value{tramp} to recompute afresh, call
+@kbd{M-x tramp-cleanup-this-connection @key{RET}} or friends
+(@pxref{Cleanup remote connections}).
 
 
 @node Remote shell setup
@@ -1946,7 +1931,7 @@ Another possibility is to check the environment variable
 to the version of the parent Emacs process, @xref{Interactive Shell, ,
 , emacs}.  @value{tramp} adds its own package version to this string,
 which could be used for further tests in an inferior shell.  The
-string of that environment variable loooks always like
+string of that environment variable looks always like
 
 @example
 @group
@@ -3425,6 +3410,11 @@ following line to @file{~/.zshrc}:
 [[ $TERM == "dumb" ]] && unsetopt zle && PS1='$ ' && return
 @end example
 
+This uses the default value of @code{tramp-terminal-type},
+@samp{"dumb"}, as value of the @env{TERM} environment variable.  If
+you want to use another value for @env{TERM}, change
+@code{tramp-terminal-type} and this line accordingly.
+
 When using fish shell on remote hosts, disable fancy formatting by
 adding the following to @file{~/.config/fish/config.fish}:
 
@@ -3821,8 +3811,9 @@ Abbreviation list expansion can be used to reduce typing long file names:
 The reduced typing: @kbd{C-x C-f /xy @key{RET}}.
 
 @strong{Note} that file name cannot be edited here because the
-environment variables are not expanded during editing in the
-minibuffer.
+abbreviations are not expanded during editing in the minibuffer.
+Furthermore, the abbreviation is not expanded during @key{TAB}
+completion.
 
 @item
 Define own abbreviation (2):
