@@ -959,7 +959,6 @@ AS_IF([test $gl_gcc_warnings = no],
   nw="$nw -Woverlength-strings"     # Not a problem these days
   nw="$nw -Wformat-nonliteral"      # we do this a lot
   nw="$nw -Wvla"                    # Emacs uses <vla.h>.
-  nw="$nw -Wswitch-default"         # Too many warnings for now
   nw="$nw -Wunused-const-variable=2" # lisp.h declares const objects.
   nw="$nw -Winline"                 # OK to ignore 'inline'
   nw="$nw -Wstrict-overflow"        # OK to optimize assuming that
@@ -5521,9 +5520,10 @@ echo
 
 if test "$HAVE_NS" = "yes"; then
    echo
-   AS_ECHO(["You must run \"${MAKE-make} install\" in order to test the built application.
-The installed application will go to nextstep/Emacs.app and can be
-run or moved from there."])
+   AS_ECHO(["Run '${MAKE-make}' to build Emacs, then run 'src/emacs' to test it.
+Run '${MAKE-make} install' in order to build an application bundle.
+The application will go to nextstep/Emacs.app and can be run or moved
+from there."])
    if test "$EN_NS_SELF_CONTAINED" = "yes"; then
       echo "The application will be fully self-contained."
     else

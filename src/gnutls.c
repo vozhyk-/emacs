@@ -1210,9 +1210,17 @@ DEFUN ("gnutls-peer-status-warning-describe", Fgnutls_peer_status_warning_descri
 
 DEFUN ("gnutls-peer-status", Fgnutls_peer_status, Sgnutls_peer_status, 1, 1, 0,
        doc: /* Describe a GnuTLS PROC peer certificate and any warnings about it.
+
 The return value is a property list with top-level keys :warnings and
-:certificate.  The :warnings entry is a list of symbols you can describe with
-`gnutls-peer-status-warning-describe'. */)
+:certificates.
+
+The :warnings entry is a list of symbols you can get a description of
+with `gnutls-peer-status-warning-describe', and :certificates is the
+certificate chain for the connection, with the host certificate
+first, and intermediary certificates (if any) following it.
+
+In addition, for backwards compatibility, the host certificate is also
+returned as the :certificate entry.  */)
   (Lisp_Object proc)
 {
   Lisp_Object warnings = Qnil, result = Qnil;
@@ -2063,7 +2071,14 @@ gnutls_symmetric (bool encrypting, Lisp_Object cipher,
     cipher = intern (SSDATA (cipher));
 
   if (SYMBOLP (cipher))
-    info = XCDR (Fassq (cipher, Fgnutls_ciphers ()));
+    {
+      info = Fassq (cipher, Fgnutls_ciphers ());
+      if (!CONSP (info))
+	xsignal2 (Qerror,
+		  build_string ("GnuTLS cipher is invalid or not found"),
+		  cipher);
+      info = XCDR (info);
+    }
   else if (TYPE_RANGED_INTEGERP (gnutls_cipher_algorithm_t, cipher))
     gca = XINT (cipher);
   else
@@ -2078,7 +2093,8 @@ gnutls_symmetric (bool encrypting, Lisp_Object cipher,
 
   ptrdiff_t key_size = gnutls_cipher_get_key_size (gca);
   if (key_size == 0)
-    error ("GnuTLS cipher is invalid or not found");
+    xsignal2 (Qerror,
+	      build_string ("GnuTLS cipher is invalid or not found"), cipher);
 
   ptrdiff_t kstart_byte, kend_byte;
   const char *kdata = extract_data_from_object (key, &kstart_byte, &kend_byte);
@@ -2334,7 +2350,14 @@ itself. */)
     hash_method = intern (SSDATA (hash_method));
 
   if (SYMBOLP (hash_method))
-    info = XCDR (Fassq (hash_method, Fgnutls_macs ()));
+    {
+      info = Fassq (hash_method, Fgnutls_macs ());
+      if (!CONSP (info))
+	xsignal2 (Qerror,
+		  build_string ("GnuTLS MAC-method is invalid or not found"),
+		  hash_method);
+      info = XCDR (info);
+    }
   else if (TYPE_RANGED_INTEGERP (gnutls_mac_algorithm_t, hash_method))
     gma = XINT (hash_method);
   else
@@ -2349,7 +2372,9 @@ itself. */)
 
   ptrdiff_t digest_length = gnutls_hmac_get_len (gma);
   if (digest_length == 0)
-    error ("GnuTLS MAC-method is invalid or not found");
+    xsignal2 (Qerror,
+	      build_string ("GnuTLS MAC-method is invalid or not found"),
+	      hash_method);
 
   ptrdiff_t kstart_byte, kend_byte;
   const char *kdata = extract_data_from_object (key, &kstart_byte, &kend_byte);
@@ -2415,7 +2440,14 @@ the number itself. */)
     digest_method = intern (SSDATA (digest_method));
 
   if (SYMBOLP (digest_method))
-    info = XCDR (Fassq (digest_method, Fgnutls_digests ()));
+    {
+      info = Fassq (digest_method, Fgnutls_digests ());
+      if (!CONSP (info))
+	xsignal2 (Qerror,
+		  build_string ("GnuTLS digest-method is invalid or not found"),
+		  digest_method);
+      info = XCDR (info);
+    }
   else if (TYPE_RANGED_INTEGERP (gnutls_digest_algorithm_t, digest_method))
     gda = XINT (digest_method);
   else
@@ -2430,7 +2462,9 @@ the number itself. */)
 
   ptrdiff_t digest_length = gnutls_hash_get_len (gda);
   if (digest_length == 0)
-    error ("GnuTLS digest-method is invalid or not found");
+    xsignal2 (Qerror,
+	      build_string ("GnuTLS digest-method is invalid or not found"),
+	      digest_method);
 
   gnutls_hash_hd_t hash;
   int ret = gnutls_hash_init (&hash, gda);

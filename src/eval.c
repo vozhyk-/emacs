@@ -282,8 +282,12 @@ call_debugger (Lisp_Object arg)
   /* Do not allow max_specpdl_size less than actual depth (Bug#16603).  */
   EMACS_INT old_max = max (max_specpdl_size, count);
 
-  if (lisp_eval_depth + 40 > max_lisp_eval_depth)
-    max_lisp_eval_depth = lisp_eval_depth + 40;
+  /* The previous value of 40 is too small now that the debugger
+     prints using cl-prin1 instead of prin1.  Printing lists nested 8
+     deep (which is the value of print-level used in the debugger)
+     currently requires 77 additional frames.  See bug#31919.  */
+  if (lisp_eval_depth + 100 > max_lisp_eval_depth)
+    max_lisp_eval_depth = lisp_eval_depth + 100;
 
   /* While debugging Bug#16603, previous value of 100 was found
      too small to avoid specpdl overflow in the debugger itself.  */
@@ -1728,28 +1732,12 @@ xsignal3 (Lisp_Object error_symbol, Lisp_Object arg1, Lisp_Object arg2, Lisp_Obj
 }
 
 /* Signal `error' with message S, and additional arg ARG.
-   If ARG is not a genuine list, make it a one-element list.  */
+   If ARG is not a proper list, make it a one-element list.  */
 
 void
 signal_error (const char *s, Lisp_Object arg)
 {
-  Lisp_Object tortoise, hare;
-
-  hare = tortoise = arg;
-  while (CONSP (hare))
-    {
-      hare = XCDR (hare);
-      if (!CONSP (hare))
-	break;
-
-      hare = XCDR (hare);
-      tortoise = XCDR (tortoise);
-
-      if (EQ (hare, tortoise))
-	break;
-    }
-
-  if (!NILP (hare))
+  if (NILP (Fproper_list_p (arg)))
     arg = list1 (arg);
 
   xsignal (Qerror, Fcons (build_string (s), arg));

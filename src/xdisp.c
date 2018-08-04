@@ -8384,7 +8384,7 @@ next_element_from_buffer (struct it *it)
   eassert (IT_CHARPOS (*it) >= BEGV);
   eassert (NILP (it->string) && !it->s);
   eassert (!it->bidi_p
-	   || (EQ (it->bidi_it.string.lstring, Qnil)
+	   || (NILP (it->bidi_it.string.lstring)
 	       && it->bidi_it.string.s == NULL));
 
   /* With bidi reordering, the character to display might not be the
@@ -23530,6 +23530,17 @@ move_elt_to_front (Lisp_Object elt, Lisp_Object list)
   return list;
 }
 
+/* Subroutine to call Fset_text_properties through
+   internal_condition_case_n.  ARGS are the arguments of
+   Fset_text_properties, in order.  */
+
+static Lisp_Object
+safe_set_text_properties (ptrdiff_t nargs, Lisp_Object *args)
+{
+  eassert (nargs == 4);
+  return Fset_text_properties (args[0], args[1], args[2], args[3]);
+}
+
 /* Contribute ELT to the mode line for window IT->w.  How it
    translates into text depends on its data type.
 
@@ -23624,8 +23635,17 @@ display_mode_element (struct it *it, int depth, int field_width, int precision,
 			= Fdelq (aelt, mode_line_proptrans_alist);
 
 		    elt = Fcopy_sequence (elt);
-		    Fset_text_properties (make_number (0), Flength (elt),
-					  props, elt);
+		    /* PROPS might cause set-text-properties to signal
+		       an error, so we call it via internal_condition_case_n,
+		       to avoid an infloop in redisplay due to the error.  */
+		    internal_condition_case_n (safe_set_text_properties,
+					       4,
+					       ((Lisp_Object [])
+					       {make_number (0),
+						   Flength (elt),
+						   props,
+						   elt}),
+					       Qt, safe_eval_handler);
 		    /* Add this item to mode_line_proptrans_alist.  */
 		    mode_line_proptrans_alist
 		      = Fcons (Fcons (elt, props),
@@ -32871,8 +32891,10 @@ mouse pointer enters it.
 Autoselection selects the minibuffer only if it is active, and never
 unselects the minibuffer if it is active.
 
-When customizing this variable make sure that the actual value of
-`focus-follows-mouse' matches the behavior of your window manager.  */);
+If you want to use the mouse to autoselect a window on another frame,
+make sure that (1) your window manager has focus follow the mouse and
+(2) the value of the option `focus-follows-mouse' matches the policy
+of your window manager.  */);
   Vmouse_autoselect_window = Qnil;
 
   DEFVAR_LISP ("auto-resize-tool-bars", Vauto_resize_tool_bars,

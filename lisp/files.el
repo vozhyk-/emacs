@@ -148,12 +148,16 @@ This variable is relevant only if `backup-by-copying' and
 Called with an absolute file name as argument, it returns t to enable backup.")
 
 (defcustom buffer-offer-save nil
-  "Non-nil in a buffer means always offer to save buffer on exit.
+  "Non-nil in a buffer means always offer to save buffer on exiting Emacs.
 Do so even if the buffer is not visiting a file.
 Automatically local in all buffers.
 
 Set to the symbol `always' to offer to save buffer whenever
-`save-some-buffers' is called."
+`save-some-buffers' is called.
+
+Note that this option has no effect on `kill-buffer';
+if you want to control what happens when a buffer is killed,
+use `kill-buffer-query-functions'."
   :type '(choice (const :tag "Never" nil)
                  (const :tag "On Emacs exit" t)
                  (const :tag "Whenever save-some-buffers is called" always))
@@ -419,14 +423,10 @@ idle for `auto-save-visited-interval' seconds."
 
 (define-minor-mode auto-save-visited-mode
   "Toggle automatic saving to file-visiting buffers on or off.
-With a prefix argument ARG, enable regular saving of all buffers
-visiting a file if ARG is positive, and disable it otherwise.
+
 Unlike `auto-save-mode', this mode will auto-save buffer contents
 to the visited files directly and will also run all save-related
-hooks.  See Info node `Saving' for details of the save process.
-
-If called from Lisp, enable the mode if ARG is omitted or nil,
-and toggle it if ARG is `toggle'."
+hooks.  See Info node `Saving' for details of the save process."
   :group 'auto-save
   :global t
   (when auto-save--timer (cancel-timer auto-save--timer))
@@ -1830,7 +1830,7 @@ killed."
           ;; Don't use `find-file' because it may end up using another window
           ;; in some corner cases, e.g. when the selected window is
           ;; softly-dedicated.
-	  (let ((newbuf (find-file-noselect filename wildcards)))
+	  (let ((newbuf (find-file-noselect filename nil nil wildcards)))
             (switch-to-buffer newbuf)))
       (when (eq obuf (current-buffer))
 	;; This executes if find-file gets an error
@@ -1954,7 +1954,7 @@ started Emacs, set `abbreviated-home-dir' to nil so it will be recalculated)."
 			 (save-match-data
 			   (string-match "^[a-zA-`]:/$" filename))))
                (equal (get 'abbreviated-home-dir 'home)
-                      (expand-file-name "~")))
+                      (save-match-data (expand-file-name "~"))))
 	  (setq filename
 		(concat "~"
 			(match-string 1 filename)
@@ -5518,6 +5518,21 @@ raised."
 		  dir parent))
 	  (dolist (dir create-list)
             (files--ensure-directory dir)))))))
+
+(defun make-empty-file (filename &optional parents)
+  "Create an empty file FILENAME.
+Optional arg PARENTS, if non-nil then creates parent dirs as needed.
+
+If called interactively, then PARENTS is non-nil."
+  (interactive
+   (let ((filename (read-file-name "Create empty file: ")))
+     (list filename t)))
+  (when (and (file-exists-p filename) (null parents))
+    (signal 'file-already-exists `("File exists" ,filename)))
+  (let ((paren-dir (file-name-directory filename)))
+    (when (and paren-dir (not (file-exists-p paren-dir)))
+      (make-directory paren-dir parents)))
+  (write-region "" nil filename nil 0))
 
 (defconst directory-files-no-dot-files-regexp
   "^\\([^.]\\|\\.\\([^.]\\|\\..\\)\\).*"

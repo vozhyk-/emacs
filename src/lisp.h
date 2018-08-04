@@ -2670,17 +2670,14 @@ XFLOAT_DATA (Lisp_Object f)
 
 /* Most hosts nowadays use IEEE floating point, so they use IEC 60559
    representations, have infinities and NaNs, and do not trap on
-   exceptions.  Define IEEE_FLOATING_POINT if this host is one of the
+   exceptions.  Define IEEE_FLOATING_POINT to 1 if this host is one of the
    typical ones.  The C11 macro __STDC_IEC_559__ is close to what is
    wanted here, but is not quite right because Emacs does not require
    all the features of C11 Annex F (and does not require C11 at all,
    for that matter).  */
-enum
-  {
-    IEEE_FLOATING_POINT
-      = (FLT_RADIX == 2 && FLT_MANT_DIG == 24
-	 && FLT_MIN_EXP == -125 && FLT_MAX_EXP == 128)
-  };
+
+#define IEEE_FLOATING_POINT (FLT_RADIX == 2 && FLT_MANT_DIG == 24 \
+			     && FLT_MIN_EXP == -125 && FLT_MAX_EXP == 128)
 
 /* A character, declared with the following typedef, is a member
    of some character set associated with the current buffer.  */
@@ -3012,15 +3009,13 @@ extern void defvar_kboard (struct Lisp_Kboard_Objfwd *, const char *, int);
   } while (false)
 
 
-/* Elisp uses several stacks:
-   - the C stack.
-   - the bytecode stack: used internally by the bytecode interpreter.
-     Allocated from the C stack.
-   - The specpdl stack: keeps track of active unwind-protect and
-     dynamic-let-bindings.  Allocated from the `specpdl' array, a manually
-     managed stack.
-   - The handler stack: keeps track of active catch tags and condition-case
-     handlers.  Allocated in a manually managed stack implemented by a
+/* Elisp uses multiple stacks:
+   - The C stack.
+   - The specpdl stack keeps track of backtraces, unwind-protects and
+     dynamic let-bindings.  It is allocated from the 'specpdl' array,
+     a manually managed stack.
+   - The handler stack keeps track of active catch tags and condition-case
+     handlers.  It is allocated in a manually managed stack implemented by a
      doubly-linked list allocated via xmalloc and never freed.  */
 
 /* Structure for recording Lisp call stack for backtrace purposes.  */
@@ -3113,7 +3108,7 @@ SPECPDL_INDEX (void)
    control structures.  A struct handler contains all the information needed to
    restore the state of the interpreter after a non-local jump.
 
-   handler structures are chained together in a doubly linked list; the `next'
+   Handler structures are chained together in a doubly linked list; the `next'
    member points to the next outer catchtag and the `nextfree' member points in
    the other direction to the next inner element (which is typically the next
    free element since we mostly use it on the deepest handler).
@@ -4017,6 +4012,7 @@ extern Lisp_Object write_region (Lisp_Object, Lisp_Object, Lisp_Object,
 extern void close_file_unwind (int);
 extern void fclose_unwind (void *);
 extern void restore_point_unwind (Lisp_Object);
+extern Lisp_Object get_file_errno_data (const char *, Lisp_Object, int);
 extern _Noreturn void report_file_errno (const char *, Lisp_Object, int);
 extern _Noreturn void report_file_error (const char *, Lisp_Object);
 extern _Noreturn void report_file_notify_error (const char *, Lisp_Object);
@@ -4700,7 +4696,7 @@ enum
 #define FOR_EACH_TAIL(tail) \
   FOR_EACH_TAIL_INTERNAL (tail, circular_list (tail), true)
 
-/* Like FOR_EACH_TAIL (LIST), except do not signal or quit.
+/* Like FOR_EACH_TAIL (TAIL), except do not signal or quit.
    If the loop exits due to a cycle, TAIL’s value is undefined.  */
 
 #define FOR_EACH_TAIL_SAFE(tail) \

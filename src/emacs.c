@@ -712,10 +712,12 @@ main (int argc, char **argv)
   bool disable_aslr = dumping;
 # endif
 
-  if (disable_aslr && disable_address_randomization ())
+  if (disable_aslr && disable_address_randomization ()
+      && !getenv ("EMACS_HEAP_EXEC"))
     {
       /* Set this so the personality will be reverted before execs
-	 after this one.  */
+	 after this one, and to work around an re-exec loop on buggy
+	 kernels (Bug#32083).  */
       xputenv ("EMACS_HEAP_EXEC=true");
 
       /* Address randomization was enabled, but is now disabled.
@@ -2030,6 +2032,10 @@ all of which are called before Emacs is actually killed.  */
 {
   int exit_code;
 
+#ifdef HAVE_LIBSYSTEMD
+  sd_notify(0, "STOPPING=1");
+#endif /* HAVE_LIBSYSTEMD */
+
   /* Fsignal calls emacs_abort () if it sees that waiting_for_input is
      set.  */
   waiting_for_input = 0;
@@ -2489,6 +2495,13 @@ from the parent process and its tty file descriptors.  */)
   if (NILP (Vafter_init_time))
     error ("This function can only be called after loading the init files");
 #ifndef WINDOWSNT
+
+  if (daemon_type == 1)
+    {
+#ifdef HAVE_LIBSYSTEMD
+      sd_notify(0, "READY=1");
+#endif /* HAVE_LIBSYSTEMD */
+    }
 
   if (daemon_type == 2)
     {
