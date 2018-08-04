@@ -1410,6 +1410,13 @@ ftfont_text_extents (struct font *font, unsigned int *code,
 	    metrics->ascent = m->horiBearingY >> 6;
 	  if (metrics->descent > ((m->height - m->horiBearingY) >> 6))
 	    metrics->descent = (m->height - m->horiBearingY) >> 6;
+	  /* fixme: ??? tweak without theory. */
+	  if (ftfont_info->is_color_font) {
+	    if (metrics->ascent + metrics->descent >= 128) {
+	      metrics->ascent >>= 3;
+	      metrics->descent >>= 3;
+	    }
+	  }
 	  width += m->horiAdvance >> 6;
 	}
       else
