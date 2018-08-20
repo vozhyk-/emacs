@@ -21,6 +21,9 @@
 
 (require 'ert)
 (require 'dired)
+(require 'wdired)
+
+(defvar dired-query)                    ; Pacify byte compiler.
 
 (ert-deftest wdired-test-bug32173-01 ()
   "Test using non-nil wdired-use-interactive-rename.
@@ -74,6 +77,27 @@ Aborting an edit should leaving original file name unchanged."
 	(if buf (kill-buffer buf))
 	(delete-directory test-dir t)))))
 
+(ert-deftest wdired-test-symlink-name ()
+  "Test the file name of a symbolic link.
+The Dired and WDired functions returning the name should include
+only the name before the link arrow."
+  (let* ((test-dir (make-temp-file "test-dir-" t))
+         (link-name "foo"))
+    (let ((buf (find-file-noselect test-dir)))
+      (unwind-protect
+	  (with-current-buffer buf
+            (make-symbolic-link "./bar/baz" link-name)
+            (revert-buffer)
+            (let* ((file-name (dired-get-filename))
+                   (dir-part (file-name-directory file-name))
+                   (lf-name (concat dir-part link-name)))
+	      (should (equal file-name lf-name))
+	      (dired-toggle-read-only)
+	      (should (equal (wdired-get-filename) lf-name))
+	      (dired-toggle-read-only)))
+	(if buf (kill-buffer buf))
+	(delete-directory test-dir t)))))
+
 (ert-deftest wdired-test-unfinished-edit-01 ()
   "Test editing a file name without saving the change.
 Finding the new name should be possible while still in
@@ -92,13 +116,13 @@ wdired-mode."
 	    (kill-region (point) (progn (search-forward ".")
 					(forward-char -1) (point)))
 	    (insert replace)
-	    (should (equal (dired-get-filename) new-file))))
+	    (should (equal (dired-get-filename) new-file)))
 	(when buf
 	  (with-current-buffer buf
             ;; Prevent kill-buffer-query-functions from chiming in.
 	    (set-buffer-modified-p nil)
 	    (kill-buffer buf)))
-	(delete-directory test-dir t))))
+	(delete-directory test-dir t)))))
 
 
 (provide 'wdired-tests)
