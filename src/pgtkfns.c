@@ -472,7 +472,7 @@ x_set_menu_bar_lines (struct frame *f, Lisp_Object value, Lisp_Object oldval)
     return;
 
   if (TYPE_RANGED_INTEGERP (int, value))
-    nlines = XINT (value);
+    nlines = XFIXNUM (value);
   else
     nlines = 0;
 
@@ -512,7 +512,7 @@ x_set_tool_bar_lines (struct frame *f, Lisp_Object value, Lisp_Object oldval)
     return;
 
   if (RANGED_INTEGERP (0, value, INT_MAX))
-    nlines = XFASTINT (value);
+    nlines = XFIXNAT (value);
   else
     nlines = 0;
 
@@ -572,7 +572,7 @@ x_set_internal_border_width (struct frame *f, Lisp_Object arg, Lisp_Object oldva
   int old_width = FRAME_INTERNAL_BORDER_WIDTH (f);
 
   CHECK_TYPE_RANGED_INTEGER (int, arg);
-  f->internal_border_width = XINT (arg);
+  f->internal_border_width = XFIXNUM (arg);
   if (FRAME_INTERNAL_BORDER_WIDTH (f) < 0)
     f->internal_border_width = 0;
 
@@ -739,8 +739,8 @@ x_icon (struct frame *f, Lisp_Object parms)
     {
       CHECK_NUMBER (icon_x);
       CHECK_NUMBER (icon_y);
-      FRAME_X_OUTPUT(f)->icon_top = XINT (icon_y);
-      FRAME_X_OUTPUT(f)->icon_left = XINT (icon_x);
+      FRAME_X_OUTPUT(f)->icon_top = XFIXNUM (icon_y);
+      FRAME_X_OUTPUT(f)->icon_left = XFIXNUM (icon_x);
     }
   else if (!EQ (icon_x, Qunbound) || !EQ (icon_y, Qunbound))
     error ("Both left and top icon corners of icon must be specified");
@@ -1209,7 +1209,7 @@ This function is an internal primitive--use `make-frame' instead.  */)
   /* Specify the parent under which to make this X window.  */
   if (!NILP (parent))
     {
-      FRAME_X_OUTPUT(f)->parent_desc = (Window) XFASTINT (parent);
+      FRAME_X_OUTPUT(f)->parent_desc = (Window) XFIXNAT (parent);
       FRAME_X_OUTPUT(f)->explicit_parent = true;
     }
   else
@@ -1259,7 +1259,7 @@ This function is an internal primitive--use `make-frame' instead.  */)
 #if 0
   if (! FRAME_X_EMBEDDED_P (f))
 #endif
-    x_default_parameter (f, parms, Qborder_width, make_number (0),
+    x_default_parameter (f, parms, Qborder_width, make_fixnum (0),
 			 "borderWidth", "BorderWidth", RES_TYPE_NUMBER);
 
   /* This defaults to 1 in order to match xterm.  We recognize either
@@ -1276,12 +1276,12 @@ This function is an internal primitive--use `make-frame' instead.  */)
 		       parms);
     }
   x_default_parameter (f, parms, Qinternal_border_width,
-		       make_number (0),
+		       make_fixnum (0),
 		       "internalBorderWidth", "internalBorderWidth",
 		       RES_TYPE_NUMBER);
-  x_default_parameter (f, parms, Qright_divider_width, make_number (0),
+  x_default_parameter (f, parms, Qright_divider_width, make_fixnum (0),
 		       NULL, NULL, RES_TYPE_NUMBER);
-  x_default_parameter (f, parms, Qbottom_divider_width, make_number (0),
+  x_default_parameter (f, parms, Qbottom_divider_width, make_fixnum (0),
 		       NULL, NULL, RES_TYPE_NUMBER);
   x_default_parameter (f, parms, Qvertical_scroll_bars,
 		       Qright,
@@ -1353,11 +1353,11 @@ This function is an internal primitive--use `make-frame' instead.  */)
 
   x_default_parameter (f, parms, Qmenu_bar_lines,
 		       NILP (Vmenu_bar_mode)
-		       ? make_number (0) : make_number (1),
+		       ? make_fixnum (0) : make_fixnum (1),
 		       NULL, NULL, RES_TYPE_NUMBER);
   x_default_parameter (f, parms, Qtool_bar_lines,
 		       NILP (Vtool_bar_mode)
-		       ? make_number (0) : make_number (1),
+		       ? make_fixnum (0) : make_fixnum (1),
 		       NULL, NULL, RES_TYPE_NUMBER);
 
   x_default_parameter (f, parms, Qbuffer_predicate, Qnil,
@@ -1774,7 +1774,7 @@ Note: "screen" here is not in X11's.  For the number of physical monitors,
   (Lisp_Object terminal)
 {
   check_pgtk_display_info (terminal);
-  return make_number (1);
+  return make_fixnum (1);
 }
 
 
@@ -1792,7 +1792,7 @@ for each physical monitor, use `display-monitor-attributes-list'.  */)
   struct pgtk_display_info *dpyinfo = check_pgtk_display_info (terminal);
   GdkDisplay *gdpy = dpyinfo->gdpy;
   GdkMonitor *gmon = gdk_display_get_monitor_at_point(gdpy, 0, 0);
-  return make_number (gdk_monitor_get_height_mm(gmon));
+  return make_fixnum (gdk_monitor_get_height_mm(gmon));
 }
 
 
@@ -1810,7 +1810,7 @@ for each physical monitor, use `display-monitor-attributes-list'.  */)
   struct pgtk_display_info *dpyinfo = check_pgtk_display_info (terminal);
   GdkDisplay *gdpy = dpyinfo->gdpy;
   GdkMonitor *gmon = gdk_display_get_monitor_at_point(gdpy, 0, 0);
-  return make_number (gdk_monitor_get_width_mm(gmon));
+  return make_fixnum (gdk_monitor_get_width_mm(gmon));
 }
 
 
@@ -2109,7 +2109,7 @@ each physical monitor, use `display-monitor-attributes-list'.  */)
 {
   struct pgtk_display_info *dpyinfo = check_pgtk_display_info (terminal);
 
-  return make_number (x_display_pixel_width (dpyinfo));
+  return make_fixnum (x_display_pixel_width (dpyinfo));
 }
 
 
@@ -2127,7 +2127,7 @@ each physical monitor, use `display-monitor-attributes-list'.  */)
 {
   struct pgtk_display_info *dpyinfo = check_pgtk_display_info (terminal);
 
-  return make_number (x_display_pixel_height (dpyinfo));
+  return make_fixnum (x_display_pixel_height (dpyinfo));
 }
 
 DEFUN ("pgtk-display-monitor-attributes-list",
@@ -2189,7 +2189,7 @@ Internal use only, use `display-monitor-attributes-list' instead.  */)
     }
   }
 
-  monitor_frames = Fmake_vector (make_number (n_monitors), Qnil);
+  monitor_frames = Fmake_vector (make_fixnum (n_monitors), Qnil);
   FOR_EACH_FRAME (rest, frame)
     {
       struct frame *f = XFRAME (frame);
@@ -2236,7 +2236,7 @@ If omitted or nil, that stands for the selected frame's display.  */)
   (Lisp_Object terminal)
 {
   check_pgtk_display_info (terminal);
-  return make_number(32);
+  return make_fixnum(32);
 }
 
 
@@ -2250,7 +2250,7 @@ If omitted or nil, that stands for the selected frame's display.  */)
 {
   struct pgtk_display_info *dpyinfo = check_pgtk_display_info (terminal);
   /* We force 24+ bit depths to 24-bit to prevent an overflow.  */
-  return make_number (1 << min (dpyinfo->n_planes, 24));
+  return make_fixnum (1 << min (dpyinfo->n_planes, 24));
 }
 
 /***********************************************************************
@@ -2309,10 +2309,10 @@ compute_tip_xy (struct frame *f, Lisp_Object parms, Lisp_Object dx, Lisp_Object 
           geometry = Fassq (Qgeometry, monitor);
           if (CONSP (geometry))
             {
-              min_x = XINT (Fnth (make_number (1), geometry));
-              min_y = XINT (Fnth (make_number (2), geometry));
-              max_x = min_x + XINT (Fnth (make_number (3), geometry));
-              max_y = min_y + XINT (Fnth (make_number (4), geometry));
+              min_x = XFIXNUM (Fnth (make_fixnum (1), geometry));
+              min_y = XFIXNUM (Fnth (make_fixnum (2), geometry));
+              max_x = min_x + XFIXNUM (Fnth (make_fixnum (3), geometry));
+              max_y = min_y + XFIXNUM (Fnth (make_fixnum (4), geometry));
               if (min_x <= *root_x && *root_x < max_x
                   && min_y <= *root_y && *root_y < max_y)
                 {
@@ -2336,33 +2336,33 @@ compute_tip_xy (struct frame *f, Lisp_Object parms, Lisp_Object dx, Lisp_Object 
     }
 
   if (INTEGERP (top))
-    *root_y = XINT (top);
+    *root_y = XFIXNUM (top);
   else if (INTEGERP (bottom))
-    *root_y = XINT (bottom) - height;
-  else if (*root_y + XINT (dy) <= min_y)
+    *root_y = XFIXNUM (bottom) - height;
+  else if (*root_y + XFIXNUM (dy) <= min_y)
     *root_y = min_y; /* Can happen for negative dy */
-  else if (*root_y + XINT (dy) + height <= max_y)
+  else if (*root_y + XFIXNUM (dy) + height <= max_y)
     /* It fits below the pointer */
-    *root_y += XINT (dy);
-  else if (height + XINT (dy) + min_y <= *root_y)
+    *root_y += XFIXNUM (dy);
+  else if (height + XFIXNUM (dy) + min_y <= *root_y)
     /* It fits above the pointer.  */
-    *root_y -= height + XINT (dy);
+    *root_y -= height + XFIXNUM (dy);
   else
     /* Put it on the top.  */
     *root_y = min_y;
 
   if (INTEGERP (left))
-    *root_x = XINT (left);
+    *root_x = XFIXNUM (left);
   else if (INTEGERP (right))
-    *root_x = XINT (right) - width;
-  else if (*root_x + XINT (dx) <= min_x)
+    *root_x = XFIXNUM (right) - width;
+  else if (*root_x + XFIXNUM (dx) <= min_x)
     *root_x = 0; /* Can happen for negative dx */
-  else if (*root_x + XINT (dx) + width <= max_x)
+  else if (*root_x + XFIXNUM (dx) + width <= max_x)
     /* It fits to the right of the pointer.  */
-    *root_x += XINT (dx);
-  else if (width + XINT (dx) + min_x <= *root_x)
+    *root_x += XFIXNUM (dx);
+  else if (width + XFIXNUM (dx) + min_x <= *root_x)
     /* It fits to the left of the pointer.  */
-    *root_x -= width + XINT (dx);
+    *root_x -= width + XFIXNUM (dx);
   else
     /* Put it left justified on the screen -- it ought to fit that way.  */
     *root_x = min_x;
@@ -2472,17 +2472,17 @@ Text larger than the specified size is clipped.  */)
 
   f = decode_window_system_frame (frame);
   if (NILP (timeout))
-    timeout = make_number (5);
+    timeout = make_fixnum (5);
   else
-    CHECK_NATNUM (timeout);
+    CHECK_FIXNAT (timeout);
 
   if (NILP (dx))
-    dx = make_number (5);
+    dx = make_fixnum (5);
   else
     CHECK_NUMBER (dx);
 
   if (NILP (dy))
-    dy = make_number (-10);
+    dy = make_fixnum (-10);
   else
     CHECK_NUMBER (dy);
 
@@ -2556,44 +2556,44 @@ frame_geometry (Lisp_Object frame, Lisp_Object attribute)
 
   /* Construct list.  */
   if (EQ (attribute, Qouter_edges))
-    return list4 (make_number (f->left_pos), make_number (f->top_pos),
-		  make_number (f->left_pos + outer_width),
-		  make_number (f->top_pos + outer_height));
+    return list4 (make_fixnum (f->left_pos), make_fixnum (f->top_pos),
+		  make_fixnum (f->left_pos + outer_width),
+		  make_fixnum (f->top_pos + outer_height));
   else if (EQ (attribute, Qnative_edges))
-    return list4 (make_number (native_left), make_number (native_top),
-		  make_number (native_right), make_number (native_bottom));
+    return list4 (make_fixnum (native_left), make_fixnum (native_top),
+		  make_fixnum (native_right), make_fixnum (native_bottom));
   else if (EQ (attribute, Qinner_edges))
-    return list4 (make_number (native_left + internal_border_width),
-		  make_number (native_top
+    return list4 (make_fixnum (native_left + internal_border_width),
+		  make_fixnum (native_top
 			       + tool_bar_height
 			       + internal_border_width),
-		  make_number (native_right - internal_border_width),
-		  make_number (native_bottom - internal_border_width));
+		  make_fixnum (native_right - internal_border_width),
+		  make_fixnum (native_bottom - internal_border_width));
   else
     return
       listn (CONSTYPE_HEAP, 10,
 	     Fcons (Qouter_position,
-		    Fcons (make_number (f->left_pos),
-			   make_number (f->top_pos))),
+		    Fcons (make_fixnum (f->left_pos),
+			   make_fixnum (f->top_pos))),
 	     Fcons (Qouter_size,
-		    Fcons (make_number (outer_width),
-			   make_number (outer_height))),
+		    Fcons (make_fixnum (outer_width),
+			   make_fixnum (outer_height))),
 	     Fcons (Qexternal_border_size,
 		    (fullscreen
-		     ? Fcons (make_number (0), make_number (0))
-		     : Fcons (make_number (border), make_number (border)))),
+		     ? Fcons (make_fixnum (0), make_fixnum (0))
+		     : Fcons (make_fixnum (border), make_fixnum (border)))),
 	     Fcons (Qtitle_bar_size,
-		    Fcons (make_number (0), make_number (title_height))),
+		    Fcons (make_fixnum (0), make_fixnum (title_height))),
 	     Fcons (Qmenu_bar_external, Qnil),
-	     Fcons (Qmenu_bar_size, Fcons (make_number (0), make_number (0))),
+	     Fcons (Qmenu_bar_size, Fcons (make_fixnum (0), make_fixnum (0))),
 	     Fcons (Qtool_bar_external,
 		    FRAME_EXTERNAL_TOOL_BAR (f) ? Qt : Qnil),
 	     Fcons (Qtool_bar_position, FRAME_TOOL_BAR_POSITION (f)),
 	     Fcons (Qtool_bar_size,
-		    Fcons (make_number (tool_bar_width),
-			   make_number (tool_bar_height))),
+		    Fcons (make_fixnum (tool_bar_width),
+			   make_fixnum (tool_bar_height))),
 	     Fcons (Qinternal_border_width,
-		    make_number (internal_border_width)));
+		    make_fixnum (internal_border_width)));
 }
 
 DEFUN ("pgtk-frame-geometry", Fpgtk_frame_geometry, Spgtk_frame_geometry, 0, 1, 0,
@@ -2681,7 +2681,7 @@ The coordinates X and Y are interpreted in pixels relative to a position
   GdkDevice *device = gdk_seat_get_pointer(seat);
 
   PGTK_TRACE("pgtk-set-mouse-absolute-pixel-position:");
-  gdk_device_warp(device, gscr, XINT(x), XINT(y));  /* No effect on wayland. */
+  gdk_device_warp(device, gscr, XFIXNUM(x), XFIXNUM(y));  /* No effect on wayland. */
 
   return Qnil;
 }
@@ -2706,7 +2706,7 @@ position (0, 0) of the selected frame's terminal. */)
 
   gdk_device_get_position(device, &gscr, &x, &y);  /* can't get on wayland? */
 
-  return Fcons(make_number(x), make_number(y));
+  return Fcons(make_fixnum(x), make_fixnum(y));
 }
 
 

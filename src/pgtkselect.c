@@ -437,7 +437,7 @@ On PGTK, TIME-STAMP is unused.  */)
     return Qnil;
   int size = strlen(s);
   Lisp_Object str = make_unibyte_string (s, size);
-  Fput_text_property (make_number (0), make_number (size),
+  Fput_text_property (make_fixnum (0), make_fixnum (size),
 		      Qforeign_selection, QUTF8_STRING, str);
   return str;
 }

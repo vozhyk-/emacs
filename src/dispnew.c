@@ -6087,7 +6087,7 @@ init_display (void)
       )
     {
       Vinitial_window_system = Qpgtk;
-      Vwindow_system_version = make_number (1);
+      Vwindow_system_version = make_fixnum (1);
       return;
     }
 #endif

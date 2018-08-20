@@ -257,8 +257,8 @@ x_calc_absolute_position (struct frame *f)
 	  XSETFRAME (frame, f);
 	  edges = Fpgtk_frame_edges (frame, Qouter_edges);
 	  if (!NILP (edges))
-	    width = (XINT (Fnth (make_number (2), edges))
-		     - XINT (Fnth (make_number (0), edges)));
+	    width = (XFIXNUM (Fnth (make_fixnum (2), edges))
+		     - XFIXNUM (Fnth (make_fixnum (0), edges)));
 	}
 
       if (p)
@@ -283,8 +283,8 @@ x_calc_absolute_position (struct frame *f)
 	  if (NILP (edges))
 	    edges = Fpgtk_frame_edges (frame, Qouter_edges);
 	  if (!NILP (edges))
-	    height = (XINT (Fnth (make_number (3), edges))
-		      - XINT (Fnth (make_number (1), edges)));
+	    height = (XFIXNUM (Fnth (make_fixnum (3), edges))
+		      - XFIXNUM (Fnth (make_fixnum (1), edges)));
 	}
 
       if (p)
@@ -430,11 +430,11 @@ x_set_window_size (struct frame *f,
 
   frame_size_history_add
     (f, Qx_set_window_size_1, width, height,
-     list5 (Fcons (make_number (pixelwidth), make_number (pixelheight)),
-	    Fcons (make_number (pixelwidth), make_number (pixelheight)),
-	    make_number (f->border_width),
-	    make_number (FRAME_PGTK_TITLEBAR_HEIGHT (f)),
-	    make_number (FRAME_TOOLBAR_HEIGHT (f))));
+     list5 (Fcons (make_fixnum (pixelwidth), make_fixnum (pixelheight)),
+	    Fcons (make_fixnum (pixelwidth), make_fixnum (pixelheight)),
+	    make_fixnum (f->border_width),
+	    make_fixnum (FRAME_PGTK_TITLEBAR_HEIGHT (f)),
+	    make_fixnum (FRAME_TOOLBAR_HEIGHT (f))));
 
   PGTK_TRACE("new: %dx%d", pixelwidth, pixelheight);
   for (GtkWidget *w = FRAME_GTK_WIDGET(f); w != NULL; w = gtk_widget_get_parent(w)) {
@@ -503,11 +503,11 @@ x_set_window_size (struct frame *f,
 
  frame_size_history_add
    (f, Qx_set_window_size_1, width, height,
-    list5 (Fcons (make_number (pixelwidth), make_number (pixelheight)),
-	   Fcons (make_number (wr.size.width), make_number (wr.size.height)),
-	   make_number (f->border_width),
-	   make_number (FRAME_NS_TITLEBAR_HEIGHT (f)),
-	   make_number (FRAME_TOOLBAR_HEIGHT (f))));
+    list5 (Fcons (make_fixnum (pixelwidth), make_fixnum (pixelheight)),
+	   Fcons (make_fixnum (wr.size.width), make_fixnum (wr.size.height)),
+	   make_fixnum (f->border_width),
+	   make_fixnum (FRAME_NS_TITLEBAR_HEIGHT (f)),
+	   make_fixnum (FRAME_TOOLBAR_HEIGHT (f))));
 
   [window setFrame: wr display: YES];
 
@@ -2042,11 +2042,11 @@ x_draw_image_relief (struct glyph_string *s)
 	  && INTEGERP (XCAR (Vtool_bar_button_margin))
 	  && INTEGERP (XCDR (Vtool_bar_button_margin)))
 	{
-	  extra_x = XINT (XCAR (Vtool_bar_button_margin));
-	  extra_y = XINT (XCDR (Vtool_bar_button_margin));
+	  extra_x = XFIXNUM (XCAR (Vtool_bar_button_margin));
+	  extra_y = XFIXNUM (XCDR (Vtool_bar_button_margin));
 	}
       else if (INTEGERP (Vtool_bar_button_margin))
-	extra_x = extra_y = XINT (Vtool_bar_button_margin);
+	extra_x = extra_y = XFIXNUM (Vtool_bar_button_margin);
     }
 
   top_p = bot_p = left_p = right_p = false;
@@ -4004,8 +4004,8 @@ pgtk_send_scroll_bar_event (Lisp_Object window, enum scroll_bar_part part,
   inev.ie.timestamp = 0;
   inev.ie.code = 0;
   inev.ie.part = part;
-  inev.ie.x = make_number(portion);
-  inev.ie.y = make_number(whole);
+  inev.ie.x = make_fixnum(portion);
+  inev.ie.y = make_fixnum(whole);
   inev.ie.modifiers = 0;
 
   evq_enqueue(&inev);
@@ -4952,15 +4952,15 @@ pgtk_gtk_to_emacs_modifiers (int state)
   Lisp_Object tem;
 
   tem = Fget (Vx_ctrl_keysym, Qmodifier_value);
-  if (INTEGERP (tem)) mod_ctrl = XINT (tem) & INT_MAX;
+  if (INTEGERP (tem)) mod_ctrl = XFIXNUM (tem) & INT_MAX;
   tem = Fget (Vx_alt_keysym, Qmodifier_value);
-  if (INTEGERP (tem)) mod_alt = XINT (tem) & INT_MAX;
+  if (INTEGERP (tem)) mod_alt = XFIXNUM (tem) & INT_MAX;
   tem = Fget (Vx_meta_keysym, Qmodifier_value);
-  if (INTEGERP (tem)) mod_meta = XINT (tem) & INT_MAX;
+  if (INTEGERP (tem)) mod_meta = XFIXNUM (tem) & INT_MAX;
   tem = Fget (Vx_hyper_keysym, Qmodifier_value);
-  if (INTEGERP (tem)) mod_hyper = XINT (tem) & INT_MAX;
+  if (INTEGERP (tem)) mod_hyper = XFIXNUM (tem) & INT_MAX;
   tem = Fget (Vx_super_keysym, Qmodifier_value);
-  if (INTEGERP (tem)) mod_super = XINT (tem) & INT_MAX;
+  if (INTEGERP (tem)) mod_super = XFIXNUM (tem) & INT_MAX;
 
   return (  ((state & GDK_SHIFT_MASK)     ? shift_modifier : 0)
             | ((state & GDK_CONTROL_MASK) ? mod_ctrl	: 0)
@@ -4982,15 +4982,15 @@ pgtk_emacs_to_gtk_modifiers (EMACS_INT state)
   Lisp_Object tem;
 
   tem = Fget (Vx_ctrl_keysym, Qmodifier_value);
-  if (INTEGERP (tem)) mod_ctrl = XINT (tem);
+  if (INTEGERP (tem)) mod_ctrl = XFIXNUM (tem);
   tem = Fget (Vx_alt_keysym, Qmodifier_value);
-  if (INTEGERP (tem)) mod_alt = XINT (tem);
+  if (INTEGERP (tem)) mod_alt = XFIXNUM (tem);
   tem = Fget (Vx_meta_keysym, Qmodifier_value);
-  if (INTEGERP (tem)) mod_meta = XINT (tem);
+  if (INTEGERP (tem)) mod_meta = XFIXNUM (tem);
   tem = Fget (Vx_hyper_keysym, Qmodifier_value);
-  if (INTEGERP (tem)) mod_hyper = XINT (tem);
+  if (INTEGERP (tem)) mod_hyper = XFIXNUM (tem);
   tem = Fget (Vx_super_keysym, Qmodifier_value);
-  if (INTEGERP (tem)) mod_super = XINT (tem);
+  if (INTEGERP (tem)) mod_super = XFIXNUM (tem);
 
 
   return (  ((state & mod_alt)		? GDK_MOD1_MASK    : 0)
@@ -5116,7 +5116,7 @@ static gboolean key_press_event(GtkWidget *widget, GdkEvent *event, gpointer *us
 #if 0
       /* Now non-ASCII.  */
       if (HASH_TABLE_P (Vx_keysym_table)
-	  && (c = Fgethash (make_number (keysym),
+	  && (c = Fgethash (make_fixnum (keysym),
 			    Vx_keysym_table,
 			    Qnil),
 	      NATNUMP (c)))
@@ -6786,11 +6786,11 @@ syms_of_pgtkterm (void)
 
   DEFSYM (Qlatin_1, "latin-1");
 
-  Fput (Qalt, Qmodifier_value, make_number (alt_modifier));
-  Fput (Qhyper, Qmodifier_value, make_number (hyper_modifier));
-  Fput (Qmeta, Qmodifier_value, make_number (meta_modifier));
-  Fput (Qsuper, Qmodifier_value, make_number (super_modifier));
-  Fput (Qcontrol, Qmodifier_value, make_number (ctrl_modifier));
+  Fput (Qalt, Qmodifier_value, make_fixnum (alt_modifier));
+  Fput (Qhyper, Qmodifier_value, make_fixnum (hyper_modifier));
+  Fput (Qmeta, Qmodifier_value, make_fixnum (meta_modifier));
+  Fput (Qsuper, Qmodifier_value, make_fixnum (super_modifier));
+  Fput (Qcontrol, Qmodifier_value, make_fixnum (ctrl_modifier));
 
   DEFVAR_LISP ("x-ctrl-keysym", Vx_ctrl_keysym,
     doc: /* Which keys Emacs uses for the ctrl modifier.
