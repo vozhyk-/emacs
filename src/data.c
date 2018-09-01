@@ -29,6 +29,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include <intprops.h>
 
 #include "lisp.h"
+#include "bignum.h"
 #include "puresize.h"
 #include "character.h"
 #include "buffer.h"
@@ -511,16 +512,6 @@ DEFUN ("integerp", Fintegerp, Sintegerp, 1, 1, 0,
   return Qnil;
 }
 
-DEFUN ("fixnump", Ffixnump, Sfixnump, 1, 1, 0,
-       doc: /* Return t if OBJECT is an fixnum.  */
-       attributes: const)
-  (Lisp_Object object)
-{
-  if (FIXNUMP (object))
-    return Qt;
-  return Qnil;
-}
-
 DEFUN ("integer-or-marker-p", Finteger_or_marker_p, Sinteger_or_marker_p, 1, 1, 0,
        doc: /* Return t if OBJECT is an integer or a marker (editor pointer).  */)
   (register Lisp_Object object)
@@ -535,9 +526,9 @@ DEFUN ("natnump", Fnatnump, Snatnump, 1, 1, 0,
        attributes: const)
   (Lisp_Object object)
 {
-  if (NATNUMP (object))
-    return Qt;
-  return Qnil;
+  return ((FIXNUMP (object) ? 0 <= XFIXNUM (object)
+	   : BIGNUMP (object) && 0 <= mpz_sgn (XBIGNUM (object)->value))
+	  ? Qt : Qnil);
 }
 
 DEFUN ("numberp", Fnumberp, Snumberp, 1, 1, 0,
@@ -595,15 +586,6 @@ DEFUN ("condition-variable-p", Fcondition_variable_p, Scondition_variable_p,
   (Lisp_Object object)
 {
   if (CONDVARP (object))
-    return Qt;
-  return Qnil;
-}
-
-DEFUN ("bignump", Fbignump, Sbignump, 1, 1, 0,
-       doc: /* Return t if OBJECT is a bignum.  */)
-  (Lisp_Object object)
-{
-  if (BIGNUMP (object))
     return Qt;
   return Qnil;
 }
@@ -1150,7 +1132,7 @@ store_symval_forwarding (union Lisp_Fwd *valcontents, register Lisp_Object newva
 		else if ((prop = Fget (predicate, Qrange), !NILP (prop)))
 		  {
 		    Lisp_Object min = XCAR (prop), max = XCDR (prop);
-		    if (! FIXED_OR_FLOATP (newval)
+		    if (! NUMBERP (newval)
 			|| NILP (CALLN (Fleq, min, newval, max)))
 		      wrong_range (min, max, newval);
 		  }
@@ -2384,6 +2366,80 @@ bool-vector.  IDX starts at 0.  */)
   return newelt;
 }
 
+/* GMP tests for this value and aborts (!) if it is exceeded.
+   This is as of GMP 6.1.2 (2016); perhaps future versions will differ.  */
+enum { GMP_NLIMBS_MAX = min (INT_MAX, ULONG_MAX / GMP_NUMB_BITS) };
+
+/* An upper bound on limb counts, needed to prevent libgmp and/or
+   Emacs from aborting or otherwise misbehaving.  This bound applies
+   to estimates of mpz_t sizes before the mpz_t objects are created,
+   as opposed to integer-width which operates on mpz_t values after
+   creation and before conversion to Lisp bignums.  */
+enum
+  {
+   NLIMBS_LIMIT = min (min (/* libgmp needs to store limb counts.  */
+			    GMP_NLIMBS_MAX,
+
+			    /* Size calculations need to work.  */
+			    min (PTRDIFF_MAX, SIZE_MAX) / sizeof (mp_limb_t)),
+
+		       /* Emacs puts bit counts into fixnums.  */
+		       MOST_POSITIVE_FIXNUM / GMP_NUMB_BITS)
+  };
+
+/* Like mpz_size, but tell the compiler the result is a nonnegative int.  */
+
+static int
+emacs_mpz_size (mpz_t const op)
+{
+  mp_size_t size = mpz_size (op);
+  eassume (0 <= size && size <= INT_MAX);
+  return size;
+}
+
+/* Wrappers to work around GMP limitations.  As of GMP 6.1.2 (2016),
+   the library code aborts when a number is too large.  These wrappers
+   avoid the problem for functions that can return numbers much larger
+   than their arguments.  For slowly-growing numbers, the integer
+   width checks in bignum.c should suffice.  */
+
+static void
+emacs_mpz_mul (mpz_t rop, mpz_t const op1, mpz_t const op2)
+{
+  if (NLIMBS_LIMIT - emacs_mpz_size (op1) < emacs_mpz_size (op2))
+    range_error ();
+  mpz_mul (rop, op1, op2);
+}
+
+static void
+emacs_mpz_mul_2exp (mpz_t rop, mpz_t const op1, mp_bitcnt_t op2)
+{
+  /* Fudge factor derived from GMP 6.1.2, to avoid an abort in
+     mpz_mul_2exp (look for the '+ 1' in its source code).  */
+  enum { mul_2exp_extra_limbs = 1 };
+  enum { lim = min (NLIMBS_LIMIT, GMP_NLIMBS_MAX - mul_2exp_extra_limbs) };
+
+  mp_bitcnt_t op2limbs = op2 / GMP_NUMB_BITS;
+  if (lim - emacs_mpz_size (op1) < op2limbs)
+    range_error ();
+  mpz_mul_2exp (rop, op1, op2);
+}
+
+static void
+emacs_mpz_pow_ui (mpz_t rop, mpz_t const base, unsigned long exp)
+{
+  /* This fudge factor is derived from GMP 6.1.2, to avoid an abort in
+     mpz_n_pow_ui (look for the '5' in its source code).  */
+  enum { pow_ui_extra_limbs = 5 };
+  enum { lim = min (NLIMBS_LIMIT, GMP_NLIMBS_MAX - pow_ui_extra_limbs) };
+
+  int nbase = emacs_mpz_size (base), n;
+  if (INT_MULTIPLY_WRAPV (nbase, exp, &n) || lim < n)
+    range_error ();
+  mpz_pow_ui (rop, base, exp);
+}
+
+
 /* Arithmetic functions */
 
 Lisp_Object
@@ -2571,48 +2627,21 @@ DEFUN ("/=", Fneq, Sneq, 2, 2, 0,
   return arithcompare (num1, num2, ARITH_NOTEQUAL);
 }
 
-/* Convert the integer I to a cons-of-integers, where I is not in
-   fixnum range.  */
-
-#define INTBIG_TO_LISP(i, extremum)				    \
-  (eassert (FIXNUM_OVERFLOW_P (i)),				    \
-   (! (FIXNUM_OVERFLOW_P ((extremum) >> 16)			    \
-       && FIXNUM_OVERFLOW_P ((i) >> 16))			    \
-    ? Fcons (make_fixnum ((i) >> 16), make_fixnum ((i) & 0xffff))   \
-    : ! (FIXNUM_OVERFLOW_P ((extremum) >> 16 >> 24)		    \
-	 && FIXNUM_OVERFLOW_P ((i) >> 16 >> 24))		    \
-    ? Fcons (make_fixnum ((i) >> 16 >> 24),			    \
-	     Fcons (make_fixnum ((i) >> 16 & 0xffffff),		    \
-		    make_fixnum ((i) & 0xffff)))		    \
-    : make_float (i)))
-
-Lisp_Object
-intbig_to_lisp (intmax_t i)
-{
-  return INTBIG_TO_LISP (i, INTMAX_MIN);
-}
-
-Lisp_Object
-uintbig_to_lisp (uintmax_t i)
-{
-  return INTBIG_TO_LISP (i, UINTMAX_MAX);
-}
-
 /* Convert the cons-of-integers, integer, or float value C to an
    unsigned value with maximum value MAX, where MAX is one less than a
    power of 2.  Signal an error if C does not have a valid format or
-   is out of range.  */
+   is out of range.
+
+   Although Emacs represents large integers with bignums instead of
+   cons-of-integers or floats, for now this function still accepts the
+   obsolete forms in case some old Lisp code still generates them.  */
 uintmax_t
 cons_to_unsigned (Lisp_Object c, uintmax_t max)
 {
   bool valid = false;
   uintmax_t val UNINIT;
-  if (FIXNUMP (c))
-    {
-      valid = XFIXNUM (c) >= 0;
-      val = XFIXNUM (c);
-    }
-  else if (FLOATP (c))
+
+  if (FLOATP (c))
     {
       double d = XFLOAT_DATA (c);
       if (d >= 0 && d < 1.0 + max)
@@ -2621,27 +2650,44 @@ cons_to_unsigned (Lisp_Object c, uintmax_t max)
 	  valid = val == d;
 	}
     }
-  else if (CONSP (c) && FIXNATP (XCAR (c)))
+  else
     {
-      uintmax_t top = XFIXNAT (XCAR (c));
-      Lisp_Object rest = XCDR (c);
-      if (top <= UINTMAX_MAX >> 24 >> 16
-	  && CONSP (rest)
-	  && FIXNATP (XCAR (rest)) && XFIXNAT (XCAR (rest)) < 1 << 24
-	  && FIXNATP (XCDR (rest)) && XFIXNAT (XCDR (rest)) < 1 << 16)
+      Lisp_Object hi = CONSP (c) ? XCAR (c) : c;
+
+      if (FIXNUMP (hi))
 	{
-	  uintmax_t mid = XFIXNAT (XCAR (rest));
-	  val = top << 24 << 16 | mid << 16 | XFIXNAT (XCDR (rest));
-	  valid = true;
+	  val = XFIXNUM (hi);
+	  valid = 0 <= val;
 	}
-      else if (top <= UINTMAX_MAX >> 16)
+      else
 	{
-	  if (CONSP (rest))
-	    rest = XCAR (rest);
-	  if (FIXNATP (rest) && XFIXNAT (rest) < 1 << 16)
+	  val = bignum_to_uintmax (hi);
+	  valid = val != 0;
+	}
+
+      if (valid && CONSP (c))
+	{
+	  uintmax_t top = val;
+	  Lisp_Object rest = XCDR (c);
+	  if (top <= UINTMAX_MAX >> 24 >> 16
+	      && CONSP (rest)
+	      && FIXNATP (XCAR (rest)) && XFIXNAT (XCAR (rest)) < 1 << 24
+	      && FIXNATP (XCDR (rest)) && XFIXNAT (XCDR (rest)) < 1 << 16)
 	    {
-	      val = top << 16 | XFIXNAT (rest);
-	      valid = true;
+	      uintmax_t mid = XFIXNAT (XCAR (rest));
+	      val = top << 24 << 16 | mid << 16 | XFIXNAT (XCDR (rest));
+	    }
+	  else
+	    {
+	      valid = top <= UINTMAX_MAX >> 16;
+	      if (valid)
+		{
+		  if (CONSP (rest))
+		    rest = XCAR (rest);
+		  valid = FIXNATP (rest) && XFIXNAT (rest) < 1 << 16;
+		  if (valid)
+		    val = top << 16 | XFIXNAT (rest);
+		}
 	    }
 	}
     }
@@ -2655,18 +2701,18 @@ cons_to_unsigned (Lisp_Object c, uintmax_t max)
    value with extrema MIN and MAX.  MAX should be one less than a
    power of 2, and MIN should be zero or the negative of a power of 2.
    Signal an error if C does not have a valid format or is out of
-   range.  */
+   range.
+
+   Although Emacs represents large integers with bignums instead of
+   cons-of-integers or floats, for now this function still accepts the
+   obsolete forms in case some old Lisp code still generates them.  */
 intmax_t
 cons_to_signed (Lisp_Object c, intmax_t min, intmax_t max)
 {
   bool valid = false;
   intmax_t val UNINIT;
-  if (FIXNUMP (c))
-    {
-      val = XFIXNUM (c);
-      valid = true;
-    }
-  else if (FLOATP (c))
+
+  if (FLOATP (c))
     {
       double d = XFLOAT_DATA (c);
       if (d >= min && d < 1.0 + max)
@@ -2675,27 +2721,44 @@ cons_to_signed (Lisp_Object c, intmax_t min, intmax_t max)
 	  valid = val == d;
 	}
     }
-  else if (CONSP (c) && FIXNUMP (XCAR (c)))
+  else
     {
-      intmax_t top = XFIXNUM (XCAR (c));
-      Lisp_Object rest = XCDR (c);
-      if (top >= INTMAX_MIN >> 24 >> 16 && top <= INTMAX_MAX >> 24 >> 16
-	  && CONSP (rest)
-	  && FIXNATP (XCAR (rest)) && XFIXNAT (XCAR (rest)) < 1 << 24
-	  && FIXNATP (XCDR (rest)) && XFIXNAT (XCDR (rest)) < 1 << 16)
+      Lisp_Object hi = CONSP (c) ? XCAR (c) : c;
+
+      if (FIXNUMP (hi))
 	{
-	  intmax_t mid = XFIXNAT (XCAR (rest));
-	  val = top << 24 << 16 | mid << 16 | XFIXNAT (XCDR (rest));
+	  val = XFIXNUM (hi);
 	  valid = true;
 	}
-      else if (top >= INTMAX_MIN >> 16 && top <= INTMAX_MAX >> 16)
+      else if (BIGNUMP (hi))
 	{
-	  if (CONSP (rest))
-	    rest = XCAR (rest);
-	  if (FIXNATP (rest) && XFIXNAT (rest) < 1 << 16)
+	  val = bignum_to_intmax (hi);
+	  valid = val != 0;
+	}
+
+      if (valid && CONSP (c))
+	{
+	  intmax_t top = val;
+	  Lisp_Object rest = XCDR (c);
+	  if (top >= INTMAX_MIN >> 24 >> 16 && top <= INTMAX_MAX >> 24 >> 16
+	      && CONSP (rest)
+	      && FIXNATP (XCAR (rest)) && XFIXNAT (XCAR (rest)) < 1 << 24
+	      && FIXNATP (XCDR (rest)) && XFIXNAT (XCDR (rest)) < 1 << 16)
 	    {
-	      val = top << 16 | XFIXNAT (rest);
-	      valid = true;
+	      intmax_t mid = XFIXNAT (XCAR (rest));
+	      val = top << 24 << 16 | mid << 16 | XFIXNAT (XCDR (rest));
+	    }
+	  else
+	    {
+	      valid = INTMAX_MIN >> 16 <= top && top <= INTMAX_MAX >> 16;
+	      if (valid)
+		{
+		  if (CONSP (rest))
+		    rest = XCAR (rest);
+		  valid = FIXNATP (rest) && XFIXNAT (rest) < 1 << 16;
+		  if (valid)
+		    val = top << 16 | XFIXNAT (rest);
+		}
 	    }
 	}
     }
@@ -2714,15 +2777,10 @@ NUMBER may be an integer or a floating point number.  */)
   char buffer[max (FLOAT_TO_STRING_BUFSIZE, INT_BUFSIZE_BOUND (EMACS_INT))];
   int len;
 
-  if (BIGNUMP (number))
-    {
-      ptrdiff_t count = SPECPDL_INDEX ();
-      char *str = mpz_get_str (NULL, 10, XBIGNUM (number)->value);
-      record_unwind_protect_ptr (xfree, str);
-      return unbind_to (count, make_unibyte_string (str, strlen (str)));
-    }
+  CHECK_NUMBER (number);
 
-  CHECK_FIXNUM_OR_FLOAT (number);
+  if (BIGNUMP (number))
+    return bignum_to_string (number, 10);
 
   if (FLOATP (number))
     len = float_to_string (buffer, XFLOAT_DATA (number));
@@ -2872,13 +2930,13 @@ arith_driver (enum arithop code, ptrdiff_t nargs, Lisp_Object *args)
 	  break;
 	case Amult:
 	  if (BIGNUMP (val))
-	    mpz_mul (accum, accum, XBIGNUM (val)->value);
+	    emacs_mpz_mul (accum, accum, XBIGNUM (val)->value);
 	  else if (! FIXNUMS_FIT_IN_LONG)
             {
 	      mpz_t tem;
 	      mpz_init (tem);
 	      mpz_set_intmax (tem, XFIXNUM (val));
-	      mpz_mul (accum, accum, tem);
+	      emacs_mpz_mul (accum, accum, tem);
 	      mpz_clear (tem);
             }
 	  else
@@ -2956,7 +3014,7 @@ arith_driver (enum arithop code, ptrdiff_t nargs, Lisp_Object *args)
 	}
     }
 
-  return unbind_to (count, make_number (accum));
+  return unbind_to (count, make_integer (accum));
 }
 
 static Lisp_Object
@@ -3086,7 +3144,7 @@ Both must be integers or markers.  */)
 
       mpz_init (result);
       mpz_tdiv_r (result, *xmp, *ymp);
-      val = make_number (result);
+      val = make_integer (result);
       mpz_clear (result);
 
       if (xmp == &xm)
@@ -3166,7 +3224,7 @@ Both X and Y must be numbers or markers.  */)
       if (cmpy < 0 ? cmpr > 0 : cmpr < 0)
 	mpz_add (result, result, *ymp);
 
-      val = make_number (result);
+      val = make_integer (result);
       mpz_clear (result);
 
       if (xmp == &xm)
@@ -3293,10 +3351,10 @@ In this case, the sign bit is duplicated.  */)
       mpz_t result;
       mpz_init (result);
       if (XFIXNUM (count) > 0)
-	mpz_mul_2exp (result, XBIGNUM (value)->value, XFIXNUM (count));
+	emacs_mpz_mul_2exp (result, XBIGNUM (value)->value, XFIXNUM (count));
       else
 	mpz_fdiv_q_2exp (result, XBIGNUM (value)->value, - XFIXNUM (count));
-      val = make_number (result);
+      val = make_integer (result);
       mpz_clear (result);
     }
   else if (XFIXNUM (count) <= 0)
@@ -3319,15 +3377,42 @@ In this case, the sign bit is duplicated.  */)
       mpz_set_intmax (result, XFIXNUM (value));
 
       if (XFIXNUM (count) >= 0)
-	mpz_mul_2exp (result, result, XFIXNUM (count));
+	emacs_mpz_mul_2exp (result, result, XFIXNUM (count));
       else
 	mpz_fdiv_q_2exp (result, result, - XFIXNUM (count));
 
-      val = make_number (result);
+      val = make_integer (result);
       mpz_clear (result);
     }
 
   return val;
+}
+
+/* Return X ** Y as an integer.  X and Y must be integers, and Y must
+   be nonnegative.  */
+
+Lisp_Object
+expt_integer (Lisp_Object x, Lisp_Object y)
+{
+  unsigned long exp;
+  if (TYPE_RANGED_FIXNUMP (unsigned long, y))
+    exp = XFIXNUM (y);
+  else if (MOST_POSITIVE_FIXNUM < ULONG_MAX && BIGNUMP (y)
+	   && mpz_fits_ulong_p (XBIGNUM (y)->value))
+    exp = mpz_get_ui (XBIGNUM (y)->value);
+  else
+    range_error ();
+
+  mpz_t val;
+  mpz_init (val);
+  emacs_mpz_pow_ui (val,
+		    (FIXNUMP (x)
+		     ? (mpz_set_intmax (val, XFIXNUM (x)), val)
+		     : XBIGNUM (x)->value),
+		    exp);
+  Lisp_Object res = make_integer (val);
+  mpz_clear (val);
+  return res;
 }
 
 DEFUN ("1+", Fadd1, Sadd1, 1, 1, 0,
@@ -3345,7 +3430,7 @@ Markers are converted to integers.  */)
       mpz_t num;
       mpz_init (num);
       mpz_add_ui (num, XBIGNUM (number)->value, 1);
-      number = make_number (num);
+      number = make_integer (num);
       mpz_clear (num);
     }
   else
@@ -3358,7 +3443,7 @@ Markers are converted to integers.  */)
 	  mpz_t num;
 	  mpz_init (num);
 	  mpz_set_intmax (num, XFIXNUM (number) + 1);
-	  number = make_number (num);
+	  number = make_integer (num);
 	  mpz_clear (num);
 	}
     }
@@ -3380,7 +3465,7 @@ Markers are converted to integers.  */)
       mpz_t num;
       mpz_init (num);
       mpz_sub_ui (num, XBIGNUM (number)->value, 1);
-      number = make_number (num);
+      number = make_integer (num);
       mpz_clear (num);
     }
   else
@@ -3393,7 +3478,7 @@ Markers are converted to integers.  */)
 	  mpz_t num;
 	  mpz_init (num);
 	  mpz_set_intmax (num, XFIXNUM (number) - 1);
-	  number = make_number (num);
+	  number = make_integer (num);
 	  mpz_clear (num);
 	}
     }
@@ -3410,7 +3495,7 @@ DEFUN ("lognot", Flognot, Slognot, 1, 1, 0,
       mpz_t value;
       mpz_init (value);
       mpz_com (value, XBIGNUM (number)->value);
-      number = make_number (value);
+      number = make_integer (value);
       mpz_clear (value);
     }
   else
@@ -4052,7 +4137,6 @@ syms_of_data (void)
   defsubr (&Sconsp);
   defsubr (&Satom);
   defsubr (&Sintegerp);
-  defsubr (&Sfixnump);
   defsubr (&Sinteger_or_marker_p);
   defsubr (&Snumberp);
   defsubr (&Snumber_or_marker_p);
@@ -4078,7 +4162,6 @@ syms_of_data (void)
   defsubr (&Sthreadp);
   defsubr (&Smutexp);
   defsubr (&Scondition_variable_p);
-  defsubr (&Sbignump);
   defsubr (&Scar);
   defsubr (&Scdr);
   defsubr (&Scar_safe);
