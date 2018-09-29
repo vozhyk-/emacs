@@ -540,13 +540,13 @@ Creates the directory if necessary and makes sure:
       (setq attrs (file-attributes dir 'integer)))
 
     ;; Check that it's safe for use.
-    (let* ((uid (nth 2 attrs))
+    (let* ((uid (file-attribute-user-id attrs))
 	   (w32 (eq system-type 'windows-nt))
            (unsafe (cond
-                    ((not (eq t (car attrs)))
+                    ((not (eq t (file-attribute-type attrs)))
                      (if (null attrs) "its attributes can't be checked"
                        (format "it is a %s"
-                               (if (stringp (car attrs))
+                               (if (stringp (file-attribute-type attrs))
                                    "symlink" "file"))))
                     ((and w32 (zerop uid)) ; on FAT32?
                      (display-warning
@@ -1297,7 +1297,7 @@ The following commands are accepted by the client:
 
             (server-execute-continuation proc))))
     ;; condition-case
-    (error (server-return-error proc err))))
+    (t (server-return-error proc err))))
 
 (defun server-execute (proc files nowait commands dontkill create-frame-func tty-name)
   ;; This is run from timers and process-filters, i.e. "asynchronously".

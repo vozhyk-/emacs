@@ -1377,7 +1377,8 @@ This ignores the environment variables LOGNAME and USER, so it differs from
 }
 
 DEFUN ("user-uid", Fuser_uid, Suser_uid, 0, 0, 0,
-       doc: /* Return the effective uid of Emacs.  */)
+       doc: /* Return the effective uid of Emacs.
+Value is a fixnum, if it's small enough, otherwise a bignum.  */)
   (void)
 {
   uid_t euid = geteuid ();
@@ -1385,7 +1386,8 @@ DEFUN ("user-uid", Fuser_uid, Suser_uid, 0, 0, 0,
 }
 
 DEFUN ("user-real-uid", Fuser_real_uid, Suser_real_uid, 0, 0, 0,
-       doc: /* Return the real uid of Emacs.  */)
+       doc: /* Return the real uid of Emacs.
+Value is a fixnum, if it's small enough, otherwise a bignum.  */)
   (void)
 {
   uid_t uid = getuid ();
@@ -1393,7 +1395,8 @@ DEFUN ("user-real-uid", Fuser_real_uid, Suser_real_uid, 0, 0, 0,
 }
 
 DEFUN ("group-gid", Fgroup_gid, Sgroup_gid, 0, 0, 0,
-       doc: /* Return the effective gid of Emacs.  */)
+       doc: /* Return the effective gid of Emacs.
+Value is a fixnum, if it's small enough, otherwise a bignum.  */)
   (void)
 {
   gid_t egid = getegid ();
@@ -1401,7 +1404,8 @@ DEFUN ("group-gid", Fgroup_gid, Sgroup_gid, 0, 0, 0,
 }
 
 DEFUN ("group-real-gid", Fgroup_real_gid, Sgroup_real_gid, 0, 0, 0,
-       doc: /* Return the real gid of Emacs.  */)
+       doc: /* Return the real gid of Emacs.
+Value is a fixnum, if it's small enough, otherwise a bignum.  */)
   (void)
 {
   gid_t gid = getgid ();
@@ -1481,7 +1485,8 @@ DEFUN ("system-name", Fsystem_name, Ssystem_name, 0, 0, 0,
 }
 
 DEFUN ("emacs-pid", Femacs_pid, Semacs_pid, 0, 0, 0,
-       doc: /* Return the process ID of Emacs, as a number.  */)
+       doc: /* Return the process ID of Emacs, as a number.
+Value is a fixnum, if it's small enough, otherwise a bignum.  */)
   (void)
 {
   pid_t pid = getpid ();
@@ -1584,13 +1589,21 @@ time_subtract (struct lisp_time ta, struct lisp_time tb)
 }
 
 static Lisp_Object
-time_arith (Lisp_Object a, Lisp_Object b,
-	    struct lisp_time (*op) (struct lisp_time, struct lisp_time))
+time_arith (Lisp_Object a, Lisp_Object b, bool subtract)
 {
+  if (FLOATP (a) && !isfinite (XFLOAT_DATA (a)))
+    {
+      double da = XFLOAT_DATA (a);
+      double db = XFLOAT_DATA (Ffloat_time (b));
+      return make_float (subtract ? da - db : da + db);
+    }
+  if (FLOATP (b) && !isfinite (XFLOAT_DATA (b)))
+    return subtract ? make_float (-XFLOAT_DATA (b)) : b;
+
   int alen, blen;
   struct lisp_time ta = lisp_time_struct (a, &alen);
   struct lisp_time tb = lisp_time_struct (b, &blen);
-  struct lisp_time t = op (ta, tb);
+  struct lisp_time t = (subtract ? time_subtract : time_add) (ta, tb);
   if (FIXNUM_OVERFLOW_P (t.hi))
     time_overflow ();
   Lisp_Object val = Qnil;
@@ -1618,7 +1631,7 @@ A nil value for either argument stands for the current time.
 See `current-time-string' for the various forms of a time value.  */)
   (Lisp_Object a, Lisp_Object b)
 {
-  return time_arith (a, b, time_add);
+  return time_arith (a, b, false);
 }
 
 DEFUN ("time-subtract", Ftime_subtract, Stime_subtract, 2, 2, 0,
@@ -1628,7 +1641,30 @@ A nil value for either argument stands for the current time.
 See `current-time-string' for the various forms of a time value.  */)
   (Lisp_Object a, Lisp_Object b)
 {
-  return time_arith (a, b, time_subtract);
+  return time_arith (a, b, true);
+}
+
+/* Return negative, 0, positive if a < b, a == b, a > b respectively.
+   Return positive if either a or b is a NaN; this is good enough
+   for the current callers.  */
+static int
+time_cmp (Lisp_Object a, Lisp_Object b)
+{
+  if ((FLOATP (a) && !isfinite (XFLOAT_DATA (a)))
+      || (FLOATP (b) && !isfinite (XFLOAT_DATA (b))))
+    {
+      double da = FLOATP (a) ? XFLOAT_DATA (a) : 0;
+      double db = FLOATP (b) ? XFLOAT_DATA (b) : 0;
+      return da < db ? -1 : da != db;
+    }
+
+  int alen, blen;
+  struct lisp_time ta = lisp_time_struct (a, &alen);
+  struct lisp_time tb = lisp_time_struct (b, &blen);
+  return (ta.hi != tb.hi ? (ta.hi < tb.hi ? -1 : 1)
+	  : ta.lo != tb.lo ? (ta.lo < tb.lo ? -1 : 1)
+	  : ta.us != tb.us ? (ta.us < tb.us ? -1 : 1)
+	  : ta.ps < tb.ps ? -1 : ta.ps != tb.ps);
 }
 
 DEFUN ("time-less-p", Ftime_less_p, Stime_less_p, 2, 2, 0,
@@ -1637,22 +1673,21 @@ A nil value for either argument stands for the current time.
 See `current-time-string' for the various forms of a time value.  */)
   (Lisp_Object t1, Lisp_Object t2)
 {
-  int t1len, t2len;
-  struct lisp_time a = lisp_time_struct (t1, &t1len);
-  struct lisp_time b = lisp_time_struct (t2, &t2len);
-  return ((a.hi != b.hi ? a.hi < b.hi
-	   : a.lo != b.lo ? a.lo < b.lo
-	   : a.us != b.us ? a.us < b.us
-	   : a.ps < b.ps)
-	  ? Qt : Qnil);
+  return time_cmp (t1, t2) < 0 ? Qt : Qnil;
+}
+
+DEFUN ("time-equal-p", Ftime_equal_p, Stime_equal_p, 2, 2, 0,
+       doc: /* Return non-nil if T1 and T2 are equal time values.  */)
+  (Lisp_Object t1, Lisp_Object t2)
+{
+  return time_cmp (t1, t2) == 0 ? Qt : Qnil;
 }
 
 
 DEFUN ("get-internal-run-time", Fget_internal_run_time, Sget_internal_run_time,
        0, 0, 0,
        doc: /* Return the current run time used by Emacs.
-The time is returned as a list (HIGH LOW USEC PSEC), using the same
-style as (current-time).
+The time is returned as in the style of `current-time'.
 
 On systems that can't determine the run time, `get-internal-run-time'
 does the same thing as `current-time'.  */)
@@ -1743,10 +1778,10 @@ disassemble_lisp_time (Lisp_Object specified_time, Lisp_Object *phigh,
 
       /* When combining components, require LOW to be an integer,
 	 as otherwise it would be a pain to add up times.  */
-      if (! FIXNUMP (low))
+      if (! INTEGERP (low))
 	return 0;
     }
-  else if (FIXNUMP (specified_time))
+  else if (INTEGERP (specified_time))
     len = 2;
 
   *phigh = high;
@@ -1807,11 +1842,12 @@ decode_time_components (Lisp_Object high, Lisp_Object low, Lisp_Object usec,
 			Lisp_Object psec,
 			struct lisp_time *result, double *dresult)
 {
-  EMACS_INT hi, lo, us, ps;
+  EMACS_INT hi, us, ps;
+  intmax_t lo;
   if (! (FIXNUMP (high)
 	 && FIXNUMP (usec) && FIXNUMP (psec)))
     return 0;
-  if (! FIXNUMP (low))
+  if (! INTEGERP (low))
     {
       if (FLOATP (low))
 	{
@@ -1841,7 +1877,8 @@ decode_time_components (Lisp_Object high, Lisp_Object low, Lisp_Object usec,
     }
 
   hi = XFIXNUM (high);
-  lo = XFIXNUM (low);
+  if (! integer_to_intmax (low, &lo))
+    return -1;
   us = XFIXNUM (usec);
   ps = XFIXNUM (psec);
 
@@ -1849,7 +1886,8 @@ decode_time_components (Lisp_Object high, Lisp_Object low, Lisp_Object usec,
      each overflow into the next higher-order component.  */
   us += ps / 1000000 - (ps % 1000000 < 0);
   lo += us / 1000000 - (us % 1000000 < 0);
-  hi += lo >> LO_TIME_BITS;
+  if (INT_ADD_WRAPV (lo >> LO_TIME_BITS, hi, &hi))
+    return -1;
   ps = ps % 1000000 + 1000000 * (ps % 1000000 < 0);
   us = us % 1000000 + 1000000 * (us % 1000000 < 0);
   lo &= (1 << LO_TIME_BITS) - 1;
@@ -2157,7 +2195,8 @@ between 0 and 23.  DAY is an integer between 1 and 31.  MONTH is an
 integer between 1 and 12.  YEAR is an integer indicating the
 four-digit year.  DOW is the day of week, an integer between 0 and 6,
 where 0 is Sunday.  DST is t if daylight saving time is in effect,
-otherwise nil.  UTCOFF is an integer indicating the UTC offset in
+nil if it is not in effect, and -1 if this information is
+not available.  UTCOFF is an integer indicating the UTC offset in
 seconds, i.e., the number of seconds east of Greenwich.  (Note that
 Common Lisp has different meanings for DOW and UTCOFF.)
 
@@ -2186,7 +2225,8 @@ usage: (decode-time &optional TIME ZONE)  */)
 		make_fixnum (local_tm.tm_mon + 1),
 		make_fixnum (local_tm.tm_year + tm_year_base),
 		make_fixnum (local_tm.tm_wday),
-		local_tm.tm_isdst ? Qt : Qnil,
+		(local_tm.tm_isdst < 0 ? make_fixnum (-1)
+		 : local_tm.tm_isdst == 0 ? Qnil : Qt),
 		(HAVE_TM_GMTOFF
 		 ? make_fixnum (tm_gmtoff (&local_tm))
 		 : gmtime_r (&time_spec, &gmt_tm)
@@ -4649,7 +4689,7 @@ styled_format (ptrdiff_t nargs, Lisp_Object *args, bool message)
 
 	      /* Characters to be inserted after spaces and before
 		 leading zeros.  This can occur with bignums, since
-		 string_to_bignum does only leading '-'.  */
+		 bignum_to_string does only leading '-'.  */
 	      char prefix[sizeof "-0x" - 1];
 	      int prefixlen = 0;
 
@@ -4691,21 +4731,16 @@ styled_format (ptrdiff_t nargs, Lisp_Object *args, bool message)
 			}
 		      else
 			{
-			  if (FIXNUMP (arg))
-			    ldarg = XFIXNUM (arg);
-			  else
+			  if (INTEGERP (arg))
 			    {
-			      intmax_t iarg = bignum_to_intmax (arg);
-			      if (iarg != 0)
+			      intmax_t iarg;
+			      uintmax_t uarg;
+			      if (integer_to_intmax (arg, &iarg))
 				ldarg = iarg;
+			      else if (integer_to_uintmax (arg, &uarg))
+				ldarg = uarg;
 			      else
-				{
-				  uintmax_t uarg = bignum_to_uintmax (arg);
-				  if (uarg != 0)
-				    ldarg = uarg;
-				  else
-				    format_bignum_as_double = true;
-				}
+				format_bignum_as_double = true;
 			    }
 			  if (!format_bignum_as_double)
 			    {
@@ -5730,6 +5765,7 @@ it to be non-nil.  */);
   defsubr (&Scurrent_time);
   defsubr (&Stime_add);
   defsubr (&Stime_subtract);
+  defsubr (&Stime_equal_p);
   defsubr (&Stime_less_p);
   defsubr (&Sget_internal_run_time);
   defsubr (&Sformat_time_string);

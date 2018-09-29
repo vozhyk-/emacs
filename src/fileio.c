@@ -3394,9 +3394,9 @@ union read_non_regular
     int fd;
     ptrdiff_t inserted, trytry;
   } s;
-  GCALIGNED_UNION
+  GCALIGNED_UNION_MEMBER
 };
-verify (alignof (union read_non_regular) % GCALIGNMENT == 0);
+verify (GCALIGNED (union read_non_regular));
 
 static Lisp_Object
 read_non_regular (Lisp_Object state)
@@ -3424,17 +3424,13 @@ read_non_regular_quit (Lisp_Object ignore)
 static off_t
 file_offset (Lisp_Object val)
 {
-  if (RANGED_FIXNUMP (0, val, TYPE_MAXIMUM (off_t)))
-    return XFIXNUM (val);
-
-  if (BIGNUMP (val))
+  if (INTEGERP (val))
     {
-      intmax_t v = bignum_to_intmax (val);
-      if (0 < v && v <= TYPE_MAXIMUM (off_t))
+      intmax_t v;
+      if (integer_to_intmax (val, &v) && 0 <= v && v <= TYPE_MAXIMUM (off_t))
 	return v;
     }
-
-  if (FLOATP (val))
+  else if (FLOATP (val))
     {
       double v = XFLOAT_DATA (val);
       if (0 <= v && v < 1.0 + TYPE_MAXIMUM (off_t))
@@ -5458,10 +5454,9 @@ See Info node `(elisp)Modification Time' for more details.  */)
 DEFUN ("visited-file-modtime", Fvisited_file_modtime,
        Svisited_file_modtime, 0, 0, 0,
        doc: /* Return the current buffer's recorded visited file modification time.
-The value is a list of the form (HIGH LOW USEC PSEC), like the time values that
-`file-attributes' returns.  If the current buffer has no recorded file
-modification time, this function returns 0.  If the visited file
-doesn't exist, return -1.
+Return a Lisp timestamp (as in `current-time') if the current buffer
+has a recorded file modification time, 0 if it doesn't, and -1 if the
+visited file doesn't exist.
 See Info node `(elisp)Modification Time' for more details.  */)
   (void)
 {
@@ -5477,9 +5472,8 @@ DEFUN ("set-visited-file-modtime", Fset_visited_file_modtime,
 Useful if the buffer was not read from the file normally
 or if the file itself has been changed for some known benign reason.
 An argument specifies the modification time value to use
-\(instead of that of the visited file), in the form of a list
-\(HIGH LOW USEC PSEC) or an integer flag as returned by
-`visited-file-modtime'.  */)
+\(instead of that of the visited file), in the form of a time value as
+in `current-time' or an integer flag as returned by `visited-file-modtime'.  */)
   (Lisp_Object time_flag)
 {
   if (!NILP (time_flag))

@@ -304,7 +304,7 @@ module_make_global_ref (emacs_env *env, emacs_value ref)
       Lisp_Object value = HASH_VALUE (h, i);
       EMACS_INT refcount = XFIXNAT (value) + 1;
       if (MOST_POSITIVE_FIXNUM < refcount)
-	xsignal0 (Qoverflow_error);
+	overflow_error ();
       value = make_fixed_natnum (refcount);
       set_hash_value_slot (h, i, value);
     }
@@ -475,7 +475,7 @@ module_funcall (emacs_env *env, emacs_value fun, ptrdiff_t nargs,
   USE_SAFE_ALLOCA;
   ptrdiff_t nargs1;
   if (INT_ADD_WRAPV (nargs, 1, &nargs1))
-    xsignal0 (Qoverflow_error);
+    overflow_error ();
   SAFE_ALLOCA_LISP (newargs, nargs1);
   newargs[0] = value_to_lisp (fun);
   for (ptrdiff_t i = 0; i < nargs; i++)
@@ -519,14 +519,10 @@ module_extract_integer (emacs_env *env, emacs_value n)
   MODULE_FUNCTION_BEGIN (0);
   Lisp_Object l = value_to_lisp (n);
   CHECK_INTEGER (l);
-  if (BIGNUMP (l))
-    {
-      intmax_t i = bignum_to_intmax (l);
-      if (i == 0)
-	xsignal1 (Qoverflow_error, l);
-      return i;
-    }
-  return XFIXNUM (l);
+  intmax_t i;
+  if (! integer_to_intmax (l, &i))
+    xsignal1 (Qoverflow_error, l);
+  return i;
 }
 
 static emacs_value
@@ -587,7 +583,7 @@ module_make_string (emacs_env *env, const char *str, ptrdiff_t length)
 {
   MODULE_FUNCTION_BEGIN (module_nil);
   if (! (0 <= length && length <= STRING_BYTES_BOUND))
-    xsignal0 (Qoverflow_error);
+    overflow_error ();
   /* FIXME: AUTO_STRING_WITH_LEN requires STR to be null-terminated,
      but we shouldn't require that.  */
   AUTO_STRING_WITH_LEN (lstr, str, length);
@@ -751,11 +747,7 @@ DEFUN ("module-load", Fmodule_load, Smodule_load, 1, 1, 0,
   maybe_quit ();
 
   if (r != 0)
-    {
-      if (FIXNUM_OVERFLOW_P (r))
-        xsignal0 (Qoverflow_error);
-      xsignal2 (Qmodule_init_failed, file, make_fixnum (r));
-    }
+    xsignal2 (Qmodule_init_failed, file, INT_TO_INTEGER (r));
 
   module_signal_or_throw (&env_priv);
   return unbind_to (count, Qt);

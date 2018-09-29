@@ -196,6 +196,9 @@ regular expression was previously invalid, but is now accepted:
 ---
 ** The German prefix and postfix input methods now support Capital sharp S.
 
+---
+** New input methods hawaiian-postfix and hawaiian-prefix.
+
 +++
 ** New function 'exec-path'.
 This function by default returns the value of the corresponding
@@ -232,9 +235,22 @@ typographic quotes, “like this”, in text modes, and in comments in
 non-text modes.
 
 ---
+** New user option 'flyspell-case-fold-duplications'.
+This option controls whether Flyspell mode considers consecutive words
+to be duplicates if they are not in the same case.  If non-nil, the
+default, words are considered to be duplicates even if their letters'
+case does not match.
+
+---
 ** 'write-abbrev-file' now includes special properties.
 'write-abbrev-file' now writes special properties like ':case-fixed'
 for abbrevs that have them.
+
++++
+** 'insert-abbrev-table-description' skips empty tables.
+'insert-abbrev-table-description' skips inserting empty tables when
+inserting non-readable tables.  By extension, this makes
+'write-abbrev-file' skip writing empty tables.
 
 +++
 ** The new functions and commands 'text-property-search-forward' and
@@ -252,8 +268,25 @@ large files.  Now it also offers a third alternative: to visit the
 file literally, as in 'find-file-literally', which speeds up
 navigation and editing of large files.
 
+---
+** add-dir-local-variable now uses dotted pair notation syntax
+to write alists of variables to .dir-locals.el.  This is the same
+syntax that you can see in the example of a .dir-locals.el file
+in (info "(emacs) Directory Variables")
+
 
 * Changes in Specialized Modes and Packages in Emacs 27.1
+
+** project.el
+*** New commands project-search and project-query-replace
+
+** Etags
++++
+*** 'next-file' is now an obsolete alias of tags-next-file
+*** tags-loop-revert-buffers is an obsolete alias of multifile-revert-buffers
+*** The tags-loop-continue function along with the tags-loop-operate and
+tags-loop-scan variables are now obsolete; use the new multifile-initialize and
+multifile-continue functions instead.
 
 ---
 ** bibtex
@@ -276,6 +309,10 @@ suitable named temporary buffer.  (An existing ChangeLog file will
 still be used if it exists.)  Set the variable to nil to get the
 previous behavior of always creating a buffer that visits a ChangeLog
 file.
+
+*** New customizable variable 'vc-git-grep-template'.
+This new variable allows customizing the default arguments passed to
+git-grep when 'vc-git-grep' is used.
 
 ** diff-mode
 *** Hunks are now automatically refined by default.
@@ -733,6 +770,13 @@ Instead, error messages are just printed in the main thread.
 ---
 *** 'thread-alive-p' is now obsolete, use 'thread-live-p' instead.
 
++++
+*** New command 'list-threads' shows Lisp threads.
+See the current list of live threads in a tabulated-list buffer which
+automatically updates.  In the buffer, you can use 's q' or 's e' to
+signal a thread with quit or error respectively, or get a snapshot
+backtrace with 'b'.
+
 ---
 ** thingatpt.el supports a new "thing" called 'uuid'.
 A symbol 'uuid' can be passed to thing-at-point and it returns the
@@ -748,6 +792,8 @@ subexpression.
 
 
 * New Modes and Packages in Emacs 27.1
+
+** multifile.el lets one setup multifile operations like search&replace
 
 +++
 ** Emacs can now visit files in archives as if they were directories.
@@ -875,6 +921,9 @@ removed.
 ** lookup-key can take a list of keymaps as argument.
 
 +++
+** 'condition-case' now accepts 't' to match any error symbol.
+
++++
 ** New function 'proper-list-p'.
 Given a proper list as argument, this predicate returns its length;
 otherwise, it returns nil.  'format-proper-list-p' is now an obsolete
@@ -908,6 +957,14 @@ like file-attributes that compute file sizes and other attributes,
 functions like process-id that compute process IDs, and functions like
 user-uid and group-gid that compute user and group IDs.
 
++++
+** 'time-add', 'time-subtract', and 'time-less-p' now accept
+infinities and NaNs too, and propagate them or return nil like
+floating-point operators do.
+
++++
+** New function 'time-equal-p' compares time values for equality.
+
 ** define-minor-mode automatically documents the meaning of ARG.
 
 +++
@@ -931,6 +988,11 @@ This works like 'dolist', but reports progress similar to
 This works like 'delete-frame-functions', but runs after the frame to
 be deleted has been made dead and removed from the frame list.
 
+---
+** The function 'provided-mode-derived-p' was extended to support aliases.
+The function now returns non-nil when the argument MODE is derived
+from any alias of any of MODES.
+
 +++
 ** New frame focus state inspection interface.
 The hooks 'focus-in-hook' and 'focus-out-hook' are now obsolete.
@@ -950,7 +1012,12 @@ displaying the same buffer.  See the Info node "Face Remapping" of the
 Emacs Lisp Reference manual for more detail.
 
 +++
-** New function assoc-delete-all.
+** Special handling of buffer-local 'window-size-change-functions'.
+A buffer-local value of this hook is now run only if at least one
+window showing the buffer has changed its size.
+
++++
+** The function assoc-delete-all now takes an optional predicate argument.
 
 +++
 ** New function 'string-distance' to calculate the Levenshtein distance
@@ -1030,6 +1097,14 @@ a multibyte string even if its second argument is an ASCII character.
 
 ** (format "%d" X) no longer mishandles a floating-point number X that
 does not fit in a machine integer.
+
++++
+** In the DST slot, encode-time and parse-time-string now return -1
+if it is not known whether daylight saving time is in effect.
+Formerly they were inconsistent: encode-time returned t in this
+situation, whereas parse-time-string returned nil.  Now they
+consistently use use nil to mean that DST is not in effect, and use -1
+to mean that it is not known whether DST is in effect.
 
 ** New JSON parsing and serialization functions 'json-serialize',
 'json-insert', 'json-parse-string', and 'json-parse-buffer'.  These

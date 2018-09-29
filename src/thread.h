@@ -30,7 +30,6 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #endif
 
 #include "sysselect.h"		/* FIXME */
-#include "systime.h"		/* FIXME */
 #include "systhread.h"
 
 struct thread_state
@@ -184,7 +183,7 @@ struct thread_state
 
   /* Threads are kept on a linked list.  */
   struct thread_state *next_thread;
-};
+} GCALIGNED_STRUCT;
 
 INLINE bool
 THREADP (Lisp_Object a)
@@ -231,7 +230,7 @@ struct Lisp_Mutex
 
   /* The lower-level mutex object.  */
   lisp_mutex_t mutex;
-};
+} GCALIGNED_STRUCT;
 
 INLINE bool
 MUTEXP (Lisp_Object a)
@@ -265,7 +264,7 @@ struct Lisp_CondVar
 
   /* The lower-level condition variable object.  */
   sys_cond_t cond;
-};
+} GCALIGNED_STRUCT;
 
 INLINE bool
 CONDVARP (Lisp_Object a)
