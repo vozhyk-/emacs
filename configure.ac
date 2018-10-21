@@ -361,7 +361,7 @@ OPTION_DEFAULT_ON([xft],[don't use XFT for anti aliased fonts])
 OPTION_DEFAULT_ON([libotf],[don't use libotf for OpenType font support])
 OPTION_DEFAULT_ON([m17n-flt],[don't use m17n-flt for text shaping])
 
-OPTION_DEFAULT_ON([toolkit-scroll-bars],[don't use Motif or Xaw3d scroll bars])
+OPTION_DEFAULT_ON([toolkit-scroll-bars],[don't use Motif/Xaw3d/GTK toolkit scroll bars])
 OPTION_DEFAULT_ON([xaw3d],[don't use Xaw3d])
 OPTION_DEFAULT_ON([xim],[at runtime, default X11 XIM to off])
 AC_ARG_WITH([ns],[AS_HELP_STRING([--with-ns],
@@ -1019,9 +1019,10 @@ AS_IF([test $gl_gcc_warnings = no],
   gl_WARN_ADD([-Wno-unused-parameter]) # Too many warnings for now
   gl_WARN_ADD([-Wno-format-nonliteral])
 
-  # clang is unduly picky about braces.
+  # clang is unduly picky about some things.
   if test "$emacs_cv_clang" = yes; then
     gl_WARN_ADD([-Wno-missing-braces])
+    gl_WARN_ADD([-Wno-null-pointer-arithmetic])
   fi
 
   # This causes too much noise in the MinGW build
@@ -1334,6 +1335,37 @@ else
   test "x$NON_GCC_LINK_TEST_OPTIONS" != x && \
     ac_link="$ac_link $NON_GCC_LINK_TEST_OPTIONS"
 fi
+
+dnl On some platforms using GNU ld, linking temacs needs -znocombreloc.
+dnl Although this has something to do with dumping, the details are unknown.
+dnl If the flag is used but not needed,
+dnl Emacs should still work (albeit a bit more slowly),
+dnl so use the flag everywhere that it is supported.
+dnl When testing whether the flag works, treat GCC specially
+dnl since it just gives a non-fatal 'unrecognized option'
+dnl if not built to support GNU ld.
+if test "$GCC" = yes; then
+  LDFLAGS_NOCOMBRELOC="-Wl,-znocombreloc"
+else
+  LDFLAGS_NOCOMBRELOC="-znocombreloc"
+fi
+
+AC_CACHE_CHECK([for -znocombreloc], [emacs_cv_znocombreloc],
+  [if test "$CANNOT_DUMP" = "yes"; then
+     emacs_cv_znocombreloc='not needed'
+   else
+     save_LDFLAGS=$LDFLAGS
+     LDFLAGS="$LDFLAGS $LDFLAGS_NOCOMBRELOC"
+     AC_LINK_IFELSE([AC_LANG_PROGRAM([], [])],
+       [emacs_cv_znocombreloc=yes], [emacs_cv_znocombreloc=no])
+     LDFLAGS=$save_LDFLAGS
+   fi])
+
+case $emacs_cv_znocombreloc in
+  no*)
+    LDFLAGS_NOCOMBRELOC= ;;
+esac
+
 
 AC_CACHE_CHECK([whether addresses are sanitized],
   [emacs_cv_sanitize_address],
@@ -5227,6 +5259,22 @@ else
 fi
 AC_SUBST(LIBXMENU)
 
+AC_CACHE_CHECK([for struct alignment],
+  [emacs_cv_struct_alignment],
+  [AC_COMPILE_IFELSE(
+     [AC_LANG_PROGRAM([[#include <stddef.h>
+			struct s { char c; } __attribute__ ((aligned (8)));
+			struct t { char c; struct s s; };
+			char verify[offsetof (struct t, s) == 8 ? 1 : -1];
+		      ]])],
+     [emacs_cv_struct_alignment=yes],
+     [emacs_cv_struct_alignment=no])])
+if test "$emacs_cv_struct_alignment" = yes; then
+  AC_DEFINE([HAVE_STRUCT_ATTRIBUTE_ALIGNED], 1,
+    [Define to 1 if 'struct __attribute__ ((aligned (N)))' aligns the
+     structure to an N-byte boundary.])
+fi
+
 if test "${GNU_MALLOC}" = "yes" ; then
   AC_DEFINE(GNU_MALLOC, 1,
 	    [Define to 1 if you want to use the GNU memory allocator.])
@@ -5396,6 +5444,8 @@ if test x$ac_enable_profiling != x ; then
     *) LD_SWITCH_SYSTEM_TEMACS="$LD_SWITCH_SYSTEM_TEMACS -pg" ;;
   esac
 fi
+
+LD_SWITCH_SYSTEM_TEMACS="$LDFLAGS_NOCOMBRELOC $LD_SWITCH_SYSTEM_TEMACS"
 
 AC_SUBST(LD_SWITCH_SYSTEM_TEMACS)
 

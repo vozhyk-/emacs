@@ -3959,6 +3959,7 @@ support pty association, if PROGRAM is nil."
                                ;; name "*Async Shell Command*<10>" (bug#30016)
 			       ("Buffer"  25 t)
 			       ("TTY"     12 t)
+			       ("Thread"  12 t)
 			       ("Command"  0 t)])
   (make-local-variable 'process-menu-query-only)
   (setq tabulated-list-sort-key (cons "Process" nil))
@@ -4000,6 +4001,11 @@ Also, delete any process that is exited or signaled."
 				   action process-menu-visit-buffer)
 			       "--"))
 		  (tty (or (process-tty-name p) "--"))
+		  (thread
+                   (cond
+                    ((null (process-thread p)) "--")
+                    ((eq (process-thread p) main-thread) "Main")
+                    ((thread-name (process-thread p)))))
 		  (cmd
 		   (if (memq type '(network serial))
 		       (let ((contact (process-contact p t)))
@@ -4022,7 +4028,7 @@ Also, delete any process that is exited or signaled."
 					 (format " at %s b/s" speed)
 				       "")))))
 		     (mapconcat 'identity (process-command p) " "))))
-	     (push (list p (vector name pid status buf-label tty cmd))
+	     (push (list p (vector name pid status buf-label tty thread cmd))
 		   tabulated-list-entries)))))
   (tabulated-list-init-header))
 
@@ -5823,10 +5829,10 @@ its earlier value."
 
 Transient Mark mode is a global minor mode.  When enabled, the
 region is highlighted with the `region' face whenever the mark
-is active.  The mark is \"deactivated\" by changing the buffer,
-and after certain other operations that set the mark but whose
-main purpose is something else--for example, incremental search,
-\\[beginning-of-buffer], and \\[end-of-buffer].
+is active.  The mark is \"deactivated\" after certain non-motion
+commands, including those that change the text in the buffer, and
+during shift or mouse selection by any unshifted cursor motion
+command (see Info node `Shift Selection' for more details).
 
 You can also deactivate the mark by typing \\[keyboard-quit] or
 \\[keyboard-escape-quit].

@@ -1671,6 +1671,7 @@ xg_set_background_color (struct frame *f, unsigned long bg)
       block_input ();
       xg_set_widget_bg (f, FRAME_GTK_WIDGET (f), FRAME_BACKGROUND_PIXEL (f));
 
+#ifdef USE_TOOLKIT_SCROLL_BARS
       Lisp_Object bar;
       for (bar = FRAME_SCROLL_BARS (f);
            !NILP (bar);
@@ -1681,7 +1682,7 @@ xg_set_background_color (struct frame *f, unsigned long bg)
           GtkWidget *webox = gtk_widget_get_parent (scrollbar);
           xg_set_widget_bg (f, webox, FRAME_BACKGROUND_PIXEL (f));
         }
-
+#endif
       unblock_input ();
     }
 }

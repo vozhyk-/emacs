@@ -763,8 +763,8 @@ handled properly.  BODY shall not contain a timeout."
 	"|-:user2@host2"
 	"|-:user3@host3:/path/to/file"))
       (format "/%s:%s@%s|%s:%s@%s|%s:%s@%s:"
-	      "-" "user1" "host1"
-	      "-" "user2" "host2"
+	      "method1" "user1" "host1"
+	      "method2" "user2" "host2"
 	      "method3" "user3" "host3")))
 
     ;; Expand `tramp-default-user-alist'.
@@ -778,9 +778,9 @@ handled properly.  BODY shall not contain a timeout."
 	"/method1:host1"
 	"|method2:host2"
 	"|method3:host3:/path/to/file"))
-      (format "/%s:%s|%s:%s|%s:%s@%s:"
-	      "method1" "host1"
-	      "method2" "host2"
+      (format "/%s:%s@%s|%s:%s@%s|%s:%s@%s:"
+	      "method1" "user1" "host1"
+	      "method2" "user2" "host2"
 	      "method3" "user3" "host3")))
 
     ;; Expand `tramp-default-host-alist'.
@@ -794,9 +794,36 @@ handled properly.  BODY shall not contain a timeout."
 	"/method1:user1@"
 	"|method2:user2@"
 	"|method3:user3@:/path/to/file"))
-      (format "/%s:%s@|%s:%s@|%s:%s@%s:"
-	      "method1" "user1"
-	      "method2" "user2"
+      (format "/%s:%s@%s|%s:%s@%s|%s:%s@%s:"
+	      "method1" "user1" "host1"
+	      "method2" "user2" "host2"
+	      "method3" "user3" "host3")))
+
+    ;; Ad-hoc user name and host name expansion.
+    (setq tramp-default-method-alist nil
+	  tramp-default-user-alist nil
+	  tramp-default-host-alist nil)
+    (should
+     (string-equal
+      (file-remote-p
+       (concat
+	"/method1:user1@host1"
+	"|method2:user2@"
+	"|method3:user3@:/path/to/file"))
+      (format "/%s:%s@%s|%s:%s@%s|%s:%s@%s:"
+	      "method1" "user1" "host1"
+	      "method2" "user2" "host1"
+	      "method3" "user3" "host1")))
+    (should
+     (string-equal
+      (file-remote-p
+       (concat
+	"/method1:%u@%h"
+	"|method2:%u@%h"
+	"|method3:user3@host3:/path/to/file"))
+      (format "/%s:%s@%s|%s:%s@%s|%s:%s@%s:"
+	      "method1" "user3" "host3"
+	      "method2" "user3" "host3"
 	      "method3" "user3" "host3")))))
 
 (ert-deftest tramp-test02-file-name-dissect-simplified ()
@@ -1067,9 +1094,9 @@ handled properly.  BODY shall not contain a timeout."
 	      "/host1"
 	      "|host2"
 	      "|host3:/path/to/file"))
-	    (format "/%s|%s|%s@%s:"
-		    "host1"
-		    "host2"
+	    (format "/%s@%s|%s@%s|%s@%s:"
+		    "user1" "host1"
+		    "user2" "host2"
 		    "user3" "host3")))
 
 	  ;; Expand `tramp-default-host-alist'.
@@ -1083,9 +1110,35 @@ handled properly.  BODY shall not contain a timeout."
 	      "/user1@"
 	      "|user2@"
 	      "|user3@:/path/to/file"))
-	    (format "/%s@|%s@|%s@%s:"
-		    "user1"
-		    "user2"
+	    (format "/%s@%s|%s@%s|%s@%s:"
+		    "user1" "host1"
+		    "user2" "host2"
+		    "user3" "host3")))
+
+	  ;; Ad-hoc user name and host name expansion.
+	  (setq tramp-default-user-alist nil
+		tramp-default-host-alist nil)
+	  (should
+	   (string-equal
+	    (file-remote-p
+	     (concat
+	      "/user1@host1"
+	      "|user2@"
+	      "|user3@:/path/to/file"))
+	    (format "/%s@%s|%s@%s|%s@%s:"
+		    "user1" "host1"
+		    "user2" "host1"
+		    "user3" "host1")))
+	  (should
+	   (string-equal
+	    (file-remote-p
+	     (concat
+	      "/%u@%h"
+	      "|%u@%h"
+	      "|user3@host3:/path/to/file"))
+	    (format "/%s@%s|%s@%s|%s@%s:"
+		    "user3" "host3"
+		    "user3" "host3"
 		    "user3" "host3"))))
 
       ;; Exit.
@@ -1670,9 +1723,9 @@ handled properly.  BODY shall not contain a timeout."
 	      "/[/user1@host1"
 	      "|/user2@host2"
 	      "|/user3@host3]/path/to/file"))
-	    (format "/[/%s@%s|/%s@%s|%s/%s@%s]"
-		    "user1" "host1"
-		    "user2" "host2"
+	    (format "/[%s/%s@%s|%s/%s@%s|%s/%s@%s]"
+		    "method1" "user1" "host1"
+		    "method2" "user2" "host2"
 		    "method3" "user3" "host3")))
 
 	  ;; Expand `tramp-default-user-alist'.
@@ -1686,9 +1739,9 @@ handled properly.  BODY shall not contain a timeout."
 	      "/[method1/host1"
 	      "|method2/host2"
 	      "|method3/host3]/path/to/file"))
-	    (format "/[%s/%s|%s/%s|%s/%s@%s]"
-		    "method1" "host1"
-		    "method2" "host2"
+	    (format "/[%s/%s@%s|%s/%s@%s|%s/%s@%s]"
+		    "method1" "user1" "host1"
+		    "method2" "user2" "host2"
 		    "method3" "user3" "host3")))
 
 	  ;; Expand `tramp-default-host-alist'.
@@ -1702,9 +1755,36 @@ handled properly.  BODY shall not contain a timeout."
 	      "/[method1/user1@"
 	      "|method2/user2@"
 	      "|method3/user3@]/path/to/file"))
-	    (format "/[%s/%s@|%s/%s@|%s/%s@%s]"
-		    "method1" "user1"
-		    "method2" "user2"
+	    (format "/[%s/%s@%s|%s/%s@%s|%s/%s@%s]"
+		    "method1" "user1" "host1"
+		    "method2" "user2" "host2"
+		    "method3" "user3" "host3")))
+
+	  ;; Ad-hoc user name and host name expansion.
+	  (setq tramp-default-method-alist nil
+		tramp-default-user-alist nil
+		tramp-default-host-alist nil)
+	  (should
+	   (string-equal
+	    (file-remote-p
+	     (concat
+	      "/[method1/user1@host1"
+	      "|method2/user2@"
+	      "|method3/user3@]/path/to/file"))
+	    (format "/[%s/%s@%s|%s/%s@%s|%s/%s@%s]"
+		    "method1" "user1" "host1"
+		    "method2" "user2" "host1"
+		    "method3" "user3" "host1")))
+	  (should
+	   (string-equal
+	    (file-remote-p
+	     (concat
+	      "/[method1/%u@%h"
+	      "|method2/%u@%h"
+	      "|method3/user3@host3]/path/to/file"))
+	    (format "/[%s/%s@%s|%s/%s@%s|%s/%s@%s]"
+		    "method1" "user3" "host3"
+		    "method2" "user3" "host3"
 		    "method3" "user3" "host3"))))
 
       ;; Exit.
@@ -2882,16 +2962,17 @@ This tests also `file-readable-p', `file-regular-p' and
 	    ;; able to return the date correctly.  They say "don't know".
 	    (dolist (elt attr)
 	      (unless
-		  (zerop
-		   (float-time
-		    (nth 5 (file-attributes
-			    (expand-file-name (car elt) tmp-name2)))))
+		  (tramp-compat-time-equal-p
+		   (nth
+		    5 (file-attributes (expand-file-name (car elt) tmp-name2)))
+		   tramp-time-dont-know)
 		(should
 		 (equal (file-attributes (expand-file-name (car elt) tmp-name2))
 			(cdr elt)))))
 	    (setq attr (directory-files-and-attributes tmp-name2 'full))
 	    (dolist (elt attr)
-	      (unless (zerop (float-time (nth 5 (file-attributes (car elt)))))
+	      (unless (tramp-compat-time-equal-p
+		       (nth 5 (file-attributes (car elt))) tramp-time-dont-know)
 		(should
 		 (equal (file-attributes (car elt)) (cdr elt)))))
 	    (setq attr (directory-files-and-attributes tmp-name2 nil "^b"))
@@ -3215,14 +3296,13 @@ This tests also `make-symbolic-link', `file-truename' and `add-name-to-file'."
 	    (write-region "foo" nil tmp-name1)
 	    (should (file-exists-p tmp-name1))
 	    (should (consp (nth 5 (file-attributes tmp-name1))))
-	    ;; A zero timestamp means don't know, and will be replaced by
-	    ;; `current-time'.  Therefore, use timestamp 1.  Skip the
-	    ;; test, if the remote handler is not able to set the
-	    ;; correct time.
+	    ;; Skip the test, if the remote handler is not able to set
+	    ;; the correct time.
 	    (skip-unless (set-file-times tmp-name1 (seconds-to-time 1)))
 	    ;; Dumb remote shells without perl(1) or stat(1) are not
 	    ;; able to return the date correctly.  They say "don't know".
-	    (unless (zerop (float-time (nth 5 (file-attributes tmp-name1))))
+	    (unless (tramp-compat-time-equal-p
+		     (nth 5 (file-attributes tmp-name1)) tramp-time-dont-know)
 	      (should
 	       (equal (nth 5 (file-attributes tmp-name1)) (seconds-to-time 1)))
 	      (write-region "bla" nil tmp-name2)
@@ -3249,6 +3329,14 @@ This tests also `make-symbolic-link', `file-truename' and `add-name-to-file'."
 	    (should (file-exists-p tmp-name))
 	    (with-temp-buffer
 	      (insert-file-contents tmp-name)
+	      (should (verify-visited-file-modtime))
+              (set-visited-file-modtime (seconds-to-time 1))
+	      (should (verify-visited-file-modtime))
+	      (should (= 1 (float-time (visited-file-modtime))))
+
+	      ;; Checks with deleted file.
+	      (delete-file tmp-name)
+	      (dired-uncache tmp-name)
 	      (should (verify-visited-file-modtime))
               (set-visited-file-modtime (seconds-to-time 1))
 	      (should (verify-visited-file-modtime))
@@ -3483,6 +3571,7 @@ This tests also `make-symbolic-link', `file-truename' and `add-name-to-file'."
   (when (not (memq system-type '(cygwin windows-nt)))
     (let ((method (file-remote-p tramp-test-temporary-file-directory 'method))
 	  (host (file-remote-p tramp-test-temporary-file-directory 'host))
+	  (vec (tramp-dissect-file-name tramp-test-temporary-file-directory))
           (orig-syntax tramp-syntax))
       (when (and (stringp host) (string-match tramp-host-with-port-regexp host))
 	(setq host (match-string 1 host)))
@@ -3493,6 +3582,10 @@ This tests also `make-symbolic-link', `file-truename' and `add-name-to-file'."
 	       (if (tramp--test-expensive-test)
 		   (tramp-syntax-values) `(,orig-syntax)))
             (tramp-change-syntax syntax)
+	    ;; This has cleaned up all connection data, which are used
+	    ;; for completion.  We must refill the cache.
+	    (tramp-set-connection-property vec "property" nil)
+
             (let ;; This is needed for the `simplified' syntax.
                 ((method-marker
                   (if (zerop (length tramp-method-regexp))
@@ -4876,7 +4969,7 @@ Use the `ls' command."
 		 (numberp (nth 2 fsi))))))
 
 (defun tramp--test-timeout-handler ()
-  (interactive)
+  "Timeout handler, reporting a failed test."
   (ert-fail (format "`%s' timed out" (ert-test-name (ert-running-test)))))
 
 ;; This test is inspired by Bug#16928.

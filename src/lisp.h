@@ -229,19 +229,21 @@ extern bool suppress_checking EXTERNALLY_VISIBLE;
    USE_LSB_TAG not only requires the least 3 bits of pointers returned by
    malloc to be 0 but also needs to be able to impose a mult-of-8 alignment
    on some non-GC Lisp_Objects, all of which are aligned via
-   GCALIGNED_UNION_MEMBER, GCALIGNED_STRUCT_MEMBER, and GCALIGNED_STRUCT.  */
+   GCALIGNED_UNION_MEMBER.  */
 
 enum Lisp_Bits
   {
     /* Number of bits in a Lisp_Object value, not counting the tag.  */
     VALBITS = EMACS_INT_WIDTH - GCTYPEBITS,
 
-    /* Number of bits in a Lisp fixnum tag.  */
-    INTTYPEBITS = GCTYPEBITS - 1,
-
     /* Number of bits in a Lisp fixnum value, not counting the tag.  */
     FIXNUM_BITS = VALBITS + 1
   };
+
+/* Number of bits in a Lisp fixnum tag; can be used in #if.  */
+DEFINE_GDB_SYMBOL_BEGIN (int, INTTYPEBITS)
+#define INTTYPEBITS (GCTYPEBITS - 1)
+DEFINE_GDB_SYMBOL_END (INTTYPEBITS)
 
 /* The maximum value that can be stored in a EMACS_INT, assuming all
    bits other than the type bits contribute to a nonnegative signed value.
@@ -282,15 +284,14 @@ error !;
 # define GCALIGNMENT 1
 #endif
 
-/* If a struct is always allocated by the GC and is therefore always
-   GC-aligned, put GCALIGNED_STRUCT after its closing '}'; this can
-   help the compiler generate better code.
+/* To cause a union to have alignment of at least GCALIGNMENT, put
+   GCALIGNED_UNION_MEMBER in its member list.
 
-   To cause a union to have alignment of at least GCALIGNMENT, put
-   GCALIGNED_UNION_MEMBER in its member list.  Similarly for a struct
-   and GCALIGNED_STRUCT_MEMBER, although this may make the struct a
-   bit bigger on non-GCC platforms.  Any struct using
-   GCALIGNED_STRUCT_MEMBER should also use GCALIGNED_STRUCT.
+   If a struct is always GC-aligned (either by the GC, or via
+   allocation in a containing union that has GCALIGNED_UNION_MEMBER)
+   and does not contain a GC-aligned struct or union, putting
+   GCALIGNED_STRUCT after its closing '}' can help the compiler
+   generate better code.
 
    Although these macros are reasonably portable, they are not
    guaranteed on non-GCC platforms, as C11 does not require support
@@ -304,10 +305,8 @@ error !;
 
 #define GCALIGNED_UNION_MEMBER char alignas (GCALIGNMENT) gcaligned;
 #if HAVE_STRUCT_ATTRIBUTE_ALIGNED
-# define GCALIGNED_STRUCT_MEMBER
 # define GCALIGNED_STRUCT __attribute__ ((aligned (GCALIGNMENT)))
 #else
-# define GCALIGNED_STRUCT_MEMBER GCALIGNED_UNION_MEMBER
 # define GCALIGNED_STRUCT
 #endif
 #define GCALIGNED(type) (alignof (type) % GCALIGNMENT == 0)
@@ -1034,7 +1033,7 @@ enum More_Lisp_Bits
    that cons.  */
 
 /* Largest and smallest representable fixnum values.  These are the C
-   values.  They are macros for use in static initializers.  */
+   values.  They are macros for use in #if and static initializers.  */
 #define MOST_POSITIVE_FIXNUM (EMACS_INT_MAX >> INTTYPEBITS)
 #define MOST_NEGATIVE_FIXNUM (-1 - MOST_POSITIVE_FIXNUM)
 
@@ -1968,9 +1967,13 @@ struct Lisp_Subr
     const char *symbol_name;
     const char *intspec;
     EMACS_INT doc;
-    GCALIGNED_STRUCT_MEMBER
   } GCALIGNED_STRUCT;
-verify (GCALIGNED (struct Lisp_Subr));
+union Aligned_Lisp_Subr
+  {
+    struct Lisp_Subr s;
+    GCALIGNED_UNION_MEMBER
+  };
+verify (GCALIGNED (union Aligned_Lisp_Subr));
 
 INLINE bool
 SUBRP (Lisp_Object a)
@@ -1982,7 +1985,7 @@ INLINE struct Lisp_Subr *
 XSUBR (Lisp_Object a)
 {
   eassert (SUBRP (a));
-  return XUNTAG (a, Lisp_Vectorlike, struct Lisp_Subr);
+  return &XUNTAG (a, Lisp_Vectorlike, union Aligned_Lisp_Subr)->s;
 }
 
 enum char_table_specials
@@ -2504,7 +2507,7 @@ INTEGERP (Lisp_Object x)
   return FIXNUMP (x) || BIGNUMP (x);
 }
 
-/* Return a Lisp integer with value taken from n.  */
+/* Return a Lisp integer with value taken from N.  */
 INLINE Lisp_Object
 make_int (intmax_t n)
 {
@@ -2950,15 +2953,15 @@ CHECK_FIXNUM_CDR (Lisp_Object x)
 /* This version of DEFUN declares a function prototype with the right
    arguments, so we can catch errors with maxargs at compile-time.  */
 #define DEFUN(lname, fnname, sname, minargs, maxargs, intspec, doc)	\
-   static struct Lisp_Subr sname =				\
-     { { PVEC_SUBR << PSEUDOVECTOR_AREA_BITS },				\
+   static union Aligned_Lisp_Subr sname =				\
+     {{{ PVEC_SUBR << PSEUDOVECTOR_AREA_BITS },				\
        { .a ## maxargs = fnname },					\
-       minargs, maxargs, lname, intspec, 0};				\
+       minargs, maxargs, lname, intspec, 0}};				\
    Lisp_Object fnname
 
 /* defsubr (Sname);
    is how we define the symbol for function `name' at start-up time.  */
-extern void defsubr (struct Lisp_Subr *);
+extern void defsubr (union Aligned_Lisp_Subr *);
 
 enum maxargs
   {
@@ -3069,6 +3072,7 @@ union specbinding
       ENUM_BF (specbind_tag) kind : CHAR_BIT;
       void (*func) (Lisp_Object);
       Lisp_Object arg;
+      EMACS_INT eval_depth;
     } unwind;
     struct {
       ENUM_BF (specbind_tag) kind : CHAR_BIT;
@@ -3327,6 +3331,7 @@ extern ptrdiff_t bignum_bufsize (Lisp_Object, int);
 extern ptrdiff_t bignum_to_c_string (char *, ptrdiff_t, Lisp_Object, int);
 extern Lisp_Object bignum_to_string (Lisp_Object, int);
 extern Lisp_Object make_bignum_str (char const *, int);
+extern Lisp_Object make_neg_biguint (uintmax_t);
 extern Lisp_Object double_to_integer (double);
 
 /* Converthe integer NUM to *N.  Return true if successful, false
@@ -3837,7 +3842,7 @@ LOADHIST_ATTACH (Lisp_Object x)
 extern int openp (Lisp_Object, Lisp_Object, Lisp_Object,
                   Lisp_Object *, Lisp_Object, bool);
 enum { S2N_IGNORE_TRAILING = 1 };
-extern Lisp_Object string_to_number (char const *, int, int);
+extern Lisp_Object string_to_number (char const *, int, ptrdiff_t *);
 extern void map_obarray (Lisp_Object, void (*) (Lisp_Object, Lisp_Object),
                          Lisp_Object);
 extern void dir_warning (const char *, Lisp_Object);
@@ -4007,6 +4012,7 @@ extern void syms_of_module (void);
 
 /* Defined in thread.c.  */
 extern void mark_threads (void);
+extern void unmark_main_thread (void);
 
 /* Defined in editfns.c.  */
 extern void insert1 (Lisp_Object);
@@ -4014,11 +4020,10 @@ extern void save_excursion_save (union specbinding *);
 extern void save_excursion_restore (Lisp_Object, Lisp_Object);
 extern Lisp_Object save_restriction_save (void);
 extern void save_restriction_restore (Lisp_Object);
-extern _Noreturn void time_overflow (void);
 extern Lisp_Object make_buffer_string (ptrdiff_t, ptrdiff_t, bool);
 extern Lisp_Object make_buffer_string_both (ptrdiff_t, ptrdiff_t, ptrdiff_t,
 					    ptrdiff_t, bool);
-extern void init_editfns (bool);
+extern void init_editfns (void);
 extern void syms_of_editfns (void);
 
 /* Defined in buffer.c.  */
@@ -4355,6 +4360,7 @@ extern ptrdiff_t emacs_write_quit (int, void const *, ptrdiff_t);
 extern void emacs_perror (char const *);
 extern int renameat_noreplace (int, char const *, int, char const *);
 extern int str_collate (Lisp_Object, Lisp_Object, Lisp_Object, Lisp_Object);
+extern void syms_of_sysdep (void);
 
 /* Defined in filelock.c.  */
 extern void lock_file (Lisp_Object);

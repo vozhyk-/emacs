@@ -62,6 +62,11 @@ to reduce differences between developer and production builds.
 ** Ibuffer
 
 ---
+*** All mode filters can now accept a list of symbols.
+This means you can now easily filter several major modes, as well
+as a single mode.
+
+---
 *** New toggle 'ibuffer-do-toggle-lock', bound to 'L'.
 
 ** Gnus
@@ -167,7 +172,7 @@ the data.
 
 +++
 ** The Network Security Manager now allows more fine-grained control
-of what checks to run via the `network-security-protocol-checks'
+of what checks to run via the 'network-security-protocol-checks'
 variable.
 
 +++
@@ -215,6 +220,12 @@ This triggers to search the program on the remote host as indicated by
 When set to t, no message will be shown when auto-saving (default
 value: nil).
 
+---
+** The value of 'make-cursor-line-fully-visible' can now be a function.
+In addition to nil or non-nil, the value can now be a predicate
+function.  Follow mode uses this to control scrolling of its windows
+when the last screen line in a window is not fully visible.
+
 
 * Editing Changes in Emacs 27.1
 
@@ -247,10 +258,9 @@ case does not match.
 for abbrevs that have them.
 
 +++
-** 'insert-abbrev-table-description' skips empty tables.
-'insert-abbrev-table-description' skips inserting empty tables when
-inserting non-readable tables.  By extension, this makes
-'write-abbrev-file' skip writing empty tables.
+** 'write-abbrev-file' skips empty tables.
+'write-abbrev-file' now skips inserting a 'define-abbrev-table' form for
+tables which do not have any non-system abbrevs to save.
 
 +++
 ** The new functions and commands 'text-property-search-forward' and
@@ -276,6 +286,16 @@ in (info "(emacs) Directory Variables")
 
 
 * Changes in Specialized Modes and Packages in Emacs 27.1
+
+---
+** Follow mode
+In the current follow group of windows, "ghost" cursors are no longer
+displayed in the non-selected follow windows.  To get the old behavior
+back, customize follow-hide-ghost-cursors to nil.
+
+** Octave mode
+The mode is automatically enabled in files that start with the
+'function' keyword.
 
 ** project.el
 *** New commands project-search and project-query-replace
@@ -314,6 +334,12 @@ file.
 This new variable allows customizing the default arguments passed to
 git-grep when 'vc-git-grep' is used.
 
+*** Command 'vc-git-stash' now respects marks in the '*vc-dir*' buffer.
+When some files are marked, only those are stashed.
+When no files are marked, all modified files are stashed, as before.
+
+*** The new hook 'vc-retrieve-tag-hook' runs after retrieving a tag.
+
 ** diff-mode
 *** Hunks are now automatically refined by default.
 To disable it, set the new defcustom 'diff-font-lock-refine' to nil.
@@ -330,7 +356,7 @@ shown in the currently selected window.
 ** Comint
 
 +++
-*** 'send-invisible' is now an obsolete alias for `comint-send-invisible'.
+*** 'send-invisible' is now an obsolete alias for 'comint-send-invisible'.
 Also, 'shell-strip-ctrl-m' is declared obsolete.
 
 +++
@@ -349,6 +375,29 @@ the Nth argument counting from the last one.  Thus 'C-c .' can now
 better emulate 'M-.' in both Bash and zsh, since the former counts
 from the beginning of the arguments, while the latter counts from the
 end.
+
+** SQL
+
+*** Installation of 'sql-indent' from ELPA is strongly encouraged.
+This package support sophisticated rules for properly indenting SQL
+statements.  SQL is not like other programming languages like C, Java,
+or Python where code is sparse and rules for formatting are fairly
+well established. Instead SQL is more like COBOL (from which it came)
+and code tends to be very dense and line ending decisions driven by
+syntax and line length considerations to make readable code.
+Experienced SQL developers may prefer to rely upon existing Emacs
+facilities for formatting code but the 'sql-indent' package provides
+facilities to aid more casual SQL developers layout queries and
+complex expressions.
+
+*** 'sql-use-indent-support' (default t) enables SQL indention support.
+The 'sql-indent' package from ELPA must be installed to get the
+indentation support in 'sql-mode' and 'sql-interactive-mode'.
+
+*** 'sql-mode-hook' and 'sql-interactive-mode-hook' changed.
+Both hook variables have had 'sql-indent-enable' added to their
+default values. If youhave existing customizations to these variables,
+you should make sure that the new default entry is included.
 
 ** Term
 
@@ -370,6 +419,9 @@ This enables more efficient backends.  See the docstring of
 'flymake-diagnostic-functions' or the Flymake manual for details.
 
 ** Package
+
+*** New function 'package-get-version' lets packages query their own version.
+Example use in auctex.el: (defconst auctex-version (package-get-version))
 
 *** New 'package-quickstart' feature.
 When 'package-quickstart' is non-nil, package.el precomputes a big autoloads
@@ -695,6 +747,10 @@ are obsoleted in GVFS.
 *** The user option 'tramp-ignored-file-name-regexp' allows to disable
 Tramp for some look-alike remote file names.
 
++++
+*** For some connection methods, like "su" or "sudo", the host name in
+ad-hoc multi-hop file names must match the previous hop.
+
 ** Register
 ---
 *** The return value of method 'register-val-describe' includes the
@@ -956,6 +1012,21 @@ include functions like encode-char that compute code-points, functions
 like file-attributes that compute file sizes and other attributes,
 functions like process-id that compute process IDs, and functions like
 user-uid and group-gid that compute user and group IDs.
+
++++
+** Although the default timestamp format is still (HI LO US PS),
+it is planned to change in a future Emacs version, to exploit bignums.
+The documentation has been updated to mention that the timestamp
+format may change and that programs should use functions like
+format-time-string, decode-time, and encode-time rather than probing
+the innards of a timestamp directly, or creating a timestamp by hand.
+
++++
+** encode-time supports a new API (encode-time TIME &optional FORM).
+This can convert decoded times and Lisp time values to Lisp timestamps
+of various forms, including a new timestamp form (TICKS . HZ), where
+TICKS is an integer and HZ is a positive integer denoting a clock
+frequency.  The old encode-time API is still supported.
 
 +++
 ** 'time-add', 'time-subtract', and 'time-less-p' now accept

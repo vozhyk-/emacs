@@ -3324,7 +3324,7 @@ readable_events (int flags)
   if (flags & READABLE_EVENTS_DO_TIMERS_NOW)
     timer_check ();
 
-  /* If the buffer contains only FOCUS_IN_EVENT events, and
+  /* If the buffer contains only FOCUS_IN/OUT_EVENT events, and
      READABLE_EVENTS_FILTER_EVENTS is set, report it as empty.  */
   if (kbd_fetch_ptr != kbd_store_ptr)
     {
@@ -3344,7 +3344,8 @@ readable_events (int flags)
 #ifdef USE_TOOLKIT_SCROLL_BARS
 		    (flags & READABLE_EVENTS_FILTER_EVENTS) &&
 #endif
-		    event->kind == FOCUS_IN_EVENT)
+		    (event->kind == FOCUS_IN_EVENT
+                     || event->kind == FOCUS_OUT_EVENT))
 #ifdef USE_TOOLKIT_SCROLL_BARS
 		  && !((flags & READABLE_EVENTS_IGNORE_SQUEEZABLES)
 		       && (event->kind == SCROLL_BAR_CLICK_EVENT
@@ -3554,6 +3555,7 @@ kbd_buffer_store_buffered_event (union buffered_input_event *event,
     case ICONIFY_EVENT: ignore_event = Qiconify_frame; break;
     case DEICONIFY_EVENT: ignore_event = Qmake_frame_visible; break;
     case SELECTION_REQUEST_EVENT: ignore_event = Qselection_request; break;
+    case BUFFER_SWITCH_EVENT: ignore_event = Qbuffer_switch; break;
     default: ignore_event = Qnil; break;
     }
 
@@ -4162,18 +4164,13 @@ decode_timer (Lisp_Object timer, struct timespec *result)
   Lisp_Object *vec;
 
   if (! (VECTORP (timer) && ASIZE (timer) == 9))
-    return 0;
+    return false;
   vec = XVECTOR (timer)->contents;
   if (! NILP (vec[0]))
-    return 0;
+    return false;
   if (! FIXNUMP (vec[2]))
     return false;
-
-  struct lisp_time t;
-  if (decode_time_components (vec[1], vec[2], vec[3], vec[8], &t, 0) <= 0)
-    return false;
-  *result = lisp_to_timespec (t);
-  return timespec_valid_p (*result);
+  return list4_to_timespec (vec[1], vec[2], vec[3], vec[8], result);
 }
 
 
@@ -11081,6 +11078,8 @@ syms_of_keyboard (void)
 
   /* Menu and tool bar item parts.  */
   DEFSYM (Qmenu_enable, "menu-enable");
+
+  DEFSYM (Qbuffer_switch, "buffer-switch");
 
 #ifdef HAVE_NTGUI
   DEFSYM (Qlanguage_change, "language-change");
