@@ -1,6 +1,6 @@
 ;;; editfns-tests.el -- tests for editfns.c
 
-;; Copyright (C) 2016-2018 Free Software Foundation, Inc.
+;; Copyright (C) 2016-2019 Free Software Foundation, Inc.
 
 ;; This file is part of GNU Emacs.
 
@@ -350,5 +350,36 @@
                    "        -0x000000003ffffffffffffffe000000000000000"))
     (should (equal (format "%-#50.40x" v3)
                    "-0x000000003ffffffffffffffe000000000000000        "))))
+
+(ert-deftest test-group-name ()
+  (should (stringp (group-name (group-gid))))
+  (should-error (group-name 'foo))
+  (cond
+   ((memq system-type '(windows-nt ms-dos))
+    (should-not (group-name 123456789)))
+   ((executable-find "getent")
+    (with-temp-buffer
+      (let (stat name)
+      (dolist (gid (list 0 1212345 (group-gid)))
+        (erase-buffer)
+        (setq stat (ignore-errors
+                     (call-process "getent" nil '(t nil) nil "group"
+                                   (number-to-string gid))))
+        (setq name (group-name gid))
+        (goto-char (point-min))
+        (cond ((eq stat 0)
+               (if (looking-at "\\([[:alnum:]_-]+\\):")
+                   (should (string= (match-string 1) name))))
+              ((eq stat 2)
+               (should-not name)))))))))
+
+(ert-deftest test-translate-region-internal ()
+  (with-temp-buffer
+    (let ((max-char #16r3FFFFF)
+          (tt (make-char-table 'translation-table)))
+      (aset tt max-char ?*)
+      (insert max-char)
+      (translate-region-internal (point-min) (point-max) tt)
+      (should (string-equal (buffer-string) "*")))))
 
 ;;; editfns-tests.el ends here

@@ -1,6 +1,6 @@
 ;;; frame.el --- multi-frame management independent of window systems  -*- lexical-binding:t -*-
 
-;; Copyright (C) 1993-1994, 1996-1997, 2000-2018 Free Software
+;; Copyright (C) 1993-1994, 1996-1997, 2000-2019 Free Software
 ;; Foundation, Inc.
 
 ;; Maintainer: emacs-devel@gnu.org
@@ -644,8 +644,42 @@ Return nil if we don't know how to interpret DISPLAY."
 (defun make-frame-on-display (display &optional parameters)
   "Make a frame on display DISPLAY.
 The optional argument PARAMETERS specifies additional frame parameters."
-  (interactive "sMake frame on display: ")
+  (interactive (list (completing-read
+                      (format "Make frame on display: ")
+                      (delete-dups
+                       (mapcar (lambda (frame)
+                                 (frame-parameter frame 'display))
+                               (frame-list))))))
   (make-frame (cons (cons 'display display) parameters)))
+
+(defun make-frame-on-monitor (monitor &optional display parameters)
+  "Make a frame on monitor MONITOR.
+The optional argument DISPLAY can be a display name, and the optional
+argument PARAMETERS specifies additional frame parameters."
+  (interactive (list (completing-read
+                      (format "Make frame on monitor: ")
+                      (mapcar (lambda (a)
+                                (cdr (assq 'name a)))
+                              (display-monitor-attributes-list)))))
+  (let* ((monitor-geometry
+          (car (delq nil (mapcar (lambda (a)
+                                   (when (equal (cdr (assq 'name a)) monitor)
+                                     (cdr (assq 'workarea a))))
+                                 (display-monitor-attributes-list display)))))
+         (frame-geometry
+          (when monitor-geometry
+            (x-parse-geometry (format "%dx%d+%d+%d"
+                                      (nth 2 monitor-geometry)
+                                      (nth 3 monitor-geometry)
+                                      (nth 0 monitor-geometry)
+                                      (nth 1 monitor-geometry)))))
+         (frame-geometry-in-pixels
+          (when frame-geometry
+            `((top . ,(cdr (assq 'top frame-geometry)))
+              (left . ,(cdr (assq 'left frame-geometry)))
+              (height . (text-pixels . ,(cdr (assq 'height frame-geometry))))
+              (width . (text-pixels . ,(cdr (assq 'width frame-geometry))))))))
+    (make-frame (append frame-geometry-in-pixels parameters))))
 
 (declare-function x-close-connection "xfns.c" (terminal))
 
@@ -1763,20 +1797,17 @@ for FRAME."
   (let* ((frame (window-normalize-frame frame))
          (root (frame-root-window frame))
          (mini (minibuffer-window frame))
-         (mini-height-before-size-change 0)
+         (mini-old-height 0)
          (mini-height 0))
     ;; FRAME's minibuffer window counts iff it's on FRAME and FRAME is
     ;; not a minibuffer-only frame.
     (when (and (eq (window-frame mini) frame) (not (eq mini root)))
-      (setq mini-height-before-size-change
-            (window-pixel-height-before-size-change mini))
+      (setq mini-old-height (window-old-pixel-height mini))
       (setq mini-height (window-pixel-height mini)))
     ;; Return non-nil when either the width of the root or the sum of
     ;; the heights of root and minibuffer window changed.
-    (or (/= (window-pixel-width-before-size-change root)
-            (window-pixel-width root))
-        (/= (+ (window-pixel-height-before-size-change root)
-               mini-height-before-size-change)
+    (or (/= (window-old-pixel-width root) (window-pixel-width root))
+        (/= (+ (window-old-pixel-height root) mini-old-height)
             (+ (window-pixel-height root) mini-height)))))
 
 ;;;; Frame/display capabilities.

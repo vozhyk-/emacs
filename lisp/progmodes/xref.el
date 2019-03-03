@@ -1,6 +1,6 @@
 ;; xref.el --- Cross-referencing commands              -*-lexical-binding:t-*-
 
-;; Copyright (C) 2014-2018 Free Software Foundation, Inc.
+;; Copyright (C) 2014-2019 Free Software Foundation, Inc.
 
 ;; This file is part of GNU Emacs.
 
@@ -70,9 +70,6 @@
 (require 'eieio)
 (require 'ring)
 (require 'project)
-
-(eval-when-compile
-  (require 'semantic/symref)) ;; for hit-lines slot
 
 (defgroup xref nil "Cross-referencing commands"
   :version "25.1"
@@ -317,8 +314,12 @@ backward."
 ;;; Marker stack  (M-. pushes, M-, pops)
 
 (defcustom xref-marker-ring-length 16
-  "Length of the xref marker ring."
-  :type 'integer)
+  "Length of the xref marker ring.
+If this variable is not set through Customize, you must call
+`xref-set-marker-ring-length' for changes to take effect."
+  :type 'integer
+  :initialize #'custom-initialize-default
+  :set #'xref-set-marker-ring-length)
 
 (defcustom xref-prompt-for-identifier '(not xref-find-definitions
                                             xref-find-definitions-other-window
@@ -353,6 +354,14 @@ elements is negated: these commands will NOT prompt."
 
 (defvar xref--marker-ring (make-ring xref-marker-ring-length)
   "Ring of markers to implement the marker stack.")
+
+(defun xref-set-marker-ring-length (var val)
+  "Set `xref-marker-ring-length'.
+VAR is the symbol `xref-marker-ring-length' and VAL is the new
+value."
+  (set-default var val)
+  (if (ring-p xref--marker-ring)
+      (ring-resize xref--marker-ring val)))
 
 (defun xref-push-marker-stack (&optional m)
   "Add point M (defaults to `point-marker') to the marker stack."
@@ -465,27 +474,17 @@ and finally return the window."
           (or (eq xref--original-window-intent 'frame)
               pop-up-frames))
          (action
-          (cond ((memq
-                  xref--original-window-intent
-                  '(window frame))
+          (cond ((eq xref--original-window-intent 'frame)
                  t)
+                ((eq xref--original-window-intent 'window)
+                 '(display-buffer-same-window))
                 ((and
                   (window-live-p xref--original-window)
                   (or (not (window-dedicated-p xref--original-window))
                       (eq (window-buffer xref--original-window) buf)))
-                 `(,(lambda (buf _alist)
-                      (set-window-buffer xref--original-window buf)
-                      xref--original-window))))))
-    (with-selected-window
-        (with-selected-window
-            ;; Just before `display-buffer', place ourselves in the
-            ;; original window to suggest preserving it. Of course, if
-            ;; user has deleted the original window, all bets are off,
-            ;; just use the selected one.
-            (or (and (window-live-p xref--original-window)
-                     xref--original-window)
-                (selected-window))
-          (display-buffer buf action))
+                 `((display-buffer-in-previous-window)
+                   (previous-window . ,xref--original-window))))))
+    (with-selected-window (display-buffer buf action)
       (xref--goto-char pos)
       (run-hooks 'xref-after-jump-hook)
       (let ((buf (current-buffer)))
@@ -542,9 +541,10 @@ SELECT is `quit', also quit the *xref* window."
 Non-interactively, non-nil QUIT means to first quit the *xref*
 buffer."
   (interactive)
-  (let ((buffer (current-buffer))
-        (xref (or (xref--item-at-point)
-                  (user-error "No reference at point"))))
+  (let* ((buffer (current-buffer))
+         (xref (or (xref--item-at-point)
+                   (user-error "No reference at point")))
+         (xref--current-item xref))
     (xref--show-location (xref-item-location xref) (if quit 'quit t))
     (next-error-found buffer (current-buffer))))
 
@@ -694,8 +694,10 @@ references displayed in the current *xref* buffer."
   (let ((backward (< n 0))
         (n (abs n))
         (xref nil))
-    (dotimes (_ n)
-      (setq xref (xref--search-property 'xref-item backward)))
+    (if (= n 0)
+        (setq xref (get-text-property (point) 'xref-item))
+      (dotimes (_ n)
+        (setq xref (xref--search-property 'xref-item backward))))
     (cond (xref
            ;; Save the current position (when the buffer is visible,
            ;; it gets reset to that window's point from time to time).
@@ -992,7 +994,7 @@ IGNORES is a list of glob patterns."
        ;; do that reliably enough, without creating false negatives?
        (command (xref--rgrep-command (xref--regexp-to-extended regexp)
                                      files
-                                     (expand-file-name dir)
+                                     (file-local-name (expand-file-name dir))
                                      ignores))
        (def default-directory)
        (buf (get-buffer-create " *xref-grep*"))
@@ -1003,7 +1005,7 @@ IGNORES is a list of glob patterns."
       (erase-buffer)
       (setq default-directory def)
       (setq status
-            (call-process-shell-command command nil t))
+            (process-file-shell-command command nil t))
       (goto-char (point-min))
       ;; Can't use the exit status: Grep exits with 1 to mean "no
       ;; matches found".  Find exits with 1 if any of the invocations
@@ -1105,6 +1107,7 @@ Such as the current syntax table and the applied syntax properties."
 
 (defun xref--collect-matches (hit regexp tmp-buffer)
   (pcase-let* ((`(,line ,file ,text) hit)
+               (file (and file (concat (file-remote-p default-directory) file)))
                (buf (xref--find-buffer-visiting file))
                (syntax-needed (xref--regexp-syntax-dependent-p regexp)))
     (if buf

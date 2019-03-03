@@ -1,6 +1,6 @@
 ;; erc.el --- An Emacs Internet Relay Chat client  -*- lexical-binding:t -*-
 
-;; Copyright (C) 1997-2018 Free Software Foundation, Inc.
+;; Copyright (C) 1997-2019 Free Software Foundation, Inc.
 
 ;; Author: Alexander L. Belikoff (alexander@belikoff.net)
 ;; Contributors: Sergey Berezin (sergey.berezin@cs.cmu.edu),
@@ -61,9 +61,6 @@
 
 ;;; History:
 ;;
-
-(defconst erc-version-string (format "\C-bERC\C-b (IRC client for Emacs %s)" emacs-version)
-  "ERC version.  This is used by function `erc-version'.")
 
 ;;; Code:
 
@@ -1943,15 +1940,15 @@ removed from the list will be disabled."
 (defun erc-setup-buffer (buffer)
   "Consults `erc-join-buffer' to find out how to display `BUFFER'."
   (pcase erc-join-buffer
-    (`window
+    ('window
      (if (active-minibuffer-window)
          (display-buffer buffer)
        (switch-to-buffer-other-window buffer)))
-    (`window-noselect
+    ('window-noselect
      (display-buffer buffer))
-    (`bury
+    ('bury
      nil)
-    (`frame
+    ('frame
      (when (or (not erc-reuse-frames)
                (not (get-buffer-window buffer t)))
        (let ((frame (make-frame (or erc-frame-alist
@@ -2568,8 +2565,8 @@ consumption for long-lived IRC or Emacs sessions."
      (maphash
       (lambda (nick last-PRIVMSG-time)
         (when
-            (> (float-time (time-subtract nil last-PRIVMSG-time))
-               erc-lurker-threshold-time)
+	    (time-less-p erc-lurker-threshold-time
+			 (time-since last-PRIVMSG-time))
           (remhash nick hash)))
       hash)
      (if (zerop (hash-table-count hash))
@@ -2634,9 +2631,8 @@ server within `erc-lurker-threshold-time'.  See also
           (gethash (erc-lurker-maybe-trim nick)
                    (gethash server erc-lurker-state (make-hash-table)))))
     (or (null last-PRIVMSG-time)
-        (> (float-time
-            (time-subtract nil last-PRIVMSG-time))
-           erc-lurker-threshold-time))))
+	(time-less-p erc-lurker-threshold-time
+		     (time-since last-PRIVMSG-time)))))
 
 (defcustom erc-common-server-suffixes
   '(("openprojects.net\\'" . "OPN")
@@ -3415,7 +3411,7 @@ Otherwise leave the channel indicated by LINE."
 
 (defun erc-cmd-PING (recipient)
   "Ping RECIPIENT."
-  (let ((time (format "%f" (erc-current-time))))
+  (let ((time (format-time-string "%s.%6N")))
     (erc-log (format "cmd: PING: %s" time))
     (erc-cmd-CTCP recipient "PING" time)))
 
@@ -4643,7 +4639,7 @@ See also `erc-display-message'."
                        (user-full-name)
                        (user-login-name)
                        (system-name))))
-          (ns (erc-time-diff erc-server-last-sent-time (erc-current-time))))
+          (ns (erc-time-diff erc-server-last-sent-time nil)))
       (when (> ns 0)
         (setq s (concat s " Idle for " (erc-sec-to-time ns))))
       (erc-send-ctcp-notice nick s)))
@@ -4732,8 +4728,7 @@ See also `erc-display-message'."
       nil
     (let ((time (match-string 1 msg)))
       (condition-case nil
-          (let ((delta (erc-time-diff (string-to-number time)
-                                      (erc-current-time))))
+          (let ((delta (erc-time-diff (string-to-number time) nil)))
             (erc-display-message
              nil 'notice 'active
              'CTCP-PING ?n nick
@@ -4791,10 +4786,7 @@ If non-nil, return from being away."
                  (erc-default-target)
                  (if away-time
                      (format "is back (gone for %s)"
-                             (erc-sec-to-time
-                              (erc-time-diff
-                               (erc-emacs-time-to-erc-time away-time)
-                               (erc-current-time))))
+                             (erc-sec-to-time (erc-time-diff away-time nil)))
                    "is back")))))))))
     (erc-update-mode-line)))
 
@@ -5386,10 +5378,10 @@ submitted line to be intentional."
 (defun erc-send-current-line ()
   "Parse current line and send it to IRC."
   (interactive)
-  (let ((now (float-time)))
+  (let ((now (current-time)))
     (if (or (not erc-accidental-paste-threshold-seconds)
-            (< erc-accidental-paste-threshold-seconds
-               (- now erc-last-input-time)))
+            (time-less-p erc-accidental-paste-threshold-seconds
+			 (time-subtract now erc-last-input-time)))
         (save-restriction
           (widen)
           (if (< (point) (erc-beg-of-input-line))
@@ -6039,22 +6031,20 @@ non-nil value is found.
 
 ;; time routines
 
-(defun erc-string-to-emacs-time (string)
-  "Convert the long number represented by STRING into an Emacs timestamp."
-  (let* ((n (string-to-number (concat string ".0"))))
-    (list (truncate (/ n 65536))
-          (truncate (mod n 65536)))))
+(define-obsolete-function-alias 'erc-string-to-emacs-time 'string-to-number
+  "27.1")
 
 (defalias 'erc-emacs-time-to-erc-time 'float-time)
 (defalias 'erc-current-time 'float-time)
 
 (defun erc-time-diff (t1 t2)
-  "Return the time difference in seconds between T1 and T2."
-  (abs (- t2 t1)))
+  "Return the absolute value of the difference in seconds between T1 and T2."
+  (abs (float-time (time-subtract t1 t2))))
 
 (defun erc-time-gt (t1 t2)
   "Check whether T1 > T2."
-  (> t1 t2))
+  (declare (obsolete time-less-p "27.1"))
+  (time-less-p t2 t1))
 
 (defun erc-sec-to-time (ns)
   "Convert NS to a time string HH:MM.SS."

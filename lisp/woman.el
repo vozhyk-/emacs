@@ -1,6 +1,6 @@
 ;;; woman.el --- browse UN*X manual pages `wo (without) man'
 
-;; Copyright (C) 2000-2018 Free Software Foundation, Inc.
+;; Copyright (C) 2000-2019 Free Software Foundation, Inc.
 
 ;; Author: Francis J. Wright <F.J.Wright@qmul.ac.uk>
 ;; Maintainer: emacs-devel@gnu.org
@@ -2010,10 +2010,8 @@ Optional argument REDRAW, if non-nil, forces mode line to be updated."
 ;;   (after Man-bgproc-sentinel-advice activate)
 ;;   ;; Terminates man processing
 ;;   "Report formatting time."
-;;   (let* ((time (current-time))
-;; 	 (time (+ (* (- (car time) (car WoMan-Man-start-time)) 65536)
-;; 		  (- (cadr time) (cadr WoMan-Man-start-time)))))
-;;     (message "Man formatting done in %d seconds" time)))
+;;   (message "Man formatting done in %s seconds"
+;;            (float-time (time-since WoMan-Man-start-time))))
 
 
 ;;; Buffer handling:
@@ -2078,7 +2076,7 @@ alist in `woman-buffer-alist' and return nil."
   (char-to-string woman-escaped-escape-char)
   "Internal string representation of escaped escape characters.")
 
-(defconst woman-unpadded-space-char ?\^]
+(defconst woman-unpadded-space-char ?\^\]
   ;; An arbitrary unused control character
   "Internal character representation of unpadded space characters.")
 (defconst woman-unpadded-space-string

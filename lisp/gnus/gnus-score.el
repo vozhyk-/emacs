@@ -1,6 +1,6 @@
 ;;; gnus-score.el --- scoring code for Gnus
 
-;; Copyright (C) 1995-2018 Free Software Foundation, Inc.
+;; Copyright (C) 1995-2019 Free Software Foundation, Inc.
 
 ;; Author: Per Abrahamsen <amanda@iesd.auc.dk>
 ;;	Lars Magne Ingebrigtsen <larsi@gnus.org>
@@ -1501,7 +1501,7 @@ If FORMAT, also format the current score file."
       (when (and gnus-summary-default-score
 		 scores)
 	(let* ((entries gnus-header-index)
-	       (now (date-to-day (current-time-string)))
+	       (now (time-to-days nil))
 	       (expire (and gnus-score-expiry-days
 			    (- now gnus-score-expiry-days)))
 	       (headers gnus-newsgroup-headers)
@@ -2380,7 +2380,7 @@ score in `gnus-newsgroup-scored' by SCORE."
 	       (memq 'word gnus-newsgroup-adaptive))
       (with-temp-buffer
 	(let* ((hashtb (gnus-make-hashtable 1000))
-	       (date (date-to-day (current-time-string)))
+	       (date (time-to-days nil))
 	       (data gnus-newsgroup-data)
 	       word d score val)
 	  (with-syntax-table gnus-adaptive-word-syntax-table

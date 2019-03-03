@@ -1,6 +1,6 @@
 ;;; characters.el --- set syntax and category for multibyte characters
 
-;; Copyright (C) 1997, 2000-2018 Free Software Foundation, Inc.
+;; Copyright (C) 1997, 2000-2019 Free Software Foundation, Inc.
 ;; Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000, 2001, 2002, 2003, 2004,
 ;;   2005, 2006, 2007, 2008, 2009, 2010, 2011
 ;;   National Institute of Advanced Industrial Science and Technology (AIST)
@@ -1334,7 +1334,7 @@ Setup char-width-table appropriate for non-CJK language environment."
 
 
 ;; Setting char-script-table.
-(if purify-flag
+(if dump-mode
     ;; While dumping, we can't use require, and international is not
     ;; in load-path.
     (load "international/charscript")

@@ -1,6 +1,6 @@
 ;;; vc-git.el --- VC backend for the git version control system -*- lexical-binding: t -*-
 
-;; Copyright (C) 2006-2018 Free Software Foundation, Inc.
+;; Copyright (C) 2006-2019 Free Software Foundation, Inc.
 
 ;; Author: Alexandre Julliard <julliard@winehq.org>
 ;; Keywords: vc tools
@@ -289,7 +289,7 @@ in the order given by 'git status'."
     ;;  2. When a file A is renamed to B in the index and then back to A
     ;;     in the working tree.
     ;;  In both of these instances, `unregistered' is a reasonable response.
-    (`("D " "??") 'unregistered)
+    ('("D " "??") 'unregistered)
     ;;  In other cases, let us return `edited'.
     (_ 'edited)))
 
@@ -486,9 +486,9 @@ or an empty string if none."
         (files (vc-git-dir-status-state->files git-state)))
     (goto-char (point-min))
     (pcase (vc-git-dir-status-state->stage git-state)
-      (`update-index
+      ('update-index
        (setq next-stage (if (vc-git--empty-db-p) 'ls-files-added 'diff-index)))
-      (`ls-files-added
+      ('ls-files-added
        (setq next-stage 'ls-files-unknown)
        (while (re-search-forward "\\([0-7]\\{6\\}\\) [0-9a-f]\\{40\\} 0\t\\([^\0]+\\)\0" nil t)
          (let ((new-perm (string-to-number (match-string 1) 8))
@@ -496,7 +496,7 @@ or an empty string if none."
            (vc-git-dir-status-update-file
             git-state name 'added
             (vc-git-create-extra-fileinfo 0 new-perm)))))
-      (`ls-files-up-to-date
+      ('ls-files-up-to-date
        (setq next-stage 'ls-files-unknown)
        (while (re-search-forward "\\([0-7]\\{6\\}\\) [0-9a-f]\\{40\\} \\([0-3]\\)\t\\([^\0]+\\)\0" nil t)
          (let ((perm (string-to-number (match-string 1) 8))
@@ -507,7 +507,7 @@ or an empty string if none."
                                'up-to-date
                              'conflict)
             (vc-git-create-extra-fileinfo perm perm)))))
-      (`ls-files-conflict
+      ('ls-files-conflict
        (setq next-stage 'ls-files-unknown)
        ;; It's enough to look for "3" to notice a conflict.
        (while (re-search-forward "\\([0-7]\\{6\\}\\) [0-9a-f]\\{40\\} 3\t\\([^\0]+\\)\0" nil t)
@@ -516,16 +516,16 @@ or an empty string if none."
            (vc-git-dir-status-update-file
             git-state name 'conflict
             (vc-git-create-extra-fileinfo perm perm)))))
-      (`ls-files-unknown
+      ('ls-files-unknown
        (when files (setq next-stage 'ls-files-ignored))
        (while (re-search-forward "\\([^\0]*?\\)\0" nil t 1)
          (vc-git-dir-status-update-file git-state (match-string 1) 'unregistered
                                         (vc-git-create-extra-fileinfo 0 0))))
-      (`ls-files-ignored
+      ('ls-files-ignored
        (while (re-search-forward "\\([^\0]*?\\)\0" nil t 1)
          (vc-git-dir-status-update-file git-state (match-string 1) 'ignored
                                         (vc-git-create-extra-fileinfo 0 0))))
-      (`diff-index
+      ('diff-index
        (setq next-stage (if files 'ls-files-up-to-date 'ls-files-conflict))
        (while (re-search-forward
                ":\\([0-7]\\{6\\}\\) \\([0-7]\\{6\\}\\) [0-9a-f]\\{40\\} [0-9a-f]\\{40\\} \\(\\([ADMUT]\\)\0\\([^\0]+\\)\\|\\([CR]\\)[0-9]*\0\\([^\0]+\\)\0\\([^\0]+\\)\\)\0"
@@ -577,30 +577,30 @@ or an empty string if none."
   (let ((files (vc-git-dir-status-state->files git-state)))
     (erase-buffer)
     (pcase (vc-git-dir-status-state->stage git-state)
-      (`update-index
+      ('update-index
        (if files
            (vc-git-command (current-buffer) 'async files "add" "--refresh" "--")
          (vc-git-command (current-buffer) 'async nil
                          "update-index" "--refresh")))
-      (`ls-files-added
+      ('ls-files-added
        (vc-git-command (current-buffer) 'async files
                        "ls-files" "-z" "-c" "-s" "--"))
-      (`ls-files-up-to-date
+      ('ls-files-up-to-date
        (vc-git-command (current-buffer) 'async files
                        "ls-files" "-z" "-c" "-s" "--"))
-      (`ls-files-conflict
+      ('ls-files-conflict
        (vc-git-command (current-buffer) 'async files
                        "ls-files" "-z" "-u" "--"))
-      (`ls-files-unknown
+      ('ls-files-unknown
        (vc-git-command (current-buffer) 'async files
                        "ls-files" "-z" "-o" "--directory"
                        "--no-empty-directory" "--exclude-standard" "--"))
-      (`ls-files-ignored
+      ('ls-files-ignored
        (vc-git-command (current-buffer) 'async files
                        "ls-files" "-z" "-o" "-i" "--directory"
                        "--no-empty-directory" "--exclude-standard" "--"))
       ;; --relative added in Git 1.5.5.
-      (`diff-index
+      ('diff-index
        (vc-git-command (current-buffer) 'async files
                        "diff-index" "--relative" "-z" "-M" "HEAD" "--")))
     (vc-run-delayed
@@ -757,6 +757,11 @@ the commit message."
   (interactive)
   (log-edit-toggle-header "Sign-Off" "yes"))
 
+(defun vc-git-log-edit-toggle-no-verify ()
+  "Toggle whether to bypass the pre-commit and commit-msg hooks."
+  (interactive)
+  (log-edit-toggle-header "No-Verify" "yes"))
+
 (defun vc-git-log-edit-toggle-amend ()
   "Toggle whether this will amend the previous commit.
 If toggling on, also insert its message into the buffer."
@@ -782,6 +787,7 @@ If toggling on, also insert its message into the buffer."
 (defvar vc-git-log-edit-mode-map
   (let ((map (make-sparse-keymap "Git-Log-Edit")))
     (define-key map "\C-c\C-s" 'vc-git-log-edit-toggle-signoff)
+    (define-key map "\C-c\C-n" 'vc-git-log-edit-toggle-no-verify)
     (define-key map "\C-c\C-e" 'vc-git-log-edit-toggle-amend)
     map))
 
@@ -825,6 +831,7 @@ It is based on `log-edit-mode', and has Git-specific extensions.")
                             `(("Author" . "--author")
                               ("Date" . "--date")
                               ("Amend" . ,(boolean-arg-fn "--amend"))
+                              ("No-Verify" . ,(boolean-arg-fn "--no-verify"))
                               ("Sign-Off" . ,(boolean-arg-fn "--signoff")))
                             comment)))
                       (when msg-file
@@ -1189,7 +1196,7 @@ This requires git 1.8.4 or later, for the \"-L\" option of \"git log\"."
 (defvar vc-git--log-view-long-font-lock-keywords nil)
 (defvar font-lock-keywords)
 (defvar vc-git-region-history-font-lock-keywords
-  `((vc-git-region-history-font-lock)))
+  '((vc-git-region-history-font-lock)))
 
 (defun vc-git-region-history-font-lock (limit)
   (let ((in-diff (save-excursion
@@ -1475,12 +1482,16 @@ This command shares argument histories with \\[rgrep] and \\[grep]."
 	(if (eq next-error-last-buffer (current-buffer))
 	    (setq default-directory dir))))))
 
+(autoload 'vc-dir-marked-files "vc-dir")
+
 (defun vc-git-stash (name)
   "Create a stash."
   (interactive "sStash name: ")
   (let ((root (vc-git-root default-directory)))
     (when root
-      (apply #'vc-git--call nil "stash" "push" "-m" name (vc-dir-marked-files))
+      (apply #'vc-git--call nil "stash" "push" "-m" name
+             (when (derived-mode-p 'vc-dir-mode)
+               (vc-dir-marked-files)))
       (vc-resynch-buffer root t t))))
 
 (defvar vc-git-stash-read-history nil
@@ -1530,10 +1541,7 @@ This command shares argument histories with \\[rgrep] and \\[grep]."
   "Create a stash with the current tree state."
   (interactive)
   (vc-git--call nil "stash" "save"
-		(let ((ct (current-time)))
-		  (concat
-		   (format-time-string "Snapshot on %Y-%m-%d" ct)
-		   (format-time-string " at %H:%M" ct))))
+		(format-time-string "Snapshot on %Y-%m-%d at %H:%M"))
   (vc-git-command "*vc-git-stash*" 0 nil "stash" "apply" "-q" "stash@{0}")
   (vc-resynch-buffer (vc-git-root default-directory) t t))
 

@@ -1,5 +1,5 @@
 /* xfont.c -- X core font driver.
-   Copyright (C) 2006-2018 Free Software Foundation, Inc.
+   Copyright (C) 2006-2019 Free Software Foundation, Inc.
    Copyright (C) 2006, 2007, 2008, 2009, 2010, 2011
      National Institute of Advanced Industrial Science and Technology (AIST)
      Registration Number H13PRO009
@@ -31,6 +31,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include "character.h"
 #include "charset.h"
 #include "font.h"
+#include "pdumper.h"
 
 
 /* X core font driver.  */
@@ -1077,6 +1078,7 @@ xfont_check (struct frame *f, struct font *font)
 }
 
 
+static void syms_of_xfont_for_pdumper (void);
 
 struct font_driver const xfont_driver =
   {
@@ -1101,6 +1103,12 @@ syms_of_xfont (void)
   staticpro (&xfont_scripts_cache);
   xfont_scripts_cache = CALLN (Fmake_hash_table, QCtest, Qequal);
   staticpro (&xfont_scratch_props);
-  xfont_scratch_props = Fmake_vector (make_fixnum (8), Qnil);
+  xfont_scratch_props = make_nil_vector (8);
+  pdumper_do_now_and_after_load (syms_of_xfont_for_pdumper);
+}
+
+static void
+syms_of_xfont_for_pdumper (void)
+{
   register_font_driver (&xfont_driver, NULL);
 }

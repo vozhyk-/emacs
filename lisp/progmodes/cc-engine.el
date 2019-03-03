@@ -1,6 +1,6 @@
 ;;; cc-engine.el --- core syntax guessing engine for CC mode -*- coding: utf-8 -*-
 
-;; Copyright (C) 1985, 1987, 1992-2018 Free Software Foundation, Inc.
+;; Copyright (C) 1985, 1987, 1992-2019 Free Software Foundation, Inc.
 
 ;; Authors:    2001- Alan Mackenzie
 ;;             1998- Martin Stjernholm
@@ -151,8 +151,6 @@
 (cc-require 'cc-defs)
 (cc-require-when-compile 'cc-langs)
 (cc-require 'cc-vars)
-
-(eval-when-compile (require 'cl))
 
 
 ;; Make declarations for all the `c-lang-defvar' variables in cc-langs.
@@ -665,10 +663,12 @@ comment at the start of cc-engine.el for more info."
 	     stack (cdr stack))
        t
      ,do-if-done
+     (setq pre-stmt-found t)
      (throw 'loop nil)))
 (defmacro c-bos-pop-state-and-retry ()
   '(throw 'loop (setq state (car (car stack))
 		      saved-pos (cdr (car stack))
+		      pre-stmt-found (not (cdr stack))
 		      ;; Throw nil if stack is empty, else throw non-nil.
 		      stack (cdr stack))))
 (defmacro c-bos-save-pos ()
@@ -694,7 +694,7 @@ comment at the start of cc-engine.el for more info."
 			     (c-point 'bol (elt saved-pos 0))))))))
 
 (defun c-beginning-of-statement-1 (&optional lim ignore-labels
-					     noerror comma-delim)
+					     noerror comma-delim hit-lim)
   "Move to the start of the current statement or declaration, or to
 the previous one if already at the beginning of one.  Only
 statements/declarations on the same level are considered, i.e. don't
@@ -729,14 +729,16 @@ Return:
 `up'            if stepped to a containing statement;
 `previous'      if stepped to a preceding statement;
 `beginning'     if stepped from a statement continuation clause to
-                its start clause; or
-`macro'         if stepped to a macro start.
+                its start clause;
+`macro'         if stepped to a macro start; or
+nil             if HIT-LIM is non-nil, and we hit the limit.
 Note that `same' and not `label' is returned if stopped at the same
 label without crossing the colon character.
 
 LIM may be given to limit the search.  If the search hits the limit,
 point will be left at the closest following token, or at the start
-position if that is less (`same' is returned in this case).
+position if that is less.  If HIT-LIM is non-nil, nil is returned in
+this case, otherwise `same'.
 
 NOERROR turns off error logging to `c-parsing-error'.
 
@@ -840,6 +842,10 @@ comment at the start of cc-engine.el for more info."
 	pos
 	;; Position of last stmt boundary character (e.g. ;).
 	boundary-pos
+	;; Non-nil when a construct has been found which delimits the search
+	;; for a statement start, e.g. an opening brace or a macro start, or a
+	;; keyword like `if' when the PDA stack is empty.
+	pre-stmt-found
 	;; The position of the last sexp or bound that follows the
 	;; first found colon, i.e. the start of the nonlabel part of
 	;; the statement.  It's `start' if a colon is found just after
@@ -877,7 +883,10 @@ comment at the start of cc-engine.el for more info."
 	tok ptok pptok)
 
     (save-restriction
-      (if lim (narrow-to-region lim (point-max)))
+      (setq lim (if lim
+		    (max lim (point-min))
+		  (point-min)))
+      (widen)
 
       (if (save-excursion
 	    (and (c-beginning-of-macro)
@@ -923,9 +932,10 @@ comment at the start of cc-engine.el for more info."
 	;; The loop is exited only by throwing nil to the (catch 'loop ...):
 	;; 1. On reaching the start of a macro;
 	;; 2. On having passed a stmt boundary with the PDA stack empty;
-	;; 3. On reaching the start of an Objective C method def;
-	;; 4. From macro `c-bos-pop-state'; when the stack is empty;
-	;; 5. From macro `c-bos-pop-state-and-retry' when the stack is empty.
+	;; 3. Going backwards past the search limit.
+	;; 4. On reaching the start of an Objective C method def;
+	;; 5. From macro `c-bos-pop-state'; when the stack is empty;
+	;; 6. From macro `c-bos-pop-state-and-retry' when the stack is empty.
 	(while
 	    (catch 'loop ;; Throw nil to break, non-nil to continue.
 	      (cond
@@ -950,6 +960,7 @@ comment at the start of cc-engine.el for more info."
 		  (setq pos saved
 			ret 'macro
 			ignore-labels t))
+		(setq pre-stmt-found t)
 		(throw 'loop nil))	; 1. Start of macro.
 
 	       ;; Do a round through the automaton if we've just passed a
@@ -959,6 +970,7 @@ comment at the start of cc-engine.el for more info."
 			 (setq sym (intern (match-string 1)))))
 
 		(when (and (< pos start) (null stack))
+		  (setq pre-stmt-found t)
 		  (throw 'loop nil))	; 2. Statement boundary.
 
 		;; The PDA state handling.
@@ -1071,7 +1083,8 @@ comment at the start of cc-engine.el for more info."
 	      ;; Step to the previous sexp, but not if we crossed a
 	      ;; boundary, since that doesn't consume an sexp.
 	      (if (eq sym 'boundary)
-		  (setq ret 'previous)
+		  (when (>= (point) lim)
+		    (setq ret 'previous))
 
                 ;; HERE IS THE SINGLE PLACE INSIDE THE PDA LOOP WHERE WE MOVE
 		;; BACKWARDS THROUGH THE SOURCE.
@@ -1080,16 +1093,20 @@ comment at the start of cc-engine.el for more info."
 		(let ((before-sws-pos (point))
 		      ;; The end position of the area to search for statement
 		      ;; barriers in this round.
-		      (maybe-after-boundary-pos pos))
+		      (maybe-after-boundary-pos pos)
+		      comma-delimited)
 
 		  ;; Go back over exactly one logical sexp, taking proper
 		  ;; account of macros and escaped EOLs.
 		  (while
 		      (progn
+			(setq comma-delimited (and (not comma-delim)
+						   (eq (char-before) ?\,)))
 			(unless (c-safe (c-backward-sexp) t)
 			  ;; Give up if we hit an unbalanced block.  Since the
 			  ;; stack won't be empty the code below will report a
 			  ;; suitable error.
+			  (setq pre-stmt-found t)
 			  (throw 'loop nil))
 			(cond
 			 ;; Have we moved into a macro?
@@ -1121,6 +1138,7 @@ comment at the start of cc-engine.el for more info."
 			 ;; Just gone back over a brace block?
 			 ((and
 			   (eq (char-after) ?{)
+			   (not comma-delimited)
 			   (not (c-looking-at-inexpr-block lim nil t))
 			   (save-excursion
 			     (c-backward-token-2 1 t nil)
@@ -1132,8 +1150,11 @@ comment at the start of cc-engine.el for more info."
 			      (if (and (looking-at c-symbol-start)
 				       (not (looking-at c-keywords-regexp)))
 				  (c-backward-token-2 1 t nil))
-			      (not (looking-at
-				    c-opt-block-decls-with-vars-key)))))
+			      (and
+			       (not (looking-at
+				     c-opt-block-decls-with-vars-key))
+			       (or comma-delim
+				   (not (eq (char-after) ?\,)))))))
 			  (save-excursion
 			    (c-forward-sexp) (point)))
 			 ;; Just gone back over some paren block?
@@ -1155,12 +1176,17 @@ comment at the start of cc-engine.el for more info."
 		    ;; Like a C "continue".  Analyze the next sexp.
 		    (throw 'loop t))))
 
+	      ;; Have we gone past the limit?
+	      (when (< (point) lim)
+		(throw 'loop nil))	; 3. Gone back over the limit.
+
 	      ;; ObjC method def?
 	      (when (and c-opt-method-key
 			 (setq saved (c-in-method-def-p)))
 		(setq pos saved
+		      pre-stmt-found t
 		      ignore-labels t)	; Avoid the label check on exit.
-		(throw 'loop nil))	; 3. ObjC method def.
+		(throw 'loop nil))	; 4. ObjC method def.
 
 	      ;; Might we have a bitfield declaration, "<type> <id> : <size>"?
 	      (if c-has-bitfields
@@ -1221,8 +1247,14 @@ comment at the start of cc-engine.el for more info."
 		    ptok tok
 		    tok (point)
 		    pos tok) ; always non-nil
-	      )		     ; end of (catch loop ....)
+	      )		     ; end of (catch 'loop ....)
 	  )		     ; end of sexp-at-a-time (while ....)
+
+	(when (and hit-lim
+		   (or (not pre-stmt-found)
+		       (< pos lim)
+		       (>= pos start)))
+	  (setq ret nil))
 
 	;; If the stack isn't empty there might be errors to report.
 	(while stack
@@ -1699,36 +1731,41 @@ comment at the start of cc-engine.el for more info."
   `(let ((beg ,beg) (end ,end))
      (put-text-property beg end 'c-is-sws t)
      ,@(when (facep 'c-debug-is-sws-face)
-	 `((c-debug-add-face beg end 'c-debug-is-sws-face)))))
+	 '((c-debug-add-face beg end 'c-debug-is-sws-face)))))
+(def-edebug-spec c-put-is-sws t)
 
 (defmacro c-put-in-sws (beg end)
   ;; This macro does a hidden buffer change.
   `(let ((beg ,beg) (end ,end))
      (put-text-property beg end 'c-in-sws t)
      ,@(when (facep 'c-debug-is-sws-face)
-	 `((c-debug-add-face beg end 'c-debug-in-sws-face)))))
+	 '((c-debug-add-face beg end 'c-debug-in-sws-face)))))
+(def-edebug-spec c-put-in-sws t)
 
 (defmacro c-remove-is-sws (beg end)
   ;; This macro does a hidden buffer change.
   `(let ((beg ,beg) (end ,end))
      (remove-text-properties beg end '(c-is-sws nil))
      ,@(when (facep 'c-debug-is-sws-face)
-	 `((c-debug-remove-face beg end 'c-debug-is-sws-face)))))
+	 '((c-debug-remove-face beg end 'c-debug-is-sws-face)))))
+(def-edebug-spec c-remove-is-sws t)
 
 (defmacro c-remove-in-sws (beg end)
   ;; This macro does a hidden buffer change.
   `(let ((beg ,beg) (end ,end))
      (remove-text-properties beg end '(c-in-sws nil))
      ,@(when (facep 'c-debug-is-sws-face)
-	 `((c-debug-remove-face beg end 'c-debug-in-sws-face)))))
+	 '((c-debug-remove-face beg end 'c-debug-in-sws-face)))))
+(def-edebug-spec c-remove-in-sws t)
 
 (defmacro c-remove-is-and-in-sws (beg end)
   ;; This macro does a hidden buffer change.
   `(let ((beg ,beg) (end ,end))
      (remove-text-properties beg end '(c-is-sws nil c-in-sws nil))
      ,@(when (facep 'c-debug-is-sws-face)
-	 `((c-debug-remove-face beg end 'c-debug-is-sws-face)
+	 '((c-debug-remove-face beg end 'c-debug-is-sws-face)
 	   (c-debug-remove-face beg end 'c-debug-in-sws-face)))))
+(def-edebug-spec c-remove-is-and-in-sws t)
 
 ;; The type of literal position `end' is in a `before-change-functions'
 ;; function - one of `c', `c++', `pound', or nil (but NOT `string').
@@ -1737,12 +1774,14 @@ comment at the start of cc-engine.el for more info."
 ;; enclosing END, if any, else nil.
 (defvar c-sws-lit-limits nil)
 
-(defun c-invalidate-sws-region-before (end)
-  ;; Called from c-before-change.  END is the end of the change region, the
-  ;; standard parameter given to all before-change-functions.
+(defun c-invalidate-sws-region-before (beg end)
+  ;; Called from c-before-change.  BEG and END are the bounds of the change
+  ;; region, the standard parameters given to all before-change-functions.
   ;;
-  ;; Note whether END is inside a comment or CPP construct, and if so note its
-  ;; bounds in `c-sws-lit-limits' and type in `c-sws-lit-type'.
+  ;; Note whether END is inside a comment, CPP construct, or noise macro, and
+  ;; if so note its bounds in `c-sws-lit-limits' and type in `c-sws-lit-type'.
+  (setq c-sws-lit-type nil
+	c-sws-lit-limits nil)
   (save-excursion
     (goto-char end)
     (let* ((limits (c-literal-limits))
@@ -1755,8 +1794,19 @@ comment at the start of cc-engine.el for more info."
 	(setq c-sws-lit-type 'pound
 	      c-sws-lit-limits (cons (point)
 				     (progn (c-end-of-macro) (point)))))
-       (t (setq c-sws-lit-type nil
-		c-sws-lit-limits nil))))))
+       ((progn (skip-syntax-backward "w_")
+	       (looking-at c-noise-macro-name-re))
+	(setq c-sws-lit-type 'noise
+	      c-sws-lit-limits (cons (match-beginning 1) (match-end 1))))
+       (t))))
+  (save-excursion
+    (goto-char beg)
+    (skip-syntax-backward "w_")
+    (when (looking-at c-noise-macro-name-re)
+      (setq c-sws-lit-type 'noise)
+      (if (consp c-sws-lit-limits)
+	  (setcar c-sws-lit-limits (match-beginning 1))
+	(setq c-sws-lit-limits (cons (match-beginning 1) (match-end 1)))))))
 
 (defun c-invalidate-sws-region-after-del (beg end old-len)
   ;; Text has been deleted, OLD-LEN characters of it starting from position
@@ -1765,7 +1815,6 @@ comment at the start of cc-engine.el for more info."
   ;; deletion deleted or "damaged" its opening delimiter.  If so, return the
   ;; current position of where the construct ended, otherwise return nil.
   (when c-sws-lit-limits
-    (setcdr c-sws-lit-limits (- (cdr c-sws-lit-limits) old-len))
     (if (and (< beg (+ (car c-sws-lit-limits) 2)) ; A lazy assumption that
 						  ; comment delimiters are 2
 						  ; chars long.
@@ -1783,9 +1832,9 @@ comment at the start of cc-engine.el for more info."
   ;; or `c-is-sws' text properties inside this literal.  If there are, return
   ;; the buffer position of the end of the literal, else return nil.
   (save-excursion
+    (goto-char end)
     (let* ((limits (c-literal-limits))
 	   (lit-type (c-literal-type limits)))
-      (goto-char end)
       (when (and (not (memq lit-type '(c c++)))
 		 (c-beginning-of-macro))
 	(setq lit-type 'pound
@@ -1809,6 +1858,10 @@ comment at the start of cc-engine.el for more info."
   ;; properties right after they're added.
   ;;
   ;; This function does hidden buffer changes.
+  (when c-sws-lit-limits
+    (setcar c-sws-lit-limits (min beg (car c-sws-lit-limits)))
+    (setcdr c-sws-lit-limits
+	    (max end (- (+ (cdr c-sws-lit-limits) (- end beg)) old-len))))
   (let ((del-end
 	 (and (> old-len 0)
 	      (c-invalidate-sws-region-after-del beg end old-len)))
@@ -1827,6 +1880,10 @@ comment at the start of cc-engine.el for more info."
       (skip-chars-forward " \t\f\v")
       (when (and (eolp) (not (eobp)))
 	(setq end (1+ (point)))))
+
+    (when (eq c-sws-lit-type 'noise)
+      (setq beg (car c-sws-lit-limits)
+	    end (cdr c-sws-lit-limits))) ; This last setting may be redundant.
 
     (when (and (= beg end)
 	       (get-text-property beg 'c-in-sws)
@@ -1847,6 +1904,7 @@ comment at the start of cc-engine.el for more info."
 
     (setq end (max (or del-end end)
 		   (or ins-end end)
+		   (or (cdr c-sws-lit-limits) end)
 		   end))
 
     (c-debug-sws-msg "c-invalidate-sws-region-after [%s..%s]" beg end)
@@ -2115,7 +2173,8 @@ comment at the start of cc-engine.el for more info."
       ;; Try to find a rung position in the simple ws preceding point, so that
       ;; we can get a cache hit even if the last bit of the simple ws has
       ;; changed recently.
-      (setq simple-ws-beg (point))
+      (setq simple-ws-beg (or (match-end 1) ; Noise macro
+			      (match-end 0))) ; c-syntactic-ws-end
       (skip-chars-backward " \t\n\r\f\v")
       (if (setq rung-is-marked (text-property-any
 				(point) (min (1+ rung-pos) (point-max))
@@ -6873,8 +6932,8 @@ comment at the start of cc-engine.el for more info."
   `(let (res)
      (setq c-last-identifier-range nil)
      (while (if (setq res ,(if (eq type 'type)
-			       `(c-forward-type)
-			     `(c-forward-name)))
+			       '(c-forward-type)
+			     '(c-forward-name)))
 		nil
 	      (cond ((looking-at c-keywords-regexp)
 		     (c-forward-keyword-clause 1))
@@ -6884,8 +6943,8 @@ comment at the start of cc-engine.el for more info."
      (when (memq res '(t known found prefix maybe))
        (when c-record-type-identifiers
         ,(if (eq type 'type)
-             `(c-record-type-id c-last-identifier-range)
-           `(c-record-ref-id c-last-identifier-range)))
+             '(c-record-type-id c-last-identifier-range)
+           '(c-record-ref-id c-last-identifier-range)))
        t)))
 
 (defmacro c-forward-id-comma-list (type update-safe-pos)
@@ -6896,7 +6955,7 @@ comment at the start of cc-engine.el for more info."
   ;; This macro might do hidden buffer changes.
   `(while (and (progn
 		 ,(when update-safe-pos
-		    `(setq safe-pos (point)))
+		    '(setq safe-pos (point)))
 		 (eq (char-after) ?,))
 	       (progn
 		 (forward-char)
@@ -7917,7 +7976,7 @@ comment at the start of cc-engine.el for more info."
   ;; a comma.  If either of <symbol> or bracketed <expression> is missing,
   ;; throw nil to 'level.  If the terminating } or ) is unmatched, throw nil
   ;; to 'done.  This is not a general purpose macro!
-  `(while (eq (char-before) ?,)
+  '(while (eq (char-before) ?,)
      (backward-char)
      (c-backward-syntactic-ws)
      (when (not (memq (char-before) '(?\) ?})))
@@ -8543,6 +8602,8 @@ comment at the start of cc-engine.el for more info."
 	  got-parens
 	  ;; True if there is an identifier in the declarator.
 	  got-identifier
+	  ;; True if we find a number where an identifier was expected.
+	  got-number
 	  ;; True if there's a non-close-paren match of
 	  ;; `c-type-decl-suffix-key'.
 	  got-suffix
@@ -8620,7 +8681,9 @@ comment at the start of cc-engine.el for more info."
 	  (and (looking-at c-identifier-start)
 	       (setq pos (point))
 	       (setq got-identifier (c-forward-name))
-	       (setq name-start pos)))
+	       (setq name-start pos))
+	  (when (looking-at "[0-9]")
+	    (setq got-number t))) ; We've probably got an arithmetic expression.
 
       ;; Skip over type decl suffix operators and trailing noise macros.
       (while
@@ -8636,7 +8699,16 @@ comment at the start of cc-engine.el for more info."
 		 (not (and (c-major-mode-is 'c-mode)
 			   (not got-prefix)
 			   (or (eq context 'top) make-top)
-			   (eq (char-after) ?\)))))
+			   (eq (char-after) ?\))
+			   (or (memq at-type '(nil maybe))
+			       (not got-identifier)
+			       (save-excursion
+				 (goto-char after-paren-pos)
+				 (c-forward-syntactic-ws)
+				 ;; Prevent the symbol being recorded as a type.
+				 (let (c-record-type-identifiers)
+				   (not (memq (c-forward-type)
+					      '(nil maybe)))))))))
 	    (if (eq (char-after) ?\))
 		(when (> paren-depth 0)
 		  (setq paren-depth (1- paren-depth))
@@ -9094,7 +9166,7 @@ comment at the start of cc-engine.el for more info."
 
 	   ;; CASE 18
 	   (when (and (not (memq context '(nil top)))
-		      (or got-prefix
+		      (or (and got-prefix (not got-number))
 			  (and (eq context 'decl)
 			       (not c-recognize-paren-inits)
 			       (or got-parens got-suffix))))
@@ -9648,7 +9720,7 @@ comment at the start of cc-engine.el for more info."
 
   (let ((beg (point)) id-start)
     (and
-     (eq (c-beginning-of-statement-1 lim) 'same)
+     (eq (c-beginning-of-statement-1 lim nil nil nil t) 'same)
 
      (not (and (c-major-mode-is 'objc-mode)
 	       (c-forward-objc-directive)))
@@ -12711,7 +12783,7 @@ comment at the start of cc-engine.el for more info."
 			       (c-back-over-member-initializers)
 			       (point)))
 			    (c-most-enclosing-brace state-cache (point))))
-	      (c-beginning-of-statement-1 lim)
+	      (c-beginning-of-statement-1 lim nil nil t)
 	      (c-add-stmt-syntax 'brace-list-intro nil t lim paren-state)))
 
 	   ;; CASE 9D: this is just a later brace-list-entry or

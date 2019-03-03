@@ -1,6 +1,6 @@
 /* Functions for image support on window system.
 
-Copyright (C) 1989, 1992-2018 Free Software Foundation, Inc.
+Copyright (C) 1989, 1992-2019 Free Software Foundation, Inc.
 
 This file is part of GNU Emacs.
 
@@ -46,6 +46,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include "coding.h"
 #include "termhooks.h"
 #include "font.h"
+#include "pdumper.h"
 
 #ifdef HAVE_SYS_STAT_H
 #include <sys/stat.h>
@@ -460,8 +461,13 @@ x_destroy_all_bitmaps (Display_Info *dpyinfo)
   dpyinfo->bitmaps_last = 0;
 }
 
+#ifndef HAVE_XRENDER
+/* Required for the definition of x_create_x_image_and_pixmap below.  */
+typedef void Picture;
+#endif
+
 static bool x_create_x_image_and_pixmap (struct frame *, int, int, int,
-					 XImagePtr *, Pixmap *);
+					 XImagePtr *, Pixmap *, Picture *);
 static void x_destroy_x_image (XImagePtr ximg);
 
 #ifdef HAVE_NTGUI
@@ -524,7 +530,8 @@ x_create_bitmap_mask (struct frame *f, ptrdiff_t id)
       return;
     }
 
-  result = x_create_x_image_and_pixmap (f, width, height, 1, &mask_img, &mask);
+  result = x_create_x_image_and_pixmap (f, width, height, 1,
+                                        &mask_img, &mask, NULL);
 
   unblock_input ();
   if (!result)
@@ -576,6 +583,33 @@ x_create_bitmap_mask (struct frame *f, ptrdiff_t id)
 /***********************************************************************
 			    Image types
  ***********************************************************************/
+
+/* Each image format (JPEG, TIFF, ...) supported is described by
+   a structure of the type below.  */
+
+struct image_type
+{
+  /* Index of a symbol uniquely identifying the image type, e.g., 'jpeg'.  */
+  int type;
+
+  /* Check that SPEC is a valid image specification for the given
+     image type.  Value is true if SPEC is valid.  */
+  bool (*valid_p) (Lisp_Object spec);
+
+  /* Load IMG which is used on frame F from information contained in
+     IMG->spec.  Value is true if successful.  */
+  bool (*load) (struct frame *f, struct image *img);
+
+  /* Free resources of image IMG which is used on frame F.  */
+  void (*free) (struct frame *f, struct image *img);
+
+  /* Initialization function (used for dynamic loading of image
+     libraries on Windows), or NULL if none.  */
+  bool (*init) (void);
+
+  /* Next in list of all supported image types.  */
+  struct image_type *next;
+};
 
 /* List of supported image types.  Use define_image_type to add new
    types.  Use lookup_image_type to find a type for a given symbol.  */
@@ -1035,6 +1069,13 @@ free_image (struct frame *f, struct image *img)
 	img->next->prev = img->prev;
 
       c->images[img->id] = NULL;
+
+#ifdef HAVE_XRENDER
+      if (img->picture)
+        XRenderFreePicture (FRAME_X_DISPLAY (f), img->picture);
+      if (img->mask_picture)
+        XRenderFreePicture (FRAME_X_DISPLAY (f), img->mask_picture);
+#endif
 
       /* Windows NT redefines 'free', but in this file, we need to
          avoid the redefinition.  */
@@ -1578,7 +1619,7 @@ clear_image_cache (struct frame *f, Lisp_Object filter)
 {
   struct image_cache *c = FRAME_IMAGE_CACHE (f);
 
-  if (c)
+  if (c && !f->inhibit_clear_image_cache)
     {
       ptrdiff_t i, nfreed = 0;
 
@@ -1785,6 +1826,154 @@ postprocess_image (struct frame *f, struct image *img)
     }
 }
 
+#if defined (HAVE_IMAGEMAGICK) || defined (HAVE_NATIVE_SCALING)
+/* Scale an image size by returning SIZE / DIVISOR * MULTIPLIER,
+   safely rounded and clipped to int range.  */
+
+static int
+scale_image_size (int size, size_t divisor, size_t multiplier)
+{
+  if (divisor != 0)
+    {
+      double s = size;
+      double scaled = s * multiplier / divisor + 0.5;
+      if (scaled < INT_MAX)
+	return scaled;
+    }
+  return INT_MAX;
+}
+
+/* Compute the desired size of an image with native size WIDTH x HEIGHT.
+   Use SPEC to deduce the size.  Store the desired size into
+   *D_WIDTH x *D_HEIGHT.  Store -1 x -1 if the native size is OK.  */
+static void
+compute_image_size (size_t width, size_t height,
+		    Lisp_Object spec,
+		    int *d_width, int *d_height)
+{
+  Lisp_Object value;
+  int desired_width = -1, desired_height = -1, max_width = -1, max_height = -1;
+  double scale = 1;
+
+  value = image_spec_value (spec, QCscale, NULL);
+  if (NUMBERP (value))
+    scale = XFLOATINT (value);
+
+  value = image_spec_value (spec, QCmax_width, NULL);
+  if (FIXNATP (value))
+    max_width = min (XFIXNAT (value), INT_MAX);
+
+  value = image_spec_value (spec, QCmax_height, NULL);
+  if (FIXNATP (value))
+    max_height = min (XFIXNAT (value), INT_MAX);
+
+  /* If width and/or height is set in the display spec assume we want
+     to scale to those values.  If either h or w is unspecified, the
+     unspecified should be calculated from the specified to preserve
+     aspect ratio.  */
+  value = image_spec_value (spec, QCwidth, NULL);
+  if (FIXNATP (value))
+    {
+      desired_width = min (XFIXNAT (value) * scale, INT_MAX);
+      /* :width overrides :max-width. */
+      max_width = -1;
+    }
+
+  value = image_spec_value (spec, QCheight, NULL);
+  if (FIXNATP (value))
+    {
+      desired_height = min (XFIXNAT (value) * scale, INT_MAX);
+      /* :height overrides :max-height. */
+      max_height = -1;
+    }
+
+  /* If we have both width/height set explicitly, we skip past all the
+     aspect ratio-preserving computations below. */
+  if (desired_width != -1 && desired_height != -1)
+    goto out;
+
+  width = width * scale;
+  height = height * scale;
+
+  if (desired_width != -1)
+    /* Width known, calculate height. */
+    desired_height = scale_image_size (desired_width, width, height);
+  else if (desired_height != -1)
+    /* Height known, calculate width. */
+    desired_width = scale_image_size (desired_height, height, width);
+  else
+    {
+      desired_width = width;
+      desired_height = height;
+    }
+
+  if (max_width != -1 && desired_width > max_width)
+    {
+      /* The image is wider than :max-width. */
+      desired_width = max_width;
+      desired_height = scale_image_size (desired_width, width, height);
+    }
+
+  if (max_height != -1 && desired_height > max_height)
+    {
+      /* The image is higher than :max-height. */
+      desired_height = max_height;
+      desired_width = scale_image_size (desired_height, height, width);
+    }
+
+ out:
+  *d_width = desired_width;
+  *d_height = desired_height;
+}
+#endif /* HAVE_IMAGEMAGICK || HAVE_NATIVE_SCALING */
+
+static void
+x_set_image_size (struct frame *f, struct image *img)
+{
+#ifdef HAVE_NATIVE_SCALING
+# ifdef HAVE_IMAGEMAGICK
+  /* ImageMagick images are already the correct size.  */
+  if (EQ (image_spec_value (img->spec, QCtype, NULL), Qimagemagick))
+    return;
+# endif
+
+  int width, height;
+  compute_image_size (img->width, img->height, img->spec, &width, &height);
+
+# ifdef HAVE_NS
+  ns_image_set_size (img->pixmap, width, height);
+  img->width = width;
+  img->height = height;
+# endif
+
+# ifdef HAVE_XRENDER
+  if (img->picture)
+    {
+      double xscale = img->width / (double) width;
+      double yscale = img->height / (double) height;
+
+      XTransform tmat
+	= {{{XDoubleToFixed (xscale), XDoubleToFixed (0), XDoubleToFixed (0)},
+	    {XDoubleToFixed (0), XDoubleToFixed (yscale), XDoubleToFixed (0)},
+	    {XDoubleToFixed (0), XDoubleToFixed (0), XDoubleToFixed (1)}}};
+
+      XRenderSetPictureFilter (FRAME_X_DISPLAY (f), img->picture, FilterBest,
+			       0, 0);
+      XRenderSetPictureTransform (FRAME_X_DISPLAY (f), img->picture, &tmat);
+
+      img->width = width;
+      img->height = height;
+    }
+# endif
+# ifdef HAVE_NTGUI
+  /* Under HAVE_NTGUI, we will scale the image on the fly, when we
+     draw it.  See w32term.c:x_draw_image_foreground.  */
+  img->width = width;
+  img->height = height;
+# endif
+#endif
+}
+
 
 /* Return the id of image with Lisp specification SPEC on frame F.
    SPEC must be a valid Lisp image specification (see valid_image_p).  */
@@ -1840,6 +2029,7 @@ lookup_image (struct frame *f, Lisp_Object spec)
 	     `:background COLOR'.  */
 	  Lisp_Object ascent, margin, relief, bg;
 	  int relief_bound;
+          x_set_image_size (f, img);
 
 	  ascent = image_spec_value (spec, QCascent, NULL);
 	  if (FIXNUMP (ascent))
@@ -2014,7 +2204,7 @@ x_check_image_size (XImagePtr ximg, int width, int height)
 
 static bool
 x_create_x_image_and_pixmap (struct frame *f, int width, int height, int depth,
-			     XImagePtr *ximg, Pixmap *pixmap)
+			     XImagePtr *ximg, Pixmap *pixmap, Picture *picture)
 {
 #ifdef HAVE_X_WINDOWS
   Display *display = FRAME_X_DISPLAY (f);
@@ -2055,6 +2245,36 @@ x_create_x_image_and_pixmap (struct frame *f, int width, int height, int depth,
       image_error ("Unable to create X pixmap");
       return 0;
     }
+
+# ifdef HAVE_XRENDER
+  int event_basep, error_basep;
+  if (picture && XRenderQueryExtension (display, &event_basep, &error_basep))
+    {
+      if (depth == 32 || depth == 24 || depth == 8)
+        {
+          XRenderPictFormat *format;
+          XRenderPictureAttributes attr;
+
+          /* FIXME: Do we need to handle all possible bit depths?
+             XRenderFindStandardFormat supports PictStandardARGB32,
+             PictStandardRGB24, PictStandardA8, PictStandardA4,
+             PictStandardA1, and PictStandardNUM (what is this?!).
+
+             XRenderFindFormat may support more, but I don't
+             understand the documentation.  */
+          format = XRenderFindStandardFormat (display,
+                                              depth == 32 ? PictStandardARGB32
+                                              : depth == 24 ? PictStandardRGB24
+                                              : PictStandardA8);
+          *picture = XRenderCreatePicture (display, *pixmap, format, 0, &attr);
+        }
+      else
+        {
+          image_error ("Specified image bit depth is not supported by XRender");
+          *picture = 0;
+        }
+    }
+# endif
 
   return 1;
 #endif /* HAVE_X_WINDOWS */
@@ -2216,7 +2436,8 @@ x_put_x_image (struct frame *f, XImagePtr ximg, Pixmap pixmap, int width, int he
 
   eassert (input_blocked_p ());
   gc = XCreateGC (FRAME_X_DISPLAY (f), pixmap, 0, NULL);
-  XPutImage (FRAME_X_DISPLAY (f), pixmap, gc, ximg, 0, 0, 0, 0, width, height);
+  XPutImage (FRAME_X_DISPLAY (f), pixmap, gc, ximg, 0, 0, 0, 0,
+             ximg->width, ximg->height);
   XFreeGC (FRAME_X_DISPLAY (f), gc);
 #endif /* HAVE_X_WINDOWS */
 
@@ -2248,8 +2469,13 @@ image_create_x_image_and_pixmap (struct frame *f, struct image *img,
 {
   eassert ((!mask_p ? img->pixmap : img->mask) == NO_PIXMAP);
 
+  Picture *picture = NULL;
+#ifdef HAVE_XRENDER
+  picture = !mask_p ? &img->picture : &img->mask_picture;
+#endif
   return x_create_x_image_and_pixmap (f, width, height, depth, ximg,
-				      !mask_p ? &img->pixmap : &img->mask);
+				      !mask_p ? &img->pixmap : &img->mask,
+				      picture);
 }
 
 /* Put X image XIMG into image IMG on frame F, as a mask if and only
@@ -2400,10 +2626,10 @@ x_find_image_fd (Lisp_Object file, int *pfd)
       file_found = ENCODE_FILE (file_found);
       if (fd == -2)
 	{
-	  /* The file exists locally, but has a file handler.  (This
-	     happens, e.g., under Auto Image File Mode.)  'openp'
-	     didn't open the file, so we should, because the caller
-	     expects that.  */
+	  /* The file exists locally, but has a file name handler.
+	     (This happens, e.g., under Auto Image File Mode.)
+	     'openp' didn't open the file, so we should, because the
+	     caller expects that.  */
 	  fd = emacs_open (SSDATA (file_found), O_RDONLY, 0);
 	}
     }
@@ -4111,7 +4337,7 @@ xpm_make_color_table_v (void (**put_func) (Lisp_Object, const char *, int,
 {
   *put_func = xpm_put_color_table_v;
   *get_func = xpm_get_color_table_v;
-  return Fmake_vector (make_fixnum (256), Qnil);
+  return make_nil_vector (256);
 }
 
 static void
@@ -4422,7 +4648,7 @@ xpm_load_image (struct frame *f,
   return 1;
 
  failure:
-  image_error ("Invalid XPM file (%s)", img->spec);
+  image_error ("Invalid XPM3 file (%s)", img->spec);
   x_destroy_x_image (ximg);
   x_destroy_x_image (mask_img);
   x_clear_image (f, img);
@@ -8202,105 +8428,6 @@ gif_load (struct frame *f, struct image *img)
 				 ImageMagick
 ***********************************************************************/
 
-/* Scale an image size by returning SIZE / DIVISOR * MULTIPLIER,
-   safely rounded and clipped to int range.  */
-
-static int
-scale_image_size (int size, size_t divisor, size_t multiplier)
-{
-  if (divisor != 0)
-    {
-      double s = size;
-      double scaled = s * multiplier / divisor + 0.5;
-      if (scaled < INT_MAX)
-	return scaled;
-    }
-  return INT_MAX;
-}
-
-/* Compute the desired size of an image with native size WIDTH x HEIGHT.
-   Use SPEC to deduce the size.  Store the desired size into
-   *D_WIDTH x *D_HEIGHT.  Store -1 x -1 if the native size is OK.  */
-static void
-compute_image_size (size_t width, size_t height,
-		    Lisp_Object spec,
-		    int *d_width, int *d_height)
-{
-  Lisp_Object value;
-  int desired_width = -1, desired_height = -1, max_width = -1, max_height = -1;
-  double scale = 1;
-
-  value = image_spec_value (spec, QCscale, NULL);
-  if (NUMBERP (value))
-    scale = XFLOATINT (value);
-
-  value = image_spec_value (spec, QCmax_width, NULL);
-  if (FIXNATP (value))
-    max_width = min (XFIXNAT (value), INT_MAX);
-
-  value = image_spec_value (spec, QCmax_height, NULL);
-  if (FIXNATP (value))
-    max_height = min (XFIXNAT (value), INT_MAX);
-
-  /* If width and/or height is set in the display spec assume we want
-     to scale to those values.  If either h or w is unspecified, the
-     unspecified should be calculated from the specified to preserve
-     aspect ratio.  */
-  value = image_spec_value (spec, QCwidth, NULL);
-  if (FIXNATP (value))
-    {
-      desired_width = min (XFIXNAT (value) * scale, INT_MAX);
-      /* :width overrides :max-width. */
-      max_width = -1;
-    }
-
-  value = image_spec_value (spec, QCheight, NULL);
-  if (FIXNATP (value))
-    {
-      desired_height = min (XFIXNAT (value) * scale, INT_MAX);
-      /* :height overrides :max-height. */
-      max_height = -1;
-    }
-
-  /* If we have both width/height set explicitly, we skip past all the
-     aspect ratio-preserving computations below. */
-  if (desired_width != -1 && desired_height != -1)
-    goto out;
-
-  width = width * scale;
-  height = height * scale;
-
-  if (desired_width != -1)
-    /* Width known, calculate height. */
-    desired_height = scale_image_size (desired_width, width, height);
-  else if (desired_height != -1)
-    /* Height known, calculate width. */
-    desired_width = scale_image_size (desired_height, height, width);
-  else
-    {
-      desired_width = width;
-      desired_height = height;
-    }
-
-  if (max_width != -1 && desired_width > max_width)
-    {
-      /* The image is wider than :max-width. */
-      desired_width = max_width;
-      desired_height = scale_image_size (desired_width, width, height);
-    }
-
-  if (max_height != -1 && desired_height > max_height)
-    {
-      /* The image is higher than :max-height. */
-      desired_height = max_height;
-      desired_width = scale_image_size (desired_height, height, width);
-    }
-
- out:
-  *d_width = desired_width;
-  *d_height = desired_height;
-}
-
 static bool imagemagick_image_p (Lisp_Object);
 static bool imagemagick_load (struct frame *, struct image *);
 static void imagemagick_clear_image (struct frame *, struct image *);
@@ -9080,8 +9207,8 @@ imagemagick_load (struct frame *f, struct image *img)
 #endif
       success_p = imagemagick_load_image (f, img, 0, 0, SSDATA (file));
     }
-  /* Else its not a file, its a lisp object.  Load the image from a
-     lisp object rather than a file.  */
+  /* Else it's not a file, it's a Lisp object.  Load the image from a
+     Lisp object rather than a file.  */
   else
     {
       Lisp_Object data;
@@ -9389,8 +9516,8 @@ svg_load (struct frame *f, struct image *img)
 				  SSDATA (ENCODE_FILE (file)));
       xfree (contents);
     }
-  /* Else its not a file, its a lisp object.  Load the image from a
-     lisp object rather than a file.  */
+  /* Else it's not a file, it's a Lisp object.  Load the image from a
+     Lisp object rather than a file.  */
   else
     {
       Lisp_Object data, original_filename;
@@ -9917,6 +10044,25 @@ DEFUN ("lookup-image", Flookup_image, Slookup_image, 1, 1, 0,
 			    Initialization
  ***********************************************************************/
 
+DEFUN ("image-scaling-p", Fimage_scaling_p, Simage_scaling_p, 0, 1, 0,
+       doc: /* Test whether FRAME supports resizing images.
+Return t if FRAME supports native scaling, nil otherwise.  */)
+     (Lisp_Object frame)
+{
+#if defined (HAVE_NS) || defined (HAVE_NTGUI)
+  return Qt;
+#elif defined (HAVE_X_WINDOWS) && defined (HAVE_XRENDER)
+  int event_basep, error_basep;
+
+  if (XRenderQueryExtension
+      (FRAME_X_DISPLAY (decode_window_system_frame (frame)),
+       &event_basep, &error_basep))
+    return Qt;
+#endif
+
+  return Qnil;
+}
+
 DEFUN ("init-image-library", Finit_image_library, Sinit_image_library, 1, 1, 0,
        doc: /* Initialize image library implementing image type TYPE.
 Return non-nil if TYPE is a supported image type.
@@ -9985,7 +10131,7 @@ lookup_image_type (Lisp_Object type)
   return NULL;
 }
 
-#if !defined CANNOT_DUMP && defined HAVE_WINDOW_SYSTEM
+#if defined HAVE_UNEXEC && defined HAVE_WINDOW_SYSTEM
 
 /* Reset image_types before dumping.
    Called from Fdump_emacs.  */
@@ -10006,7 +10152,9 @@ void
 syms_of_image (void)
 {
   /* Initialize this only once; it will be reset before dumping.  */
+  /* The portable dumper will just leave it NULL, so no need to reset.  */
   image_types = NULL;
+  PDUMPER_IGNORE (image_types);
 
   /* Must be defined now because we're going to update it below, while
      defining the supported image types.  */
@@ -10158,6 +10306,8 @@ non-numeric, there is no explicit limit on the size of images.  */);
   defsubr (&Simagep);
   defsubr (&Slookup_image);
 #endif
+
+  defsubr (&Simage_scaling_p);
 
   DEFVAR_BOOL ("cross-disabled-images", cross_disabled_images,
     doc: /* Non-nil means always draw a cross over disabled images.

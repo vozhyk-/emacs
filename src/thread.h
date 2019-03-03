@@ -1,5 +1,5 @@
 /* Thread definitions
-Copyright (C) 2012-2018 Free Software Foundation, Inc.
+Copyright (C) 2012-2019 Free Software Foundation, Inc.
 
 This file is part of GNU Emacs.
 
@@ -104,7 +104,7 @@ struct thread_state
 #define specpdl_ptr (current_thread->m_specpdl_ptr)
 
   /* Depth in Lisp evaluations and function calls.  */
-  EMACS_INT m_lisp_eval_depth;
+  intmax_t m_lisp_eval_depth;
 #define lisp_eval_depth (current_thread->m_lisp_eval_depth)
 
   /* This points to the current buffer.  */
@@ -295,7 +295,7 @@ extern void maybe_reacquire_global_lock (void);
 extern void init_threads_once (void);
 extern void init_threads (void);
 extern void syms_of_threads (void);
-extern bool main_thread_p (void *);
+extern bool main_thread_p (const void *);
 extern bool in_current_thread (void);
 
 typedef int select_func (int, fd_set *, fd_set *, fd_set *,

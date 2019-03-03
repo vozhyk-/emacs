@@ -1,6 +1,6 @@
 ;;; ange-ftp.el --- transparent FTP support for GNU Emacs  -*- lexical-binding:t -*-
 
-;; Copyright (C) 1989-1996, 1998, 2000-2018 Free Software Foundation,
+;; Copyright (C) 1989-1996, 1998, 2000-2019 Free Software Foundation,
 ;; Inc.
 
 ;; Author: Andy Norman (ange@hplb.hpl.hp.com)
@@ -2679,7 +2679,7 @@ The main reason for this alist is to deal with file versions in VMS.")
 
 (defmacro ange-ftp-parse-filename ()
   ;;Extract the filename from the current line of a dired-like listing.
-  `(save-match-data
+  '(save-match-data
      (let ((eol (progn (end-of-line) (point))))
        (beginning-of-line)
        (if (re-search-forward directory-listing-before-filename-regexp eol t)
@@ -2761,7 +2761,7 @@ match subdirectories as well.")
 (defmacro ange-ftp-dl-parser ()
   ;; Parse the current buffer, which is assumed to be a descriptive
   ;; listing, and return a hashtable.
-  `(let ((tbl (make-hash-table :test 'equal)))
+  '(let ((tbl (make-hash-table :test 'equal)))
      (while (not (eobp))
        (puthash
         (buffer-substring (point)
@@ -4441,10 +4441,11 @@ NEWNAME should be the name to give the new compressed or uncompressed file.")
 
 ;; We can handle process-file in a restricted way (just for chown).
 ;; Nothing possible for `start-file-process'.
+(put 'exec-path 'ange-ftp 'ignore)
+(put 'make-process 'ange-ftp 'ignore)
 (put 'process-file 'ange-ftp 'ange-ftp-process-file)
 (put 'start-file-process 'ange-ftp 'ignore)
 (put 'shell-command 'ange-ftp 'ange-ftp-shell-command)
-(put 'exec-path 'ange-ftp 'ignore)
 
 ;;; Define ways of getting at unmodified Emacs primitives,
 ;;; turning off our handler.

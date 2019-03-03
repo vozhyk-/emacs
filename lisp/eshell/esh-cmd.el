@@ -1,6 +1,6 @@
 ;;; esh-cmd.el --- command invocation  -*- lexical-binding:t -*-
 
-;; Copyright (C) 1999-2018 Free Software Foundation, Inc.
+;; Copyright (C) 1999-2019 Free Software Foundation, Inc.
 
 ;; Author: John Wiegley <johnw@gnu.org>
 
@@ -816,7 +816,7 @@ This is used on systems where async subprocesses are not supported."
        ;; The last process in the pipe should get its handles
        ;; redirected as we found them before running the pipe.
        ,(if (null (cdr pipeline))
-            `(progn
+            '(progn
                (setq eshell-current-handles tail-handles)
                (setq eshell-in-pipeline-p nil)))
        (let ((result ,(car pipeline)))

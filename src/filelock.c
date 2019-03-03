@@ -1,6 +1,6 @@
 /* Lock files for editing.
 
-Copyright (C) 1985-1987, 1993-1994, 1996, 1998-2018 Free Software
+Copyright (C) 1985-1987, 1993-1994, 1996, 1998-2019 Free Software
 Foundation, Inc.
 
 Author: Richard King
@@ -171,13 +171,10 @@ get_boot_time (void)
     }
 
 #if defined (BOOT_TIME)
-#ifndef CANNOT_DUMP
-  /* The utmp routines maintain static state.
-     Don't touch that state unless we are initialized,
-     since it might not survive dumping.  */
-  if (! initialized)
+  /* The utmp routines maintain static state.  Don't touch that state
+     if we are going to dump, since it might not survive dumping.  */
+  if (will_dump_p ())
     return boot_time;
-#endif /* not CANNOT_DUMP */
 
   /* Try to get boot time from utmp before wtmp,
      since utmp is typically much smaller than wtmp.
@@ -666,7 +663,7 @@ lock_file (Lisp_Object fn)
   /* Don't do locking while dumping Emacs.
      Uncompressing wtmp files uses call-process, which does not work
      in an uninitialized Emacs.  */
-  if (! NILP (Vpurify_flag))
+  if (will_dump_p ())
     return;
 
   orig_fn = fn;

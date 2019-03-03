@@ -1,6 +1,6 @@
 ;;; org-table.el --- The Table Editor for Org        -*- lexical-binding: t; -*-
 
-;; Copyright (C) 2004-2018 Free Software Foundation, Inc.
+;; Copyright (C) 2004-2019 Free Software Foundation, Inc.
 
 ;; Author: Carsten Dominik <carsten at orgmode dot org>
 ;; Keywords: outlines, hypermedia, calendar, wp
@@ -2175,8 +2175,8 @@ If NLAST is a number, only the NLAST fields will actually be summed."
 	     (sres (if (= org-timecnt 0)
 		       (number-to-string res)
 		     (setq diff (* 3600 res)
-			   h (floor (/ diff 3600)) diff (mod diff 3600)
-			   m (floor (/ diff 60)) diff (mod diff 60)
+			   h (floor diff 3600) diff (mod diff 3600)
+			   m (floor diff 60) diff (mod diff 60)
 			   s diff)
 		     (format "%.0f:%02.0f:%02.0f" h m s))))
 	(kill-new sres)
@@ -2909,8 +2909,8 @@ location of point."
 		     (format-time-string
 		      (org-time-stamp-format
 		       (string-match-p "[0-9]\\{1,2\\}:[0-9]\\{2\\}" ts))
-		      (apply #'encode-time
-			     (save-match-data (org-parse-time-string ts))))))
+		      (encode-time
+		       (save-match-data (org-parse-time-string ts))))))
 		 form t t))
 
 	  (setq ev (if (and duration (string-match "^[0-9]+:[0-9]+\\(?::[0-9]+\\)?$" form))

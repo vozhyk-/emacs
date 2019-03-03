@@ -1,6 +1,6 @@
 ;;; mule.el --- basic commands for multilingual environment
 
-;; Copyright (C) 1997-2018 Free Software Foundation, Inc.
+;; Copyright (C) 1997-2019 Free Software Foundation, Inc.
 ;; Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000, 2001, 2002, 2003, 2004,
 ;;   2005, 2006, 2007, 2008, 2009, 2010, 2011
 ;;   National Institute of Advanced Industrial Science and Technology (AIST)
@@ -343,7 +343,7 @@ Return t if file exists."
 	    ;; Have the original buffer current while we eval.
 	    (eval-buffer buffer nil
 			 ;; This is compatible with what `load' does.
-			 (if purify-flag file fullname)
+                         (if dump-mode file fullname)
 			 nil t))
 	(let (kill-buffer-hook kill-buffer-query-functions)
 	  (kill-buffer buffer)))
@@ -2501,7 +2501,11 @@ This function is intended to be added to `auto-coding-functions'."
                   (let ((sym-type (coding-system-type sym))
                         (bfcs-type
                          (coding-system-type buffer-file-coding-system)))
-                    (if (and (coding-system-equal 'utf-8 sym-type)
+                    ;; 'charset' will signal an error in
+                    ;; coding-system-equal, since it isn't a
+                    ;; coding-system.  So test that up front.
+                    (if (and (not (equal sym-type 'charset))
+                             (coding-system-equal 'utf-8 sym-type)
                              (coding-system-equal 'utf-8 bfcs-type))
                         buffer-file-coding-system
 		      sym))

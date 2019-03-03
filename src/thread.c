@@ -1,5 +1,5 @@
 /* Threading code.
-Copyright (C) 2012-2018 Free Software Foundation, Inc.
+Copyright (C) 2012-2019 Free Software Foundation, Inc.
 
 This file is part of GNU Emacs.
 
@@ -25,6 +25,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include "process.h"
 #include "coding.h"
 #include "syssignal.h"
+#include "pdumper.h"
 #include "keyboard.h"
 
 union aligned_thread_state
@@ -1064,7 +1065,7 @@ init_main_thread (void)
 }
 
 bool
-main_thread_p (void *ptr)
+main_thread_p (const void *ptr)
 {
   return ptr == &main_thread.s;
 }

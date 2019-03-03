@@ -1,6 +1,6 @@
 ;;; gnus-util.el --- utility functions for Gnus
 
-;; Copyright (C) 1996-2018 Free Software Foundation, Inc.
+;; Copyright (C) 1996-2019 Free Software Foundation, Inc.
 
 ;; Author: Lars Magne Ingebrigtsen <larsi@gnus.org>
 ;; Keywords: news
@@ -40,7 +40,7 @@
   "Function use to do completing read."
   :version "24.1"
   :group 'gnus-meta
-  :type `(radio (function-item
+  :type '(radio (function-item
                  :doc "Use Emacs standard `completing-read' function."
                  gnus-emacs-completing-read)
 		(function-item
@@ -139,7 +139,7 @@ This is a compatibility function for different Emacsen."
 
 (defun gnus-extract-address-components (from)
   "Extract address components from a From header.
-Given an RFC-822 address FROM, extract full name and canonical address.
+Given an RFC-822 (or later) address FROM, extract name and address.
 Returns a list of the form (FULL-NAME CANONICAL-ADDRESS).  Much more simple
 solution than `mail-header-parse-address', which works much better, but
 is slower."

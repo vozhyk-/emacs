@@ -1,5 +1,5 @@
 /* Header for coding system handler.
-   Copyright (C) 2001-2018 Free Software Foundation, Inc.
+   Copyright (C) 2001-2019 Free Software Foundation, Inc.
    Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000, 2001, 2002, 2003, 2004,
      2005, 2006, 2007, 2008, 2009, 2010, 2011
      National Institute of Advanced Industrial Science and Technology (AIST)
@@ -450,7 +450,7 @@ struct coding_system
 
   unsigned char *safe_charsets;
 
-  /* How may heading bytes we can skip for decoding.  This is set to
+  /* How many heading bytes we can skip for decoding.  This is set to
      -1 in setup_coding_system, and updated by detect_coding.  So,
      when this is equal to the byte length of the text being
      converted, we can skip the actual conversion process except for
@@ -762,14 +762,9 @@ surrogates_to_codepoint (int low, int high)
 
 extern Lisp_Object preferred_coding_system (void);
 
-
-#ifdef emacs
-
 /* Coding system to be used to encode text for terminal display when
    terminal coding system is nil.  */
 extern struct coding_system safe_terminal_coding;
-
-#endif
 
 extern char emacs_mule_bytes[256];
 

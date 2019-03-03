@@ -1,6 +1,6 @@
 ;;; python-tests.el --- Test suite for python.el
 
-;; Copyright (C) 2013-2018 Free Software Foundation, Inc.
+;; Copyright (C) 2013-2019 Free Software Foundation, Inc.
 
 ;; This file is part of GNU Emacs.
 
@@ -184,7 +184,8 @@ aliqua."
 
 (ert-deftest python-syntax-after-python-backspace ()
   ;; `python-indent-dedent-line-backspace' garbles syntax
-  :expected-result :failed
+  ;; But it seems that since da7580, the test passes.
+;;;  :expected-result :failed
   (python-tests-with-temp-buffer
       "\"\"\""
     (goto-char (point-max))
@@ -1161,10 +1162,13 @@ def b()
 if do:
     something()
     else
+outside
 "
    (python-tests-look-at "else")
    (goto-char (line-end-position))
    (python-tests-self-insert ":")
+   (should (= (current-indentation) 0))
+   (python-tests-look-at "outside")
    (should (= (current-indentation) 0))))
 
 (ert-deftest python-indent-electric-colon-3 ()

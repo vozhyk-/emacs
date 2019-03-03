@@ -1,6 +1,6 @@
 ;;; ido.el --- interactively do things with buffers and files -*- lexical-binding: t -*-
 
-;; Copyright (C) 1996-2018 Free Software Foundation, Inc.
+;; Copyright (C) 1996-2019 Free Software Foundation, Inc.
 
 ;; Author: Kim F. Storm <storm@cua.dk>
 ;; Based on: iswitchb by Stephen Eglen <stephen@cns.ed.ac.uk>
@@ -1515,20 +1515,20 @@ Removes badly formatted data and ignored directories."
 				(files (cdr (cdr (car l)))))
 			    (and
 			     (stringp dir)
-			     (consp time)
-			     (cond
-			      ((integerp (car time))
-			       (and (not (zerop (float-time time)))
-				    (ido-may-cache-directory dir)))
-			      ((eq (car time) 'ftp)
-			       (and (numberp (cdr time))
-				    (ido-is-ftp-directory dir)
-				    (ido-cache-ftp-valid (cdr time))))
-			      ((eq (car time) 'unc)
-			       (and (numberp (cdr time))
-				    (ido-is-unc-host dir)
-				    (ido-cache-unc-valid (cdr time))))
-			      (t nil))
+			     (if (condition-case nil
+				     (not (time-equal-p time 0))
+				   (error))
+				 (ido-may-cache-directory dir)
+			       (and
+				(consp time)
+				(numberp (cdr time))
+				(cond
+				 ((eq (car time) 'ftp)
+				  (and (ido-is-ftp-directory dir)
+				       (ido-cache-ftp-valid (cdr time))))
+				 ((eq (car time) 'unc)
+				  (and (ido-is-unc-host dir)
+				       (ido-cache-unc-valid (cdr time)))))))
 			     (let ((s files) (ok t))
 			       (while s
 				 (if (stringp (car s))
@@ -1688,27 +1688,27 @@ is enabled then some keybindings are changed in the keymap."
     (when viper-p
       (define-key map [remap viper-intercept-ESC-key] 'ignore))
     (pcase ido-cur-item
-     ((or `file `dir)
-      (when ido-context-switch-command
-	(define-key map "\C-x\C-b" ido-context-switch-command)
-	(define-key map "\C-x\C-d" 'ignore))
-      (when viper-p
-	(define-key map [remap viper-backward-char]
-	  'ido-delete-backward-updir)
-	(define-key map [remap viper-del-backward-char-in-insert]
-	  'ido-delete-backward-updir)
-	(define-key map [remap viper-delete-backward-word]
-	  'ido-delete-backward-word-updir))
-      (set-keymap-parent map
-			 (if (eq ido-cur-item 'file)
-			     ido-file-completion-map
-			   ido-file-dir-completion-map)))
-     (`buffer
-      (when ido-context-switch-command
-	(define-key map "\C-x\C-f" ido-context-switch-command))
-      (set-keymap-parent map ido-buffer-completion-map))
-     (_
-      (set-keymap-parent map ido-common-completion-map)))
+      ((or 'file 'dir)
+       (when ido-context-switch-command
+	 (define-key map "\C-x\C-b" ido-context-switch-command)
+	 (define-key map "\C-x\C-d" 'ignore))
+       (when viper-p
+	 (define-key map [remap viper-backward-char]
+	   'ido-delete-backward-updir)
+	 (define-key map [remap viper-del-backward-char-in-insert]
+	   'ido-delete-backward-updir)
+	 (define-key map [remap viper-delete-backward-word]
+	   'ido-delete-backward-word-updir))
+       (set-keymap-parent map
+			  (if (eq ido-cur-item 'file)
+			      ido-file-completion-map
+			    ido-file-dir-completion-map)))
+      ('buffer
+       (when ido-context-switch-command
+	 (define-key map "\C-x\C-f" ido-context-switch-command))
+       (set-keymap-parent map ido-buffer-completion-map))
+      (_
+       (set-keymap-parent map ido-common-completion-map)))
     (setq ido-completion-map map)))
 
 (defun ido-final-slash (dir &optional fix-it)
@@ -3621,8 +3621,7 @@ Uses and updates `ido-dir-file-cache'."
 			     (ido-cache-unc-valid (cdr ctime)))))
 	   (t
 	    (if attr
-		(setq valid (and (= (car ctime) (car mtime))
-				 (= (car (cdr ctime)) (car (cdr mtime))))))))
+		(setq valid (time-equal-p ctime mtime)))))
 	  (unless valid
 	    (setq ido-dir-file-cache (delq cached ido-dir-file-cache)
 		  cached nil)))

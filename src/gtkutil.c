@@ -1,6 +1,6 @@
 /* Functions for creating and updating GTK widgets.
 
-Copyright (C) 2003-2018 Free Software Foundation, Inc.
+Copyright (C) 2003-2019 Free Software Foundation, Inc.
 
 This file is part of GNU Emacs.
 
@@ -160,6 +160,10 @@ struct xg_frame_tb_info
   int hmargin, vmargin;
   GtkTextDirection dir;
 };
+
+#ifdef HAVE_XWIDGETS
+bool xg_gtk_initialized;        /* Used to make sure xwidget calls are possible */
+#endif
 
 static GtkWidget * xg_get_widget_from_map (ptrdiff_t idx);
 
@@ -4535,7 +4539,7 @@ xg_print_frames_dialog (Lisp_Object frames)
     gtk_print_operation_set_print_settings (print, print_settings);
   if (page_setup != NULL)
     gtk_print_operation_set_default_page_setup (print, page_setup);
-  gtk_print_operation_set_n_pages (print, XFIXNUM (Flength (frames)));
+  gtk_print_operation_set_n_pages (print, list_length (frames));
   g_signal_connect (print, "draw-page", G_CALLBACK (draw_page), &frames);
   res = gtk_print_operation_run (print, GTK_PRINT_OPERATION_ACTION_PRINT_DIALOG,
                                  NULL, NULL);
@@ -5566,6 +5570,10 @@ xg_initialize (void)
 
 #ifdef HAVE_FREETYPE
   x_last_font_name = NULL;
+#endif
+
+#ifdef HAVE_XWIDGETS
+  xg_gtk_initialized = true;
 #endif
 }
 

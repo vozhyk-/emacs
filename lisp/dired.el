@@ -1,6 +1,6 @@
 ;;; dired.el --- directory-browsing commands -*- lexical-binding: t -*-
 
-;; Copyright (C) 1985-1986, 1992-1997, 2000-2018 Free Software
+;; Copyright (C) 1985-1986, 1992-1997, 2000-2019 Free Software
 ;; Foundation, Inc.
 
 ;; Author: Sebastian Kremer <sk@thp.uni-koeln.de>
@@ -1478,12 +1478,36 @@ change; the point does."
                (list w
 		     (dired-get-filename nil t)
                      (line-number-at-pos (window-point w)))))
-	   (get-buffer-window-list nil 0 t))))
+	   (get-buffer-window-list nil 0 t))
+   ;; For each window that showed the current buffer before, scan its
+   ;; list of previous buffers.  For each association thus found save
+   ;; a triple <point, name, line> where 'point' is that window's
+   ;; window-point marker stored in the window's list of previous
+   ;; buffers, 'name' is the filename at the position of 'point' and
+   ;; 'line' is the line number at the position of 'point'.
+   (let ((buffer (current-buffer))
+         prevs)
+     (walk-windows
+      (lambda (window)
+        (let ((prev (assq buffer (window-prev-buffers window))))
+          (when prev
+            (with-current-buffer buffer
+              (save-excursion
+                (goto-char (nth 2 prev))
+                (setq prevs
+                      (cons
+                       (list (nth 2 prev)
+                             (dired-get-filename nil t)
+                             (line-number-at-pos (point)))
+                       prevs)))))))
+      'nomini t)
+     prevs)))
 
 (defun dired-restore-positions (positions)
   "Restore POSITIONS saved with `dired-save-positions'."
   (let* ((buf-file-pos (nth 0 positions))
-	 (buffer (nth 0 buf-file-pos)))
+	 (buffer (nth 0 buf-file-pos))
+         (prevs (nth 2 positions)))
     (unless (and (nth 1 buf-file-pos)
 		 (dired-goto-file (nth 1 buf-file-pos)))
       (goto-char (point-min))
@@ -1497,7 +1521,21 @@ change; the point does."
 		       (dired-goto-file (nth 1 win-file-pos)))
             (goto-char (point-min))
 	    (forward-line (1- (nth 2 win-file-pos)))
-	    (dired-move-to-filename)))))))
+	    (dired-move-to-filename)))))
+    (when prevs
+      (with-current-buffer buffer
+        (save-excursion
+          (dolist (prev prevs)
+            (let ((point (nth 0 prev)))
+              ;; Sanity check of the point marker.
+              (when (and (markerp point)
+                         (eq (marker-buffer point) buffer))
+                (unless (and (nth 1 prev)
+                             (dired-goto-file (nth 1 prev)))
+                  (goto-char (point-min))
+	          (forward-line (1- (nth 2 prev))))
+	        (dired-move-to-filename)
+                (move-marker point (point) buffer)))))))))
 
 (defun dired-remember-marks (beg end)
   "Return alist of files and their marks, from BEG to END."
@@ -1709,7 +1747,7 @@ Do so according to the former subdir alist OLD-SUBDIR-ALIST."
 
     ;; Make menu bar items.
 
-    ;; No need to fo this, now that top-level items are fewer.
+    ;; No need to do this, now that top-level items are fewer.
     ;;;;
     ;; Get rid of the Edit menu bar item to save space.
     ;(define-key map [menu-bar edit] 'undefined)
@@ -2219,7 +2257,7 @@ directory in another window."
   (let ((raw (dired-get-filename nil t))
 	file-name)
     (if (null raw)
-	(error "No file on this line"))
+	(user-error "No file on this line"))
     (setq file-name (file-name-sans-versions raw t))
     (if (file-exists-p file-name)
 	file-name
@@ -3046,10 +3084,10 @@ TRASH non-nil means to trash the file instead of deleting, provided
                              ("no"   ?n "skip to next")
                              ("all"  ?! "delete all remaining directories with no more questions")
                              ("quit" ?q "exit")))
-                     ('"all" (setq recursive 'always dired-recursive-deletes recursive))
-                     ('"yes" (if (eq recursive 'top) (setq recursive 'always)))
-                     ('"no" (setq recursive nil))
-                     ('"quit" (keyboard-quit))
+                     ("all" (setq recursive 'always dired-recursive-deletes recursive))
+                     ("yes" (if (eq recursive 'top) (setq recursive 'always)))
+                     ("no" (setq recursive nil))
+                     ("quit" (keyboard-quit))
                      (_ (keyboard-quit))))) ; catch all unknown answers
              (setq recursive nil)) ; Empty dir or recursive is nil.
            (delete-directory file recursive trash))))

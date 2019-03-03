@@ -1,6 +1,6 @@
 ;;; vhdl-mode.el --- major mode for editing VHDL code
 
-;; Copyright (C) 1992-2018 Free Software Foundation, Inc.
+;; Copyright (C) 1992-2019 Free Software Foundation, Inc.
 
 ;; Authors:     Reto Zimmermann <reto@gnu.org>
 ;;              Rodney J. Whitby <software.vhdl-mode@rwhitby.net>
@@ -7392,8 +7392,8 @@ only-lines."
 (defun vhdl-update-progress-info (string pos)
   "Update progress information."
   (when (and vhdl-progress-info (not noninteractive)
-	     (< vhdl-progress-interval
-		(- (nth 1 (current-time)) (aref vhdl-progress-info 2))))
+	     (time-less-p vhdl-progress-interval
+			  (time-since (aref vhdl-progress-info 2))))
     (let ((delta (- (aref vhdl-progress-info 1)
                     (aref vhdl-progress-info 0))))
       (message "%s... (%2d%%)" string
@@ -7401,7 +7401,7 @@ only-lines."
 		   100
                  (floor (* 100.0 (- pos (aref vhdl-progress-info 0)))
                         delta))))
-    (aset vhdl-progress-info 2 (nth 1 (current-time)))))
+    (aset vhdl-progress-info 2 (encode-time nil 'integer))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Indentation commands
@@ -8142,12 +8142,12 @@ depending on parameter UPPER-CASE."
 		 (upcase-word -1)
 	       (downcase-word -1)))
 	 (when (and count vhdl-progress-interval (not noninteractive)
-		    (< vhdl-progress-interval
-		       (- (nth 1 (current-time)) last-update)))
+		    (time-less-p vhdl-progress-interval
+				 (time-since last-update)))
 	   (message "Fixing case... (%2d%s)"
 		    (+ (* count 20) (/ (* 20 (- (point) beg)) (- end beg)))
 		    "%")
-	   (setq last-update (nth 1 (current-time)))))
+	   (setq last-update (encode-time nil 'integer))))
        (goto-char end)))))
 
 (defun vhdl-fix-case-region (beg end &optional arg)

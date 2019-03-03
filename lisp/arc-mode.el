@@ -1,6 +1,6 @@
 ;;; arc-mode.el --- simple editing of archives
 
-;; Copyright (C) 1995, 1997-1998, 2001-2018 Free Software Foundation,
+;; Copyright (C) 1995, 1997-1998, 2001-2019 Free Software Foundation,
 ;; Inc.
 
 ;; Author: Morten Welinder <terra@gnu.org>
@@ -637,7 +637,7 @@ the mode is invalid.  If ERROR is nil then nil will be returned."
 
 (defun archive-unixdate (low high)
   "Stringify Unix (LOW HIGH) date."
-  (let* ((time (cons high low))
+  (let* ((time (list high low))
 	 (str (current-time-string time)))
     (format "%s-%s-%s"
 	    (substring str 8 10)
@@ -646,8 +646,7 @@ the mode is invalid.  If ERROR is nil then nil will be returned."
 
 (defun archive-unixtime (low high)
   "Stringify Unix (LOW HIGH) time."
-  (let ((str (current-time-string (cons high low))))
-    (substring str 11 19)))
+  (format-time-string "%H:%M:%S" (list high low)))
 
 (defun archive-get-lineno ()
   (if (>= (point) archive-file-list-start)
@@ -969,8 +968,8 @@ using `make-temp-file', and the generated name is returned."
                   (jka-compr-inhibit t))
               (write-region (point-min) (point-max) tmpfile nil 'quiet))
             (erase-buffer)
-            (let ((coding-system-for-read 'no-conversion))
-              (insert-file-contents tmpfile)))
+            (set-buffer-multibyte t)
+            (insert-file-contents tmpfile))
         (delete-file tmpfile)))))
 
 (defun archive-file-name-handler (op &rest args)
@@ -2066,7 +2065,7 @@ This doesn't recover lost files, it just undoes changes in the buffer itself."
       ;; The code below assumes the name is relative and may do undesirable
       ;; things otherwise.
       (error "Can't extract files with non-relative names")
-    (archive-extract-by-file archive name `("unar" "-no-directory" "-o") "Successfully extracted")))
+    (archive-extract-by-file archive name '("unar" "-no-directory" "-o") "Successfully extracted")))
 
 ;;; Section: Rar self-extracting .exe archives.
 

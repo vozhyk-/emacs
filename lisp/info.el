@@ -1,6 +1,6 @@
 ;; info.el --- Info package for Emacs  -*- lexical-binding:t -*-
 
-;; Copyright (C) 1985-1986, 1992-2018 Free Software Foundation, Inc.
+;; Copyright (C) 1985-1986, 1992-2019 Free Software Foundation, Inc.
 
 ;; Maintainer: emacs-devel@gnu.org
 ;; Keywords: help
@@ -2734,7 +2734,7 @@ Because of ambiguities, this should be concatenated with something like
           (user-error "No menu in this node"))
         (cond
          ((eq (car-safe action) 'boundaries) nil)
-         ((eq action 'metadata) `(metadata (category . info-menu)))
+         ((eq action 'metadata) '(metadata (category . info-menu)))
          ((eq action 'lambda)
           (re-search-forward
            (concat "\n\\* +" (regexp-quote string) ":") nil t))

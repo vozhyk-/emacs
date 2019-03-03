@@ -1,6 +1,6 @@
 ;;; files-x.el --- extended file handling commands
 
-;; Copyright (C) 2009-2018 Free Software Foundation, Inc.
+;; Copyright (C) 2009-2019 Free Software Foundation, Inc.
 
 ;; Author: Juri Linkov <juri@jurta.org>
 ;; Maintainer: emacs-devel@gnu.org
@@ -29,6 +29,8 @@
 ;; to not make the dumped image bigger.
 
 ;;; Code:
+
+(eval-when-compile (require 'subr-x)) ; for string-trim-right
 
 
 ;;; Commands to add/delete file-local/directory-local variables.
@@ -484,7 +486,7 @@ from the MODE alist ignoring the input argument VALUE."
 				 (if (memq variable '(mode eval))
 				     (cdr mode-assoc)
 				   (assq-delete-all variable (cdr mode-assoc))))))
-			(assq-delete-all mode variables)))
+			(assoc-delete-all mode variables)))
 	  (setq variables
 		(cons `(,mode . ((,variable . ,value)))
 		      variables))))
@@ -513,9 +515,11 @@ from the MODE alist ignoring the input argument VALUE."
                             (car mode-variables)
                             (format "(%s)" (mapconcat
                                             (lambda (variable-value)
-                                              (format "(%S . %S)"
+                                              (format "(%S . %s)"
                                                       (car variable-value)
-                                                      (cdr variable-value)))
+                                                      (string-trim-right
+                                                       (pp-to-string
+                                                        (cdr variable-value)))))
                                             (cdr mode-variables) "\n"))))
                   variables "\n")))
 

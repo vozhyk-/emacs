@@ -764,7 +764,7 @@ This variable is set by `nnmaildir-request-article'.")
 
 (defun nnmaildir--scan (gname scan-msgs groups _method srv-dir srv-ls)
   (catch 'return
-    (let ((36h-ago (- (float-time) 129600))
+    (let ((36h-ago (time-since 129600))
 	  absdir nndir tdir ndir cdir nattr cattr isnew pgname read-only ls
 	  files num dir flist group x)
       (setq absdir (nnmaildir--srvgrp-dir srv-dir gname)
@@ -1467,7 +1467,7 @@ This variable is set by `nnmaildir-request-article'.")
       (unless (string-equal nnmaildir--delivery-time file)
 	(setq nnmaildir--delivery-time file
 	      nnmaildir--delivery-count 0))
-      (setq file (concat file "M" (number-to-string (caddr time))))
+      (setq file (concat file (format-time-string "M%6N" time)))
       (setq file (concat file nnmaildir--delivery-pid)
 	    file (concat file "Q" (number-to-string nnmaildir--delivery-count))
 	    file (concat file "." (nnmaildir--system-name))
@@ -1553,7 +1553,7 @@ This variable is set by `nnmaildir-request-article'.")
 (defun nnmaildir-request-expire-articles (ranges &optional gname server force)
   (let ((no-force (not force))
 	(group (nnmaildir--prepare server gname))
-	pgname time boundary bound-iter high low target dir nlist
+	pgname time boundary high low target dir nlist
 	didnt nnmaildir--file nnmaildir-article-file-name
 	deactivate-mark)
     (catch 'return
@@ -1577,14 +1577,7 @@ This variable is set by `nnmaildir-request-article'.")
       (when no-force
 	(unless (integerp time) ;; handle 'never
 	  (throw 'return (gnus-uncompress-range ranges)))
-	(setq boundary (current-time)
-	      high (- (car boundary) (/ time 65536))
-	      low (- (cadr boundary) (% time 65536)))
-	(if (< low 0)
-	    (setq low (+ low 65536)
-		  high (1- high)))
-	(setcar (cdr boundary) low)
-	(setcar boundary high))
+	(setq boundary (time-since time)))
       (setq dir (nnmaildir--srv-dir nnmaildir--cur-server)
 	    dir (nnmaildir--srvgrp-dir dir gname)
 	    dir (nnmaildir--cur dir)
@@ -1602,15 +1595,8 @@ This variable is set by `nnmaildir-request-article'.")
 	    ((null time)
 	     (nnmaildir--expired-article group article))
 	    ((and no-force
-		  (progn
-		    (setq time (file-attribute-modification-time time)
-			  bound-iter boundary)
-		    (while (and bound-iter time
-				(= (car bound-iter) (car time)))
-		      (setq bound-iter (cdr bound-iter)
-			    time (cdr time)))
-		    (and bound-iter time
-			 (car-less-than-car bound-iter time))))
+		  (time-less-p boundary
+			       (file-attribute-modification-time time)))
 	     (setq didnt (cons (nnmaildir--art-num article) didnt)))
 	    (t
 	     (setq nnmaildir-article-file-name nnmaildir--file

@@ -1,6 +1,6 @@
 ;;; gnus-icalendar.el --- reply to iCalendar meeting requests
 
-;; Copyright (C) 2013-2018 Free Software Foundation, Inc.
+;; Copyright (C) 2013-2019 Free Software Foundation, Inc.
 
 ;; Author: Jan Tatarik <Jan.Tatarik@gmail.com>
 ;; Keywords: mail, icalendar, org
@@ -147,7 +147,7 @@
                        (icalendar--get-event-property-attributes
                         event field) zone-map))
          (dtdate-dec (icalendar--decode-isodatetime dtdate nil dtdate-zone)))
-    (apply 'encode-time dtdate-dec)))
+    (encode-time dtdate-dec)))
 
 (defun gnus-icalendar-event--find-attendee (ical name-or-email)
   (let* ((event (car (icalendar--all-events ical)))
@@ -413,13 +413,12 @@ Return nil for non-recurring EVENT."
          (end-time (format-time-string "%H:%M" end))
          (end-at-midnight (string= end-time "00:00"))
          (start-end-date-diff
-	  (/ (float-time (time-subtract
-			  (org-time-string-to-time end-date)
-			  (org-time-string-to-time start-date)))
-	     86400))
+	  (time-to-number-of-days (time-subtract
+				   (org-time-string-to-time end-date)
+				   (org-time-string-to-time start-date))))
          (org-repeat (gnus-icalendar-event:org-repeat event))
          (repeat (if org-repeat (concat " " org-repeat) ""))
-         (time-1-day '(0 86400)))
+	 (time-1-day 86400))
 
     ;; NOTE: special care is needed with appointments ending at midnight
     ;; (typically all-day events): the end time has to be changed to 23:59 to
@@ -655,10 +654,7 @@ is searched."
 (defun gnus-icalendar-show-org-agenda (event)
   (let* ((time-delta (time-subtract (gnus-icalendar-event:end-time event)
                                     (gnus-icalendar-event:start-time event)))
-         (duration-days (1+ (/ (+ (* (car time-delta) (expt 2 16))
-                                  (cadr time-delta))
-                               86400))))
-
+         (duration-days (1+ (floor (encode-time time-delta 'integer) 86400))))
     (org-agenda-list nil (gnus-icalendar-event:start event) duration-days)))
 
 (cl-defmethod gnus-icalendar-event:sync-to-org ((event gnus-icalendar-event-request) reply-status)

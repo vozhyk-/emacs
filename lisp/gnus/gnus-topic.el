@@ -1,6 +1,6 @@
 ;;; gnus-topic.el --- a folding minor mode for Gnus group buffers
 
-;; Copyright (C) 1995-2018 Free Software Foundation, Inc.
+;; Copyright (C) 1995-2019 Free Software Foundation, Inc.
 
 ;; Author: Ilja Weis <kult@uni-paderborn.de>
 ;;	Lars Magne Ingebrigtsen <larsi@gnus.org>
@@ -85,7 +85,7 @@ See Info node `(gnus)Formatting Variables'."
 (defvar gnus-topic-inhibit-change-level nil)
 
 (defconst gnus-topic-line-format-alist
-  `((?n name ?s)
+  '((?n name ?s)
     (?v visible ?s)
     (?i indentation ?s)
     (?g number-of-groups ?d)

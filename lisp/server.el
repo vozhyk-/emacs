@@ -1,6 +1,6 @@
 ;;; server.el --- Lisp code for GNU Emacs running as server process -*- lexical-binding: t -*-
 
-;; Copyright (C) 1986-1987, 1992, 1994-2018 Free Software Foundation,
+;; Copyright (C) 1986-1987, 1992, 1994-2019 Free Software Foundation,
 ;; Inc.
 
 ;; Author: William Sommerfeld <wesommer@athena.mit.edu>
@@ -270,7 +270,14 @@ been consumed.")
     "server")
   "The name of the Emacs server, if this Emacs process creates one.
 The command `server-start' makes use of this.  It should not be
-changed while a server is running."
+changed while a server is running.
+If this is a file name with no leading directories, Emacs will
+create a socket file by that name under `server-socket-dir'
+if `server-use-tcp' is nil, else under `server-auth-dir'.
+If this is an absolute file name, it specifies where the socket
+file will be created.  To have emacsclient connect to the same
+socket, use the \"-s\" switch for local non-TCP sockets, and
+the \"-f\" switch otherwise."
   :group 'server
   :type 'string
   :version "23.1")
@@ -281,7 +288,10 @@ changed while a server is running."
   (if internal--daemon-sockname
       (file-name-directory internal--daemon-sockname)
     (and (featurep 'make-network-process '(:family local))
-         (format "%s/emacs%d" (or (getenv "TMPDIR") "/tmp") (user-uid))))
+	 (let ((xdg_runtime_dir (getenv "XDG_RUNTIME_DIR")))
+	   (if xdg_runtime_dir
+	       (format "%s/emacs" xdg_runtime_dir)
+	     (format "%s/emacs%d" (or (getenv "TMPDIR") "/tmp") (user-uid))))))
   "The directory in which to place the server socket.
 If local sockets are not supported, this is nil.")
 
@@ -1112,16 +1122,16 @@ The following commands are accepted by the client:
 	    (while args-left
               (pcase (pop args-left)
                 ;; -version CLIENT-VERSION: obsolete at birth.
-                (`"-version" (pop args-left))
+                ("-version" (pop args-left))
 
                 ;; -nowait:  Emacsclient won't wait for a result.
-                (`"-nowait" (setq nowait t))
+                ("-nowait" (setq nowait t))
 
                 ;; -current-frame:  Don't create frames.
-                (`"-current-frame" (setq use-current-frame t))
+                ("-current-frame" (setq use-current-frame t))
 
                 ;; -frame-parameters: Set frame parameters
-                (`"-frame-parameters"
+                ("-frame-parameters"
                  (let ((alist (pop args-left)))
                    (if coding-system
                        (setq alist (decode-coding-string alist coding-system)))
@@ -1129,24 +1139,24 @@ The following commands are accepted by the client:
 
                 ;; -display DISPLAY:
                 ;; Open X frames on the given display instead of the default.
-                (`"-display"
+                ("-display"
                  (setq display (pop args-left))
                  (if (zerop (length display)) (setq display nil)))
 
                 ;; -parent-id ID:
                 ;; Open X frame within window ID, via XEmbed.
-                (`"-parent-id"
+                ("-parent-id"
                  (setq parent-id (pop args-left))
                  (if (zerop (length parent-id)) (setq parent-id nil)))
 
                 ;; -window-system:  Open a new X frame.
-                (`"-window-system"
+                ("-window-system"
 		 (if (fboundp 'x-create-frame)
 		     (setq dontkill t
 			   tty-name 'window-system)))
 
                 ;; -resume:  Resume a suspended tty frame.
-                (`"-resume"
+                ("-resume"
                  (let ((terminal (process-get proc 'terminal)))
                    (setq dontkill t)
                    (push (lambda ()
@@ -1157,7 +1167,7 @@ The following commands are accepted by the client:
                 ;; -suspend:  Suspend the client's frame.  (In case we
                 ;; get out of sync, and a C-z sends a SIGTSTP to
                 ;; emacsclient.)
-                (`"-suspend"
+                ("-suspend"
                  (let ((terminal (process-get proc 'terminal)))
                    (setq dontkill t)
                    (push (lambda ()
@@ -1167,13 +1177,13 @@ The following commands are accepted by the client:
 
                 ;; -ignore COMMENT:  Noop; useful for debugging emacsclient.
                 ;; (The given comment appears in the server log.)
-                (`"-ignore"
+                ("-ignore"
                  (setq dontkill t)
                  (pop args-left))
 
 		;; -tty DEVICE-NAME TYPE:  Open a new tty frame.
 		;; (But if we see -window-system later, use that.)
-                (`"-tty"
+                ("-tty"
                  (setq tty-name (pop args-left)
                        tty-type (pop args-left)
                        dontkill (or dontkill
@@ -1192,7 +1202,7 @@ The following commands are accepted by the client:
 
                 ;; -position LINE[:COLUMN]:  Set point to the given
                 ;;  position in the next file.
-                (`"-position"
+                ("-position"
                  (if (not (string-match "\\+\\([0-9]+\\)\\(?::\\([0-9]+\\)\\)?"
                                         (car args-left)))
                      (error "Invalid -position command in client args"))
@@ -1203,7 +1213,7 @@ The following commands are accepted by the client:
                                                      ""))))))
 
                 ;; -file FILENAME:  Load the given file.
-                (`"-file"
+                ("-file"
                  (let ((file (pop args-left)))
                    (if coding-system
                        (setq file (decode-coding-string file coding-system)))
@@ -1221,7 +1231,7 @@ The following commands are accepted by the client:
                  (setq filepos nil))
 
                 ;; -eval EXPR:  Evaluate a Lisp expression.
-                (`"-eval"
+                ("-eval"
                  (if use-current-frame
                      (setq use-current-frame 'always))
                  (let ((expr (pop args-left)))
@@ -1232,14 +1242,14 @@ The following commands are accepted by the client:
                    (setq filepos nil)))
 
                 ;; -env NAME=VALUE:  An environment variable.
-                (`"-env"
+                ("-env"
                  (let ((var (pop args-left)))
                    ;; XXX Variables should be encoded as in getenv/setenv.
                    (process-put proc 'env
                                 (cons var (process-get proc 'env)))))
 
                 ;; -dir DIRNAME:  The cwd of the emacsclient process.
-                (`"-dir"
+                ("-dir"
                  (setq dir (pop args-left))
                  (if coding-system
                      (setq dir (decode-coding-string dir coding-system)))
@@ -1734,7 +1744,7 @@ returns the process ID of the Emacs instance running \"server\"."
 				   (server-quote-arg (format "%S" form))
 				   "\n"))
       (while (memq (process-status process) '(open run))
-	(accept-process-output process 0 10))
+	(accept-process-output process 0.01))
       (goto-char (point-min))
       ;; If the result is nil, there's nothing in the buffer.  If the
       ;; result is non-nil, it's after "-print ".

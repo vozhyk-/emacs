@@ -1,6 +1,6 @@
 /* Platform-independent code for terminal communications.
 
-Copyright (C) 1986, 1988, 1993-1994, 1996, 1999-2018 Free Software
+Copyright (C) 1986, 1988, 1993-1994, 1996, 1999-2019 Free Software
 Foundation, Inc.
 
 This file is part of GNU Emacs.
@@ -86,7 +86,7 @@ init_menu_items (void)
   if (NILP (menu_items))
     {
       menu_items_allocated = 60;
-      menu_items = Fmake_vector (make_fixnum (menu_items_allocated), Qnil);
+      menu_items = make_nil_vector (menu_items_allocated);
     }
 
   menu_items_inuse = Qt;
@@ -524,19 +524,15 @@ bool
 parse_single_submenu (Lisp_Object item_key, Lisp_Object item_name,
 		      Lisp_Object maps)
 {
-  Lisp_Object length;
-  EMACS_INT len;
   Lisp_Object *mapvec;
-  ptrdiff_t i;
   bool top_level_items = 0;
   USE_SAFE_ALLOCA;
 
-  length = Flength (maps);
-  len = XFIXNUM (length);
+  ptrdiff_t len = list_length (maps);
 
   /* Convert the list MAPS into a vector MAPVEC.  */
   SAFE_ALLOCA_LISP (mapvec, len);
-  for (i = 0; i < len; i++)
+  for (ptrdiff_t i = 0; i < len; i++)
     {
       mapvec[i] = Fcar (maps);
       maps = Fcdr (maps);
@@ -544,7 +540,7 @@ parse_single_submenu (Lisp_Object item_key, Lisp_Object item_name,
 
   /* Loop over the given keymaps, making a pane for each map.
      But don't make a pane that is empty--ignore that map instead.  */
-  for (i = 0; i < len; i++)
+  for (ptrdiff_t i = 0; i < len; i++)
     {
       if (!KEYMAPP (mapvec[i]))
 	{
@@ -1309,7 +1305,7 @@ x_popup_menu_1 (Lisp_Object position, Lisp_Object menu)
   else if (CONSP (menu) && KEYMAPP (XCAR (menu)))
     {
       /* We were given a list of keymaps.  */
-      EMACS_INT nmaps = XFIXNAT (Flength (menu));
+      ptrdiff_t nmaps = list_length (menu);
       Lisp_Object *maps;
       ptrdiff_t i;
       USE_SAFE_ALLOCA;
@@ -1580,9 +1576,10 @@ for instance using the window manager, then this produces a quit and
 void
 syms_of_menu (void)
 {
-  staticpro (&menu_items);
   menu_items = Qnil;
+  staticpro (&menu_items);
   menu_items_inuse = Qnil;
+  staticpro (&menu_items_inuse);
 
   defsubr (&Sx_popup_menu);
   defsubr (&Sx_popup_dialog);

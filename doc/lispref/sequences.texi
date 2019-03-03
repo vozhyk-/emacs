@@ -1,6 +1,6 @@
 @c -*-texinfo-*-
 @c This is part of the GNU Emacs Lisp Reference Manual.
-@c Copyright (C) 1990-1995, 1998-1999, 2001-2018 Free Software
+@c Copyright (C) 1990-1995, 1998-1999, 2001-2019 Free Software
 @c Foundation, Inc.
 @c See the file elisp.texi for copying conditions.
 @node Sequences Arrays Vectors
@@ -1049,15 +1049,18 @@ that @var{sequence} can be a list, vector or string.  This is
 primarily useful for side-effects.
 @end defmac
 
-@defmac seq-let arguments sequence body@dots{}
+@anchor{seq-let}
+@defmac seq-let var-sequence val-sequence body@dots{}
 @cindex sequence destructuring
-  This macro binds the variables defined in @var{arguments} to the
-elements of @var{sequence}.  @var{arguments} can themselves include
-sequences, allowing for nested destructuring.
+  This macro binds the variables defined in @var{var-sequence} to the
+values that are the corresponding elements of @var{val-sequence}.
+This is known as @dfn{destructuring binding}.  The elements of
+@var{var-sequence} can themselves include sequences, allowing for
+nested destructuring.
 
-The @var{arguments} sequence can also include the @code{&rest} marker
-followed by a variable name to be bound to the rest of
-@code{sequence}.
+The @var{var-sequence} sequence can also include the @code{&rest}
+marker followed by a variable name to be bound to the rest of
+@var{val-sequence}.
 
 @example
 @group
@@ -1081,6 +1084,9 @@ followed by a variable name to be bound to the rest of
 @end group
 @result{} [3 4]
 @end example
+
+The @code{pcase} patterns provide an alternative facility for
+destructuring binding, see @ref{Destructuring with pcase Patterns}.
 @end defmac
 
 @defun seq-random-elt sequence
@@ -1769,6 +1775,11 @@ element.  The return value is not significant.
 
 If the ring is full, this function removes the newest element to make
 room for the inserted element.
+@end defun
+
+@defun ring-resize ring size
+Set the size of @var{ring} to @var{size}.  If the new size is smaller,
+then the oldest items in the ring are discarded.
 @end defun
 
 @cindex fifo data structure

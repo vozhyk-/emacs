@@ -1,6 +1,6 @@
 /* Generic frame functions.
 
-Copyright (C) 1993-1995, 1997, 1999-2018 Free Software Foundation, Inc.
+Copyright (C) 1993-1995, 1997, 1999-2019 Free Software Foundation, Inc.
 
 This file is part of GNU Emacs.
 
@@ -53,10 +53,13 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #ifdef USE_X_TOOLKIT
 #include "widget.h"
 #endif
+#include "pdumper.h"
 
 /* The currently selected frame.  */
-
 Lisp_Object selected_frame;
+
+/* The selected frame the last time window change functions were run.  */
+Lisp_Object old_selected_frame;
 
 /* A frame which is not just a mini-buffer, or NULL if there are no such
    frames.  This is usually the most recent such frame that was selected.  */
@@ -857,7 +860,8 @@ make_frame (bool mini_p)
   f->ns_transparent_titlebar = false;
 #endif
 #endif
-
+  /* This one should never be zero.  */
+  f->change_stamp = 1;
   root_window = make_window ();
   rw = XWINDOW (root_window);
   if (mini_p)
@@ -1050,10 +1054,7 @@ make_initial_frame (void)
   Lisp_Object frame;
 
   eassert (initial_kboard);
-
-  /* The first call must initialize Vframe_list.  */
-  if (! (NILP (Vframe_list) || CONSP (Vframe_list)))
-    Vframe_list = Qnil;
+  eassert (NILP (Vframe_list) || CONSP (Vframe_list));
 
   terminal = init_initial_terminal ();
 
@@ -1453,7 +1454,8 @@ This function returns FRAME, or nil if FRAME has been deleted.  */)
   return do_switch_frame (frame, 1, 0, norecord);
 }
 
-DEFUN ("handle-switch-frame", Fhandle_switch_frame, Shandle_switch_frame, 1, 1, "^e",
+DEFUN ("handle-switch-frame", Fhandle_switch_frame,
+       Shandle_switch_frame, 1, 1, "^e",
        doc: /* Handle a switch-frame event EVENT.
 Switch-frame events are usually bound to this function.
 A switch-frame event is an event Emacs sends itself to
@@ -1472,6 +1474,18 @@ DEFUN ("selected-frame", Fselected_frame, Sselected_frame, 0, 0, 0,
   (void)
 {
   return selected_frame;
+}
+
+DEFUN ("old-selected-frame", Fold_selected_frame,
+       Sold_selected_frame, 0, 0, 0,
+       doc: /* Return the old selected FRAME.
+FRAME must be a live frame and defaults to the selected one.
+
+The return value is the frame selected the last time window change
+functions were run.  */)
+  (void)
+{
+  return old_selected_frame;
 }
 
 DEFUN ("frame-list", Fframe_list, Sframe_list,
@@ -3193,7 +3207,7 @@ list, but are otherwise ignored.  */)
 #endif
 
     {
-      EMACS_INT length = XFIXNAT (Flength (alist));
+      EMACS_INT length = list_length (alist);
       ptrdiff_t i;
       Lisp_Object *parms;
       Lisp_Object *values;
@@ -5298,9 +5312,9 @@ x_figure_window_size (struct frame *f, Lisp_Object parms, bool toolbar_p, int *x
 	{
 	  int margin, relief;
 
-	  relief = (tool_bar_button_relief >= 0
-		    ? tool_bar_button_relief
-		    : DEFAULT_TOOL_BAR_BUTTON_RELIEF);
+	  relief = (tool_bar_button_relief < 0
+		    ? DEFAULT_TOOL_BAR_BUTTON_RELIEF
+		    : min (tool_bar_button_relief, 1000000));
 
 	  if (RANGED_FIXNUMP (1, Vtool_bar_button_margin, INT_MAX))
 	    margin = XFIXNAT (Vtool_bar_button_margin);
@@ -5612,6 +5626,26 @@ make_monitor_attribute_list (struct MonitorInfo *monitors,
 /***********************************************************************
 				Initialization
  ***********************************************************************/
+
+static void init_frame_once_for_pdumper (void);
+
+void
+init_frame_once (void)
+{
+  staticpro (&Vframe_list);
+  staticpro (&selected_frame);
+  PDUMPER_IGNORE (last_nonminibuf_frame);
+  Vframe_list = Qnil;
+  selected_frame = Qnil;
+  pdumper_do_now_and_after_load (init_frame_once_for_pdumper);
+}
+
+static void
+init_frame_once_for_pdumper (void)
+{
+  PDUMPER_RESET_LV (Vframe_list, Qnil);
+  PDUMPER_RESET_LV (selected_frame, Qnil);
+}
 
 void
 syms_of_frame (void)
@@ -6095,16 +6129,15 @@ making the child frame unresponsive to user actions, the default is to
 iconify the top level frame instead.  */);
   iconify_child_frame = Qiconify_top_level;
 
-  staticpro (&Vframe_list);
-
   defsubr (&Sframep);
   defsubr (&Sframe_live_p);
   defsubr (&Swindow_system);
   defsubr (&Sframe_windows_min_size);
   defsubr (&Smake_terminal_frame);
-  defsubr (&Shandle_switch_frame);
   defsubr (&Sselect_frame);
+  defsubr (&Shandle_switch_frame);
   defsubr (&Sselected_frame);
+  defsubr (&Sold_selected_frame);
   defsubr (&Sframe_list);
   defsubr (&Sframe_parent);
   defsubr (&Sframe_ancestor_p);

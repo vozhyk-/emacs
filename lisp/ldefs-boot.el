@@ -2289,7 +2289,7 @@ a reflection.
  (define-key ctl-x-r-map "M" 'bookmark-set-no-overwrite)
  (define-key ctl-x-r-map "l" 'bookmark-bmenu-list)
 
-(defvar bookmark-map (let ((map (make-sparse-keymap))) (define-key map "x" 'bookmark-set) (define-key map "m" 'bookmark-set) (define-key map "M" 'bookmark-set-no-overwrite) (define-key map "j" 'bookmark-jump) (define-key map "g" 'bookmark-jump) (define-key map "o" 'bookmark-jump-other-window) (define-key map "i" 'bookmark-insert) (define-key map "e" 'edit-bookmarks) (define-key map "f" 'bookmark-insert-location) (define-key map "r" 'bookmark-rename) (define-key map "d" 'bookmark-delete) (define-key map "l" 'bookmark-load) (define-key map "w" 'bookmark-write) (define-key map "s" 'bookmark-save) map) "\
+(defvar bookmark-map (let ((map (make-sparse-keymap))) (define-key map "x" 'bookmark-set) (define-key map "m" 'bookmark-set) (define-key map "M" 'bookmark-set-no-overwrite) (define-key map "j" 'bookmark-jump) (define-key map "g" 'bookmark-jump) (define-key map "o" 'bookmark-jump-other-window) (define-key map "5" 'bookmark-jump-other-frame) (define-key map "i" 'bookmark-insert) (define-key map "e" 'edit-bookmarks) (define-key map "f" 'bookmark-insert-location) (define-key map "r" 'bookmark-rename) (define-key map "d" 'bookmark-delete) (define-key map "l" 'bookmark-load) (define-key map "w" 'bookmark-write) (define-key map "s" 'bookmark-save) map) "\
 Keymap containing bindings to bookmark functions.
 It is not bound to any key by default: to bind it
 so that you have a bookmark prefix, just use `global-set-key' and bind a
@@ -2377,6 +2377,11 @@ DISPLAY-FUNC would be `switch-to-buffer-other-window'.
 
 (autoload 'bookmark-jump-other-window "bookmark" "\
 Jump to BOOKMARK in another window.  See `bookmark-jump' for more.
+
+\(fn BOOKMARK)" t nil)
+
+(autoload 'bookmark-jump-other-frame "bookmark" "\
+Jump to BOOKMARK in another frame.  See `bookmark-jump' for more.
 
 \(fn BOOKMARK)" t nil)
 
@@ -3086,7 +3091,7 @@ and corresponding effects.
 
 \(fn &optional ARG)" nil nil)
 
-(if (fboundp 'register-definition-prefixes) (register-definition-prefixes "bytecomp" '("batch-byte-compile-file" "byte-" "displaying-byte-compile-warnings" "emacs-lisp-file-regexp" "no-byte-compile")))
+(if (fboundp 'register-definition-prefixes) (register-definition-prefixes "bytecomp" '("batch-byte-compile-file" "byte-" "displaying-byte-compile-warnings" "emacs-lisp-" "no-byte-compile")))
 
 ;;;***
 
@@ -4627,9 +4632,8 @@ a separate buffer.
 
 (autoload 'checkdoc-continue "checkdoc" "\
 Find the next doc string in the current buffer which has a style error.
-Prefix argument TAKE-NOTES means to continue through the whole buffer and
-save warnings in a separate buffer.  Second optional argument START-POINT
-is the starting location.  If this is nil, `point-min' is used instead.
+Prefix argument TAKE-NOTES means to continue through the whole
+buffer and save warnings in a separate buffer.
 
 \(fn &optional TAKE-NOTES)" t nil)
 
@@ -6108,7 +6112,10 @@ if ARG is `toggle'; disable the mode otherwise.
 ;;;;;;  (0 0 0 0))
 ;;; Generated autoloads from emacs-lisp/cursor-sensor.el
 
-(defvar cursor-sensor-inhibit nil)
+(defvar cursor-sensor-inhibit nil "\
+When non-nil, suspend `cursor-sensor-mode' and `cursor-intangible-mode'.
+By convention, this is a list of symbols where each symbol stands for the
+\"cause\" of the suspension.")
 
 (autoload 'cursor-intangible-mode "cursor-sensor" "\
 Keep cursor outside of any `cursor-intangible' text property.
@@ -6847,7 +6854,7 @@ Trigger a debugger invocation when VARIABLE is changed.
 
 When called interactively, prompt for VARIABLE in the minibuffer.
 
-This works by calling `add-variable-watch' on VARIABLE.  If you
+This works by calling `add-variable-watcher' on VARIABLE.  If you
 quit from the debugger, this will abort the change (unless the
 change is caused by the termination of a let-binding).
 
@@ -7064,13 +7071,22 @@ The position information includes POS; the total size of BUFFER; the
 region limits, if narrowed; the column number; and the horizontal
 scroll amount, if the buffer is horizontally scrolled.
 
-The character information includes the character code; charset and
-code points in it; syntax; category; how the character is encoded in
-BUFFER and in BUFFER's file; character composition information (if
-relevant); the font and font glyphs used to display the character;
-the character's canonical name and other properties defined by the
-Unicode Data Base; and widgets, buttons, overlays, and text properties
-relevant to POS.
+The character information includes:
+ its codepoint;
+ its charset (see `char-charset'), overridden by the `charset' text
+   property at POS, if any;
+ the codepoint of the character in the above charset;
+ the character's script (as defined by `char-script-table')
+ the character's syntax, as produced by `syntax-after'
+   and `internal-describe-syntax-value';
+ its category (see `char-category-set' and `describe-char-categories');
+ how to input the character using the keyboard and input methods;
+ how the character is encoded in BUFFER and in BUFFER's file;
+ the font and font glyphs used to display the character;
+ the composition information for displaying the character (if relevant);
+ the character's canonical name and other properties defined by the
+   Unicode Data Base;
+ and widgets, buttons, overlays, and text properties relevant to POS.
 
 \(fn POS &optional BUFFER)" t nil)
 
@@ -7469,7 +7485,7 @@ You can also switch between context diff and unified diff with \\[diff-context->
 or vice versa with \\[diff-unified->context] and you can also reverse the direction of
 a diff with \\[diff-reverse-direction].
 
-   \\{diff-mode-map}
+\\{diff-mode-map}
 
 \(fn)" t nil)
 
@@ -9393,6 +9409,7 @@ MERGE-AUTOSTORE-DIR is the directory in which to store merged files.
 
 (autoload 'ediff-windows-wordwise "ediff" "\
 Compare WIND-A and WIND-B, which are selected by clicking, wordwise.
+This compares the portions of text visible in each of the two windows.
 With prefix argument, DUMB-MODE, or on a non-windowing display, works as
 follows:
 If WIND-A is nil, use selected window.
@@ -9404,6 +9421,7 @@ arguments after setting up the Ediff buffers.
 
 (autoload 'ediff-windows-linewise "ediff" "\
 Compare WIND-A and WIND-B, which are selected by clicking, linewise.
+This compares the portions of text visible in each of the two windows.
 With prefix argument, DUMB-MODE, or on a non-windowing display, works as
 follows:
 If WIND-A is nil, use selected window.
@@ -9417,8 +9435,8 @@ arguments after setting up the Ediff buffers.
 Run Ediff on a pair of regions in specified buffers.
 BUFFER-A and BUFFER-B are the buffers to be compared.
 Regions (i.e., point and mark) can be set in advance or marked interactively.
-This function is effective only for relatively small regions, up to 200
-lines.  For large regions, use `ediff-regions-linewise'.
+This function might be slow for large regions.  If you find it slow,
+use `ediff-regions-linewise' instead.
 STARTUP-HOOKS is a list of functions that Emacs calls without
 arguments after setting up the Ediff buffers.
 
@@ -11475,7 +11493,7 @@ argument is passed to `next-file', which see).
 
 \(fn &optional FIRST-TIME)" t nil)
 
-(make-obsolete 'tags-loop-continue 'multifile-continue '"27.1")
+(make-obsolete 'tags-loop-continue 'fileloop-continue '"27.1")
 
 (autoload 'tags-search "etags" "\
 Search through all files listed in tags table for match for REGEXP.
@@ -11494,7 +11512,7 @@ Do `query-replace-regexp' of FROM with TO on all files listed in tags table.
 Third arg DELIMITED (prefix arg) means replace only word-delimited matches.
 If you exit (\\[keyboard-quit], RET or q), you can resume the query replace
 with the command \\[tags-loop-continue].
-For non-interactive use, superceded by `multifile-initialize-replace'.
+For non-interactive use, superceded by `fileloop-initialize-replace'.
 
 \(fn FROM TO &optional DELIMITED FILES)" t nil)
 
@@ -11908,7 +11926,10 @@ Fetch URL and render the page.
 If the input doesn't look like an URL or a domain name, the
 word(s) will be searched for via `eww-search-prefix'.
 
-\(fn URL)" t nil)
+If called with a prefix ARG, use a new buffer instead of reusing
+the default EWW buffer.
+
+\(fn URL &optional ARG)" t nil)
  (defalias 'browse-web 'eww)
 
 (autoload 'eww-open-file "eww" "\
@@ -12498,6 +12519,41 @@ the name is considered already unique; only the second substitution
 
 ;;;***
 
+;;;### (autoloads nil "fileloop" "fileloop.el" (0 0 0 0))
+;;; Generated autoloads from fileloop.el
+
+(autoload 'fileloop-initialize "fileloop" "\
+Initialize a new round of operation on several files.
+FILES can be either a list of file names, or an iterator (used with `iter-next')
+which returns a file name at each step.
+SCAN-FUNCTION is a function called with no argument inside a buffer
+and it should return non-nil if that buffer has something on which to operate.
+OPERATE-FUNCTION is a function called with no argument; it is expected
+to perform the operation on the current file buffer and when done
+should return non-nil to mean that we should immediately continue
+operating on the next file and nil otherwise.
+
+\(fn FILES SCAN-FUNCTION OPERATE-FUNCTION)" nil nil)
+
+(autoload 'fileloop-initialize-search "fileloop" "\
+
+
+\(fn REGEXP FILES CASE-FOLD)" nil nil)
+
+(autoload 'fileloop-initialize-replace "fileloop" "\
+Initialize a new round of query&replace on several files.
+FROM is a regexp and TO is the replacement to use.
+FILES describes the file, as in `fileloop-initialize'.
+CASE-FOLD can be t, nil, or `default', the latter one meaning to obey
+the default setting of `case-fold-search'.
+DELIMITED if non-nil means replace only word-delimited matches.
+
+\(fn FROM TO FILES CASE-FOLD &optional DELIMITED)" nil nil)
+
+(if (fboundp 'register-definition-prefixes) (register-definition-prefixes "fileloop" '("fileloop-")))
+
+;;;***
+
 ;;;### (autoloads nil "filenotify" "filenotify.el" (0 0 0 0))
 ;;; Generated autoloads from filenotify.el
 
@@ -13074,7 +13130,7 @@ to get the effect of a C-q.
 
 ;;;### (autoloads nil "flymake" "progmodes/flymake.el" (0 0 0 0))
 ;;; Generated autoloads from progmodes/flymake.el
-(push (purecopy '(flymake 1 0)) package--builtin-versions)
+(push (purecopy '(flymake 1 0 5)) package--builtin-versions)
 
 (autoload 'flymake-log "flymake" "\
 Log, at level LEVEL, the message MSG formatted with ARGS.
@@ -13091,7 +13147,12 @@ TYPE is a key to symbol and TEXT is a description of the problem
 detected in this region.  DATA is any object that the caller
 wishes to attach to the created diagnostic for later retrieval.
 
-\(fn BUFFER BEG END TYPE TEXT &optional DATA)" nil nil)
+OVERLAY-PROPERTIES is an an alist of properties attached to the
+created diagnostic, overriding the default properties and any
+properties of `flymake-overlay-control' of the diagnostic's
+type.
+
+\(fn BUFFER BEG END TYPE TEXT &optional DATA OVERLAY-PROPERTIES)" nil nil)
 
 (autoload 'flymake-diagnostics "flymake" "\
 Get Flymake diagnostics in region determined by BEG and END.
@@ -13804,6 +13865,8 @@ Interactively, reads the register using `register-read-with-preview'.
 ;;;### (autoloads nil "fringe" "fringe.el" (0 0 0 0))
 ;;; Generated autoloads from fringe.el
 
+(unless (fboundp 'define-fringe-bitmap) (defun define-fringe-bitmap (_bitmap _bits &optional _height _width _align) "Define fringe bitmap BITMAP from BITS of size HEIGHT x WIDTH.\nBITMAP is a symbol identifying the new fringe bitmap.\nBITS is either a string or a vector of integers.\nHEIGHT is height of bitmap.  If HEIGHT is nil, use length of BITS.\nWIDTH must be an integer between 1 and 16, or nil which defaults to 8.\nOptional fifth arg ALIGN may be one of ‘top’, ‘center’, or ‘bottom’,\nindicating the positioning of the bitmap relative to the rows where it\nis used; the default is to center the bitmap.  Fifth arg may also be a\nlist (ALIGN PERIODIC) where PERIODIC non-nil specifies that the bitmap\nshould be repeated.\nIf BITMAP already exists, the existing definition is replaced."))
+
 (if (fboundp 'register-definition-prefixes) (register-definition-prefixes "fringe" '("fringe-" "set-fringe-")))
 
 ;;;***
@@ -13908,7 +13971,7 @@ detailed description of this mode.
 
 \(fn COMMAND-LINE)" t nil)
 
-(if (fboundp 'register-definition-prefixes) (register-definition-prefixes "gdb-mi" '("breakpoint-" "def-gdb-" "gdb" "gud-" "nil")))
+(if (fboundp 'register-definition-prefixes) (register-definition-prefixes "gdb-mi" '("breakpoint" "def-gdb-" "gdb" "gud-" "hollow-right-triangle" "nil")))
 
 ;;;***
 
@@ -15195,7 +15258,7 @@ List of hook functions run by `grep-process-setup' (see `run-hooks').")
 
 (custom-autoload 'grep-setup-hook "grep" t)
 
-(defconst grep-regexp-alist `((,(concat "^\\(?:" "\\(?1:[^\0\n]+\\)\\(?3:\0\\)\\(?2:[0-9]+\\):" "\\|" "\\(?1:" "\\(?:[a-zA-Z]:\\)?" "[^\n:]+?[^\n/:]\\):[\11 ]*\\(?2:[1-9][0-9]*\\)[\11 ]*:" "\\)") 1 2 (,(lambda nil (when grep-highlight-matches (let* ((beg (match-end 0)) (end (save-excursion (goto-char beg) (line-end-position))) (mbeg (text-property-any beg end 'font-lock-face 'grep-match-face))) (when mbeg (- mbeg beg))))) \, (lambda nil (when grep-highlight-matches (let* ((beg (match-end 0)) (end (save-excursion (goto-char beg) (line-end-position))) (mbeg (text-property-any beg end 'font-lock-face 'grep-match-face)) (mend (and mbeg (next-single-property-change mbeg 'font-lock-face nil end)))) (when mend (- mend beg)))))) nil nil (3 '(face nil display ":"))) ("^Binary file \\(.+\\) matches$" 1 nil nil 0 1)) "\
+(defconst grep-regexp-alist `((,(concat "^\\(?:" "\\(?1:[^\0\n]+\\)\\(?3:\0\\)\\(?2:[0-9]+\\):" "\\|" "\\(?1:" "\\(?:[a-zA-Z]:\\)?" "[^\n:]+?[^\n/:]\\):[\11 ]*\\(?2:[1-9][0-9]*\\)[\11 ]*:" "\\)") 1 2 (,(lambda nil (when grep-highlight-matches (let* ((beg (match-end 0)) (end (save-excursion (goto-char beg) (line-end-position))) (mbeg (text-property-any beg end 'font-lock-face grep-match-face))) (when mbeg (- mbeg beg))))) \, (lambda nil (when grep-highlight-matches (let* ((beg (match-end 0)) (end (save-excursion (goto-char beg) (line-end-position))) (mbeg (text-property-any beg end 'font-lock-face grep-match-face)) (mend (and mbeg (next-single-property-change mbeg 'font-lock-face nil end)))) (when mend (- mend beg)))))) nil nil (3 '(face nil display ":"))) ("^Binary file \\(.+\\) matches$" 1 nil nil 0 1)) "\
 Regexp used to match grep hits.
 See `compilation-error-regexp-alist' for format details.")
 
@@ -17694,13 +17757,20 @@ must be available.
 (autoload 'create-image "image" "\
 Create an image.
 FILE-OR-DATA is an image file name or image data.
+
 Optional TYPE is a symbol describing the image type.  If TYPE is omitted
 or nil, try to determine the image type from its first few bytes
 of image data.  If that doesn't work, and FILE-OR-DATA is a file name,
 use its file extension as image type.
+
 Optional DATA-P non-nil means FILE-OR-DATA is a string containing image data.
+
 Optional PROPS are additional image attributes to assign to the image,
-like, e.g. `:mask MASK'.
+like, e.g. `:mask MASK'.  If the property `:scale' is not given and the
+display has a high resolution (more exactly, when the average width of a
+character in the default font is more than 10 pixels), the image is
+automatically scaled up in proportion to the default font.
+
 Value is the image created, or nil if images of type TYPE are not supported.
 
 Images should not be larger than specified by `max-image-size'.
@@ -19243,7 +19313,7 @@ locally, like so:
 
 ;;;### (autoloads nil "jsonrpc" "jsonrpc.el" (0 0 0 0))
 ;;; Generated autoloads from jsonrpc.el
-(push (purecopy '(jsonrpc 1 0 6)) package--builtin-versions)
+(push (purecopy '(jsonrpc 1 0 7)) package--builtin-versions)
 
 (if (fboundp 'register-definition-prefixes) (register-definition-prefixes "jsonrpc" '("jrpc-default-request-timeout" "jsonrpc-")))
 
@@ -19440,9 +19510,10 @@ the current value of `kmacro-counter').
 
 When used during defining/executing a macro, inserts the current value
 of `kmacro-counter' and increments the counter value by ARG (or by 1 if no
-prefix argument).  With just \\[universal-argument], inserts the current value
-of `kmacro-counter', but does not modify the counter; this is the
-same as incrementing the counter by zero.
+prefix argument).  With just \\[universal-argument], inserts the previous
+value of `kmacro-counter', and does not modify the counter; this is
+different from incrementing the counter by zero.  (The previous value
+of the counter is the one it had before the last increment.)
 
 The macro counter can be set directly via \\[kmacro-set-counter] and \\[kmacro-add-counter].
 The format of the inserted value of the counter can be controlled
@@ -20125,7 +20196,8 @@ and then select the region of un-tablified names and use
 ;;; Generated autoloads from mail/mail-extr.el
 
 (autoload 'mail-extract-address-components "mail-extr" "\
-Given an RFC-822 address ADDRESS, extract full name and canonical address.
+Extract full name and canonical address from ADDRESS.
+ADDRESS should be in RFC 822 (or later) format.
 Returns a list of the form (FULL-NAME CANONICAL-ADDRESS).  If no
 name can be extracted, FULL-NAME will be nil.  Also see
 `mail-extr-ignore-single-names' and
@@ -20216,7 +20288,7 @@ This function normally would be called when the message is sent.
 ;;; Generated autoloads from mail/mail-utils.el
 
 (defvar mail-use-rfc822 nil "\
-If non-nil, use a full, hairy RFC822 parser on mail addresses.
+If non-nil, use a full, hairy RFC 822 (or later) parser on mail addresses.
 Otherwise, (the default) use a smaller, somewhat faster, and
 often correct parser.")
 
@@ -20641,7 +20713,7 @@ Default bookmark handler for Man buffers.
 ;;; Generated autoloads from emacs-lisp/map.el
 (push (purecopy '(map 1 2)) package--builtin-versions)
 
-(if (fboundp 'register-definition-prefixes) (register-definition-prefixes "map" '("map")))
+(if (fboundp 'register-definition-prefixes) (register-definition-prefixes "map" '("map-")))
 
 ;;;***
 
@@ -22266,41 +22338,6 @@ QUALITY can be:
 
 ;;;***
 
-;;;### (autoloads nil "multifile" "multifile.el" (0 0 0 0))
-;;; Generated autoloads from multifile.el
-
-(autoload 'multifile-initialize "multifile" "\
-Initialize a new round of operation on several files.
-FILES can be either a list of file names, or an iterator (used with `iter-next')
-which returns a file name at each step.
-SCAN-FUNCTION is a function called with no argument inside a buffer
-and it should return non-nil if that buffer has something on which to operate.
-OPERATE-FUNCTION is a function called with no argument; it is expected
-to perform the operation on the current file buffer and when done
-should return non-nil to mean that we should immediately continue
-operating on the next file and nil otherwise.
-
-\(fn FILES SCAN-FUNCTION OPERATE-FUNCTION)" nil nil)
-
-(autoload 'multifile-initialize-search "multifile" "\
-
-
-\(fn REGEXP FILES CASE-FOLD)" nil nil)
-
-(autoload 'multifile-initialize-replace "multifile" "\
-Initialize a new round of query&replace on several files.
-FROM is a regexp and TO is the replacement to use.
-FILES describes the file, as in `multifile-initialize'.
-CASE-FOLD can be t, nil, or `default', the latter one meaning to obey
-the default setting of `case-fold-search'.
-DELIMITED if non-nil means replace only word-delimited matches.
-
-\(fn FROM TO FILES CASE-FOLD &optional DELIMITED)" nil nil)
-
-(if (fboundp 'register-definition-prefixes) (register-definition-prefixes "multifile" '("multifile-")))
-
-;;;***
-
 ;;;### (autoloads nil "mwheel" "mwheel.el" (0 0 0 0))
 ;;; Generated autoloads from mwheel.el
 
@@ -23452,6 +23489,12 @@ Many aspects this mode can be customized using
 
 ;;;### (autoloads nil "octave" "progmodes/octave.el" (0 0 0 0))
 ;;; Generated autoloads from progmodes/octave.el
+ (add-to-list 'auto-mode-alist '("\\.m\\'" . octave-maybe-mode))
+
+(autoload 'octave-maybe-mode "octave" "\
+Select `octave-mode' if the current buffer seems to hold Octave code.
+
+\(fn)" nil nil)
 
 (autoload 'octave-mode "octave" "\
 Major mode for editing Octave code.
@@ -24820,6 +24863,16 @@ short description.
 
 (defalias 'package-list-packages 'list-packages)
 
+(autoload 'package-get-version "package" "\
+Return the version number of the package in which this is used.
+Assumes it is used from an Elisp file placed inside the top-level directory
+of an installed ELPA package.
+The return value is a string (or nil in case we can't find it).
+
+\(fn)" nil nil)
+
+(function-put 'package-get-version 'pure 't)
+
 (if (fboundp 'register-definition-prefixes) (register-definition-prefixes "package" '("bad-signature" "define-package" "describe-package-1" "package-")))
 
 ;;;***
@@ -24877,7 +24930,7 @@ matching parenthesis is highlighted in `show-paren-style' after
 
 (autoload 'parse-time-string "parse-time" "\
 Parse the time-string STRING into (SEC MIN HOUR DAY MON YEAR DOW DST TZ).
-STRING should be on something resembling an RFC2822 string, a la
+STRING should be something resembling an RFC 822 (or later) date-time, e.g.,
 \"Fri, 25 Mar 2016 16:24:56 +0100\", but this function is
 somewhat liberal in what format it accepts, and will attempt to
 return a \"likely\" value even for somewhat malformed strings.
@@ -25013,6 +25066,13 @@ Emacs Lisp manual for more information and examples.
 
 (function-put 'pcase 'lisp-indent-function '1)
 
+(put 'pcase 'function-documentation '(pcase--make-docstring))
+
+(autoload 'pcase--make-docstring "pcase" "\
+
+
+\(fn)" nil nil)
+
 (autoload 'pcase-exhaustive "pcase" "\
 The exhaustive version of `pcase' (which see).
 If EXP fails to match any of the patterns in CASES, an error is signaled.
@@ -25034,28 +25094,45 @@ variable name being but a special case of it).
 (function-put 'pcase-lambda 'lisp-indent-function 'defun)
 
 (autoload 'pcase-let* "pcase" "\
-Like `let*' but where you can use `pcase' patterns for bindings.
-BODY should be an expression, and BINDINGS should be a list of bindings
-of the form (PAT EXP).
+Like `let*', but supports destructuring BINDINGS using `pcase' patterns.
+As with `pcase-let', BINDINGS are of the form (PATTERN EXP), but the
+EXP in each binding in BINDINGS can use the results of the destructuring
+bindings that precede it in BINDINGS' order.
+
+Each EXP should match (i.e. be of compatible structure) to its
+respective PATTERN; a mismatch may signal an error or may go
+undetected, binding variables to arbitrary values, such as nil.
 
 \(fn BINDINGS &rest BODY)" nil t)
 
 (function-put 'pcase-let* 'lisp-indent-function '1)
 
 (autoload 'pcase-let "pcase" "\
-Like `let' but where you can use `pcase' patterns for bindings.
-BODY should be a list of expressions, and BINDINGS should be a list of bindings
-of the form (PAT EXP).
-The macro is expanded and optimized under the assumption that those
-patterns *will* match, so a mismatch may go undetected or may cause
-any kind of error.
+Like `let', but supports destructuring BINDINGS using `pcase' patterns.
+BODY should be a list of expressions, and BINDINGS should be a list of
+bindings of the form (PATTERN EXP).
+All EXPs are evaluated first, and then used to perform destructuring
+bindings by matching each EXP against its respective PATTERN.  Then
+BODY is evaluated with those bindings in effect.
+
+Each EXP should match (i.e. be of compatible structure) to its
+respective PATTERN; a mismatch may signal an error or may go
+undetected, binding variables to arbitrary values, such as nil.
 
 \(fn BINDINGS &rest BODY)" nil t)
 
 (function-put 'pcase-let 'lisp-indent-function '1)
 
 (autoload 'pcase-dolist "pcase" "\
-Like `dolist' but where the binding can be a `pcase' pattern.
+Eval BODY once for each set of bindings defined by PATTERN and LIST elements.
+PATTERN should be a `pcase' pattern describing the structure of
+LIST elements, and LIST is a list of objects that match PATTERN,
+i.e. have a structure that is compatible with PATTERN.
+For each element of LIST, this macro binds the variables in
+PATTERN to the corresponding subfields of the LIST element, and
+then evaluates BODY with these bindings in effect.  The
+destructuring bindings of variables in PATTERN to the subfields
+of the elements of LIST is performed as if by `pcase-let'.
 
 \(fn (PATTERN LIST) BODY...)" nil t)
 
@@ -25560,6 +25637,13 @@ they are not by default assigned to keys.
 (defalias 'edit-picture 'picture-mode)
 
 (if (fboundp 'register-definition-prefixes) (register-definition-prefixes "picture" '("picture-")))
+
+;;;***
+
+;;;### (autoloads nil "pinyin" "language/pinyin.el" (0 0 0 0))
+;;; Generated autoloads from language/pinyin.el
+
+(if (fboundp 'register-definition-prefixes) (register-definition-prefixes "pinyin" '("pinyin-character-map")))
 
 ;;;***
 
@@ -26390,14 +26474,14 @@ recognized.
 (autoload 'project-search "project" "\
 Search for REGEXP in all the files of the project.
 Stops when a match is found.
-To continue searching for next match, use command \\[multifile-continue].
+To continue searching for next match, use command \\[fileloop-continue].
 
 \(fn REGEXP)" t nil)
 
-(autoload 'project-query-replace "project" "\
+(autoload 'project-query-replace-regexp "project" "\
 Search for REGEXP in all the files of the project.
 Stops when a match is found.
-To continue searching for next match, use command \\[multifile-continue].
+To continue searching for next match, use command \\[fileloop-continue].
 
 \(fn FROM TO)" t nil)
 
@@ -28779,7 +28863,7 @@ CHAR
      matches 0 through 9.
 
 `control', `cntrl'
-     matches ASCII control characters.
+     matches any character whose code is in the range 0-31.
 
 `hex-digit', `hex', `xdigit'
      matches 0 through 9, a through f and A through F.
@@ -28866,7 +28950,9 @@ CHAR
      matches a character with category CATEGORY.  CATEGORY must be
      either a character to use for C, or one of the following symbols.
 
-     `consonant'			(\\c0 in string notation)
+     `space-for-indent'                 (\\c\\s in string notation)
+     `base'                             (\\c.)
+     `consonant'			(\\c0)
      `base-vowel'			(\\c1)
      `upper-diacritical-mark'		(\\c2)
      `lower-diacritical-mark'		(\\c3)
@@ -28882,9 +28968,11 @@ CHAR
      `chinese-two-byte'			(\\cC)
      `greek-two-byte'			(\\cG)
      `japanese-hiragana-two-byte'	(\\cH)
-     `indian-tow-byte'			(\\cI)
+     `indian-two-byte'			(\\cI)
      `japanese-katakana-two-byte'	(\\cK)
+     `strong-left-to-right'             (\\cL)
      `korean-hangul-two-byte'		(\\cN)
+     `strong-right-to-left'             (\\cR)
      `cyrillic-two-byte'		(\\cY)
      `combining-diacritic'		(\\c^)
      `ascii'				(\\ca)
@@ -29063,9 +29151,26 @@ also enable the mode if ARG is omitted or nil, and toggle it
 if ARG is `toggle'; disable the mode otherwise.
 
 When Savehist mode is enabled, minibuffer history is saved
-periodically and when exiting Emacs.  When Savehist mode is
-enabled for the first time in an Emacs session, it loads the
-previous minibuffer history from `savehist-file'.
+to `savehist-file' periodically and when exiting Emacs.  When
+Savehist mode is enabled for the first time in an Emacs session,
+it loads the previous minibuffer histories from `savehist-file'.
+The variable `savehist-autosave-interval' controls the
+periodicity of saving minibuffer histories.
+
+If `savehist-save-minibuffer-history' is non-nil (the default),
+all recorded minibuffer histories will be saved.  You can arrange
+for additional history variables to be saved and restored by
+customizing `savehist-additional-variables', which by default is
+an empty list.  For example, to save the history of commands
+invoked via \\[execute-extended-command], add `command-history' to the list in
+`savehist-additional-variables'.
+
+Alternatively, you could customize `savehist-save-minibuffer-history'
+to nil, and add to `savehist-additional-variables' only those
+history variables you want to save.
+
+To ignore some history variables, add their symbols to the list
+in `savehist-ignored-variables'.
 
 This mode should normally be turned on from your Emacs init file.
 Calling it at any other time replaces your current minibuffer
@@ -29965,7 +30070,7 @@ Otherwise, let mailer send back a message to report errors.")
 (defvar send-mail-function (if (and (boundp 'smtpmail-smtp-server) smtpmail-smtp-server) 'smtpmail-send-it 'sendmail-query-once) "\
 Function to call to send the current buffer as mail.
 The headers should be delimited by a line which is
-not a valid RFC822 header or continuation line,
+not a valid RFC 822 (or later) header or continuation line,
 that matches the variable `mail-header-separator'.
 This is used by the default mail-sending commands.  See also
 `message-send-mail-function' for use with the Message package.")
@@ -30204,7 +30309,7 @@ Like `mail' command, but display mail buffer in another frame.
 
 ;;;### (autoloads nil "seq" "emacs-lisp/seq.el" (0 0 0 0))
 ;;; Generated autoloads from emacs-lisp/seq.el
-(push (purecopy '(seq 2 20)) package--builtin-versions)
+(push (purecopy '(seq 2 21)) package--builtin-versions)
 
 (if (fboundp 'register-definition-prefixes) (register-definition-prefixes "seq" '("seq-")))
 
@@ -31015,7 +31120,7 @@ then `snmpv2-mode-hook'.
 
 ;;;### (autoloads nil "soap-client" "net/soap-client.el" (0 0 0 0))
 ;;; Generated autoloads from net/soap-client.el
-(push (purecopy '(soap-client 3 1 4)) package--builtin-versions)
+(push (purecopy '(soap-client 3 1 5)) package--builtin-versions)
 
 (if (fboundp 'register-definition-prefixes) (register-definition-prefixes "soap-client" '("soap-")))
 
@@ -31822,8 +31927,7 @@ The default comes from `process-coding-system-alist' and
 your might try undecided-dos as a coding system.  If this doesn't help,
 Try to set `comint-output-filter-functions' like this:
 
-\(setq comint-output-filter-functions (append comint-output-filter-functions
-					     \\='(comint-strip-ctrl-m)))
+\(add-hook 'comint-output-filter-functions #\\='comint-strip-ctrl-m 'append)
 
 \(Type \\[describe-mode] in the SQL buffer for a list of commands.)
 
@@ -32265,7 +32369,7 @@ Studlify-case the current buffer.
 ;;;### (autoloads nil "subr-x" "emacs-lisp/subr-x.el" (0 0 0 0))
 ;;; Generated autoloads from emacs-lisp/subr-x.el
 
-(if (fboundp 'register-definition-prefixes) (register-definition-prefixes "subr-x" '("and-let*" "hash-table-" "if-let" "internal--" "string-" "thread-" "when-let")))
+(if (fboundp 'register-definition-prefixes) (register-definition-prefixes "subr-x" '("and-let*" "hash-table-" "if-let" "internal--" "replace-region-contents" "string-" "thread-" "when-let")))
 
 ;;;***
 
@@ -34133,16 +34237,14 @@ Return a string giving the duration of the Emacs initialization.
 
 (autoload 'date-to-time "time-date" "\
 Parse a string DATE that represents a date-time and return a time value.
+DATE should be in one of the forms recognized by `parse-time-string'.
 If DATE lacks timezone information, GMT is assumed.
 
 \(fn DATE)" nil nil)
 
 (defalias 'time-to-seconds 'float-time)
 
-(autoload 'seconds-to-time "time-date" "\
-Convert SECONDS to a time value.
-
-\(fn SECONDS)" nil nil)
+(defalias 'seconds-to-time 'encode-time)
 
 (autoload 'days-to-time "time-date" "\
 Convert DAYS into a time value.
@@ -34422,7 +34524,7 @@ To get complete usage, invoke \"emacs -batch -f batch-titdic-convert -h\".
 
 \(fn &optional FORCE)" nil nil)
 
-(if (fboundp 'register-definition-prefixes) (register-definition-prefixes "titdic-cnv" '("batch-miscdic-convert" "ctlau-" "miscdic-convert" "py-converter" "quail-" "quick-" "tit-" "tsang-" "ziranma-converter")))
+(if (fboundp 'register-definition-prefixes) (register-definition-prefixes "titdic-cnv" '("batch-miscdic-convert" "ctlau-" "miscdic-convert" "pinyin-convert" "py-converter" "quail-" "quick-" "tit-" "tsang-" "ziranma-converter")))
 
 ;;;***
 
@@ -34463,8 +34565,10 @@ MENU is like the MENU argument to `x-popup-menu': either a
 keymap or an alist of alists.
 DEFAULT-ITEM, if non-nil, specifies an initial default choice.
 Its value should be an event that has a binding in MENU.
+NO-EXECUTE, if non-nil, means to return the command the user selects
+instead of executing it.
 
-\(fn MENU &optional IN-POPUP DEFAULT-ITEM)" nil nil)
+\(fn MENU &optional IN-POPUP DEFAULT-ITEM NO-EXECUTE)" nil nil)
 
 (if (fboundp 'register-definition-prefixes) (register-definition-prefixes "tmm" '("tmm-")))
 
@@ -34681,7 +34785,7 @@ the output buffer or changing the window configuration.
 
 ;;;### (autoloads nil "tramp" "net/tramp.el" (0 0 0 0))
 ;;; Generated autoloads from net/tramp.el
-(push (purecopy '(tramp 2 4 1 -1)) package--builtin-versions)
+(push (purecopy '(tramp 2 4 2 -1)) package--builtin-versions)
 
 (defvar tramp-mode t "\
 Whether Tramp is enabled.
@@ -34711,14 +34815,14 @@ match file names at root of the underlying local file system,
 like \"/sys\" or \"/C:\".")
 
 (defun tramp-autoload-file-name-handler (operation &rest args) "\
-Load Tramp file name handler, and perform OPERATION." (if tramp-mode (let ((default-directory temporary-file-directory)) (load "tramp" 'noerror 'nomessage)) (tramp-unload-file-name-handlers)) (apply operation args))
+Load Tramp file name handler, and perform OPERATION." (tramp-unload-file-name-handlers) (if tramp-mode (let ((default-directory temporary-file-directory)) (load "tramp" 'noerror 'nomessage))) (apply operation args))
 
 (defun tramp-register-autoload-file-name-handlers nil "\
 Add Tramp file name handlers to `file-name-handler-alist' during autoload." (add-to-list 'file-name-handler-alist (cons tramp-autoload-file-name-regexp 'tramp-autoload-file-name-handler)) (put 'tramp-autoload-file-name-handler 'safe-magic t))
  (tramp-register-autoload-file-name-handlers)
 
 (defun tramp-unload-file-name-handlers nil "\
-Unload Tramp file name handlers from `file-name-handler-alist'." (dolist (fnh '(tramp-file-name-handler tramp-completion-file-name-handler tramp-archive-file-name-handler tramp-autoload-file-name-handler)) (let ((a1 (rassq fnh file-name-handler-alist))) (setq file-name-handler-alist (delq a1 file-name-handler-alist)))))
+Unload Tramp file name handlers from `file-name-handler-alist'." (dolist (fnh file-name-handler-alist) (when (and (symbolp (cdr fnh)) (string-prefix-p "tramp-" (symbol-name (cdr fnh)))) (setq file-name-handler-alist (delq fnh file-name-handler-alist)))))
 
 (defvar tramp-completion-mode nil "\
 If non-nil, external packages signal that they are in file name completion.")
@@ -34755,14 +34859,16 @@ List of suffixes which indicate a compressed file.
 It must be supported by libarchive(3).")
 
 (defmacro tramp-archive-autoload-file-name-regexp nil "\
-Regular expression matching archive file names." `(concat "\\`" "\\(" ".+" "\\." (regexp-opt tramp-archive-suffixes) "\\(?:" "\\." (regexp-opt tramp-archive-compression-suffixes) "\\)*" "\\)" "\\(" "/" ".*" "\\)" "\\'"))
+Regular expression matching archive file names." '(concat "\\`" "\\(" ".+" "\\." (regexp-opt tramp-archive-suffixes) "\\(?:" "\\." (regexp-opt tramp-archive-compression-suffixes) "\\)*" "\\)" "\\(" "/" ".*" "\\)" "\\'"))
+
+(defalias 'tramp-archive-autoload-file-name-handler #'tramp-autoload-file-name-handler)
 
 (defun tramp-register-archive-file-name-handler nil "\
-Add archive file name handler to `file-name-handler-alist'." (when tramp-archive-enabled (add-to-list 'file-name-handler-alist (cons (tramp-archive-autoload-file-name-regexp) 'tramp-autoload-file-name-handler)) (put 'tramp-archive-file-name-handler 'safe-magic t)))
+Add archive file name handler to `file-name-handler-alist'." (when tramp-archive-enabled (add-to-list 'file-name-handler-alist (cons (tramp-archive-autoload-file-name-regexp) #'tramp-archive-autoload-file-name-handler)) (put 'tramp-archive-autoload-file-name-handler 'safe-magic t)))
 
-(add-hook 'after-init-hook 'tramp-register-archive-file-name-handler)
+(add-hook 'after-init-hook #'tramp-register-archive-file-name-handler)
 
-(add-hook 'tramp-archive-unload-hook (lambda nil (remove-hook 'after-init-hook 'tramp-register-archive-file-name-handler)))
+(add-hook 'tramp-archive-unload-hook (lambda nil (remove-hook 'after-init-hook #'tramp-register-archive-file-name-handler)))
 
 (if (fboundp 'register-definition-prefixes) (register-definition-prefixes "tramp-archive" '("tramp-" "with-parsed-tramp-archive-file-name")))
 
@@ -34793,11 +34899,6 @@ Add archive file name handler to `file-name-handler-alist'." (when tramp-archive
 ;;;### (autoloads nil "tramp-ftp" "net/tramp-ftp.el" (0 0 0 0))
 ;;; Generated autoloads from net/tramp-ftp.el
 
-(autoload 'tramp-ftp-enable-ange-ftp "tramp-ftp" "\
-Reenable Ange-FTP, when Tramp is unloaded.
-
-\(fn)" nil nil)
-
 (if (fboundp 'register-definition-prefixes) (register-definition-prefixes "tramp-ftp" '("tramp-")))
 
 ;;;***
@@ -34806,6 +34907,22 @@ Reenable Ange-FTP, when Tramp is unloaded.
 ;;; Generated autoloads from net/tramp-gvfs.el
 
 (if (fboundp 'register-definition-prefixes) (register-definition-prefixes "tramp-gvfs" '("tramp-" "with-tramp-dbus-")))
+
+;;;***
+
+;;;### (autoloads nil "tramp-integration" "net/tramp-integration.el"
+;;;;;;  (0 0 0 0))
+;;; Generated autoloads from net/tramp-integration.el
+
+(if (fboundp 'register-definition-prefixes) (register-definition-prefixes "tramp-integration" '("tramp-")))
+
+;;;***
+
+;;;### (autoloads nil "tramp-rclone" "net/tramp-rclone.el" (0 0 0
+;;;;;;  0))
+;;; Generated autoloads from net/tramp-rclone.el
+
+(if (fboundp 'register-definition-prefixes) (register-definition-prefixes "tramp-rclone" '("tramp-rclone-")))
 
 ;;;***
 
@@ -34820,6 +34937,14 @@ Reenable Ange-FTP, when Tramp is unloaded.
 ;;; Generated autoloads from net/tramp-smb.el
 
 (if (fboundp 'register-definition-prefixes) (register-definition-prefixes "tramp-smb" '("tramp-smb-")))
+
+;;;***
+
+;;;### (autoloads nil "tramp-sudoedit" "net/tramp-sudoedit.el" (0
+;;;;;;  0 0 0))
+;;; Generated autoloads from net/tramp-sudoedit.el
+
+(if (fboundp 'register-definition-prefixes) (register-definition-prefixes "tramp-sudoedit" '("tramp-sudoedit-")))
 
 ;;;***
 
@@ -36184,7 +36309,12 @@ first backend that could register the file is used.
 \(fn &optional VC-FILESET COMMENT)" t nil)
 
 (autoload 'vc-version-diff "vc" "\
-Report diffs between revisions of the fileset in the repository history.
+Report diffs between REV1 and REV2 revisions of the fileset.
+
+\(fn FILES REV1 REV2)" t nil)
+
+(autoload 'vc-root-version-diff "vc" "\
+Report diffs between REV1 and REV2 revisions of the whole tree.
 
 \(fn FILES REV1 REV2)" t nil)
 
@@ -36271,6 +36401,11 @@ Display a message indicating unresolved conflicts in FILENAME.
 
 (defalias 'vc-resolve-conflicts 'smerge-ediff)
 
+(autoload 'vc-find-conflicted-file "vc" "\
+Visit the next conflicted file in the current project.
+
+\(fn)" t nil)
+
 (autoload 'vc-create-tag "vc" "\
 Descending recursively from DIR, make a tag called NAME.
 For each registered file, the working revision becomes part of
@@ -36290,6 +36425,7 @@ If NAME is empty, it refers to the latest revisions of the current branch.
 If locking is used for the files in DIR, then there must not be any
 locked files at or below DIR (but if NAME is empty, locked files are
 allowed and simply skipped).
+This function runs the hook `vc-retrieve-tag-hook' when finished.
 
 \(fn DIR NAME)" t nil)
 
@@ -38488,7 +38624,8 @@ With no prefix argument, or with prefix argument equal to zero,
 \"left\" is relative to the position of point in the window; otherwise
 it is relative to the top edge (for positive ARG) or the bottom edge
 \(for negative ARG) of the current window.
-If no window is at the desired location, an error is signaled.
+If no window is at the desired location, an error is signaled
+unless `windmove-create-window' is non-nil and a new window is created.
 
 \(fn &optional ARG)" t nil)
 
@@ -38498,7 +38635,8 @@ With no prefix argument, or with prefix argument equal to zero, \"up\"
 is relative to the position of point in the window; otherwise it is
 relative to the left edge (for positive ARG) or the right edge (for
 negative ARG) of the current window.
-If no window is at the desired location, an error is signaled.
+If no window is at the desired location, an error is signaled
+unless `windmove-create-window' is non-nil and a new window is created.
 
 \(fn &optional ARG)" t nil)
 
@@ -38508,7 +38646,8 @@ With no prefix argument, or with prefix argument equal to zero,
 \"right\" is relative to the position of point in the window;
 otherwise it is relative to the top edge (for positive ARG) or the
 bottom edge (for negative ARG) of the current window.
-If no window is at the desired location, an error is signaled.
+If no window is at the desired location, an error is signaled
+unless `windmove-create-window' is non-nil and a new window is created.
 
 \(fn &optional ARG)" t nil)
 
@@ -38518,7 +38657,8 @@ With no prefix argument, or with prefix argument equal to zero,
 \"down\" is relative to the position of point in the window; otherwise
 it is relative to the left edge (for positive ARG) or the right edge
 \(for negative ARG) of the current window.
-If no window is at the desired location, an error is signaled.
+If no window is at the desired location, an error is signaled
+unless `windmove-create-window' is non-nil and a new window is created.
 
 \(fn &optional ARG)" t nil)
 
@@ -38527,6 +38667,110 @@ Set up keybindings for `windmove'.
 Keybindings are of the form MODIFIERS-{left,right,up,down},
 where MODIFIERS is either a list of modifiers or a single modifier.
 Default value of MODIFIERS is `shift'.
+
+\(fn &optional MODIFIERS)" t nil)
+
+(autoload 'windmove-display-left "windmove" "\
+Display the next buffer in window to the left of the current one.
+See the logic of the prefix ARG in `windmove-display-in-direction'.
+
+\(fn &optional ARG)" t nil)
+
+(autoload 'windmove-display-up "windmove" "\
+Display the next buffer in window above the current one.
+See the logic of the prefix ARG in `windmove-display-in-direction'.
+
+\(fn &optional ARG)" t nil)
+
+(autoload 'windmove-display-right "windmove" "\
+Display the next buffer in window to the right of the current one.
+See the logic of the prefix ARG in `windmove-display-in-direction'.
+
+\(fn &optional ARG)" t nil)
+
+(autoload 'windmove-display-down "windmove" "\
+Display the next buffer in window below the current one.
+See the logic of the prefix ARG in `windmove-display-in-direction'.
+
+\(fn &optional ARG)" t nil)
+
+(autoload 'windmove-display-same-window "windmove" "\
+Display the next buffer in the same window.
+
+\(fn &optional ARG)" t nil)
+
+(autoload 'windmove-display-default-keybindings "windmove" "\
+Set up keybindings for directional buffer display.
+Keys are bound to commands that display the next buffer in the specified
+direction.  Keybindings are of the form MODIFIERS-{left,right,up,down},
+where MODIFIERS is either a list of modifiers or a single modifier.
+Default value of MODIFIERS is `shift-meta'.
+
+\(fn &optional MODIFIERS)" t nil)
+
+(autoload 'windmove-delete-left "windmove" "\
+Delete the window to the left of the current one.
+If prefix ARG is `C-u', delete the selected window and
+select the window that was to the left of the current one.
+
+\(fn &optional ARG)" t nil)
+
+(autoload 'windmove-delete-up "windmove" "\
+Delete the window above the current one.
+If prefix ARG is `C-u', delete the selected window and
+select the window that was above the current one.
+
+\(fn &optional ARG)" t nil)
+
+(autoload 'windmove-delete-right "windmove" "\
+Delete the window to the right of the current one.
+If prefix ARG is `C-u', delete the selected window and
+select the window that was to the right of the current one.
+
+\(fn &optional ARG)" t nil)
+
+(autoload 'windmove-delete-down "windmove" "\
+Delete the window below the current one.
+If prefix ARG is `C-u', delete the selected window and
+select the window that was below the current one.
+
+\(fn &optional ARG)" t nil)
+
+(autoload 'windmove-delete-default-keybindings "windmove" "\
+Set up keybindings for directional window deletion.
+Keys are bound to commands that delete windows in the specified
+direction.  Keybindings are of the form PREFIX MODIFIERS-{left,right,up,down},
+where PREFIX is a prefix key and MODIFIERS is either a list of modifiers or
+a single modifier.  Default value of PREFIX is `C-x' and MODIFIERS is `shift'.
+
+\(fn &optional PREFIX MODIFIERS)" t nil)
+
+(autoload 'windmove-swap-states-left "windmove" "\
+Swap the states with the window on the left from the current one.
+
+\(fn)" t nil)
+
+(autoload 'windmove-swap-states-up "windmove" "\
+Swap the states with the window above from the current one.
+
+\(fn)" t nil)
+
+(autoload 'windmove-swap-states-down "windmove" "\
+Swap the states with the window below from the current one.
+
+\(fn)" t nil)
+
+(autoload 'windmove-swap-states-right "windmove" "\
+Swap the states with the window on the right from the current one.
+
+\(fn)" t nil)
+
+(autoload 'windmove-swap-states-default-keybindings "windmove" "\
+Set up keybindings for directional window swap states.
+Keys are bound to commands that swap the states of the selected window
+with the window in the specified direction.  Keybindings are of the form
+MODIFIERS-{left,right,up,down}, where MODIFIERS is either a list of modifiers
+or a single modifier.  Default value of MODIFIERS is `shift-super'.
 
 \(fn &optional MODIFIERS)" t nil)
 

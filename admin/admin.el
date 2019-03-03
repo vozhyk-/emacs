@@ -1,6 +1,6 @@
 ;;; admin.el --- utilities for Emacs administration
 
-;; Copyright (C) 2001-2018 Free Software Foundation, Inc.
+;; Copyright (C) 2001-2019 Free Software Foundation, Inc.
 
 ;; This file is part of GNU Emacs.
 
@@ -657,7 +657,7 @@ style=\"text-align:left\">")
 
 
 (defconst make-manuals-dist-output-variables
-  `(("@\\(top_\\)?srcdir@" . ".")	; top_srcdir is wrong, but not used
+  '(("@\\(top_\\)?srcdir@" . ".")	; top_srcdir is wrong, but not used
     ("^\\(\\(?:texinfo\\|buildinfo\\|emacs\\)dir *=\\).*" . "\\1 .")
     ("^\\(clean:.*\\)" . "\\1 infoclean")
     ("@MAKEINFO@" . "makeinfo")

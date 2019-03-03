@@ -1,6 +1,6 @@
 ;;; cus-start.el --- define customization properties of builtins  -*- lexical-binding:t -*-
 
-;; Copyright (C) 1997, 1999-2018 Free Software Foundation, Inc.
+;; Copyright (C) 1997, 1999-2019 Free Software Foundation, Inc.
 
 ;; Author: Per Abrahamsen <abraham@dina.kvl.dk>
 ;; Keywords: internal
@@ -685,7 +685,7 @@ since it could result in memory overflow and make Emacs crash."
 		      ((string-match "selection" (symbol-name symbol))
 		       (fboundp 'x-selection-exists-p))
 		      ((string-match "fringe" (symbol-name symbol))
-		       (fboundp 'define-fringe-bitmap))
+		       (boundp 'fringe-bitmaps))
 		      ((string-match "\\`imagemagick" (symbol-name symbol))
 		       (fboundp 'imagemagick-types))
 		      ((equal "font-use-system-font" (symbol-name symbol))
@@ -730,7 +730,7 @@ since it could result in memory overflow and make Emacs crash."
       ;; If this is NOT while dumping Emacs, set up the rest of the
       ;; customization info.  This is the stuff that is not needed
       ;; until someone does M-x customize etc.
-      (unless purify-flag
+      (unless dump-mode
 	;; Add it to the right group(s).
 	(if (listp group)
 	    (dolist (g group)
@@ -752,7 +752,7 @@ since it could result in memory overflow and make Emacs crash."
 ;; Record cus-start as loaded if we have set up all the info that we can.
 ;; Don't record it as loaded if we have only set up the standard values
 ;; and safe/risky properties.
-(unless purify-flag
+(unless dump-mode
   (provide 'cus-start))
 
 ;;; cus-start.el ends here

@@ -1,5 +1,5 @@
 /* Asynchronous timers.
-   Copyright (C) 2000-2018 Free Software Foundation, Inc.
+   Copyright (C) 2000-2019 Free Software Foundation, Inc.
 
 This file is part of GNU Emacs.
 
@@ -587,6 +587,7 @@ init_atimer (void)
   sigaction (SIGALRM, &action, 0);
 
 #ifdef ENABLE_CHECKING
-  defsubr (&Sdebug_timer_check);
+  if (!initialized)
+    defsubr (&Sdebug_timer_check);
 #endif
 }

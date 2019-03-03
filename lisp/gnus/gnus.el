@@ -1,6 +1,6 @@
 ;;; gnus.el --- a newsreader for GNU Emacs  -*- lexical-binding:t -*-
 
-;; Copyright (C) 1987-1990, 1993-1998, 2000-2018 Free Software
+;; Copyright (C) 1987-1990, 1993-1998, 2000-2019 Free Software
 ;; Foundation, Inc.
 
 ;; Author: Masanobu UMEDA <umerin@flab.flab.fujitsu.junet>
@@ -637,6 +637,12 @@ be set in `.emacs' instead."
   "Face used for low interest read articles."
   :group 'gnus-summary)
 
+;;; Base gnus-mode
+
+(define-derived-mode gnus-mode special-mode nil
+  "Base mode from which all other gnus modes derive.
+This does nothing but derive from `special-mode', and should not
+be used directly.")
 
 ;;;
 ;;; Gnus buffers
@@ -2764,7 +2770,7 @@ See Info node `(gnus)Formatting Variables'."
 
 (defun gnus-suppress-keymap (keymap)
   (suppress-keymap keymap)
-  (let ((keys `([delete] "\177" "\M-u"))) ;[mouse-2]
+  (let ((keys '([delete] "\177" "\M-u"))) ;[mouse-2]
     (while keys
       (define-key keymap (pop keys) 'undefined))))
 

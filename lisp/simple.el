@@ -1,6 +1,6 @@
 ;;; simple.el --- basic editing commands for Emacs  -*- lexical-binding: t -*-
 
-;; Copyright (C) 1985-1987, 1993-2018 Free Software Foundation, Inc.
+;; Copyright (C) 1985-1987, 1993-2019 Free Software Foundation, Inc.
 
 ;; Maintainer: emacs-devel@gnu.org
 ;; Keywords: internal
@@ -383,13 +383,11 @@ backwards, if negative).
 Finds and highlights the source line like \\[next-error], but does not
 select the source buffer."
   (interactive "p")
-  (let ((next-error-highlight next-error-highlight-no-select))
-    (next-error n))
-  (let ((display-buffer-overriding-action '(display-buffer-reuse-window)))
-    ;; Override user customization such as display-buffer-same-window
-    ;; and use display-buffer-reuse-window to ensure next-error-last-buffer
-    ;; is displayed somewhere, not necessarily in the same window (bug#32607).
-    (pop-to-buffer next-error-last-buffer)))
+  (save-selected-window
+    (let ((next-error-highlight next-error-highlight-no-select)
+          (display-buffer-overriding-action
+           '(nil (inhibit-same-window . t))))
+      (next-error n))))
 
 (defun previous-error-no-select (&optional n)
   "Move point to the previous error in the `next-error' buffer and highlight match.
@@ -1071,13 +1069,16 @@ instead of deleted."
         (filter-buffer-substring (region-beginning) (region-end) method)))))
   "Function to get the region's content.
 Called with one argument METHOD which can be:
-- nil: return the content as a string.
+- nil: return the content as a string (list of strings for
+  non-contiguous regions).
 - `delete-only': delete the region; the return value is undefined.
-- `bounds': return the boundaries of the region as a list of cons
-  cells of the form (START . END).
+- `bounds': return the boundaries of the region as a list of one
+  or more cons cells of the form (START . END).
 - anything else: delete the region and return its content
-  as a string, after filtering it with `filter-buffer-substring', which
-  is called with METHOD as its 3rd argument.")
+  as a string (or list of strings for non-contiguous regions),
+  after filtering it with `filter-buffer-substring', which
+  is called, for each contiguous sub-region, with METHOD as its
+  3rd argument.")
 
 (defvar region-insert-function
   (lambda (lines)
@@ -1612,7 +1613,7 @@ this command arranges for all errors to enter the debugger."
          (eval-expression-get-print-arguments current-prefix-arg)))
 
   (if (null eval-expression-debug-on-error)
-      (push (eval exp lexical-binding) values)
+      (push (eval (macroexpand-all exp) lexical-binding) values)
     (let ((old-value (make-symbol "t")) new-value)
       ;; Bind debug-on-error to something unique so that we can
       ;; detect when evalled code changes it.
@@ -1838,9 +1839,11 @@ invoking, give a prefix argument to `execute-extended-command'."
             ;; If this command displayed something in the echo area;
             ;; wait a few seconds, then display our suggestion message.
             ;; FIXME: Wait *after* running post-command-hook!
-            ;; FIXME: Don't wait if execute-extended-command--shorter won't
-            ;; find a better answer anyway!
-            (when suggest-key-bindings
+            ;; FIXME: If execute-extended-command--shorter were
+            ;; faster, we could compute the result here first too.
+            (when (and suggest-key-bindings
+                       (or binding
+                           (and extended-command-suggest-shorter typed)))
               (sit-for (cond
                         ((zerop (length (current-message))) 0)
                         ((numberp suggest-key-bindings) suggest-key-bindings)
@@ -2169,7 +2172,11 @@ next element of the minibuffer history in the minibuffer."
 	 (prompt-end (minibuffer-prompt-end))
 	 (old-column (unless (and (eolp) (> (point) prompt-end))
 		       (if (= (line-number-at-pos) 1)
-			   (max (- (current-column) (1- prompt-end)) 0)
+			   (max (- (current-column)
+				   (save-excursion
+				     (goto-char (1- prompt-end))
+				     (current-column)))
+				0)
 			 (current-column)))))
     (condition-case nil
 	(with-no-warnings
@@ -2188,7 +2195,10 @@ next element of the minibuffer history in the minibuffer."
        (goto-char (point-max))
        (when old-column
 	 (if (= (line-number-at-pos) 1)
-	     (move-to-column (+ old-column (1- (minibuffer-prompt-end))))
+	     (move-to-column (+ old-column
+				(save-excursion
+				  (goto-char (1- (minibuffer-prompt-end)))
+				  (current-column))))
 	   (move-to-column old-column)))))))
 
 (defun previous-line-or-history-element (&optional arg)
@@ -2203,7 +2213,11 @@ previous element of the minibuffer history in the minibuffer."
 	 (prompt-end (minibuffer-prompt-end))
 	 (old-column (unless (and (eolp) (> (point) prompt-end))
 		       (if (= (line-number-at-pos) 1)
-			   (max (- (current-column) (1- prompt-end)) 0)
+			   (max (- (current-column)
+				   (save-excursion
+				     (goto-char (1- prompt-end))
+				     (current-column)))
+				0)
 			 (current-column)))))
     (condition-case nil
 	(with-no-warnings
@@ -2222,7 +2236,10 @@ previous element of the minibuffer history in the minibuffer."
        (goto-char (minibuffer-prompt-end))
        (if old-column
 	   (if (= (line-number-at-pos) 1)
-	       (move-to-column (+ old-column (1- (minibuffer-prompt-end))))
+	       (move-to-column (+ old-column
+				  (save-excursion
+				    (goto-char (1- (minibuffer-prompt-end)))
+				    (current-column))))
 	     (move-to-column old-column))
 	 ;; Put the cursor at the end of the visual line instead of the
 	 ;; logical line, so the next `previous-line-or-history-element'
@@ -3875,18 +3892,21 @@ interactively, this is t."
       (shell-command command t))))
 
 (defun process-file (program &optional infile buffer display &rest args)
-  "Process files synchronously in a separate process.
-Similar to `call-process', but may invoke a file handler based on
+  "Process files synchronously in a separate process that runs PROGRAM.
+Similar to `call-process', but may invoke a file name handler based on
 `default-directory'.  The current working directory of the
 subprocess is `default-directory'.
+
+If PROGRAM is a remote file name, it should be processed
+by `file-local-name' before passing it to this function.
 
 File names in INFILE and BUFFER are handled normally, but file
 names in ARGS should be relative to `default-directory', as they
 are passed to the process verbatim.  (This is a difference to
-`call-process' which does not support file handlers for INFILE
+`call-process' which does not support file name handlers for INFILE
 and BUFFER.)
 
-Some file handlers might not support all variants, for example
+Some file name handlers might not support all variants, for example
 they might behave as if DISPLAY was nil, regardless of the actual
 value passed."
   (let ((fh (find-file-name-handler default-directory 'process-file))
@@ -3910,7 +3930,7 @@ value passed."
 
 By default, this variable is always set to t, meaning that a
 call of `process-file' could potentially change any file on a
-remote host.  When set to nil, a file handler could optimize
+remote host.  When set to nil, a file name handler could optimize
 its behavior with respect to remote file attribute caching.
 
 You should only ever change this variable with a let-binding;
@@ -3919,17 +3939,20 @@ never with `setq'.")
 (defun start-file-process (name buffer program &rest program-args)
   "Start a program in a subprocess.  Return the process object for it.
 
-Similar to `start-process', but may invoke a file handler based on
+Similar to `start-process', but may invoke a file name handler based on
 `default-directory'.  See Info node `(elisp)Magic File Names'.
 
 This handler ought to run PROGRAM, perhaps on the local host,
 perhaps on a remote host that corresponds to `default-directory'.
-In the latter case, the local part of `default-directory' becomes
-the working directory of the process.
+In the latter case, the local part of `default-directory', the one
+produced from it by `file-local-name', becomes the working directory
+of the process on the remote host.
 
 PROGRAM and PROGRAM-ARGS might be file names.  They are not
-objects of file handler invocation.  File handlers might not
-support pty association, if PROGRAM is nil."
+objects of file name handler invocation, so they need to be obtained
+by calling `file-local-name', in case they are remote file names.
+
+File name handlers might not support pty association, if PROGRAM is nil."
   (let ((fh (find-file-name-handler default-directory 'start-file-process)))
     (if fh (apply fh 'start-file-process name buffer program program-args)
       (apply 'start-process name buffer program program-args))))
@@ -4003,7 +4026,9 @@ Also, delete any process that is exited or signaled."
 		  (tty (or (process-tty-name p) "--"))
 		  (thread
                    (cond
-                    ((null (process-thread p)) "--")
+                    ((or
+                      (null (process-thread p))
+                      (not (fboundp 'thread-name))) "--")
                     ((eq (process-thread p) main-thread) "Main")
                     ((thread-name (process-thread p)))))
 		  (cmd
@@ -4115,7 +4140,7 @@ Runs `prefix-command-preserve-state-hook'."
   (when prefix-arg
     (concat "C-u"
             (pcase prefix-arg
-              (`(-) " -")
+              ('(-) " -")
               (`(,(and (pred integerp) n))
                (let ((str ""))
                  (while (and (> n 4) (= (mod n 4) 0))
@@ -4263,7 +4288,7 @@ unless a hook has been set.
 Use `filter-buffer-substring' instead of `buffer-substring',
 `buffer-substring-no-properties', or `delete-and-extract-region' when
 you want to allow filtering to take place.  For example, major or minor
-modes can use `filter-buffer-substring-function' to extract characters
+modes can use `filter-buffer-substring-function' to exclude text properties
 that are special to a buffer, and should not be copied into other buffers."
   (funcall filter-buffer-substring-function beg end delete))
 
@@ -5527,8 +5552,10 @@ also checks the value of `use-empty-active-region'."
        (progn (cl-assert (mark)) t)))
 
 (defun region-bounds ()
-  "Return the boundaries of the region as a pair of positions.
-Value is a list of cons cells of the form (START . END)."
+  "Return the boundaries of the region.
+Value is a list of one or more cons cells of the form (START . END).
+It will have more than one cons cell when the region is non-contiguous,
+see `region-noncontiguous-p' and `extract-rectangle-bounds'."
   (funcall region-extract-function 'bounds))
 
 (defun region-noncontiguous-p ()
@@ -7807,7 +7834,7 @@ appears to have customizations applying to the old default,
   "If the buffer starts with a mail header, move point to the header's end.
 Otherwise, moves to `point-min'.
 The end of the header is the start of the next line, if there is one,
-else the end of the last line.  This function obeys RFC822."
+else the end of the last line.  This function obeys RFC 822 (or later)."
   (goto-char (point-min))
   (when (re-search-forward
 	 "^\\([:\n]\\|[^: \t\n]+[ \t\n]\\)" nil 'move)
@@ -7935,7 +7962,7 @@ With a prefix argument, set VARIABLE to VALUE buffer-locally."
 		   (read-variable (format "Set variable (default %s): " default-var)
 				  default-var)
 		 (read-variable "Set variable: ")))
-	  (minibuffer-help-form '(describe-variable var))
+	  (minibuffer-help-form `(describe-variable ',var))
 	  (prop (get var 'variable-interactive))
           (obsolete (car (get var 'byte-obsolete-variable)))
 	  (prompt (format "Set %s %s to value: " var
@@ -8694,7 +8721,7 @@ See also `normal-erase-is-backspace'."
     (cond ((or (memq window-system '(x w32 ns pc pgtk))
 	       (memq system-type '(ms-dos windows-nt)))
 	   (let ((bindings
-		  `(([M-delete] [M-backspace])
+		  '(([M-delete] [M-backspace])
 		    ([C-M-delete] [C-M-backspace])
 		    ([?\e C-delete] [?\e C-backspace]))))
 

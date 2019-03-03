@@ -1,6 +1,6 @@
 ;; idlwave.el --- IDL editing mode for GNU Emacs
 
-;; Copyright (C) 1999-2018 Free Software Foundation, Inc.
+;; Copyright (C) 1999-2019 Free Software Foundation, Inc.
 
 ;; Authors: J.D. Smith <jdsmith@as.arizona.edu>
 ;;          Carsten Dominik <dominik@science.uva.nl>
@@ -9074,7 +9074,7 @@ Assumes that point is at the beginning of the unit as found by
 
 ;; Menus - using easymenu.el
 (defvar idlwave-mode-menu-def
-  `("IDLWAVE"
+  '("IDLWAVE"
     ["PRO/FUNC menu" idlwave-function-menu t]
     ("Motion"
      ["Subprogram Start" idlwave-beginning-of-subprogram t]
@@ -9151,7 +9151,7 @@ Assumes that point is at the beginning of the unit as found by
      ["Kill auto-created buffers" idlwave-kill-autoloaded-buffers t]
      "--"
      ["Insert TAB character" idlwave-hard-tab t])
-     "--"
+    "--"
     ("External"
      ["Start IDL shell" idlwave-shell t]
      ["Edit file in IDLDE" idlwave-edit-in-idlde t]

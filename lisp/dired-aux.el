@@ -1,6 +1,6 @@
 ;;; dired-aux.el --- less commonly used parts of dired -*- lexical-binding: t -*-
 
-;; Copyright (C) 1985-1986, 1992, 1994, 1998, 2000-2018 Free Software
+;; Copyright (C) 1985-1986, 1992, 1994, 1998, 2000-2019 Free Software
 ;; Foundation, Inc.
 
 ;; Author: Sebastian Kremer <sk@thp.uni-koeln.de>.
@@ -1231,7 +1231,12 @@ return t; if SYM is q or ESC, return nil."
 
 ;;;###autoload
 (defun dired-do-compress (&optional arg)
-  "Compress or uncompress marked (or next ARG) files."
+  "Compress or uncompress marked (or next ARG) files.
+If invoked on a directory, compress all of the files in
+the directory and all of its subdirectories, recursively,
+into a .tar.gz archive.
+If invoked on a .tar.gz or a .tgz or a .zip or a .7z archive,
+uncompress and unpack all the files in the archive."
   (interactive "P")
   (dired-map-over-marks-check #'dired-compress arg 'compress t))
 
@@ -1738,7 +1743,7 @@ or with the current marker character if MARKER-CHAR is t."
           (let* ((overwrite (file-exists-p to))
                  (dired-overwrite-confirmed ; for dired-handle-overwrite
                   (and overwrite
-                       (let ((help-form '(format-message "\
+                       (let ((help-form (format-message "\
 Type SPC or `y' to overwrite file `%s',
 DEL or `n' to skip to next,
 ESC or `q' to not overwrite any of the remaining files,
@@ -2854,11 +2859,11 @@ is part of a file name (i.e., has the text property `dired-filename')."
 Stops when a match is found.
 To continue searching for next match, use command \\[tags-loop-continue]."
   (interactive "sSearch marked files (regexp): ")
-  (multifile-initialize-search
+  (fileloop-initialize-search
    regexp
    (dired-get-marked-files nil nil #'dired-nondirectory-p)
    'default)
-  (multifile-continue))
+  (fileloop-continue))
 
 ;;;###autoload
 (defun dired-do-query-replace-regexp (from to &optional delimited)
@@ -2876,11 +2881,11 @@ with the command \\[tags-loop-continue]."
       (if (and buffer (with-current-buffer buffer
 			buffer-read-only))
 	  (error "File `%s' is visited read-only" file))))
-  (multifile-initialize-replace
+  (fileloop-initialize-replace
    from to (dired-get-marked-files nil nil #'dired-nondirectory-p)
    (if (equal from (downcase from)) nil 'default)
    delimited)
-  (multifile-continue))
+  (fileloop-continue))
 
 (declare-function xref--show-xrefs "xref")
 (declare-function xref-query-replace-in-results "xref")

@@ -1,6 +1,6 @@
 ;;; url-util.el --- Miscellaneous helper routines for URL library -*- lexical-binding: t -*-
 
-;; Copyright (C) 1996-1999, 2001, 2004-2018 Free Software Foundation,
+;; Copyright (C) 1996-1999, 2001, 2004-2019 Free Software Foundation,
 ;; Inc.
 
 ;; Author: Bill Perry <wmperry@gnu.org>
@@ -74,7 +74,8 @@ If a list, it is a list of the types of messages to be logged."
 
 ;;;###autoload
 (defun url-parse-args (str &optional nodowncase)
-  ;; Return an assoc list of attribute/value pairs from an RFC822-type string
+  ;; Return an assoc list of attribute/value pairs from a string
+  ;; that uses RFC 822 (or later) format.
   (let (
 	name				; From name=
 	value				; its value
@@ -182,7 +183,7 @@ Will not do anything if `url-show-status' is nil."
 	  (null url-show-status)
 	  (active-minibuffer-window)
 	  (= url-lazy-message-time
-	     (setq url-lazy-message-time (nth 1 (current-time)))))
+	     (setq url-lazy-message-time (encode-time nil 'integer))))
       nil
     (apply 'message args)))
 

@@ -1,6 +1,6 @@
 ;;; tabulated-list.el --- generic major mode for tabulated lists -*- lexical-binding: t -*-
 
-;; Copyright (C) 2011-2018 Free Software Foundation, Inc.
+;; Copyright (C) 2011-2019 Free Software Foundation, Inc.
 
 ;; Author: Chong Yidong <cyd@stupidchicken.com>
 ;; Keywords: extensions, lisp
@@ -151,8 +151,10 @@ If ADVANCE is non-nil, move forward by one line afterwards."
       (forward-line)))
 
 (defvar tabulated-list-mode-map
-  (let ((map (copy-keymap special-mode-map)))
-    (set-keymap-parent map button-buffer-map)
+  (let ((map (make-sparse-keymap)))
+    (set-keymap-parent map (make-composed-keymap
+                            button-buffer-map
+                            special-mode-map))
     (define-key map "n" 'next-line)
     (define-key map "p" 'previous-line)
     (define-key map "S" 'tabulated-list-sort)

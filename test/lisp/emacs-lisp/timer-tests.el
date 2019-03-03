@@ -1,6 +1,6 @@
 ;;; timer-tests.el --- tests for timers -*- lexical-binding:t -*-
 
-;; Copyright (C) 2013-2018 Free Software Foundation, Inc.
+;; Copyright (C) 2013-2019 Free Software Foundation, Inc.
 
 ;; This file is part of GNU Emacs.
 
@@ -47,9 +47,21 @@
 (ert-deftest timer-next-integral-multiple-of-time-2 ()
   "Test bug#33071."
   (let* ((tc (current-time))
-         (tce (encode-time tc 100))
-         (nt (timer-next-integral-multiple-of-time tc 0.01))
-         (nte (encode-time nt 100)))
-    (should (= (car nte) (1+ (car tce))))))
+         (delta-ticks 1000)
+         (hz 128000)
+         (tce (encode-time tc hz))
+         (tc+delta (time-add tce (cons delta-ticks hz)))
+         (tc+deltae (encode-time tc+delta hz))
+         (tc+delta-ticks (car tc+deltae))
+         (tc-nexte (cons (- tc+delta-ticks (% tc+delta-ticks delta-ticks)) hz))
+         (nt (timer-next-integral-multiple-of-time
+              tc (/ (float delta-ticks) hz)))
+         (nte (encode-time nt hz)))
+    (should (equal tc-nexte nte))))
+
+(ert-deftest timer-next-integral-multiple-of-time-3 ()
+  "Test bug#33071."
+  (let ((nt (timer-next-integral-multiple-of-time '(32770 . 65539) 0.5)))
+    (should (time-equal-p 1 nt))))
 
 ;;; timer-tests.el ends here

@@ -1,6 +1,6 @@
 ;;; timer.el --- run a function with args at some time in future -*- lexical-binding: t -*-
 
-;; Copyright (C) 1996, 2001-2018 Free Software Foundation, Inc.
+;; Copyright (C) 1996, 2001-2019 Free Software Foundation, Inc.
 
 ;; Maintainer: emacs-devel@gnu.org
 ;; Package: emacs
@@ -74,7 +74,7 @@
 
 (defun timer-set-time (timer time &optional delta)
   "Set the trigger time of TIMER to TIME.
-TIME must be in the internal format returned by, e.g., `current-time'.
+TIME must be a Lisp time value.
 If optional third argument DELTA is a positive number, make the timer
 fire repeatedly that many seconds apart."
   (setf (timer--time timer) time)
@@ -88,7 +88,7 @@ SECS may be an integer, floating point number, or the internal
 time format returned by, e.g., `current-idle-time'.
 If optional third argument REPEAT is non-nil, make the timer
 fire each time Emacs is idle for that many seconds."
-  (setf (timer--time timer) (if (consp secs) secs (seconds-to-time secs)))
+  (setf (timer--time timer) secs)
   (setf (timer--repeat-delay timer) repeat)
   timer)
 
@@ -100,10 +100,16 @@ of SECS seconds since the epoch.  SECS may be a fraction."
 			    (integerp (cdr time)) (< 0 (cdr time)))
 		       time
 		     (encode-time time 1000000000000)))
+	 (ticks (car ticks-hz))
 	 (hz (cdr ticks-hz))
-	 (s-ticks (round (* secs hz)))
-	 (more-ticks (+ (car ticks-hz) s-ticks)))
-    (encode-time (cons (- more-ticks (% more-ticks s-ticks)) hz))))
+	 trunc-s-ticks)
+    (while (let ((s-ticks (* secs hz)))
+	     (setq trunc-s-ticks (truncate s-ticks))
+	     (/= s-ticks trunc-s-ticks))
+      (setq ticks (ash ticks 1))
+      (setq hz (ash hz 1)))
+    (let ((more-ticks (+ ticks trunc-s-ticks)))
+      (encode-time (cons (- more-ticks (% more-ticks trunc-s-ticks)) hz)))))
 
 (defun timer-relative-time (time secs &optional usecs psecs)
   "Advance TIME by SECS seconds and optionally USECS microseconds
@@ -243,8 +249,8 @@ how many will really happen."
 (defun timer-until (timer time)
   "Calculate number of seconds from when TIMER will run, until TIME.
 TIMER is a timer, and stands for the time when its next repeat is scheduled.
-TIME is a time-list."
-  (- (float-time time) (float-time (timer--time timer))))
+TIME is a Lisp time value."
+  (float-time (time-subtract time (timer--time timer))))
 
 (defun timer-event-handler (timer)
   "Call the handler for the timer TIMER.
@@ -275,7 +281,7 @@ This function is called, by name, directly by the C code."
               ;; perhaps because Emacs was suspended for a long time,
               ;; limit how many times things get repeated.
               (if (and (numberp timer-max-repeats)
-                       (< 0 (timer-until timer nil)))
+		       (time-less-p nil (timer--time timer)))
                   (let ((repeats (/ (timer-until timer nil)
                                     (timer--repeat-delay timer))))
                     (if (> repeats timer-max-repeats)

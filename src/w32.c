@@ -1,6 +1,6 @@
 /* Utility and Unix shadow routines for GNU Emacs on the Microsoft Windows API.
 
-Copyright (C) 1994-1995, 2000-2018 Free Software Foundation, Inc.
+Copyright (C) 1994-1995, 2000-2019 Free Software Foundation, Inc.
 
 This file is part of GNU Emacs.
 
@@ -1771,7 +1771,40 @@ filename_from_ansi (const char *fn_in, char *fn_out)
 /* The directory where we started, in UTF-8. */
 static char startup_dir[MAX_UTF8_PATH];
 
-/* Get the current working directory.  */
+/* Get the current working directory.  The caller must arrange for CWD
+   to be allocated with enough space to hold a 260-char directory name
+   in UTF-8.  IOW, the space should be at least MAX_UTF8_PATH bytes.  */
+static void
+w32_get_current_directory (char *cwd)
+{
+  /* FIXME: Do we need to resolve possible symlinks in startup_dir?
+     Does it matter anywhere in Emacs?  */
+  if (w32_unicode_filenames)
+    {
+      wchar_t wstartup_dir[MAX_PATH];
+
+      if (!GetCurrentDirectoryW (MAX_PATH, wstartup_dir))
+	emacs_abort ();
+      filename_from_utf16 (wstartup_dir, cwd);
+    }
+  else
+    {
+      char astartup_dir[MAX_PATH];
+
+      if (!GetCurrentDirectoryA (MAX_PATH, astartup_dir))
+	emacs_abort ();
+      filename_from_ansi (astartup_dir, cwd);
+    }
+}
+
+/* For external callers.  Used by 'main' in emacs.c.  */
+void
+w32_init_current_directory (void)
+{
+  w32_get_current_directory (startup_dir);
+}
+
+/* Return the original directory where Emacs started.  */
 char *
 getcwd (char *dir, int dirsize)
 {
@@ -2043,7 +2076,9 @@ getpwuid (unsigned uid)
 struct group *
 getgrgid (gid_t gid)
 {
-  return &dflt_group;
+  if (gid == dflt_passwd.pw_gid)
+    return &dflt_group;
+  return NULL;
 }
 
 struct passwd *
@@ -2056,7 +2091,29 @@ getpwnam (char *name)
     return pw;
 
   if (xstrcasecmp (name, pw->pw_name))
-    return NULL;
+    {
+      /* Mimic what init_editfns does with these environment
+	 variables, so that the likes of ~USER is recognized by
+	 expand-file-name even if $LOGNAME gives a name different from
+	 the real username produced by the process token.  */
+      char *logname = getenv ("LOGNAME");
+      char *username = getenv ("USERNAME");
+      if ((logname || username)
+	  && xstrcasecmp (name, logname ? logname : username) == 0)
+	{
+	  static struct passwd alias_user;
+	  static char alias_name[PASSWD_FIELD_SIZE];
+
+	  memcpy (&alias_user, &dflt_passwd, sizeof dflt_passwd);
+	  alias_name[0] = '\0';
+	  strncat (alias_name, logname ? logname : username,
+		   PASSWD_FIELD_SIZE - 1);
+	  alias_user.pw_name = alias_name;
+	  pw = &alias_user;
+	}
+      else
+	return NULL;
+    }
 
   return pw;
 }
@@ -2995,24 +3052,7 @@ init_environment (char ** argv)
   }
 
   /* Remember the initial working directory for getcwd.  */
-  /* FIXME: Do we need to resolve possible symlinks in startup_dir?
-     Does it matter anywhere in Emacs?  */
-  if (w32_unicode_filenames)
-    {
-      wchar_t wstartup_dir[MAX_PATH];
-
-      if (!GetCurrentDirectoryW (MAX_PATH, wstartup_dir))
-	emacs_abort ();
-      filename_from_utf16 (wstartup_dir, startup_dir);
-    }
-  else
-    {
-      char astartup_dir[MAX_PATH];
-
-      if (!GetCurrentDirectoryA (MAX_PATH, astartup_dir))
-	emacs_abort ();
-      filename_from_ansi (astartup_dir, startup_dir);
-    }
+  w32_get_current_directory (startup_dir);
 
   {
     static char modname[MAX_PATH];
@@ -3196,22 +3236,7 @@ GetCachedVolumeInformation (char * root_dir)
   /* NULL for root_dir means use root from current directory.  */
   if (root_dir == NULL)
     {
-      if (w32_unicode_filenames)
-	{
-	  wchar_t curdirw[MAX_PATH];
-
-	  if (GetCurrentDirectoryW (MAX_PATH, curdirw) == 0)
-	    return NULL;
-	  filename_from_utf16 (curdirw, default_root);
-	}
-      else
-	{
-	  char curdira[MAX_PATH];
-
-	  if (GetCurrentDirectoryA (MAX_PATH, curdira) == 0)
-	    return NULL;
-	  filename_from_ansi (curdira, default_root);
-	}
+      w32_get_current_directory (default_root);
       parse_root (default_root, (const char **)&root_dir);
       *root_dir = 0;
       root_dir = default_root;
@@ -7223,6 +7248,7 @@ system_process_attributes (Lisp_Object pid)
 			 code_convert_string_norecord (tem, Vlocale_coding_system, 0)),
 		 attrs);
 
+  memstex.dwLength = sizeof (memstex);
   if (global_memory_status_ex (&memstex))
 #if __GNUC__ || (defined (_MSC_VER) && _MSC_VER >= 1300)
     totphys = memstex.ullTotalPhys / 1024.0;
@@ -9920,6 +9946,40 @@ maybe_load_unicows_dll (void)
         multiByteToWideCharFlags = MB_ERR_INVALID_CHARS;
       return LoadLibrary ("Gdi32.dll");
     }
+}
+
+/* Relocate a directory specified by epaths.h, using the location of
+   our binary as an anchor.  Note: this runs early during startup, so
+   we cannot rely on the usual file-related facilities, and in
+   particular the argument is assumed to be a unibyte string in system
+   codepage encoding.  */
+const char *
+w32_relocate (const char *epath_dir)
+{
+  if (strncmp (epath_dir, "%emacs_dir%/", 12) == 0)
+    {
+      static char relocated_dir[MAX_PATH];
+
+      /* Replace "%emacs_dir%" with the parent of the directory where
+	 our binary lives.  Note that init_environment was not yet
+	 called, so we cannot rely on emacs_dir being set in the
+	 environment.  */
+      if (GetModuleFileNameA (NULL, relocated_dir, MAX_PATH))
+	{
+	  char *p = _mbsrchr (relocated_dir, '\\');
+
+	  if (p)
+	    {
+	      *p = '\0';
+	      if ((p = _mbsrchr (relocated_dir, '\\')) != NULL)
+		{
+		  strcpy (p, epath_dir + 11);
+		  epath_dir = relocated_dir;
+		}
+	    }
+	}
+    }
+  return epath_dir;
 }
 
 /*

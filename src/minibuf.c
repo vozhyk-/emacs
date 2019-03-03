@@ -1,6 +1,6 @@
 /* Minibuffer input and completion.
 
-Copyright (C) 1985-1986, 1993-2018 Free Software Foundation, Inc.
+Copyright (C) 1985-1986, 1993-2019 Free Software Foundation, Inc.
 
 This file is part of GNU Emacs.
 
@@ -32,6 +32,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include "keymap.h"
 #include "sysstdio.h"
 #include "systty.h"
+#include "pdumper.h"
 
 /* List of buffers for use as minibuffers.
    The first element of the list is used for the outermost minibuffer
@@ -181,12 +182,8 @@ string_to_object (Lisp_Object val, Lisp_Object defalt)
    from read_minibuf to do the job if noninteractive.  */
 
 static Lisp_Object
-read_minibuf_noninteractive (Lisp_Object map, Lisp_Object initial,
-			     Lisp_Object prompt, Lisp_Object backup_n,
-			     bool expflag,
-			     Lisp_Object histvar, Lisp_Object histpos,
-			     Lisp_Object defalt,
-			     bool allow_props, bool inherit_input_method)
+read_minibuf_noninteractive (Lisp_Object prompt, bool expflag,
+			     Lisp_Object defalt)
 {
   ptrdiff_t size, len;
   char *line;
@@ -430,10 +427,7 @@ read_minibuf (Lisp_Object map, Lisp_Object initial, Lisp_Object prompt,
        || (IS_DAEMON && DAEMON_RUNNING))
       && NILP (Vexecuting_kbd_macro))
     {
-      val = read_minibuf_noninteractive (map, initial, prompt,
-					 make_fixnum (pos),
-					 expflag, histvar, histpos, defalt,
-					 allow_props, inherit_input_method);
+      val = read_minibuf_noninteractive (prompt, expflag, defalt);
       return unbind_to (count, val);
     }
 
@@ -787,8 +781,7 @@ read_minibuf_unwind (void)
 
   /* Restore prompt, etc, from outer minibuffer level.  */
   Lisp_Object key_vec = Fcar (minibuf_save_list);
-  eassert (VECTORP (key_vec));
-  this_command_key_count = XFIXNAT (Flength (key_vec));
+  this_command_key_count = ASIZE (key_vec);
   this_command_keys = key_vec;
   minibuf_save_list = Fcdr (minibuf_save_list);
   minibuf_prompt = Fcar (minibuf_save_list);
@@ -1205,6 +1198,9 @@ is used to further constrain the set of candidates.  */)
       obsize = ASIZE (collection);
       bucket = AREF (collection, idx);
     }
+
+  if (HASH_TABLE_P (collection))
+    hash_rehash_if_needed (XHASH_TABLE (collection));
 
   while (1)
     {
@@ -1790,7 +1786,7 @@ If FLAG is nil, invoke `try-completion'; if it is t, invoke
 	  while (CONSP (bufs) && SREF (XCAR (bufs), 0) == ' ')
 	    bufs = XCDR (bufs);
 	  if (NILP (bufs))
-	    return (EQ (Flength (res), Flength (Vbuffer_alist))
+	    return (list_length (res) == list_length (Vbuffer_alist)
 		    /* If all bufs are internal don't strip them out.  */
 		    ? res : bufs);
 	  res = bufs;
@@ -1805,7 +1801,9 @@ If FLAG is nil, invoke `try-completion'; if it is t, invoke
   else if (EQ (flag, Qlambda))
     return Ftest_completion (string, Vbuffer_alist, predicate);
   else if (EQ (flag, Qmetadata))
-    return list2 (Qmetadata, Fcons (Qcategory, Qbuffer));
+    return list3 (Qmetadata,
+                  Fcons (Qcategory, Qbuffer),
+                  Fcons (Qcycle_sort_function, Qidentity));
   else
     return Qnil;
 }
@@ -1866,21 +1864,36 @@ If no minibuffer is active, return nil.  */)
 }
 
 
+
+static void init_minibuf_once_for_pdumper (void);
+
 void
 init_minibuf_once (void)
 {
-  Vminibuffer_list = Qnil;
   staticpro (&Vminibuffer_list);
+  pdumper_do_now_and_after_load (init_minibuf_once_for_pdumper);
+}
+
+static void
+init_minibuf_once_for_pdumper (void)
+{
+  PDUMPER_IGNORE (minibuf_level);
+  PDUMPER_IGNORE (minibuf_prompt_width);
+
+  /* We run this function on first initialization and whenever we
+     restore from a pdumper image.  pdumper doesn't try to preserve
+     frames, windows, and so on, so reset everything related here.  */
+  Vminibuffer_list = Qnil;
+  minibuf_level = 0;
+  minibuf_prompt = Qnil;
+  minibuf_save_list = Qnil;
+  last_minibuf_string = Qnil;
 }
 
 void
 syms_of_minibuf (void)
 {
-  minibuf_level = 0;
-  minibuf_prompt = Qnil;
   staticpro (&minibuf_prompt);
-
-  minibuf_save_list = Qnil;
   staticpro (&minibuf_save_list);
 
   DEFSYM (Qcompletion_ignore_case, "completion-ignore-case");
@@ -1890,7 +1903,6 @@ syms_of_minibuf (void)
   DEFSYM (Qminibuffer_completion_table, "minibuffer-completion-table");
 
   staticpro (&last_minibuf_string);
-  last_minibuf_string = Qnil;
 
   DEFSYM (Qcustom_variable_history, "custom-variable-history");
   Fset (Qcustom_variable_history, Qnil);
@@ -1912,6 +1924,8 @@ syms_of_minibuf (void)
   DEFSYM (Qactivate_input_method, "activate-input-method");
   DEFSYM (Qcase_fold_search, "case-fold-search");
   DEFSYM (Qmetadata, "metadata");
+  DEFSYM (Qcycle_sort_function, "cycle-sort-function");
+
   /* A frame parameter.  */
   DEFSYM (Qminibuffer_exit, "minibuffer-exit");
 

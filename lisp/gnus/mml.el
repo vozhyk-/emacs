@@ -1,6 +1,6 @@
 ;;; mml.el --- A package for parsing and validating MML documents
 
-;; Copyright (C) 1998-2018 Free Software Foundation, Inc.
+;; Copyright (C) 1998-2019 Free Software Foundation, Inc.
 
 ;; Author: Lars Magne Ingebrigtsen <larsi@gnus.org>
 ;; This file is part of GNU Emacs.
@@ -982,8 +982,10 @@ If HANDLES is non-nil, use it instead reparsing the buffer."
   (unless handles
     (setq handles (mm-dissect-buffer t)))
   (goto-char (point-min))
-  (search-forward "\n\n" nil t)
-  (delete-region (point) (point-max))
+  (if (search-forward "\n\n" nil 'move)
+      (delete-region (point) (point-max))
+    ;; No content in the part that is the sole part of this message.
+    (insert (if (bolp) "\n" "\n\n")))
   (if (stringp (car handles))
       (mml-insert-mime handles)
     (mml-insert-mime handles t))
@@ -1152,7 +1154,7 @@ If HANDLES is non-nil, use it instead reparsing the buffer."
 
 (easy-menu-define
   mml-menu mml-mode-map ""
-  `("Attachments"
+  '("Attachments"
     ["Attach File..." mml-attach-file :help "Attach a file at point"]
     ["Attach Buffer..." mml-attach-buffer
      :help "Attach a buffer to the outgoing message"]

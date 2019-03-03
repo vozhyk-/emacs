@@ -1,6 +1,6 @@
 /* Emacs regular expression matching and search
 
-   Copyright (C) 1993-2018 Free Software Foundation, Inc.
+   Copyright (C) 1993-2019 Free Software Foundation, Inc.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -698,7 +698,6 @@ print_partial_compiled_pattern (re_char *start, re_char *end)
 	  fprintf (stderr, "/%d", mcnt);
 	  break;
 
-# ifdef emacs
 	case at_dot:
 	  fprintf (stderr, "/at_dot");
 	  break;
@@ -714,7 +713,6 @@ print_partial_compiled_pattern (re_char *start, re_char *end)
 	  mcnt = *p++;
 	  fprintf (stderr, "/%d", mcnt);
 	  break;
-# endif /* emacs */
 
 	case begbuf:
 	  fprintf (stderr, "/begbuf");
@@ -753,9 +751,6 @@ print_compiled_pattern (struct re_pattern_buffer *bufp)
   printf ("re_nsub: %zu\t", bufp->re_nsub);
   printf ("regs_alloc: %d\t", bufp->regs_allocated);
   printf ("can_be_null: %d\t", bufp->can_be_null);
-#ifndef emacs
-  printf ("syntax: %lx\n", bufp->syntax);
-#endif
   fflush (stdout);
   /* Perhaps we should print the translate table?  */
 }
@@ -4737,8 +4732,8 @@ re_match_2_internal (struct re_pattern_buffer *bufp, re_char *string1,
 		int c1, c2;
 		int s1, s2;
 		int dummy;
-		ptrdiff_t offset = PTR_TO_OFFSET (d - 1);
-		ptrdiff_t charpos = SYNTAX_TABLE_BYTE_TO_CHAR (offset);
+                ptrdiff_t offset = PTR_TO_OFFSET (d);
+                ptrdiff_t charpos = SYNTAX_TABLE_BYTE_TO_CHAR (offset) - 1;
 		UPDATE_SYNTAX_TABLE (charpos);
 		GET_CHAR_BEFORE_2 (c1, d, string1, end1, string2, end2);
 		s1 = SYNTAX (c1);
@@ -4816,8 +4811,8 @@ re_match_2_internal (struct re_pattern_buffer *bufp, re_char *string1,
 	      int c1, c2;
 	      int s1, s2;
 	      int dummy;
-	      ptrdiff_t offset = PTR_TO_OFFSET (d) - 1;
-	      ptrdiff_t charpos = SYNTAX_TABLE_BYTE_TO_CHAR (offset);
+              ptrdiff_t offset = PTR_TO_OFFSET (d);
+              ptrdiff_t charpos = SYNTAX_TABLE_BYTE_TO_CHAR (offset) - 1;
 	      UPDATE_SYNTAX_TABLE (charpos);
 	      GET_CHAR_BEFORE_2 (c1, d, string1, end1, string2, end2);
 	      s1 = SYNTAX (c1);
@@ -4831,7 +4826,7 @@ re_match_2_internal (struct re_pattern_buffer *bufp, re_char *string1,
 		{
 		  PREFETCH_NOLIMIT ();
 		  GET_CHAR_AFTER (c2, d, dummy);
-		  UPDATE_SYNTAX_TABLE_FORWARD (charpos);
+                  UPDATE_SYNTAX_TABLE_FORWARD (charpos + 1);
 		  s2 = SYNTAX (c2);
 
 		  /* ... and S2 is Sword, and WORD_BOUNDARY_P (C1, C2)
@@ -4895,8 +4890,8 @@ re_match_2_internal (struct re_pattern_buffer *bufp, re_char *string1,
 		 is the character at D, and S2 is the syntax of C2.  */
 	      int c1, c2;
 	      int s1, s2;
-	      ptrdiff_t offset = PTR_TO_OFFSET (d) - 1;
-	      ptrdiff_t charpos = SYNTAX_TABLE_BYTE_TO_CHAR (offset);
+              ptrdiff_t offset = PTR_TO_OFFSET (d);
+              ptrdiff_t charpos = SYNTAX_TABLE_BYTE_TO_CHAR (offset) - 1;
 	      UPDATE_SYNTAX_TABLE (charpos);
 	      GET_CHAR_BEFORE_2 (c1, d, string1, end1, string2, end2);
 	      s1 = SYNTAX (c1);

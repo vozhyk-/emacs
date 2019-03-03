@@ -1,6 +1,6 @@
 ;;; gnus-group.el --- group mode commands for Gnus
 
-;; Copyright (C) 1996-2018 Free Software Foundation, Inc.
+;; Copyright (C) 1996-2019 Free Software Foundation, Inc.
 
 ;; Author: Lars Magne Ingebrigtsen <larsi@gnus.org>
 ;; Keywords: news
@@ -496,7 +496,7 @@ simple manner."
 (defvar gnus-tmp-number-of-unread)
 
 (defvar gnus-group-line-format-alist
-  `((?M gnus-tmp-marked-mark ?c)
+  '((?M gnus-tmp-marked-mark ?c)
     (?S gnus-tmp-subscribed ?c)
     (?L gnus-tmp-level ?d)
     (?N (cond ((eq number t) "*" )
@@ -544,7 +544,7 @@ simple manner."
     ))
 
 (defvar gnus-group-mode-line-format-alist
-  `((?S gnus-tmp-news-server ?s)
+  '((?S gnus-tmp-news-server ?s)
     (?M gnus-tmp-news-method ?s)
     (?u gnus-tmp-user-defined ?s)
     (?: gnus-tmp-colon ?s)))
@@ -566,8 +566,6 @@ simple manner."
 ;;;
 ;;; Gnus group mode
 ;;;
-
-(put 'gnus-group-mode 'mode-class 'special)
 
 (gnus-define-keys gnus-group-mode-map
   " " gnus-group-read-group
@@ -782,7 +780,7 @@ simple manner."
 
     (easy-menu-define
      gnus-group-reading-menu gnus-group-mode-map ""
-     `("Group"
+     '("Group"
        ["Read" gnus-group-read-group
 	:included (not (gnus-topic-mode-p))
 	:active (gnus-group-group-name)]
@@ -949,7 +947,7 @@ simple manner."
 
     (easy-menu-define
      gnus-group-misc-menu gnus-group-mode-map ""
-     `("Gnus"
+     '("Gnus"
        ["Send a mail" gnus-group-mail t]
        ["Send a message (mail or news)" gnus-group-post-news t]
        ["Create a local message" gnus-group-news t]
@@ -1106,9 +1104,8 @@ When FORCE, rebuild the tool bar."
 	  (set (make-local-variable 'tool-bar-map) map))))
   gnus-group-tool-bar-map)
 
-(define-derived-mode gnus-group-mode fundamental-mode "Group"
+(define-derived-mode gnus-group-mode gnus-mode "Group"
   "Major mode for reading news.
-
 All normal editing commands are switched off.
 \\<gnus-group-mode-map>
 The group buffer lists (some of) the groups available.  For instance,
@@ -1131,8 +1128,7 @@ The following commands are available:
   (setq mode-line-process nil)
   (buffer-disable-undo)
   (setq truncate-lines t)
-  (setq buffer-read-only t
-	show-trailing-whitespace nil)
+  (setq show-trailing-whitespace nil)
   (gnus-set-default-directory)
   (gnus-update-format-specifications nil 'group 'group-mode)
   (gnus-update-group-mark-positions)
@@ -4582,8 +4578,7 @@ and the second element is the address."
 This function can be used in hooks like `gnus-select-group-hook'
 or `gnus-group-catchup-group-hook'."
   (when gnus-newsgroup-name
-    (let ((time (current-time)))
-      (setcdr (cdr time) nil)
+    (let ((time (encode-time nil 'integer)))
       (gnus-group-set-parameter gnus-newsgroup-name 'timestamp time))))
 
 (defsubst gnus-group-timestamp (group)
@@ -4592,11 +4587,11 @@ or `gnus-group-catchup-group-hook'."
 
 (defun gnus-group-timestamp-delta (group)
   "Return the offset in seconds from the timestamp for GROUP to the current time, as a floating point number."
-  (let* ((time (or (gnus-group-timestamp group)
-		   (list 0 0)))
-	 (delta (time-subtract nil time)))
-    (+ (* (nth 0 delta) 65536.0)
-       (nth 1 delta))))
+  ;; FIXME: This should return a Lisp integer, not a Lisp float,
+  ;; since it is always an integer.
+  (let* ((time (or (gnus-group-timestamp group) 0))
+	 (delta (time-since time)))
+    (float-time delta)))
 
 (defun gnus-group-timestamp-string (group)
   "Return a string of the timestamp for GROUP."

@@ -1,6 +1,6 @@
 ;;; cperl-mode.el --- Perl code editing commands for Emacs  -*- lexical-binding:t -*-
 
-;; Copyright (C) 1985-1987, 1991-2018 Free Software Foundation, Inc.
+;; Copyright (C) 1985-1987, 1991-2019 Free Software Foundation, Inc.
 
 ;; Author: Ilya Zakharevich
 ;;	Bob Olson
@@ -119,7 +119,7 @@
                (beginning-of-line 2)
                (list ,file ,line)))
 	(defmacro cperl-etags-snarf-tag (_file _line)
-	  `(etags-snarf-tag)))
+	  '(etags-snarf-tag)))
       (if (featurep 'xemacs)
 	  (defmacro cperl-etags-goto-tag-location (elt)
 	    ;;(progn
@@ -8675,9 +8675,7 @@ start with default arguments, then refine the slowdown regions."
   (or l (setq l 1))
   (or step (setq step 500))
   (or lim (setq lim 40))
-  (let* ((timems (function (lambda ()
-			     (let ((tt (current-time)))
-			       (+ (* 1000 (nth 1 tt)) (/ (nth 2 tt) 1000))))))
+  (let* ((timems (function (lambda () (car (encode-time nil 1000)))))
 	 (tt (funcall timems)) (c 0) delta tot)
     (goto-char (point-min))
     (forward-line (1- l))
@@ -8786,7 +8784,7 @@ do extra unwind via `cperl-unwind-to-safe'."
 	(goto-char new-beg)))
     (setq beg (point))
     (goto-char end)
-    (while (and end
+    (while (and end (< end (point-max))
 		(progn
 		  (or (bolp) (condition-case nil
 				 (forward-line 1)

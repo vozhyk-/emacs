@@ -1,6 +1,6 @@
 ;;; em-dirs.el --- directory navigation commands  -*- lexical-binding:t -*-
 
-;; Copyright (C) 1999-2018 Free Software Foundation, Inc.
+;; Copyright (C) 1999-2019 Free Software Foundation, Inc.
 
 ;; Author: John Wiegley <johnw@gnu.org>
 
@@ -259,7 +259,7 @@ Thus, this does not include the current directory.")
   (if (> (length args) 1)
       (error "%s: command not found" (car args))
     (throw 'eshell-replace-command
-	   (eshell-parse-command "cd" (eshell-flatten-list args)))))
+	   (eshell-parse-command "cd" (flatten-tree args)))))
 
 (defun eshell-parse-user-reference ()
   "An argument beginning with ~ is a filename to be expanded."
@@ -353,7 +353,7 @@ in the minibuffer:
 
 (defun eshell/cd (&rest args)           ; all but first ignored
   "Alias to extend the behavior of `cd'."
-  (setq args (eshell-flatten-list args))
+  (setq args (flatten-tree args))
   (let ((path (car args))
 	(subpath (car (cdr args)))
 	(case-fold-search (eshell-under-windows-p))
@@ -552,15 +552,16 @@ in the minibuffer:
 
 (defun eshell-write-last-dir-ring ()
   "Write the buffer's `eshell-last-dir-ring' to a history file."
-  (let ((file eshell-last-dir-ring-file-name))
+  (let* ((file eshell-last-dir-ring-file-name)
+	 (resolved-file (if (stringp file) (file-truename file))))
     (cond
      ((or (null file)
 	  (equal file "")
 	  (null eshell-last-dir-ring)
 	  (ring-empty-p eshell-last-dir-ring))
       nil)
-     ((not (file-writable-p file))
-      (message "Cannot write last-dir-ring file %s" file))
+     ((not (file-writable-p resolved-file))
+      (message "Cannot write last-dir-ring file %s" resolved-file))
      (t
       (let* ((ring eshell-last-dir-ring)
 	     (index (ring-length ring)))
@@ -570,7 +571,7 @@ in the minibuffer:
 	    (insert (ring-ref ring index) ?\n))
 	  (insert (eshell/pwd) ?\n)
 	  (eshell-with-private-file-modes
-	   (write-region (point-min) (point-max) file nil
+	   (write-region (point-min) (point-max) resolved-file nil
 			 'no-message))))))))
 
 (provide 'em-dirs)

@@ -1,6 +1,6 @@
 Known Problems with GNU Emacs
 
-Copyright (C) 1987-1989, 1993-1999, 2001-2018 Free Software Foundation,
+Copyright (C) 1987-1989, 1993-1999, 2001-2019 Free Software Foundation,
 Inc.
 See the end of the file for license conditions.
 
@@ -1833,6 +1833,12 @@ term/xterm.el) for more details.
 
 ** GNU/Linux
 
+*** GNU/Linux: profiler-report outputs nothing.
+
+A few versions of the Linux kernel have timer bugs that break CPU
+profiling; see Bug#34235.  To fix the problem, upgrade to one of the
+kernel versions 4.14.97, 4.19.19, or 4.20.6, or later.
+
 *** GNU/Linux: Process output is corrupted.
 
 There is a bug in Linux kernel 2.6.10 PTYs that can cause emacs to
@@ -2597,6 +2603,13 @@ selection".
 If this does not work, please inform bug-gnu-emacs@gnu.org.  Then
 please call support for your X-server and see if you can get a fix.
 If you do, please send it to bug-gnu-emacs@gnu.org so we can list it here.
+
+
+* Runtime problems specific to macOS
+
+** macOS doesn't come with libxpm, so only XPM3 is supported.
+
+Libxpm is available for macOS as part of the XQuartz project.
 
 
 * Build-time problems

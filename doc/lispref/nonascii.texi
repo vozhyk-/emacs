@@ -1,6 +1,6 @@
 @c -*- mode: texinfo; coding: utf-8 -*-
 @c This is part of the GNU Emacs Lisp Reference Manual.
-@c Copyright (C) 1998-1999, 2001-2018 Free Software Foundation, Inc.
+@c Copyright (C) 1998-1999, 2001-2019 Free Software Foundation, Inc.
 @c See the file elisp.texi for copying conditions.
 @node Non-ASCII Characters
 @chapter Non-@acronym{ASCII} Characters
@@ -287,12 +287,11 @@ unibyte string, it is returned unchanged.  Use this function for
 characters.
 @end defun
 
-@c FIXME: Should '@var{character}' be '@var{byte}'?
 @defun byte-to-string byte
 @cindex byte to string
 This function returns a unibyte string containing a single byte of
-character data, @var{character}.  It signals an error if
-@var{character} is not an integer between 0 and 255.
+character data, @var{byte}.  It signals an error if @var{byte} is not
+an integer between 0 and 255.
 @end defun
 
 @defun multibyte-char-to-unibyte char
@@ -2116,9 +2115,9 @@ Return a 12-element vector of month names (locale items @code{MON_1}
 through @code{MON_12}).
 
 @item paper
-Return a list @code{(@var{width} @var{height})} for the default paper
-size measured in millimeters (locale items @code{PAPER_WIDTH} and
-@code{PAPER_HEIGHT}).
+Return a list @w{@code{(@var{width} @var{height})}} of 2 integers, for
+the default paper size measured in millimeters (locale items
+@code{_NL_PAPER_WIDTH} and @code{_NL_PAPER_HEIGHT}).
 @end table
 
 If the system can't provide the requested information, or if

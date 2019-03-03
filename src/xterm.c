@@ -1,6 +1,6 @@
 /* X Communication module for terminals which understand the X protocol.
 
-Copyright (C) 1989, 1993-2018 Free Software Foundation, Inc.
+Copyright (C) 1989, 1993-2019 Free Software Foundation, Inc.
 
 This file is part of GNU Emacs.
 
@@ -36,11 +36,6 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 /* If we have Xfixes extension, use it for pointer blanking.  */
 #ifdef HAVE_XFIXES
 #include <X11/extensions/Xfixes.h>
-#endif
-
-/* Using Xft implies that XRender is available.  */
-#ifdef HAVE_XFT
-#include <X11/extensions/Xrender.h>
 #endif
 
 #ifdef HAVE_XDBE
@@ -79,6 +74,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include "xsettings.h"
 #include "sysselect.h"
 #include "menu.h"
+#include "pdumper.h"
 
 #ifdef USE_X_TOOLKIT
 #include <X11/Shell.h>
@@ -360,10 +356,15 @@ x_begin_cr_clip (struct frame *f, GC gc)
 
       if (! FRAME_CR_SURFACE (f))
         {
+	  int scale = 1;
+#ifdef USE_GTK
+	  scale = xg_get_scale (f);
+#endif
+
 	  FRAME_CR_SURFACE (f) =
 	    cairo_image_surface_create (CAIRO_FORMAT_ARGB32,
-					FRAME_PIXEL_WIDTH (f),
-					FRAME_PIXEL_HEIGHT (f));
+					scale * FRAME_PIXEL_WIDTH (f),
+					scale * FRAME_PIXEL_HEIGHT (f));
 	}
       cr = cairo_create (FRAME_CR_SURFACE (f));
       FRAME_CR_CONTEXT (f) = cr;
@@ -999,8 +1000,9 @@ x_update_begin (struct frame *f)
       if (FRAME_GTK_WIDGET (f))
         {
           GdkWindow *w = gtk_widget_get_window (FRAME_GTK_WIDGET (f));
-          width = gdk_window_get_width (w);
-          height = gdk_window_get_height (w);
+	  int scale = xg_get_scale (f);
+	  width = scale * gdk_window_get_width (w);
+	  height = scale * gdk_window_get_height (w);
         }
       else
 #endif
@@ -2970,6 +2972,47 @@ x_draw_glyph_string_box (struct glyph_string *s)
 }
 
 
+static void
+x_composite_image (struct glyph_string *s, Pixmap dest,
+                   int srcX, int srcY, int dstX, int dstY,
+                   int width, int height)
+{
+#ifdef HAVE_XRENDER
+  if (s->img->picture)
+    {
+      Picture destination;
+      XRenderPictFormat *default_format;
+      XRenderPictureAttributes attr;
+
+      /* FIXME: Should we do this each time or would it make sense to
+         store destination in the frame struct?  */
+      default_format = XRenderFindVisualFormat (s->display,
+                                                DefaultVisual (s->display, 0));
+      destination = XRenderCreatePicture (s->display, dest,
+                                          default_format, 0, &attr);
+
+      /* FIXME: It may make sense to use PictOpSrc instead of
+         PictOpOver, as I don't know if we care about alpha values too
+         much here.  */
+      XRenderComposite (s->display, PictOpOver,
+                        s->img->picture, s->img->mask_picture, destination,
+                        srcX, srcY,
+                        srcX, srcY,
+                        dstX, dstY,
+                        width, height);
+
+      XRenderFreePicture (s->display, destination);
+      return;
+    }
+#endif
+
+  XCopyArea (s->display, s->img->pixmap,
+	     dest, s->gc,
+	     srcX, srcY,
+	     width, height, dstX, dstY);
+}
+
+
 /* Draw foreground of image glyph string S.  */
 
 static void
@@ -3001,6 +3044,7 @@ x_draw_image_foreground (struct glyph_string *s)
 	     trust on the shape extension to be available
 	     (XShapeCombineRegion).  So, compute the rectangle to draw
 	     manually.  */
+          /* FIXME: Do we need to do this when using XRender compositing?  */
 	  unsigned long mask = (GCClipMask | GCClipXOrigin | GCClipYOrigin
 				| GCFunction);
 	  XGCValues xgcv;
@@ -3018,10 +3062,9 @@ x_draw_image_foreground (struct glyph_string *s)
 	  image_rect.width = s->slice.width;
 	  image_rect.height = s->slice.height;
 	  if (x_intersect_rectangles (&clip_rect, &image_rect, &r))
-            XCopyArea (s->display, s->img->pixmap,
-                       FRAME_X_DRAWABLE (s->f), s->gc,
-		       s->slice.x + r.x - x, s->slice.y + r.y - y,
-		       r.width, r.height, r.x, r.y);
+            x_composite_image (s, FRAME_X_DRAWABLE (s->f),
+			       s->slice.x + r.x - x, s->slice.y + r.y - y,
+                               r.x, r.y, r.width, r.height);
 	}
       else
 	{
@@ -3033,10 +3076,8 @@ x_draw_image_foreground (struct glyph_string *s)
 	  image_rect.width = s->slice.width;
 	  image_rect.height = s->slice.height;
 	  if (x_intersect_rectangles (&clip_rect, &image_rect, &r))
-            XCopyArea (s->display, s->img->pixmap,
-                       FRAME_X_DRAWABLE (s->f), s->gc,
-		       s->slice.x + r.x - x, s->slice.y + r.y - y,
-		       r.width, r.height, r.x, r.y);
+            x_composite_image (s, FRAME_X_DRAWABLE (s->f), s->slice.x + r.x - x, s->slice.y + r.y - y,
+                               r.x, r.y, r.width, r.height);
 
 	  /* When the image has a mask, we can expect that at
 	     least part of a mouse highlight or a block cursor will
@@ -3090,7 +3131,9 @@ x_draw_image_relief (struct glyph_string *s)
   if (s->hl == DRAW_IMAGE_SUNKEN
       || s->hl == DRAW_IMAGE_RAISED)
     {
-      thick = tool_bar_button_relief >= 0 ? tool_bar_button_relief : DEFAULT_TOOL_BAR_BUTTON_RELIEF;
+      thick = (tool_bar_button_relief < 0
+	       ? DEFAULT_TOOL_BAR_BUTTON_RELIEF
+	       : min (tool_bar_button_relief, 1000000));
       raised_p = s->hl == DRAW_IMAGE_RAISED;
     }
   else
@@ -4843,7 +4886,7 @@ x_x_to_emacs_modifiers (struct x_display_info *dpyinfo, int state)
 }
 
 static int
-x_emacs_to_x_modifiers (struct x_display_info *dpyinfo, EMACS_INT state)
+x_emacs_to_x_modifiers (struct x_display_info *dpyinfo, intmax_t state)
 {
   EMACS_INT mod_ctrl = ctrl_modifier;
   EMACS_INT mod_meta = meta_modifier;
@@ -10644,7 +10687,7 @@ get_current_wm_state (struct frame *f,
   int rc, actual_format;
   Atom actual_type;
   unsigned char *tmp_data = NULL;
-  Atom *reply_data;
+  Atom *reply_data UNINIT;
 #endif
 
   *sticky = false;
@@ -13258,6 +13301,7 @@ void
 syms_of_xterm (void)
 {
   x_error_message = NULL;
+  PDUMPER_IGNORE (x_error_message);
 
   DEFSYM (Qvendor_specific_keysyms, "vendor-specific-keysyms");
   DEFSYM (Qlatin_1, "latin-1");
