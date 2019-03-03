@@ -897,7 +897,6 @@ extern void ftfont_filter_properties (Lisp_Object, Lisp_Object);
 extern void ftfont_text_extents (struct font *, unsigned *, int,
 				 struct font_metrics *);
 extern void syms_of_ftfont (void);
-extern struct font_driver const ftfont_driver;
 #endif	/* HAVE_FREETYPE */
 #ifdef HAVE_X_WINDOWS
 extern struct font_driver const xfont_driver;

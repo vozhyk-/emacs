@@ -47,6 +47,8 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include "ftfont.h"
 #include "pdumper.h"
 
+static struct font_driver const ftfont_driver;
+
 /* Flag to tell if FcInit is already called or not.  */
 static bool fc_initialized;
 
