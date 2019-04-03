@@ -237,6 +237,10 @@ properly.  BODY shall not contain a timeout."
   (should (tramp-tramp-file-p "/method:[::1]:"))
   (should (tramp-tramp-file-p "/method:user@[::1]:"))
 
+  ;; Using an IPv4 mapped IPv6 address.
+  (should (tramp-tramp-file-p "/method:[::ffff:1.2.3.4]:"))
+  (should (tramp-tramp-file-p "/method:user@[::ffff:1.2.3.4]:"))
+
   ;; Local file name part.
   (should (tramp-tramp-file-p "/method:::"))
   (should (tramp-tramp-file-p "/method::/:"))
@@ -264,6 +268,7 @@ properly.  BODY shall not contain a timeout."
   (should-not (tramp-tramp-file-p "/1.2.3.4:"))
   (should-not (tramp-tramp-file-p "/[]:"))
   (should-not (tramp-tramp-file-p "/[::1]:"))
+  (should-not (tramp-tramp-file-p "/[::ffff:1.2.3.4]:"))
   (should-not (tramp-tramp-file-p "/host:/:"))
   (should-not (tramp-tramp-file-p "/host1|host2:"))
   (should-not (tramp-tramp-file-p "/user1@host1|user2@host2:"))
@@ -311,6 +316,10 @@ properly.  BODY shall not contain a timeout."
 	  ;; Using an IPv6 address.
 	  (should (tramp-tramp-file-p "/[::1]:"))
 	  (should (tramp-tramp-file-p "/user@[::1]:"))
+
+	  ;; Using an IPv4 mapped IPv6 address.
+	  (should (tramp-tramp-file-p "/[::ffff:1.2.3.4]:"))
+	  (should (tramp-tramp-file-p "/user@[::ffff:1.2.3.4]:"))
 
 	  ;; Local file name part.
 	  (should (tramp-tramp-file-p "/host::"))
@@ -361,6 +370,10 @@ properly.  BODY shall not contain a timeout."
 	  ;; Using an IPv6 address.
 	  (should (tramp-tramp-file-p "/[method/::1]"))
 	  (should (tramp-tramp-file-p "/[method/user@::1]"))
+
+	  ;; Using an IPv4 mapped IPv6 address.
+	  (should (tramp-tramp-file-p "/[method/::ffff:1.2.3.4]"))
+	  (should (tramp-tramp-file-p "/[method/user@::ffff:1.2.3.4]"))
 
 	  ;; Local file name part.
 	  (should (tramp-tramp-file-p "/[method/]"))
@@ -1975,6 +1988,18 @@ properly.  BODY shall not contain a timeout."
   (should
    (string-equal
     (expand-file-name "/method:host:/path/../file") "/method:host:/file"))
+  (should
+   (string-equal
+    (expand-file-name "/method:host:/path/.") "/method:host:/path"))
+  (should
+   (string-equal
+    (expand-file-name "/method:host:/path/..") "/method:host:/"))
+  (should
+   (string-equal
+    (expand-file-name "." "/method:host:/path/") "/method:host:/path"))
+  (should
+   (string-equal
+    (expand-file-name "" "/method:host:/path/") "/method:host:/path"))
   ;; Quoting local part.
   (should
    (string-equal
@@ -1988,9 +2013,9 @@ properly.  BODY shall not contain a timeout."
     (expand-file-name "/method:host:/:/~/path/./file")
     "/method:host:/:/~/path/file")))
 
-;; The following test is inspired by Bug#26911.  It is rather a bug in
-;; `expand-file-name', and it fails for all Emacs versions.  Test
-;; added for later, when it is fixed.
+;; The following test is inspired by Bug#26911 and Bug#34834.  They
+;; are rather bugs in `expand-file-name', and it fails for all Emacs
+;; versions.  Test added for later, when they are fixed.
 (ert-deftest tramp-test05-expand-file-name-relative ()
   "Check `expand-file-name'."
   ;; Mark as failed until bug has been fixed.
@@ -4040,7 +4065,10 @@ This tests also `make-symbolic-link', `file-truename' and `add-name-to-file'."
   "Check `shell-command'."
   :tags '(:expensive-test)
   (skip-unless (tramp--test-enabled))
-  (skip-unless (tramp--test-sh-p))
+  ;; Prior Emacs 27, `shell-file-name' was hard coded as "/bin/sh" for
+  ;; remote processes in Emacs.  That doesn't work for tramp-adb.el.
+  (skip-unless (or (and (tramp--test-adb-p) (tramp--test-emacs27-p))
+		   (tramp--test-sh-p)))
 
   (dolist (quoted (if (tramp--test-expensive-test) '(nil t) '(nil)))
     (let ((tmp-name (tramp--test-make-temp-name nil quoted))
@@ -4068,6 +4096,8 @@ This tests also `make-symbolic-link', `file-truename' and `add-name-to-file'."
 	;; Cleanup.
 	(ignore-errors (delete-file tmp-name)))
 
+      ;; tramp-adb.el is not fit yet for asynchronous processes.
+      (unless (tramp--test-adb-p)
       (unwind-protect
 	  (with-temp-buffer
 	    (write-region "foo" nil tmp-name)
@@ -4094,8 +4124,10 @@ This tests also `make-symbolic-link', `file-truename' and `add-name-to-file'."
 	      (buffer-string))))
 
 	;; Cleanup.
-	(ignore-errors (delete-file tmp-name)))
+	(ignore-errors (delete-file tmp-name))))
 
+      ;; tramp-adb.el is not fit yet for asynchronous processes.
+      (unless (tramp--test-adb-p)
       (unwind-protect
 	  (with-temp-buffer
 	    (write-region "foo" nil tmp-name)
@@ -4123,7 +4155,7 @@ This tests also `make-symbolic-link', `file-truename' and `add-name-to-file'."
 	      (buffer-string))))
 
 	;; Cleanup.
-	(ignore-errors (delete-file tmp-name))))))
+	(ignore-errors (delete-file tmp-name)))))))
 
 (defun tramp--test-shell-command-to-string-asynchronously (command)
   "Like `shell-command-to-string', but for asynchronous processes."
@@ -4249,12 +4281,80 @@ This tests also `make-symbolic-link', `file-truename' and `add-name-to-file'."
     (dolist (dir '("/mock:localhost#11111:" "/mock:localhost#22222:"))
       (tramp-cleanup-connection (tramp-dissect-file-name dir)))))
 
+;; Connection-local variables are enabled per default since Emacs 27.1.
+(ert-deftest tramp-test34-connection-local-variables ()
+  "Check that connection-local variables are enabled."
+  :tags '(:expensive-test)
+  (skip-unless (tramp--test-enabled))
+  ;; Since Emacs 27.1.
+  (skip-unless (fboundp 'with-connection-local-variables))
+
+  ;; `connection-local-set-profile-variables' and
+  ;; `connection-local-set-profiles' exist since Emacs 26.1.  We don't
+  ;; want to see compiler warnings for older Emacsen.
+  (let* ((default-directory tramp-test-temporary-file-directory)
+	 (tmp-name1 (tramp--test-make-temp-name))
+	 (tmp-name2 (expand-file-name "foo" tmp-name1))
+	 (enable-local-variables :all)
+	 (enable-remote-dir-locals t)
+	 kill-buffer-query-functions
+	 connection-local-profile-alist connection-local-criteria-alist)
+    (unwind-protect
+	(progn
+	  (make-directory tmp-name1)
+          (should (file-directory-p tmp-name1))
+
+	  ;; `local-variable' is buffer-local due to explicit setting.
+	  (with-no-warnings
+	    (defvar-local local-variable 'buffer))
+	  (with-temp-buffer
+	    (should (eq local-variable 'buffer)))
+
+	  ;; `local-variable' is connection-local due to Tramp.
+	  (write-region "foo" nil tmp-name2)
+	  (should (file-exists-p tmp-name2))
+	  (with-no-warnings
+	    (connection-local-set-profile-variables
+	     'local-variable-profile
+	     '((local-variable . connect)))
+	    (connection-local-set-profiles
+	     `(:application tramp
+	       :protocol ,(file-remote-p default-directory 'method)
+	       :user ,(file-remote-p default-directory 'user)
+	       :machine ,(file-remote-p default-directory 'host))
+	     'local-variable-profile))
+	  (with-current-buffer (find-file-noselect tmp-name2)
+	    (should (eq local-variable 'connect))
+	    (kill-buffer (current-buffer)))
+
+	  ;; `local-variable' is dir-local due to existence of .dir-locals.el.
+	  (write-region
+	   "((nil . ((local-variable . dir))))" nil
+	   (expand-file-name ".dir-locals.el" tmp-name1))
+	  (should (file-exists-p (expand-file-name ".dir-locals.el" tmp-name1)))
+	  (with-current-buffer (find-file-noselect tmp-name2)
+	    (should (eq local-variable 'dir))
+	    (kill-buffer (current-buffer)))
+
+	  ;; `local-variable' is file-local due to specifying as file variable.
+	  (write-region
+	   "-*- mode: comint; local-variable: file; -*-" nil tmp-name2)
+          (should (file-exists-p tmp-name2))
+	  (with-current-buffer (find-file-noselect tmp-name2)
+	    (should (eq local-variable 'file))
+	    (kill-buffer (current-buffer))))
+
+      ;; Cleanup.
+      (ignore-errors (delete-directory tmp-name1 'recursive)))))
+
 ;; The functions were introduced in Emacs 26.1.
 (ert-deftest tramp-test34-explicit-shell-file-name ()
   "Check that connection-local `explicit-shell-file-name' is set."
-  :tags '(:expensive-test)
+  ;; The handling of connection-local variables has changed.  Test
+  ;; must be reworked.
+  :tags '(:expensive-test :unstable)
   (skip-unless (tramp--test-enabled))
-  (skip-unless (tramp--test-sh-p))
+  (skip-unless (or (tramp--test-adb-p) (tramp--test-sh-p)))
   ;; Since Emacs 26.1.
   (skip-unless (and (fboundp 'connection-local-set-profile-variables)
 		    (fboundp 'connection-local-set-profiles)))
@@ -4263,7 +4363,8 @@ This tests also `make-symbolic-link', `file-truename' and `add-name-to-file'."
   ;; `connection-local-set-profiles' exist since Emacs 26.1.  We don't
   ;; want to see compiler warnings for older Emacsen.
   (let ((default-directory tramp-test-temporary-file-directory)
-	explicit-shell-file-name kill-buffer-query-functions)
+	explicit-shell-file-name kill-buffer-query-functions
+	connection-local-profile-alist connection-local-criteria-alist)
     (unwind-protect
 	(progn
 	  ;; `shell-mode' would ruin our test, because it deletes all
@@ -4273,7 +4374,8 @@ This tests also `make-symbolic-link', `file-truename' and `add-name-to-file'."
 	  (with-no-warnings
 	    (connection-local-set-profile-variables
 	     'remote-sh
-	     '((explicit-shell-file-name . "/bin/sh")
+	     `((explicit-shell-file-name
+		. ,(if (tramp--test-adb-p) "/system/bin/sh" "/bin/sh"))
 	       (explicit-sh-args . ("-i"))))
 	    (connection-local-set-profiles
 	     `(:application tramp
@@ -4281,6 +4383,8 @@ This tests also `make-symbolic-link', `file-truename' and `add-name-to-file'."
 	       :user ,(file-remote-p default-directory 'user)
 	       :machine ,(file-remote-p default-directory 'host))
 	     'remote-sh))
+	  (put 'explicit-shell-file-name 'safe-local-variable #'identity)
+	  (put 'explicit-sh-args 'safe-local-variable #'identity)
 
 	  ;; Run interactive shell.  Since the default directory is
 	  ;; remote, `explicit-shell-file-name' shall be set in order
@@ -4291,6 +4395,7 @@ This tests also `make-symbolic-link', `file-truename' and `add-name-to-file'."
 	    (call-interactively #'shell)
 	    (should explicit-shell-file-name)))
 
+      ;; Cleanup.
       (put 'explicit-shell-file-name 'permanent-local nil)
       (kill-buffer "*shell*"))))
 
@@ -5609,6 +5714,10 @@ Since it unloads Tramp, it shall be the last test to run."
 ;;   do not work properly for `nextcloud'.
 ;; * Fix `tramp-test29-start-file-process' and
 ;;   `tramp-test30-make-process' on MS Windows (`process-send-eof'?).
+;; * Fix `tramp-test29-start-file-process',
+;;   `tramp-test30-make-process' and `tramp-test32-shell-command' for
+;;   `adb' (see comment in `tramp-adb-send-command').
+;; * Rework `tramp-test34-explicit-shell-file-name'.
 ;; * Fix Bug#16928 in `tramp-test43-asynchronous-requests'.
 
 (provide 'tramp-tests)

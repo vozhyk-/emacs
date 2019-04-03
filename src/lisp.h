@@ -631,7 +631,8 @@ extern _Noreturn void wrong_type_argument (Lisp_Object, Lisp_Object);
    subsequent starts.  */
 extern bool initialized;
 
-extern struct gflags {
+extern struct gflags
+{
   /* True means this Emacs instance was born to dump.  */
 #if defined HAVE_PDUMPER || defined HAVE_UNEXEC
   bool will_dump_ : 1;
@@ -796,6 +797,13 @@ INLINE void
 
 #define XUNTAG(a, type, ctype) ((ctype *) \
 				((char *) XLP (a) - LISP_WORD_TAG (type)))
+
+/* A forwarding pointer to a value.  It uses a generic pointer to
+   avoid alignment bugs that could occur if it used a pointer to a
+   union of the possible values (struct Lisp_Objfwd, struct
+   Lisp_Intfwd, etc.).  The pointer is packaged inside a struct to
+   help static checking.  */
+typedef struct { void const *fwdptr; } lispfwd;
 
 /* Interned state of a symbol.  */
 
@@ -861,7 +869,7 @@ struct Lisp_Symbol
 	Lisp_Object value;
 	struct Lisp_Symbol *alias;
 	struct Lisp_Buffer_Local_Value *blv;
-	union Lisp_Fwd *fwd;
+	lispfwd fwd;
       } val;
 
       /* Function value of the symbol or Qnil if not fboundp.  */
@@ -1529,11 +1537,11 @@ STRING_MULTIBYTE (Lisp_Object str)
 }
 
 /* An upper bound on the number of bytes in a Lisp string, not
-   counting the terminating null.  This a tight enough bound to
+   counting the terminating NUL.  This a tight enough bound to
    prevent integer overflow errors that would otherwise occur during
    string size calculations.  A string cannot contain more bytes than
    a fixnum can represent, nor can it be so long that C pointer
-   arithmetic stops working on the string plus its terminating null.
+   arithmetic stops working on the string plus its terminating NUL.
    Although the actual size limit (see STRING_BYTES_MAX in alloc.c)
    may be a bit smaller than STRING_BYTES_BOUND, calculating it here
    would expose alloc.c internal details that we'd rather keep
@@ -2170,10 +2178,10 @@ SYMBOL_BLV (struct Lisp_Symbol *sym)
   eassume (sym->u.s.redirect == SYMBOL_LOCALIZED && sym->u.s.val.blv);
   return sym->u.s.val.blv;
 }
-INLINE union Lisp_Fwd *
+INLINE lispfwd
 SYMBOL_FWD (struct Lisp_Symbol *sym)
 {
-  eassume (sym->u.s.redirect == SYMBOL_FORWARDED && sym->u.s.val.fwd);
+  eassume (sym->u.s.redirect == SYMBOL_FORWARDED && sym->u.s.val.fwd.fwdptr);
   return sym->u.s.val.fwd;
 }
 
@@ -2196,10 +2204,10 @@ SET_SYMBOL_BLV (struct Lisp_Symbol *sym, struct Lisp_Buffer_Local_Value *v)
   sym->u.s.val.blv = v;
 }
 INLINE void
-SET_SYMBOL_FWD (struct Lisp_Symbol *sym, union Lisp_Fwd *v)
+SET_SYMBOL_FWD (struct Lisp_Symbol *sym, void const *v)
 {
   eassume (sym->u.s.redirect == SYMBOL_FORWARDED && v);
-  sym->u.s.val.fwd = v;
+  sym->u.s.val.fwd.fwdptr = v;
 }
 
 INLINE Lisp_Object
@@ -2726,7 +2734,7 @@ struct Lisp_Buffer_Local_Value
        Presumably equivalent to (defcell!=valcell).  */
     bool_bf found : 1;
     /* If non-NULL, a forwarding to the C var where it should also be set.  */
-    union Lisp_Fwd *fwd;	/* Should never be (Buffer|Kboard)_Objfwd.  */
+    lispfwd fwd;	/* Should never be (Buffer|Kboard)_Objfwd.  */
     /* The buffer for which the loaded binding was found.  */
     Lisp_Object where;
     /* A cons cell that holds the default value.  It has the form
@@ -2748,32 +2756,24 @@ struct Lisp_Kboard_Objfwd
     int offset;
   };
 
-union Lisp_Fwd
-  {
-    struct Lisp_Intfwd u_intfwd;
-    struct Lisp_Boolfwd u_boolfwd;
-    struct Lisp_Objfwd u_objfwd;
-    struct Lisp_Buffer_Objfwd u_buffer_objfwd;
-    struct Lisp_Kboard_Objfwd u_kboard_objfwd;
-  };
-
 INLINE enum Lisp_Fwd_Type
-XFWDTYPE (union Lisp_Fwd *a)
+XFWDTYPE (lispfwd a)
 {
-  return a->u_intfwd.type;
+  enum Lisp_Fwd_Type const *p = a.fwdptr;
+  return *p;
 }
 
 INLINE bool
-BUFFER_OBJFWDP (union Lisp_Fwd *a)
+BUFFER_OBJFWDP (lispfwd a)
 {
   return XFWDTYPE (a) == Lisp_Fwd_Buffer_Obj;
 }
 
-INLINE struct Lisp_Buffer_Objfwd *
-XBUFFER_OBJFWD (union Lisp_Fwd *a)
+INLINE struct Lisp_Buffer_Objfwd const *
+XBUFFER_OBJFWD (lispfwd a)
 {
   eassert (BUFFER_OBJFWDP (a));
-  return &a->u_buffer_objfwd;
+  return a.fwdptr;
 }
 
 /* Lisp floating point type.  */
@@ -3044,7 +3044,7 @@ CHECK_INTEGER (Lisp_Object x)
 
 /* Define a built-in function for calling from Lisp.
  `lname' should be the name to give the function in Lisp,
-    as a null-terminated C string.
+    as a NUL-terminated C string.
  `fnname' should be the name of the function in C.
     By convention, it starts with F.
  `sname' should be the name for the C constant structure
@@ -3096,11 +3096,11 @@ enum maxargs
    CALLN is overkill for simple usages like 'Finsert (1, &text);'.  */
 #define CALLN(f, ...) CALLMANY (f, ((Lisp_Object []) {__VA_ARGS__}))
 
-extern void defvar_lisp (struct Lisp_Objfwd *, const char *, Lisp_Object *);
-extern void defvar_lisp_nopro (struct Lisp_Objfwd *, const char *, Lisp_Object *);
-extern void defvar_bool (struct Lisp_Boolfwd *, const char *, bool *);
-extern void defvar_int (struct Lisp_Intfwd *, const char *, intmax_t *);
-extern void defvar_kboard (struct Lisp_Kboard_Objfwd *, const char *, int);
+extern void defvar_lisp (struct Lisp_Objfwd const *, char const *);
+extern void defvar_lisp_nopro (struct Lisp_Objfwd const *, char const *);
+extern void defvar_bool (struct Lisp_Boolfwd const *, char const *);
+extern void defvar_int (struct Lisp_Intfwd const *, char const *);
+extern void defvar_kboard (struct Lisp_Kboard_Objfwd const *, char const *);
 
 /* Macros we use to define forwarded Lisp variables.
    These are used in the syms_of_FILENAME functions.
@@ -3121,29 +3121,34 @@ extern void defvar_kboard (struct Lisp_Kboard_Objfwd *, const char *, int);
 
 #define DEFVAR_LISP(lname, vname, doc)		\
   do {						\
-    static struct Lisp_Objfwd o_fwd;		\
-    defvar_lisp (&o_fwd, lname, &globals.f_ ## vname);		\
+    static struct Lisp_Objfwd const o_fwd	\
+      = {Lisp_Fwd_Obj, &globals.f_##vname};	\
+    defvar_lisp (&o_fwd, lname);		\
   } while (false)
 #define DEFVAR_LISP_NOPRO(lname, vname, doc)	\
   do {						\
-    static struct Lisp_Objfwd o_fwd;		\
-    defvar_lisp_nopro (&o_fwd, lname, &globals.f_ ## vname);	\
+    static struct Lisp_Objfwd const o_fwd	\
+      = {Lisp_Fwd_Obj, &globals.f_##vname};	\
+    defvar_lisp_nopro (&o_fwd, lname);		\
   } while (false)
 #define DEFVAR_BOOL(lname, vname, doc)		\
   do {						\
-    static struct Lisp_Boolfwd b_fwd;		\
-    defvar_bool (&b_fwd, lname, &globals.f_ ## vname);		\
+    static struct Lisp_Boolfwd const b_fwd	\
+      = {Lisp_Fwd_Bool, &globals.f_##vname};	\
+    defvar_bool (&b_fwd, lname);		\
   } while (false)
 #define DEFVAR_INT(lname, vname, doc)		\
   do {						\
-    static struct Lisp_Intfwd i_fwd;		\
-    defvar_int (&i_fwd, lname, &globals.f_ ## vname);		\
+    static struct Lisp_Intfwd const i_fwd	\
+      = {Lisp_Fwd_Int, &globals.f_##vname};	\
+    defvar_int (&i_fwd, lname);			\
   } while (false)
 
 #define DEFVAR_KBOARD(lname, vname, doc)			\
   do {								\
-    static struct Lisp_Kboard_Objfwd ko_fwd;			\
-    defvar_kboard (&ko_fwd, lname, offsetof (KBOARD, vname ## _)); \
+    static struct Lisp_Kboard_Objfwd const ko_fwd		\
+      = {Lisp_Fwd_Kboard_Obj, offsetof (KBOARD, vname##_)};	\
+    defvar_kboard (&ko_fwd, lname);				\
   } while (false)
 
 
@@ -3232,11 +3237,6 @@ union specbinding
     } bt;
   };
 
-/* These 3 are defined as macros in thread.h.  */
-/* extern union specbinding *specpdl; */
-/* extern union specbinding *specpdl_ptr; */
-/* extern ptrdiff_t specpdl_size; */
-
 INLINE ptrdiff_t
 SPECPDL_INDEX (void)
 {
@@ -3316,10 +3316,10 @@ extern Lisp_Object Vascii_canon_table;
 
 /* Call staticpro (&var) to protect static variable `var'.  */
 
-void staticpro (Lisp_Object *);
+void staticpro (Lisp_Object const *);
 
 enum { NSTATICS = 2048 };
-extern Lisp_Object *staticvec[NSTATICS];
+extern Lisp_Object const *staticvec[NSTATICS];
 extern int staticidx;
 
 
@@ -3327,10 +3327,22 @@ extern int staticidx;
 struct window;
 struct frame;
 
+/* Define if the windowing system provides a menu bar.  */
+#if defined (USE_X_TOOLKIT) || defined (HAVE_NTGUI) \
+  || defined (HAVE_NS) || (defined (USE_GTK) && !defined (HAVE_PGTK))
+#define HAVE_EXT_MENU_BAR true
+#endif
+
+/* Define if the windowing system provides a tool-bar.  */
+#if defined (USE_GTK) || defined (HAVE_NS)
+#define HAVE_EXT_TOOL_BAR true
+#endif
+
 /* Copy COUNT Lisp_Objects from ARGS to contents of V starting from OFFSET.  */
 
 INLINE void
-vcopy (Lisp_Object v, ptrdiff_t offset, Lisp_Object *args, ptrdiff_t count)
+vcopy (Lisp_Object v, ptrdiff_t offset, Lisp_Object const *args,
+       ptrdiff_t count)
 {
   eassert (0 <= offset && 0 <= count && offset + count <= ASIZE (v));
   memcpy (XVECTOR (v)->contents + offset, args, count * sizeof *args);
@@ -3544,7 +3556,7 @@ extern _Noreturn void args_out_of_range (Lisp_Object, Lisp_Object);
 extern _Noreturn void args_out_of_range_3 (Lisp_Object, Lisp_Object,
 					   Lisp_Object);
 extern _Noreturn void circular_list (Lisp_Object);
-extern Lisp_Object do_symval_forwarding (union Lisp_Fwd *);
+extern Lisp_Object do_symval_forwarding (lispfwd);
 enum Set_Internal_Bind {
   SET_INTERNAL_SET,
   SET_INTERNAL_BIND,
@@ -3760,8 +3772,8 @@ extern void refill_memory_reserve (void);
 #endif
 extern void alloc_unexec_pre (void);
 extern void alloc_unexec_post (void);
-extern void mark_maybe_objects (Lisp_Object *, ptrdiff_t);
-extern void mark_stack (char *, char *);
+extern void mark_maybe_objects (Lisp_Object const *, ptrdiff_t);
+extern void mark_stack (char const *, char const *);
 extern void flush_stack_call_func (void (*func) (void *arg), void *arg);
 extern void garbage_collect (void);
 extern const char *pending_malloc_warning;
@@ -3782,25 +3794,35 @@ extern Lisp_Object list3 (Lisp_Object, Lisp_Object, Lisp_Object);
 extern Lisp_Object list4 (Lisp_Object, Lisp_Object, Lisp_Object, Lisp_Object);
 extern Lisp_Object list5 (Lisp_Object, Lisp_Object, Lisp_Object, Lisp_Object,
 			  Lisp_Object);
-enum constype {CONSTYPE_HEAP, CONSTYPE_PURE};
-extern Lisp_Object listn (enum constype, ptrdiff_t, Lisp_Object, ...);
+extern Lisp_Object listn (ptrdiff_t, Lisp_Object, ...);
+extern Lisp_Object pure_listn (ptrdiff_t, Lisp_Object, ...);
+#define list(...) \
+  listn (ARRAYELTS (((Lisp_Object []) {__VA_ARGS__})), __VA_ARGS__)
+#define pure_list(...) \
+  pure_listn (ARRAYELTS (((Lisp_Object []) {__VA_ARGS__})), __VA_ARGS__)
 
-enum gc_root_type {
+enum gc_root_type
+{
   GC_ROOT_STATICPRO,
   GC_ROOT_BUFFER_LOCAL_DEFAULT,
   GC_ROOT_BUFFER_LOCAL_NAME,
   GC_ROOT_C_SYMBOL
 };
 
-struct gc_root_visitor {
-  void (*visit)(Lisp_Object *root_ptr,
-                enum gc_root_type type,
-                void *data);
+struct gc_root_visitor
+{
+  void (*visit) (Lisp_Object const *, enum gc_root_type, void *);
   void *data;
 };
 extern void visit_static_gc_roots (struct gc_root_visitor visitor);
 
-/* Build a frequently used 2/3/4-integer lists.  */
+/* Build a frequently used 1/2/3/4-integer lists.  */
+
+INLINE Lisp_Object
+list1i (EMACS_INT x)
+{
+  return list1 (make_fixnum (x));
+}
 
 INLINE Lisp_Object
 list2i (EMACS_INT x, EMACS_INT y)
@@ -4195,7 +4217,6 @@ extern void syms_of_module (void);
 #endif
 
 /* Defined in thread.c.  */
-extern struct thread_state primary_thread;
 extern void mark_threads (void);
 extern void unmark_main_thread (void);
 
@@ -4706,7 +4727,7 @@ extern char *xlispstrdup (Lisp_Object) ATTRIBUTE_MALLOC;
 extern void dupstring (char **, char const *);
 
 /* Make DEST a copy of STRING's data.  Return a pointer to DEST's terminating
-   null byte.  This is like stpcpy, except the source is a Lisp string.  */
+   NUL byte.  This is like stpcpy, except the source is a Lisp string.  */
 
 INLINE char *
 lispstpcpy (char *dest, Lisp_Object string)
@@ -4910,7 +4931,7 @@ enum
 	 : list4 (a, b, c, d))
 
 /* Declare NAME as an auto Lisp string if possible, a GC-based one if not.
-   Take its unibyte value from the null-terminated string STR,
+   Take its unibyte value from the NUL-terminated string STR,
    an expression that should not have side effects.
    STR's value is not necessarily copied.  The resulting Lisp string
    should not be modified or given text properties or made visible to
@@ -4920,8 +4941,8 @@ enum
   AUTO_STRING_WITH_LEN (name, str, strlen (str))
 
 /* Declare NAME as an auto Lisp string if possible, a GC-based one if not.
-   Take its unibyte value from the null-terminated string STR with length LEN.
-   STR may have side effects and may contain null bytes.
+   Take its unibyte value from the NUL-terminated string STR with length LEN.
+   STR may have side effects and may contain NUL bytes.
    STR's value is not necessarily copied.  The resulting Lisp string
    should not be modified or given text properties or made visible to
    user code.  */

@@ -430,7 +430,7 @@ Matched keyword is in group 1.")
 
 (defconst org-deadline-time-hour-regexp
   (concat "\\<" org-deadline-string
-	  " *<\\([^>]+[0-9]\\{1,2\\}:[0-9]\\{2\\}[0-9-+:hdwmy \t.]*\\)>")
+	  " *<\\([^>]+[0-9]\\{1,2\\}:[0-9]\\{2\\}[0-9+:hdwmy \t.-]*\\)>")
   "Matches the DEADLINE keyword together with a time-and-hour stamp.")
 
 (defconst org-deadline-line-regexp
@@ -446,7 +446,7 @@ Matched keyword is in group 1.")
 
 (defconst org-scheduled-time-hour-regexp
   (concat "\\<" org-scheduled-string
-	  " *<\\([^>]+[0-9]\\{1,2\\}:[0-9]\\{2\\}[0-9-+:hdwmy \t.]*\\)>")
+	  " *<\\([^>]+[0-9]\\{1,2\\}:[0-9]\\{2\\}[0-9+:hdwmy \t.-]*\\)>")
   "Matches the SCHEDULED keyword together with a time-and-hour stamp.")
 
 (defconst org-closed-time-regexp
@@ -10467,7 +10467,7 @@ This is still an experimental function, your mileage may vary."
    ((and (equal type "lisp") (string-match "^/" path))
     ;; Planner has a slash, we do not.
     (setq type "elisp" path (substring path 1)))
-   ((string-match "^//\\(.?*\\)/\\(<.*>\\)$" path)
+   ((string-match "^//\\(.*\\)/\\(<.*>\\)$" path)
     ;; A typical message link.  Planner has the id after the final slash,
     ;; we separate it with a hash mark
     (setq path (concat (match-string 1 path) "#"
@@ -11878,7 +11878,8 @@ prefix argument (`C-u C-u C-u C-c C-w')."
 	    (when (featurep 'org-inlinetask)
 	      (org-inlinetask-remove-END-maybe))
 	    (setq org-markers-to-move nil)
-	    (message (concat actionmsg " to \"%s\" in file %s: done") (car it) file)))))))
+	    (message "%s to \"%s\" in file %s: done" actionmsg
+		     (car it) file)))))))
 
 (defun org-refile-goto-last-stored ()
   "Go to the location where the last refile was stored."
@@ -14952,7 +14953,7 @@ When JUST-ALIGN is non-nil, only align tags."
 	  (unless (equal tags "")
 	    (let* ((level (save-excursion
 			    (beginning-of-line)
-			    (skip-chars-forward "\\*")))
+			    (skip-chars-forward "*")))
 		   (offset (if (bound-and-true-p org-indent-mode)
 			       (* (1- org-indent-indentation-per-level)
 				  (1- level))
@@ -20614,7 +20615,7 @@ this numeric value."
     (unless inc (setq inc 1))
     (let ((pos (point))
 	  (beg (skip-chars-backward "-+^/*0-9eE."))
-	  (end (skip-chars-forward "-+^/*0-9eE^.")) nap)
+	  (end (skip-chars-forward "-+^/*0-9eE.")) nap)
       (setq nap (buffer-substring-no-properties
 		 (+ pos beg) (+ pos beg end)))
       (delete-region (+ pos beg) (+ pos beg end))
@@ -22836,9 +22837,9 @@ assumed to be significant there."
 (defun org-fill-line-break-nobreak-p ()
   "Non-nil when a new line at point would create an Org line break."
   (save-excursion
-    (skip-chars-backward "[ \t]")
+    (skip-chars-backward " \t")
     (skip-chars-backward "\\\\")
-    (looking-at "\\\\\\\\\\($\\|[^\\\\]\\)")))
+    (looking-at "\\\\\\\\\\($\\|[^\\]\\)")))
 
 (defun org-fill-paragraph-with-timestamp-nobreak-p ()
   "Non-nil when a new line at point would split a timestamp."

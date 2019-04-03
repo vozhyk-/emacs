@@ -27,9 +27,10 @@
 
 ;;; Code:
 
+(require 'tramp-compat)
+
 ;; Pacify byte-compiler.
 (require 'cl-lib)
-(declare-function tramp-compat-exec-path "tramp")
 (declare-function tramp-dissect-file-name "tramp")
 (declare-function tramp-file-name-equal-p "tramp")
 (declare-function tramp-tramp-file-p "tramp")
@@ -169,6 +170,26 @@ NAME must be equal to `tramp-current-connection'."
 			      #'tramp-recentf-cleanup)
 		 (remove-hook 'tramp-cleanup-all-connections-hook
 			      #'tramp-recentf-cleanup-all)))))
+
+;;; Default connection-local variables for Tramp:
+
+(defconst tramp-connection-local-default-profile
+  '((shell-file-name . "/bin/sh")
+    (shell-command-switch . "-c"))
+  "Default connection-local variables for remote connections.")
+
+;; `connection-local-set-profile-variables' and
+;; `connection-local-set-profiles' exists since Emacs 26.1.
+(eval-after-load "shell"
+  '(progn
+     (tramp-compat-funcall
+      'connection-local-set-profile-variables
+      'tramp-connection-local-default-profile
+      tramp-connection-local-default-profile)
+     (tramp-compat-funcall
+      'connection-local-set-profiles
+      `(:application tramp)
+      'tramp-connection-local-default-profile)))
 
 (add-hook 'tramp-unload-hook
 	  (lambda () (unload-feature 'tramp-integration 'force)))

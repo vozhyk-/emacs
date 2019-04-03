@@ -1034,8 +1034,8 @@ hiding certain lines on the screen.
 @cindex explicit selective display
   The first variant, explicit selective display, was designed for use in a Lisp
 program: it controls which lines are hidden by altering the text.  This kind of
-hiding is now obsolete; instead you can get the same effect with the
-@code{invisible} property (@pxref{Invisible Text}).
+hiding is now obsolete and deprecated; instead you should use the
+@code{invisible} property (@pxref{Invisible Text}) to get the same effect.
 
   In the second variant, the choice of lines to hide is made
 automatically based on indentation.  This variant is designed to be a
@@ -3957,6 +3957,9 @@ fringe, and likewise @var{right} for the right fringe.  A value of
 @var{outside-margins} is non-@code{nil}, that specifies that fringes
 should appear outside of the display margins.
 
+If @var{window} is not large enough to accommodate fringes of the
+desired width, this leaves the fringes of @var{window} unchanged.
+
 The values specified here may be later overridden by invoking
 @code{set-window-buffer} (@pxref{Buffers and Windows}) on @var{window}
 with its @var{keep-margins} argument @code{nil} or omitted.
@@ -4377,6 +4380,9 @@ vertical scroll bar.
 @var{horizontal-type} specifies whether to have a horizontal scroll bar.
 The possible values are @code{bottom}, @code{t}, which means to use the
 frame's default, and @code{nil} for no horizontal scroll bar.
+
+If @var{window} is not large enough to accommodate a scroll bar of the
+desired dimension, this leaves the corresponding scroll bar unchanged.
 
 The values specified here may be later overridden by invoking
 @code{set-window-buffer} (@pxref{Buffers and Windows}) on @var{window}
@@ -4894,6 +4900,16 @@ and the buffer position where the @code{display} property was found,
 respectively.  Both positions can be different when @code{object} is a
 string.
 
+Note that @var{condition} will only be evaluated when redisplay
+examines the text where this display spec is located, so this feature
+is best suited for conditions that are relatively stable, i.e.@:
+yield, for each particular buffer position, the same results on every
+evaluation.  If the results change for the same text location, e.g.,
+if the result depends on the position of point, then the conditional
+specification might not do what you want, because redisplay examines
+only those parts of buffer text where it has reasons to assume that
+something changed since the last display cycle.
+
 @node Display Margins
 @subsection Displaying in the Margins
 @cindex display margins
@@ -4956,6 +4972,9 @@ Thus, you can make changes take effect by calling
 This function specifies the margin widths for window @var{window}, in
 character cell units.  The argument @var{left} controls the left
 margin, and @var{right} controls the right margin (default @code{0}).
+
+If @var{window} is not large enough to accommodate margins of the
+desired width, this leaves the margins of @var{window} unchanged.
 
 The values specified here may be later overridden by invoking
 @code{set-window-buffer} (@pxref{Buffers and Windows}) on @var{window}

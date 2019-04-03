@@ -1795,7 +1795,7 @@ non-indentation text within the comment."
            (goto-char (match-end 0)))
           (t
            ;; Move past line number.
-           (skip-chars-forward "[ \t0-9]")))
+           (skip-chars-forward " \t0-9")))
     ;; Move past whitespace.
     (skip-chars-forward " \t")
     (current-column)))
@@ -2052,7 +2052,7 @@ If ALL is nil, only match comments that start in column > 0."
                 (when (<= (point) bos)
                   (move-to-column (1+ fill-column))
                   ;; What is this doing???
-                  (or (re-search-forward "[\t\n,'+-/*)=]" eol t)
+                  (or (re-search-forward "[-\t\n,'+/*)=]" eol t)
                       (goto-char bol)))
                 (if (bolp)
                     (re-search-forward "[ \t]" opoint t))

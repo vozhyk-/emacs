@@ -1281,7 +1281,7 @@ buffer-local values of tags table format variables."
       ;; This regexp matches an explicit tag name or the place where
       ;; it would start.
       (while (re-search-forward
-              "[\f\t\n\r()=,; ]?\177\\\(?:\\([^\n\001]+\\)\001\\)?"
+              "[\f\t\n\r()=,; ]?\177\\(?:\\([^\n\001]+\\)\001\\)?"
 	      nil t)
 	(push	(prog1 (if (match-beginning 1)
 			   ;; There is an explicit tag name.
@@ -1645,7 +1645,7 @@ Point should be just after a string that matches TAG."
   ;; a textual description of the four rules.
   (and (string-match "^[^ \t()=,;]+$" tag) ;rule #1
        ;; Rules #2 and #4, and a check that there's no explicit name.
-       (looking-at "[ \t()=,;]?\177\\(?:[0-9]+\\)?,\\(?:[0-9]+\\)?$")
+       (looking-at "[ \t()=,;]?\177[0-9]*,[0-9]*$")
        (save-excursion
 	 (backward-char (1+ (length tag)))
 	 (looking-at "[\n \t()=,;]"))))	;rule #3

@@ -593,25 +593,43 @@ When called from Lisp code, ARG may be a prefix string to copy."
     (indent-to col 0)
     (goto-char pos)))
 
-(defun delete-indentation (&optional arg)
+(defun delete-indentation (&optional arg beg end)
   "Join this line to previous and fix up whitespace at join.
-If there is a fill prefix, delete it from the beginning of this line.
-With argument, join this line to following line."
-  (interactive "*P")
-  (beginning-of-line)
-  (if arg (forward-line 1))
-  (if (eq (preceding-char) ?\n)
-      (progn
-	(delete-region (point) (1- (point)))
-	;; If the second line started with the fill prefix,
-	;; delete the prefix.
-	(if (and fill-prefix
-		 (<= (+ (point) (length fill-prefix)) (point-max))
-		 (string= fill-prefix
-			  (buffer-substring (point)
-					    (+ (point) (length fill-prefix)))))
-	    (delete-region (point) (+ (point) (length fill-prefix))))
-	(fixup-whitespace))))
+If there is a fill prefix, delete it from the beginning of this
+line.
+With prefix ARG, join the current line to the following line.
+When BEG and END are non-nil, join all lines in the region they
+define.  Interactively, BEG and END are, respectively, the start
+and end of the region if it is active, else nil.  (The region is
+ignored if prefix ARG is given.)"
+  (interactive
+   (progn (barf-if-buffer-read-only)
+          (cons current-prefix-arg
+                (and (use-region-p)
+                     (list (region-beginning) (region-end))))))
+  ;; Consistently deactivate mark even when no text is changed.
+  (setq deactivate-mark t)
+  (if (and beg (not arg))
+      ;; Region is active.  Go to END, but only if region spans
+      ;; multiple lines.
+      (and (goto-char beg)
+           (> end (line-end-position))
+           (goto-char end))
+    ;; Region is inactive.  Set a loop sentinel
+    ;; (subtracting 1 in order to compare less than BOB).
+    (setq beg (1- (line-beginning-position (and arg 2))))
+    (when arg (forward-line)))
+  (let ((prefix (and (> (length fill-prefix) 0)
+                     (regexp-quote fill-prefix))))
+    (while (and (> (line-beginning-position) beg)
+                (forward-line 0)
+                (= (preceding-char) ?\n))
+      (delete-char -1)
+      ;; If the appended line started with the fill prefix,
+      ;; delete the prefix.
+      (if (and prefix (looking-at prefix))
+          (replace-match "" t t))
+      (fixup-whitespace))))
 
 (defalias 'join-line #'delete-indentation) ; easier to find
 

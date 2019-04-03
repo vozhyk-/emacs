@@ -248,7 +248,7 @@ typedef intptr_t object_ct;
 
 /* Number of live and free conses etc.  */
 
-struct gcstat
+static struct gcstat
 {
   object_ct total_conses, total_free_conses;
   object_ct total_symbols, total_free_symbols;
@@ -508,7 +508,7 @@ static struct mem_node *mem_find (void *);
    value if we might unexec; otherwise some compilers put it into
    BSS.  */
 
-Lisp_Object *staticvec[NSTATICS]
+Lisp_Object const *staticvec[NSTATICS]
 #ifdef HAVE_UNEXEC
 = {&Vpurify_flag}
 #endif
@@ -1814,7 +1814,7 @@ static char const string_overrun_cookie[GC_STRING_OVERRUN_COOKIE_SIZE] =
 #define GC_STRING_EXTRA (GC_STRING_OVERRUN_COOKIE_SIZE)
 
 /* Exact bound on the number of bytes in a string, not counting the
-   terminating null.  A string cannot contain more bytes than
+   terminating NUL.  A string cannot contain more bytes than
    STRING_BYTES_BOUND, nor can it be so long that the size_t
    arithmetic in allocate_string_data would overflow while it is
    calculating a value to be passed to malloc.  */
@@ -2864,50 +2864,57 @@ list3 (Lisp_Object arg1, Lisp_Object arg2, Lisp_Object arg3)
   return Fcons (arg1, Fcons (arg2, Fcons (arg3, Qnil)));
 }
 
-
 Lisp_Object
 list4 (Lisp_Object arg1, Lisp_Object arg2, Lisp_Object arg3, Lisp_Object arg4)
 {
   return Fcons (arg1, Fcons (arg2, Fcons (arg3, Fcons (arg4, Qnil))));
 }
 
-
 Lisp_Object
-list5 (Lisp_Object arg1, Lisp_Object arg2, Lisp_Object arg3, Lisp_Object arg4, Lisp_Object arg5)
+list5 (Lisp_Object arg1, Lisp_Object arg2, Lisp_Object arg3, Lisp_Object arg4,
+       Lisp_Object arg5)
 {
   return Fcons (arg1, Fcons (arg2, Fcons (arg3, Fcons (arg4,
 						       Fcons (arg5, Qnil)))));
 }
 
-/* Make a list of COUNT Lisp_Objects, where ARG is the
-   first one.  Allocate conses from pure space if TYPE
-   is CONSTYPE_PURE, or allocate as usual if type is CONSTYPE_HEAP.  */
-
-Lisp_Object
-listn (enum constype type, ptrdiff_t count, Lisp_Object arg, ...)
+/* Make a list of COUNT Lisp_Objects, where ARG is the first one.
+   Use CONS to construct the pairs.  AP has any remaining args.  */
+static Lisp_Object
+cons_listn (ptrdiff_t count, Lisp_Object arg,
+	    Lisp_Object (*cons) (Lisp_Object, Lisp_Object), va_list ap)
 {
-  Lisp_Object (*cons) (Lisp_Object, Lisp_Object);
-  switch (type)
-    {
-    case CONSTYPE_PURE: cons = pure_cons; break;
-    case CONSTYPE_HEAP: cons = Fcons; break;
-    default: emacs_abort ();
-    }
-
   eassume (0 < count);
   Lisp_Object val = cons (arg, Qnil);
   Lisp_Object tail = val;
-
-  va_list ap;
-  va_start (ap, arg);
   for (ptrdiff_t i = 1; i < count; i++)
     {
       Lisp_Object elem = cons (va_arg (ap, Lisp_Object), Qnil);
       XSETCDR (tail, elem);
       tail = elem;
     }
-  va_end (ap);
+  return val;
+}
 
+/* Make a list of COUNT Lisp_Objects, where ARG1 is the first one.  */
+Lisp_Object
+listn (ptrdiff_t count, Lisp_Object arg1, ...)
+{
+  va_list ap;
+  va_start (ap, arg1);
+  Lisp_Object val = cons_listn (count, arg1, Fcons, ap);
+  va_end (ap);
+  return val;
+}
+
+/* Make a pure list of COUNT Lisp_Objects, where ARG1 is the first one.  */
+Lisp_Object
+pure_listn (ptrdiff_t count, Lisp_Object arg1, ...)
+{
+  va_list ap;
+  va_start (ap, arg1);
+  Lisp_Object val = cons_listn (count, arg1, pure_cons, ap);
+  va_end (ap);
   return val;
 }
 
@@ -4822,9 +4829,9 @@ mark_maybe_object (Lisp_Object obj)
 }
 
 void
-mark_maybe_objects (Lisp_Object *array, ptrdiff_t nelts)
+mark_maybe_objects (Lisp_Object const *array, ptrdiff_t nelts)
 {
-  for (Lisp_Object *lim = array + nelts; array < lim; array++)
+  for (Lisp_Object const *lim = array + nelts; array < lim; array++)
     mark_maybe_object (*array);
 }
 
@@ -4936,15 +4943,15 @@ mark_maybe_pointer (void *p)
    or END+OFFSET..START.  */
 
 static void ATTRIBUTE_NO_SANITIZE_ADDRESS
-mark_memory (void *start, void *end)
+mark_memory (void const *start, void const *end)
 {
-  char *pp;
+  char const *pp;
 
   /* Make START the pointer to the start of the memory region,
      if it isn't already.  */
   if (end < start)
     {
-      void *tem = start;
+      void const *tem = start;
       start = end;
       end = tem;
     }
@@ -4969,14 +4976,14 @@ mark_memory (void *start, void *end)
      away.  The only reference to the life string is through the
      pointer `s'.  */
 
-  for (pp = start; (void *) pp < end; pp += GC_POINTER_ALIGNMENT)
+  for (pp = start; (void const *) pp < end; pp += GC_POINTER_ALIGNMENT)
     {
-      mark_maybe_pointer (*(void **) pp);
+      mark_maybe_pointer (*(void *const *) pp);
 
       verify (alignof (Lisp_Object) % GC_POINTER_ALIGNMENT == 0);
       if (alignof (Lisp_Object) == GC_POINTER_ALIGNMENT
 	  || (uintptr_t) pp % alignof (Lisp_Object) == 0)
-	mark_maybe_object (*(Lisp_Object *) pp);
+	mark_maybe_object (*(Lisp_Object const *) pp);
     }
 }
 
@@ -5178,7 +5185,7 @@ typedef union
    from the stack start.  */
 
 void
-mark_stack (char *bottom, char *end)
+mark_stack (char const *bottom, char const *end)
 {
   /* This assumes that the stack is a contiguous region in memory.  If
      that's not the case, something has to be done here to iterate
@@ -5335,7 +5342,8 @@ valid_lisp_object_p (Lisp_Object obj)
 
 /* Allocate room for SIZE bytes from pure Lisp storage and return a
    pointer to it.  TYPE is the Lisp type for which the memory is
-   allocated.  TYPE < 0 means it's not used for a Lisp object.  */
+   allocated.  TYPE < 0 means it's not used for a Lisp object,
+   and that the result should have an alignment of -TYPE.  */
 
 static void *
 pure_alloc (size_t size, int type)
@@ -5354,8 +5362,11 @@ pure_alloc (size_t size, int type)
     {
       /* Allocate space for a non-Lisp object from the end of the free
 	 space.  */
-      pure_bytes_used_non_lisp += size;
-      result = purebeg + pure_size - pure_bytes_used_non_lisp;
+      ptrdiff_t unaligned_non_lisp = pure_bytes_used_non_lisp + size;
+      char *unaligned = purebeg + pure_size - unaligned_non_lisp;
+      int decr = (intptr_t) unaligned & (-1 - type);
+      pure_bytes_used_non_lisp = unaligned_non_lisp + decr;
+      result = unaligned - decr;
     }
   pure_bytes_used = pure_bytes_used_lisp + pure_bytes_used_non_lisp;
 
@@ -5542,7 +5553,8 @@ make_pure_bignum (struct Lisp_Bignum *value)
   struct Lisp_Bignum *b = pure_alloc (sizeof *b, Lisp_Vectorlike);
   XSETPVECTYPESIZE (b, PVEC_BIGNUM, 0, VECSIZE (struct Lisp_Bignum));
 
-  pure_limbs = pure_alloc (nbytes, -1);
+  int limb_alignment = alignof (mp_limb_t);
+  pure_limbs = pure_alloc (nbytes, - limb_alignment);
   for (i = 0; i < nlimbs; ++i)
     pure_limbs[i] = mpz_getlimbn (value->value, i);
 
@@ -5719,7 +5731,7 @@ purecopy (Lisp_Object obj)
    VARADDRESS.  */
 
 void
-staticpro (Lisp_Object *varaddress)
+staticpro (Lisp_Object const *varaddress)
 {
   for (int i = 0; i < staticidx; i++)
     eassert (staticvec[i] != varaddress);
@@ -5972,7 +5984,7 @@ visit_static_gc_roots (struct gc_root_visitor visitor)
 }
 
 static void
-mark_object_root_visitor (Lisp_Object *root_ptr,
+mark_object_root_visitor (Lisp_Object const *root_ptr,
                           enum gc_root_type type,
                           void *data)
 {
@@ -6067,7 +6079,7 @@ garbage_collect_1 (struct gcstat *gcst)
 #if MAX_SAVE_STACK > 0
   if (NILP (Vpurify_flag))
     {
-      char *stack;
+      char const *stack;
       ptrdiff_t stack_size;
       if (&stack_top_variable < stack_bottom)
 	{
@@ -6103,9 +6115,7 @@ garbage_collect_1 (struct gcstat *gcst)
 
   /* Mark all the special slots that serve as the roots of accessibility.  */
 
-  struct gc_root_visitor visitor;
-  memset (&visitor, 0, sizeof (visitor));
-  visitor.visit = mark_object_root_visitor;
+  struct gc_root_visitor visitor = { .visit = mark_object_root_visitor };
   visit_static_gc_roots (visitor);
 
   mark_pinned_objects ();
@@ -7286,8 +7296,7 @@ Frames, windows, buffers, and subprocesses count as vectors
   (but the contents of a buffer's text do not count here).  */)
   (void)
 {
-  return listn (CONSTYPE_HEAP, 7,
-		make_int (cons_cells_consed),
+  return  list (make_int (cons_cells_consed),
 		make_int (floats_consed),
 		make_int (vector_cells_consed),
 		make_int (symbols_consed),
@@ -7587,8 +7596,10 @@ do hash-consing of the objects allocated to pure space.  */);
   /* We build this in advance because if we wait until we need it, we might
      not be able to allocate the memory to hold it.  */
   Vmemory_signal_data
-    = listn (CONSTYPE_PURE, 2, Qerror,
-	     build_pure_c_string ("Memory exhausted--use M-x save-some-buffers then exit and restart Emacs"));
+    = pure_list (Qerror,
+		 build_pure_c_string ("Memory exhausted--use"
+				      " M-x save-some-buffers then"
+				      " exit and restart Emacs"));
 
   DEFVAR_LISP ("memory-full", Vmemory_full,
 	       doc: /* Non-nil means Emacs cannot get much more Lisp memory.  */);
@@ -7641,6 +7652,12 @@ than 2**N, where N is this variable's value.  N should be nonnegative.  */);
   defsubr (&Ssuspicious_object);
 }
 
+#ifdef HAVE_X_WINDOWS
+enum defined_HAVE_X_WINDOWS { defined_HAVE_X_WINDOWS = true };
+#else
+enum defined_HAVE_X_WINDOWS { defined_HAVE_X_WINDOWS = false };
+#endif
+
 /* When compiled with GCC, GDB might say "No enum type named
    pvec_type" if we don't have at least one symbol with that type, and
    then xbacktrace could fail.  Similarly for the other enums and
@@ -7659,5 +7676,6 @@ union
   enum MAX_ALLOCA MAX_ALLOCA;
   enum More_Lisp_Bits More_Lisp_Bits;
   enum pvec_type pvec_type;
+  enum defined_HAVE_X_WINDOWS defined_HAVE_X_WINDOWS;
 } const EXTERNALLY_VISIBLE gdb_make_enums_visible = {0};
 #endif	/* __GNUC__ */

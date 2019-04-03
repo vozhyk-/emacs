@@ -714,7 +714,7 @@ invoke it.  If KEYS is omitted or nil, the return value of
 	default:
 	  {
 	    /* How many bytes are left unprocessed in the specs string?
-	       (Note that this excludes the trailing null byte.)  */
+	       (Note that this excludes the trailing NUL byte.)  */
 	    ptrdiff_t bytes_left = string_len - (tem - string);
 	    unsigned letter;
 
@@ -814,11 +814,10 @@ syms_of_callint (void)
   callint_message = Qnil;
   staticpro (&callint_message);
 
-  preserved_fns = listn (CONSTYPE_PURE, 4,
-			 intern_c_string ("region-beginning"),
-			 intern_c_string ("region-end"),
-			 intern_c_string ("point"),
-                         intern_c_string ("mark"));
+  preserved_fns = pure_list (intern_c_string ("region-beginning"),
+			     intern_c_string ("region-end"),
+			     intern_c_string ("point"),
+			     intern_c_string ("mark"));
   staticpro (&preserved_fns);
 
   DEFSYM (Qlist, "list");

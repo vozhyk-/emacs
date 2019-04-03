@@ -2836,6 +2836,25 @@ usage: (save-restriction &rest BODY)  */)
   return unbind_to (count, val);
 }
 
+/* i18n (internationalization).  */
+
+DEFUN ("ngettext", Fngettext, Sngettext, 3, 3, 0,
+       doc: /* Return the translation of MSGID (plural MSGID_PLURAL) depending on N.
+MSGID is the singular form of the string to be converted;
+use it as the key for the search in the translation catalog.
+MSGID_PLURAL is the plural form.  Use N to select the proper translation.
+If no message catalog is found, MSGID is returned if N is equal to 1,
+otherwise MSGID_PLURAL.  */)
+  (Lisp_Object msgid, Lisp_Object msgid_plural, Lisp_Object n)
+{
+  CHECK_STRING (msgid);
+  CHECK_STRING (msgid_plural);
+  CHECK_INTEGER (n);
+
+  /* Placeholder implementation until we get our act together.  */
+  return EQ (n, make_fixnum (1)) ? msgid : msgid_plural;
+}
+
 DEFUN ("message", Fmessage, Smessage, 1, MANY, 0,
        doc: /* Display a message at the bottom of the screen.
 The message also goes into the `*Messages*' buffer, if `message-log-max'
@@ -2989,8 +3008,8 @@ the next available argument, or the argument explicitly specified:
 
 %s means print a string argument.  Actually, prints any object, with `princ'.
 %d means print as signed number in decimal.
-%o means print as unsigned number in octal.
-%x means print as unsigned number in hex.
+%o means print a number in octal.
+%x means print a number in hex.
 %X is like %x, but uses upper case.
 %e means print a number in exponential notation.
 %f means print a number in decimal-point notation.
@@ -3001,6 +3020,8 @@ the next available argument, or the argument explicitly specified:
 %S means print any object as an s-expression (using `prin1').
 
 The argument used for %d, %o, %x, %e, %f, %g or %c must be a number.
+%o, %x, and %X treat arguments as unsigned if `binary-as-unsigned' is t
+  (this is experimental; email 32252@debbugs.gnu.org if you need it).
 Use %% to put a single % into the output.
 
 A %-sequence other than %% may contain optional field number, flag,
@@ -3084,7 +3105,7 @@ styled_format (ptrdiff_t nargs, Lisp_Object *args, bool message)
 			      : FLT_RADIX == 16 ? 4
 			      : -1)),
 
-   /* Maximum number of bytes (including terminating null) generated
+   /* Maximum number of bytes (including terminating NUL) generated
       by any format, if precision is no more than USEFUL_PRECISION_MAX.
       On all practical hosts, %Lf is the worst case.  */
    SPRINTF_BUFSIZE = (sizeof "-." + (LDBL_MAX_10_EXP + 1)
@@ -4483,17 +4504,13 @@ functions if all the text being accessed has this property.  */);
 	       binary_as_unsigned,
 	       doc: /* Non-nil means `format' %x and %o treat integers as unsigned.
 This has machine-dependent results.  Nil means to treat integers as
-signed, which is portable; for example, if N is a negative integer,
-(read (format "#x%x") N) returns N only when this variable is nil.
+signed, which is portable and is the default; for example, if N is a
+negative integer, (read (format "#x%x" N)) returns N only when this
+variable is nil.
 
 This variable is experimental; email 32252@debbugs.gnu.org if you need
 it to be non-nil.  */);
-  /* For now, default to true if bignums exist, false in traditional Emacs.  */
-#ifdef lisp_h_FIXNUMP
   binary_as_unsigned = false;
-#else
-  binary_as_unsigned = true;
-#endif
 
   defsubr (&Spropertize);
   defsubr (&Schar_equal);
@@ -4555,6 +4572,8 @@ it to be non-nil.  */);
   defsubr (&Sinsert_and_inherit_before_markers);
   defsubr (&Sinsert_char);
   defsubr (&Sinsert_byte);
+
+  defsubr (&Sngettext);
 
   defsubr (&Suser_login_name);
   defsubr (&Sgroup_name);

@@ -819,10 +819,10 @@ VALUE is a CCL program name defined by `define-ccl-program'.  The
 CCL program reads a character sequence and writes a byte sequence
 as an encoding result.
 
-`:inhibit-null-byte-detection'
+`:inhibit-nul-byte-detection'
 
 VALUE non-nil means Emacs ignore null bytes on code detection.
-See the variable `inhibit-null-byte-detection'.  This attribute
+See the variable `inhibit-nul-byte-detection'.  This attribute
 is meaningful only when `:coding-type' is `undecided'.
 
 `:inhibit-iso-escape-detection'
@@ -867,7 +867,7 @@ non-ASCII files.  This attribute is meaningful only when
 				      :ccl-encoder
 				      :valids))
 				   ((eq coding-type 'undecided)
-				    '(:inhibit-null-byte-detection
+				    '(:inhibit-nul-byte-detection
 				      :inhibit-iso-escape-detection
 				      :prefer-utf-8))))))
 
@@ -920,8 +920,8 @@ non-ASCII files.  This attribute is meaningful only when
 	  (cons :name (cons name (cons :docstring (cons (purecopy docstring)
 							props)))))
     (setcdr (assq :plist common-attrs) props)
-    (apply 'define-coding-system-internal
-	   name (mapcar 'cdr (append common-attrs spec-attrs)))))
+    (apply #'define-coding-system-internal
+	   name (mapcar #'cdr (append common-attrs spec-attrs)))))
 
 (defun coding-system-doc-string (coding-system)
   "Return the documentation string for CODING-SYSTEM."
@@ -1852,9 +1852,12 @@ or nil."
 
 Each function in this list should be written to operate on the
 current buffer, but should not modify it in any way.  The buffer
-will contain undecoded text of parts of the file.  Each function
+will contain the text of parts of the file.  Each function
 should take one argument, SIZE, which says how many characters
-\(starting from point) it should look at.
+\(starting from point) it should look at.  The function might be
+called both when the file is visited and Emacs wants to decode
+its contents, and when the file's buffer is about to be saved
+and Emacs wants to determine how to encode its contents.
 
 If one of these functions succeeds in determining a coding
 system, it should return that coding system.  Otherwise, it
@@ -2501,10 +2504,17 @@ This function is intended to be added to `auto-coding-functions'."
                   (let ((sym-type (coding-system-type sym))
                         (bfcs-type
                          (coding-system-type buffer-file-coding-system)))
-                    ;; 'charset' will signal an error in
-                    ;; coding-system-equal, since it isn't a
-                    ;; coding-system.  So test that up front.
-                    (if (and (not (equal sym-type 'charset))
+                    ;; If the buffer is unibyte, its encoding is
+                    ;; immaterial (it is just the default value of
+                    ;; buffer-file-coding-system), so we ignore it.
+                    ;; This situation happens when this function is
+                    ;; called as part of visiting a file, as opposed
+                    ;; to when saving a buffer to a file.
+                    (if (and enable-multibyte-characters
+                             ;; 'charset' will signal an error in
+                             ;; coding-system-equal, since it isn't a
+                             ;; coding-system.  So test that up front.
+                             (not (equal sym-type 'charset))
                              (coding-system-equal 'utf-8 sym-type)
                              (coding-system-equal 'utf-8 bfcs-type))
                         buffer-file-coding-system
@@ -2545,7 +2555,7 @@ This function is intended to be added to `auto-coding-functions'."
     ;; (allowing for whitespace at bob).  Note: 'DOCTYPE NETSCAPE' is
     ;; useful for Mozilla bookmark files.
     (when (and (re-search-forward "\\`[[:space:]\n]*\\(<!doctype[[:space:]\n]+\\(html\\|netscape\\)\\|<html\\)" size t)
-	       (re-search-forward "<meta\\s-+\\(http-equiv=[\"']?content-type[\"']?\\s-+content=[\"']text/\\sw+;\\s-*\\)?charset=[\"']?\\(.+?\\)[\"'\\s-/>]" size t))
+	       (re-search-forward "<meta\\s-+\\(http-equiv=[\"']?content-type[\"']?\\s-+content=[\"']text/\\sw+;\\s-*\\)?charset=[\"']?\\(.+?\\)[\"'[:space:]/>]" size t))
       (let* ((match (match-string 2))
 	     (sym (intern (downcase match))))
 	(if (coding-system-p sym)
@@ -2556,7 +2566,8 @@ This function is intended to be added to `auto-coding-functions'."
             (let ((sym-type (coding-system-type sym))
                   (bfcs-type
                    (coding-system-type buffer-file-coding-system)))
-              (if (and (coding-system-equal 'utf-8 sym-type)
+              (if (and enable-multibyte-characters
+                       (coding-system-equal 'utf-8 sym-type)
                        (coding-system-equal 'utf-8 bfcs-type))
                   buffer-file-coding-system
 		sym))

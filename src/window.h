@@ -739,7 +739,7 @@ wset_next_buffers (struct window *w, Lisp_Object val)
 #endif
 
 /* True if W is a tool bar window.  */
-#if defined (HAVE_WINDOW_SYSTEM) && ! defined (USE_GTK) && ! defined (HAVE_NS)
+#if defined (HAVE_WINDOW_SYSTEM) && ! defined (HAVE_EXT_TOOL_BAR)
 #define WINDOW_TOOL_BAR_P(W) \
   (WINDOWP (WINDOW_XFRAME (W)->tool_bar_window) \
    && (W) == XWINDOW (WINDOW_XFRAME (W)->tool_bar_window))
@@ -1063,8 +1063,8 @@ extern Lisp_Object window_from_coordinates (struct frame *, int, int,
 extern void resize_frame_windows (struct frame *, int, bool, bool);
 extern void restore_window_configuration (Lisp_Object);
 extern void delete_all_child_windows (Lisp_Object);
-extern void grow_mini_window (struct window *, int, bool);
-extern void shrink_mini_window (struct window *, bool);
+extern void grow_mini_window (struct window *, int);
+extern void shrink_mini_window (struct window *);
 extern int window_relative_x_coord (struct window *, enum window_part, int);
 
 void run_window_change_functions (void);

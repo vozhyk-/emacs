@@ -1838,7 +1838,7 @@ This performs fontification according to `js--class-styles'."
                   (save-excursion (backward-char) (not (looking-at "[/*]/\\|=>")))
                   (js--looking-at-operator-p)
                   (and (progn (backward-char)
-                              (not (looking-at "+\\+\\|--\\|/[/*]"))))))))))
+                              (not (looking-at "\\+\\+\\|--\\|/[/*]"))))))))))
 
 (defun js--skip-term-backward ()
   "Skip a term before point; return t if a term was skipped."
@@ -1908,7 +1908,7 @@ the same column as the current line."
     (save-match-data
       (when (looking-at "\\s-*\\_<while\\_>")
 	(if (save-excursion
-	      (skip-chars-backward "[ \t\n]*}")
+	      (skip-chars-backward " \t\n}")
 	      (looking-at "[ \t\n]*}"))
 	    (save-excursion
 	      (backward-list) (forward-symbol -1) (looking-at "\\_<do\\_>"))

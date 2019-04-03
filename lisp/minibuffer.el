@@ -269,7 +269,7 @@ the form (concat S2 S)."
                     (+ beg (- (length s1) (length s2))))
               . ,(and (eq (car-safe res) 'boundaries) (cddr res)))))
          ((stringp res)
-          (if (string-prefix-p s2 string completion-ignore-case)
+          (if (string-prefix-p s2 res completion-ignore-case)
               (concat s1 (substring res (length s2)))))
          ((eq action t)
           (let ((bounds (completion-boundaries str table pred "")))
@@ -2297,7 +2297,7 @@ Useful to give the user default values that won't be substituted."
   (if (and (not (file-name-quoted-p filename))
            (file-name-absolute-p filename)
            (string-match-p (if (memq system-type '(windows-nt ms-dos))
-                               "[/\\\\]~" "/~")
+                               "[/\\]~" "/~")
                            (file-local-name filename)))
       (file-name-quote filename)
     (minibuffer--double-dollars filename)))
@@ -2311,7 +2311,7 @@ Useful to give the user default values that won't be substituted."
   ;; We can't reuse env--substitute-vars-regexp because we need to match only
   ;; potentially-unfinished envvars at end of string.
   (concat "\\(?:^\\|[^$]\\(?:\\$\\$\\)*\\)"
-          "$\\([[:alnum:]_]*\\|{\\([^}]*\\)\\)\\'"))
+          "\\$\\([[:alnum:]_]*\\|{\\([^}]*\\)\\)\\'"))
 
 (defun completion--embedded-envvar-table (string _pred action)
   "Completion table for envvars embedded in a string.

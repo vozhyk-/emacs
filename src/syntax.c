@@ -3477,10 +3477,7 @@ internalize_parse_state (Lisp_Object external, struct lisp_parse_state *state)
   else
     {
       tem = Fcar (external);
-      if (!NILP (tem))
-	state->depth = XFIXNUM (tem);
-      else
-	state->depth = 0;
+      state->depth = FIXNUMP (tem) ? XFIXNUM (tem) : 0;
 
       external = Fcdr (external);
       external = Fcdr (external);
@@ -3719,7 +3716,7 @@ syms_of_syntax (void)
 
   DEFSYM (Qscan_error, "scan-error");
   Fput (Qscan_error, Qerror_conditions,
-	listn (CONSTYPE_PURE, 2, Qscan_error, Qerror));
+	pure_list (Qscan_error, Qerror));
   Fput (Qscan_error, Qerror_message,
 	build_pure_c_string ("Scan error"));
 

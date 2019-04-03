@@ -3105,7 +3105,7 @@ displayed."
 (defun sql-end-of-statement (arg)
   "Move to the end of the current SQL statement."
   (interactive "p")
-  (let ((term (sql-get-product-feature sql-product :terminator))
+  (let ((term (or (sql-get-product-feature sql-product :terminator) ";"))
         (re-search (if (> 0 arg) 're-search-backward 're-search-forward))
         (here (point))
         (n 0))
@@ -3225,11 +3225,11 @@ appended to the SQLi buffer without disturbing your SQL buffer.")
   "Return a docstring for `sql-help' listing loaded SQL products."
   (let ((doc sql--help-docstring))
     ;; Insert FREE software list
-    (when (string-match "^\\(\\s-*\\)[\\\\][\\\\]FREE\\s-*$" doc 0)
+    (when (string-match "^\\(\\s-*\\)[\\][\\]FREE\\s-*$" doc 0)
       (setq doc (replace-match (sql-help-list-products (match-string 1 doc) t)
 			       t t doc 0)))
     ;; Insert non-FREE software list
-    (when (string-match "^\\(\\s-*\\)[\\\\][\\\\]NONFREE\\s-*$" doc 0)
+    (when (string-match "^\\(\\s-*\\)[\\][\\]NONFREE\\s-*$" doc 0)
       (setq doc (replace-match (sql-help-list-products (match-string 1 doc) nil)
 			       t t doc 0)))
     doc))

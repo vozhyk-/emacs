@@ -737,7 +737,8 @@ void
 force_auto_save_soon (void)
 {
   last_auto_save = - auto_save_interval - 1;
-
+  /* FIXME: What's the relationship between forcing auto-save and adding
+     a buffer-switch event?  */
   record_asynch_buffer_change ();
 }
 #endif
@@ -1328,7 +1329,7 @@ command_loop_1 (void)
 	  if (!NILP (Vquit_flag))
 	    {
 	      Vquit_flag = Qnil;
-	      Vunread_command_events = list1 (make_fixnum (quit_char));
+	      Vunread_command_events = list1i (quit_char);
 	    }
 	}
 
@@ -1476,8 +1477,12 @@ command_loop_1 (void)
       safe_run_hooks (Qpost_command_hook);
 
       /* If displaying a message, resize the echo area window to fit
-	 that message's size exactly.  */
-      if (!NILP (echo_area_buffer[0]))
+	 that message's size exactly.  Do this only if the echo area
+	 window is the minibuffer window of the selected frame.  See
+	 Bug#34317.  */
+      if (!NILP (echo_area_buffer[0])
+	  && (EQ (echo_area_window,
+		  FRAME_MINIBUF_WINDOW (XFRAME (selected_frame)))))
 	resize_echo_area_exactly ();
 
       /* If there are warnings waiting, process them.  */
@@ -2360,7 +2365,14 @@ read_char (int commandflag, Lisp_Object map,
       if (CONSP (c) && EQ (XCAR (c), Qt))
 	c = XCDR (c);
       else
-	reread = true;
+	{
+	  if (CONSP (c) && EQ (XCAR (c), Qno_record))
+	    {
+	      c = XCDR (c);
+	      recorded = true;
+	    }
+	  reread = true;
+	}
 
       /* Undo what read_char_x_menu_prompt did when it unread
 	 additional keys returned by Fx_popup_menu.  */
@@ -2741,7 +2753,14 @@ read_char (int commandflag, Lisp_Object map,
       if (CONSP (c) && EQ (XCAR (c), Qt))
 	c = XCDR (c);
       else
-	reread = true;
+	{
+	  if (CONSP (c) && EQ (XCAR (c), Qno_record))
+	    {
+	      c = XCDR (c);
+	      recorded = true;
+	    }
+	  reread = true;
+	}
     }
 
   /* Read something from current KBOARD's side queue, if possible.  */
@@ -2803,6 +2822,11 @@ read_char (int commandflag, Lisp_Object map,
 
       if (CONSP (c) && EQ (XCAR (c), Qt))
 	c = XCDR (c);
+      else if (CONSP (c) && EQ (XCAR (c), Qno_record))
+	{
+	  c = XCDR (c);
+	  recorded = true;
+	}
   }
 
  non_reread:
@@ -3865,8 +3889,7 @@ kbd_buffer_get_event (KBOARD **kbp,
 	}
         break;
 
-#if defined (USE_X_TOOLKIT) || defined (HAVE_NTGUI) \
-    || defined (HAVE_NS) || (defined (USE_GTK) && !defined (HAVE_PGTK))
+#ifdef HAVE_EXT_MENU_BAR
       case MENU_BAR_ACTIVATE_EVENT:
 	{
 	  kbd_fetch_ptr = next_kbd_event (event);
@@ -3946,8 +3969,7 @@ kbd_buffer_get_event (KBOARD **kbp,
 	    {
 	      obj = make_lispy_event (&event->ie);
 
-#if defined (USE_X_TOOLKIT) || defined (HAVE_NTGUI) \
-    || defined (HAVE_NS) || defined (USE_GTK)
+#ifdef HAVE_EXT_MENU_BAR
 	      /* If this was a menu selection, then set the flag to inhibit
 		 writing to last_nonmenu_event.  Don't do this if the event
 		 we're returning is (menu-bar), though; that indicates the
@@ -5228,7 +5250,7 @@ make_lispy_position (struct frame *f, Lisp_Object x, Lisp_Object y,
 static bool
 toolkit_menubar_in_use (struct frame *f)
 {
-#if defined (USE_X_TOOLKIT) || defined (USE_GTK) || defined (HAVE_NS) || defined (HAVE_NTGUI)
+#ifdef HAVE_EXT_MENU_BAR
   return !(!FRAME_WINDOW_P (f));
 #else
   return false;
@@ -5921,8 +5943,7 @@ make_lispy_event (struct input_event *event)
 	return list3 (head, position, files);
       }
 
-#if defined (USE_X_TOOLKIT) || defined (HAVE_NTGUI) \
-    || defined (HAVE_NS) || defined (USE_GTK)
+#ifdef HAVE_EXT_MENU_BAR
     case MENU_BAR_EVENT:
       if (EQ (event->arg, event->frame_or_window))
 	/* This is the prefix key.  We translate this to
@@ -6171,7 +6192,7 @@ parse_modifiers_uncached (Lisp_Object symbol, ptrdiff_t *modifier_end)
 static Lisp_Object
 apply_modifiers_uncached (int modifiers, char *base, int base_len, int base_len_byte)
 {
-  /* Since BASE could contain nulls, we can't use intern here; we have
+  /* Since BASE could contain NULs, we can't use intern here; we have
      to use Fintern, which expects a genuine Lisp_String, and keeps a
      reference to it.  */
   char new_mods[sizeof "A-C-H-M-S-s-up-down-drag-double-triple-"];
@@ -8132,7 +8153,7 @@ parse_tool_bar_item (Lisp_Object key, Lisp_Object item)
       if (menu_separator_name_p (SSDATA (caption)))
 	{
 	  set_prop (TOOL_BAR_ITEM_TYPE, Qt);
-#if !defined (USE_GTK) && !defined (HAVE_NS)
+#ifndef HAVE_EXT_TOOL_BAR
 	  /* If we use build_desired_tool_bar_string to render the
 	     tool bar, the separator is rendered as an image.  */
 	  set_prop (TOOL_BAR_ITEM_IMAGES,
@@ -11192,6 +11213,7 @@ syms_of_keyboard (void)
 	Fput (var, Qevent_symbol_elements, list1 (var));
       }
   }
+  DEFSYM (Qno_record, "no-record");
 
   button_down_location = make_nil_vector (5);
   staticpro (&button_down_location);
@@ -11302,7 +11324,9 @@ so that you can determine whether the command was run by mouse or not.  */);
 These events are processed first, before actual keyboard input.
 Events read from this list are not normally added to `this-command-keys',
 as they will already have been added once as they were read for the first time.
-An element of the form (t . EVENT) forces EVENT to be added to that list.  */);
+An element of the form (t . EVENT) forces EVENT to be added to that list.
+An element of the form (no-record . EVENT) means process EVENT, but do not
+record it in the keyboard macros, recent-keys, and the dribble file.  */);
   Vunread_command_events = Qnil;
 
   DEFVAR_LISP ("unread-post-input-method-events", Vunread_post_input_method_events,

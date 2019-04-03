@@ -118,6 +118,33 @@ BODY should be a list of Lisp expressions.
   ;; depend on backquote.el.
   (list 'function (cons 'lambda cdr)))
 
+(defmacro prog2 (form1 form2 &rest body)
+  "Eval FORM1, FORM2 and BODY sequentially; return value from FORM2.
+The value of FORM2 is saved during the evaluation of the
+remaining args, whose values are discarded."
+  (declare (indent 2) (debug t))
+  `(progn ,form1 (prog1 ,form2 ,@body)))
+
+(defmacro setq-default (&rest args)
+  "Set the default value of variable VAR to VALUE.
+VAR, the variable name, is literal (not evaluated);
+VALUE is an expression: it is evaluated and its value returned.
+The default value of a variable is seen in buffers
+that do not have their own values for the variable.
+
+More generally, you can use multiple variables and values, as in
+  (setq-default VAR VALUE VAR VALUE...)
+This sets each VAR's default value to the corresponding VALUE.
+The VALUE for the Nth VAR can refer to the new default values
+of previous VARs.
+
+\(setq-default [VAR VALUE]...)"
+  (declare (debug setq))
+  (let ((exps nil))
+    (while args
+      (push `(set-default ',(pop args) ,(pop args)) exps))
+    `(progn . ,(nreverse exps))))
+
 (defmacro setq-local (var val)
   "Set variable VAR to value VAL in current buffer."
   ;; Can't use backquote here, it's too early in the bootstrap.
@@ -756,9 +783,31 @@ Elements of ALIST that are not conses are ignored."
 If KEY is not found in ALIST, return DEFAULT.
 Use TESTFN to lookup in the alist if non-nil.  Otherwise, use `assq'.
 
-This is a generalized variable suitable for use with `setf'.
+You can use `alist-get' in PLACE expressions.  This will modify
+an existing association (more precisely, the first one if
+multiple exist), or add a new element to the beginning of ALIST,
+destructively modifying the list stored in ALIST.
+
+Example:
+
+   (setq foo '((a . 0)))
+   (setf (alist-get 'a foo) 1
+         (alist-get 'b foo) 2)
+
+   foo => ((b . 2) (a . 1))
+
+
 When using it to set a value, optional argument REMOVE non-nil
-means to remove KEY from ALIST if the new value is `eql' to DEFAULT."
+means to remove KEY from ALIST if the new value is `eql' to
+DEFAULT (more precisely the first found association will be
+deleted from the alist).
+
+Example:
+
+  (setq foo '((a . 1) (b . 2)))
+  (setf (alist-get 'b foo nil 'remove) nil)
+
+  foo => ((a . 1))"
   (ignore remove) ;;Silence byte-compiler.
   (let ((x (if (not testfn)
                (assq key alist)
@@ -1511,6 +1560,8 @@ be a list of the form returned by `event-start' and `event-end'."
 (make-obsolete-variable 'x-gtk-use-window-move nil "26.1")
 
 (defvaralias 'messages-buffer-max-lines 'message-log-max)
+(define-obsolete-variable-alias 'inhibit-null-byte-detection
+  'inhibit-nul-byte-detection "27.1")
 
 ;;;; Alternate names for functions - these are not being phased out.
 
@@ -3185,11 +3236,12 @@ discouraged."
   "Start a program in a subprocess.  Return the process object for it.
 Similar to `start-process-shell-command', but calls `start-file-process'."
   (declare (advertised-calling-convention (name buffer command) "23.1"))
-  (start-file-process
-   name buffer
-   (if (file-remote-p default-directory) "/bin/sh" shell-file-name)
-   (if (file-remote-p default-directory) "-c" shell-command-switch)
-   (mapconcat 'identity args " ")))
+  ;; On remote hosts, the local `shell-file-name' might be useless.
+  (with-connection-local-variables
+   (start-file-process
+    name buffer
+    shell-file-name shell-command-switch
+    (mapconcat 'identity args " "))))
 
 (defun call-process-shell-command (command &optional infile buffer display
 					   &rest args)
@@ -3230,11 +3282,11 @@ discouraged."
 Similar to `call-process-shell-command', but calls `process-file'."
   (declare (advertised-calling-convention
             (command &optional infile buffer display) "24.5"))
-  (process-file
-   (if (file-remote-p default-directory) "/bin/sh" shell-file-name)
-   infile buffer display
-   (if (file-remote-p default-directory) "-c" shell-command-switch)
-   (mapconcat 'identity (cons command args) " ")))
+  ;; On remote hosts, the local `shell-file-name' might be useless.
+  (with-connection-local-variables
+   (process-file
+    shell-file-name infile buffer display shell-command-switch
+    (mapconcat 'identity (cons command args) " "))))
 
 (defun call-shell-region (start end command &optional delete buffer)
   "Send text from START to END as input to an inferior shell running COMMAND.
@@ -3685,7 +3737,7 @@ the specified region.  It must not change
 `before-change-functions' or `after-change-functions'.
 
 Additionally, the buffer modifications of BODY are recorded on
-the buffer's undo list as a single \(apply ...) entry containing
+the buffer's undo list as a single (apply ...) entry containing
 the function `undo--wrap-and-run-primitive-undo'."
   (let ((old-bul buffer-undo-list)
 	(end-marker (copy-marker end t))
@@ -3698,7 +3750,14 @@ the function `undo--wrap-and-run-primitive-undo'."
 	(if (eq buffer-undo-list t)
 	    (setq result (funcall body))
 	  (let (;; (inhibit-modification-hooks t)
-                before-change-functions after-change-functions)
+                (before-change-functions
+                 ;; Ugly Hack: if the body uses syntax-ppss/syntax-propertize
+                 ;; (e.g. via a regexp-search or sexp-movement trigerring
+                 ;; on-the-fly syntax-propertize), make sure that this gets
+                 ;; properly refreshed after subsequent changes.
+                 (if (memq #'syntax-ppss-flush-cache before-change-functions)
+                     '(syntax-ppss-flush-cache)))
+                after-change-functions)
 	    (setq result (funcall body)))
 	  (let ((ap-elt
 		 (list 'apply

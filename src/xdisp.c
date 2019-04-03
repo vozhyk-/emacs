@@ -3761,7 +3761,7 @@ compute_display_string_pos (struct text_pos *position,
 	  || !EQ (Fget_char_property (make_fixnum (charpos - 1), Qdisplay,
 				      object),
 		  spec))
-      && (rv = handle_display_spec (NULL, spec, object, Qnil, &tpos, bufpos,
+      && (rv = handle_display_spec (NULL, spec, object1, Qnil, &tpos, bufpos,
 				    frame_window_p)))
     {
       if (rv == 2)
@@ -3788,7 +3788,7 @@ compute_display_string_pos (struct text_pos *position,
     if (!STRINGP (object))
       bufpos = CHARPOS (tpos);
   } while (NILP (spec)
-	   || !(rv = handle_display_spec (NULL, spec, object, Qnil, &tpos,
+	   || !(rv = handle_display_spec (NULL, spec, object1, Qnil, &tpos,
 					  bufpos, frame_window_p)));
   if (rv == 2)
     *disp_prop = 2;
@@ -10568,7 +10568,7 @@ message_log_check_duplicate (ptrdiff_t prev_bol_byte, ptrdiff_t this_bol_byte)
 
 
 /* Display an echo area message M with a specified length of NBYTES
-   bytes.  The string may include null characters.  If M is not a
+   bytes.  The string may include NUL characters.  If M is not a
    string, clear out any existing message, and let the mini-buffer
    text show through.
 
@@ -10672,7 +10672,7 @@ message3_nolog (Lisp_Object m)
 }
 
 
-/* Display a null-terminated echo area message M.  If M is 0, clear
+/* Display a NUL-terminated echo area message M.  If M is 0, clear
    out any existing message, and let the mini-buffer text show through.
 
    The buffer M must continue to exist until after the echo area gets
@@ -11035,15 +11035,15 @@ unwind_with_echo_area_buffer (Lisp_Object vector)
       buffer = AREF (vector, 4);
 
       wset_buffer (w, buffer);
-      set_marker_both (w->pointm, buffer,
-		       XFIXNAT (AREF (vector, 5)),
-		       XFIXNAT (AREF (vector, 6)));
-      set_marker_both (w->old_pointm, buffer,
-		       XFIXNAT (AREF (vector, 7)),
-		       XFIXNAT (AREF (vector, 8)));
-      set_marker_both (w->start, buffer,
-		       XFIXNAT (AREF (vector, 9)),
-		       XFIXNAT (AREF (vector, 10)));
+      set_marker_restricted_both (w->pointm, buffer,
+				  XFIXNAT (AREF (vector, 5)),
+				  XFIXNAT (AREF (vector, 6)));
+      set_marker_restricted_both (w->old_pointm, buffer,
+				  XFIXNAT (AREF (vector, 7)),
+				  XFIXNAT (AREF (vector, 8)));
+      set_marker_restricted_both (w->start, buffer,
+				  XFIXNAT (AREF (vector, 9)),
+				  XFIXNAT (AREF (vector, 10)));
     }
 
   Vwith_echo_area_save_vector = vector;
@@ -11259,14 +11259,9 @@ bool
 resize_mini_window (struct window *w, bool exact_p)
 {
   struct frame *f = XFRAME (w->frame);
-  bool window_height_changed_p = false;
+  int old_height = WINDOW_PIXEL_HEIGHT (w);
 
   eassert (MINI_WINDOW_P (w));
-
-  /* By default, start display at the beginning.  */
-  set_marker_both (w->start, w->contents,
-		   BUF_BEGV (XBUFFER (w->contents)),
-		   BUF_BEGV_BYTE (XBUFFER (w->contents)));
 
   /* Don't resize windows while redisplaying a window; it would
      confuse redisplay functions when the size of the window they are
@@ -11278,19 +11273,30 @@ resize_mini_window (struct window *w, bool exact_p)
     return false;
 
   /* Nil means don't try to resize.  */
-  if (NILP (Vresize_mini_windows)
+  if ((NILP (Vresize_mini_windows)
+       && (NILP (resize_mini_frames) || !FRAME_MINIBUF_ONLY_P (f)))
       || (FRAME_X_P (f) && FRAME_X_OUTPUT (f) == NULL))
     return false;
 
-  if (!FRAME_MINIBUF_ONLY_P (f))
+  /* By default, start display at the beginning.  */
+  set_marker_both (w->start, w->contents,
+		   BUF_BEGV (XBUFFER (w->contents)),
+		   BUF_BEGV_BYTE (XBUFFER (w->contents)));
+
+  if (FRAME_MINIBUF_ONLY_P (f))
+    {
+      if (!NILP (resize_mini_frames))
+	safe_call1 (Qwindow__resize_mini_frame, WINDOW_FRAME (w));
+    }
+  else
     {
       struct it it;
-      int total_height = (WINDOW_PIXEL_HEIGHT (XWINDOW (FRAME_ROOT_WINDOW (f)))
-			  + WINDOW_PIXEL_HEIGHT (w));
+      int old_height = WINDOW_PIXEL_HEIGHT (w);
       int unit = FRAME_LINE_HEIGHT (f);
       int height, max_height;
       struct text_pos start;
       struct buffer *old_current_buffer = NULL;
+      int windows_height = FRAME_WINDOWS_HEIGHT (f);
 
       if (current_buffer != XBUFFER (w->contents))
 	{
@@ -11302,14 +11308,14 @@ resize_mini_window (struct window *w, bool exact_p)
 
       /* Compute the max. number of lines specified by the user.  */
       if (FLOATP (Vmax_mini_window_height))
-	max_height = XFLOAT_DATA (Vmax_mini_window_height) * total_height;
+	max_height = XFLOAT_DATA (Vmax_mini_window_height) * windows_height;
       else if (FIXNUMP (Vmax_mini_window_height))
 	max_height = XFIXNUM (Vmax_mini_window_height) * unit;
       else
-	max_height = total_height / 4;
+	max_height = windows_height / 4;
 
       /* Correct that max. height if it's bogus.  */
-      max_height = clip_to_bounds (unit, max_height, total_height);
+      max_height = clip_to_bounds (unit, max_height, windows_height);
 
       /* Find out the height of the text in the window.  */
       if (it.line_wrap == TRUNCATE)
@@ -11335,63 +11341,27 @@ resize_mini_window (struct window *w, bool exact_p)
 	}
       else
 	SET_TEXT_POS (start, BEGV, BEGV_BYTE);
+
       SET_MARKER_FROM_TEXT_POS (w->start, start);
 
       if (EQ (Vresize_mini_windows, Qgrow_only))
 	{
 	  /* Let it grow only, until we display an empty message, in which
 	     case the window shrinks again.  */
-	  if (height > WINDOW_PIXEL_HEIGHT (w))
-	    {
-	      int old_height = WINDOW_PIXEL_HEIGHT (w);
-
-	      FRAME_WINDOWS_FROZEN (f) = true;
-	      grow_mini_window (w, height - WINDOW_PIXEL_HEIGHT (w), true);
-	      window_height_changed_p = WINDOW_PIXEL_HEIGHT (w) != old_height;
-	    }
-	  else if (height < WINDOW_PIXEL_HEIGHT (w)
-		   && (exact_p || BEGV == ZV))
-	    {
-	      int old_height = WINDOW_PIXEL_HEIGHT (w);
-
-	      FRAME_WINDOWS_FROZEN (f) = false;
-	      shrink_mini_window (w, true);
-	      window_height_changed_p = WINDOW_PIXEL_HEIGHT (w) != old_height;
-	    }
+	  if (height > old_height)
+	    grow_mini_window (w, height - old_height);
+	  else if (height < old_height && (exact_p || BEGV == ZV))
+	    shrink_mini_window (w);
 	}
-      else
-	{
-	  /* Always resize to exact size needed.  */
-	  if (height > WINDOW_PIXEL_HEIGHT (w))
-	    {
-	      int old_height = WINDOW_PIXEL_HEIGHT (w);
-
-	      FRAME_WINDOWS_FROZEN (f) = true;
-	      grow_mini_window (w, height - WINDOW_PIXEL_HEIGHT (w), true);
-	      window_height_changed_p = WINDOW_PIXEL_HEIGHT (w) != old_height;
-	    }
-	  else if (height < WINDOW_PIXEL_HEIGHT (w))
-	    {
-	      int old_height = WINDOW_PIXEL_HEIGHT (w);
-
-	      FRAME_WINDOWS_FROZEN (f) = false;
-	      shrink_mini_window (w, true);
-
-	      if (height)
-		{
-		  FRAME_WINDOWS_FROZEN (f) = true;
-		  grow_mini_window (w, height - WINDOW_PIXEL_HEIGHT (w), true);
-		}
-
-	      window_height_changed_p = WINDOW_PIXEL_HEIGHT (w) != old_height;
-	    }
-	}
+      else if (height != old_height)
+	/* Always resize to exact size needed.  */
+	grow_mini_window (w, height - old_height);
 
       if (old_current_buffer)
 	set_buffer_internal (old_current_buffer);
     }
 
-  return window_height_changed_p;
+  return WINDOW_PIXEL_HEIGHT (w) != old_height;
 }
 
 
@@ -12070,18 +12040,25 @@ x_consider_frame_title (Lisp_Object frame)
       /* Set global variable indicating that multiple frames exist.  */
       multiple_frames = CONSP (tail);
 
+      /* select-frame calls resize_mini_window, which could resize the
+	 mini-window and by that undo the effect of this redisplay
+	 cycle wrt minibuffer and echo-area display.  Binding
+	 inhibit-redisplay to t makes the call to resize_mini_window a
+	 no-op, thus avoiding the adverse side effects.  */
+
+      /* The following was moved before the record_unwind_protect form
+	 below to inhibit redisplay also when restoring the selected
+	 window/frame: This avoids that resize_mini_window sizes back
+	 the minibuffer window of a temporarily selected frame.  See
+	 Bug#34317.  */
+      specbind (Qinhibit_redisplay, Qt);
+
       /* Switch to the buffer of selected window of the frame.  Set up
 	 mode_line_target so that display_mode_element will output into
 	 mode_line_noprop_buf; then display the title.  */
       record_unwind_protect (unwind_format_mode_line,
 			     format_mode_line_unwind_data
 			       (f, current_buffer, selected_window, false));
-      /* select-frame calls resize_mini_window, which could resize the
-	 mini-window and by that undo the effect of this redisplay
-	 cycle wrt minibuffer and echo-area display.  Binding
-	 inhibit-redisplay to t makes the call to resize_mini_window a
-	 no-op, thus avoiding the adverse side effects.  */
-      specbind (Qinhibit_redisplay, Qt);
 
       Fselect_window (f->selected_window, Qt);
       set_buffer_internal_1
@@ -12268,8 +12245,7 @@ update_menu_bar (struct frame *f, bool save_match_data, bool hooks_run)
 
   if (FRAME_WINDOW_P (f)
       ?
-#if defined (USE_X_TOOLKIT) || defined (HAVE_NTGUI) \
-    || defined (HAVE_NS) || defined (USE_GTK)
+#ifdef HAVE_EXT_MENU_BAR
       FRAME_EXTERNAL_MENU_BAR (f)
 #else
       FRAME_MENU_BAR_LINES (f) > 0
@@ -12322,8 +12298,7 @@ update_menu_bar (struct frame *f, bool save_match_data, bool hooks_run)
 	  fset_menu_bar_items (f, menu_bar_items (FRAME_MENU_BAR_ITEMS (f)));
 
 	  /* Redisplay the menu bar in case we changed it.  */
-#if defined (USE_X_TOOLKIT) || defined (HAVE_NTGUI) \
-    || defined (HAVE_NS) || (defined (USE_GTK) && !defined(HAVE_PGTK))
+#ifdef HAVE_EXT_MENU_BAR
 	  if (FRAME_WINDOW_P (f))
             {
 #if defined (HAVE_NS)
@@ -12337,11 +12312,11 @@ update_menu_bar (struct frame *f, bool save_match_data, bool hooks_run)
 	    /* On a terminal screen, the menu bar is an ordinary screen
 	       line, and this makes it get updated.  */
 	    w->update_mode_line = true;
-#else /* ! (USE_X_TOOLKIT || HAVE_NTGUI || HAVE_NS || USE_GTK) */
+#else /* ! (HAVE_EXT_MENU_BAR) */
 	  /* In the non-toolkit version, the menu bar is an ordinary screen
 	     line, and this makes it get updated.  */
 	  w->update_mode_line = true;
-#endif /* ! (USE_X_TOOLKIT || HAVE_NTGUI || HAVE_NS || USE_GTK) */
+#endif /* HAVE_EXT_MENU_BAR */
 
 	  unbind_to (count, Qnil);
 	  set_buffer_internal_1 (prev);
@@ -12379,7 +12354,7 @@ fast_set_selected_frame (Lisp_Object frame)
 static void
 update_tool_bar (struct frame *f, bool save_match_data)
 {
-#if defined (USE_GTK) || defined (HAVE_NS)
+#ifdef HAVE_EXT_TOOL_BAR
   bool do_update = FRAME_EXTERNAL_TOOL_BAR (f);
 #else
   bool do_update = (WINDOWP (f->tool_bar_window)
@@ -12464,7 +12439,7 @@ update_tool_bar (struct frame *f, bool save_match_data)
     }
 }
 
-#if ! defined (USE_GTK) && ! defined (HAVE_NS)
+#ifndef HAVE_EXT_TOOL_BAR
 
 /* Set F->desired_tool_bar_string to a Lisp string representing frame
    F's desired tool-bar contents.  F->tool_bar_items must have
@@ -12799,7 +12774,7 @@ tool_bar_height (struct frame *f, int *n_rows, bool pixelwise)
     return (it.current_y + FRAME_LINE_HEIGHT (f) - 1) / FRAME_LINE_HEIGHT (f);
 }
 
-#endif /* !USE_GTK && !HAVE_NS */
+#endif /* ! (HAVE_EXT_TOOL_BAR) */
 
 DEFUN ("tool-bar-height", Ftool_bar_height, Stool_bar_height,
        0, 2, 0,
@@ -12810,7 +12785,7 @@ PIXELWISE non-nil means return the height of the tool bar in pixels.  */)
 {
   int height = 0;
 
-#if ! defined (USE_GTK) && ! defined (HAVE_NS)
+#ifndef HAVE_EXT_TOOL_BAR
   struct frame *f = decode_any_frame (frame);
 
   if (WINDOWP (f->tool_bar_window)
@@ -12835,7 +12810,7 @@ static bool
 redisplay_tool_bar (struct frame *f)
 {
   f->tool_bar_redisplayed = true;
-#if defined (USE_GTK) || defined (HAVE_NS)
+#ifdef HAVE_EXT_TOOL_BAR
 
 #if 0
   if (FRAME_EXTERNAL_TOOL_BAR (f))
@@ -12843,7 +12818,7 @@ redisplay_tool_bar (struct frame *f)
 #endif
   return false;
 
-#else /* !USE_GTK && !HAVE_NS */
+#else /* ! (HAVE_EXT_TOOL_BAR) */
 
   struct window *w;
   struct it it;
@@ -12992,10 +12967,10 @@ redisplay_tool_bar (struct frame *f)
   f->minimize_tool_bar_window_p = false;
   return false;
 
-#endif /* USE_GTK || HAVE_NS */
+#endif /* HAVE_EXT_TOOL_BAR */
 }
 
-#if ! defined (USE_GTK) && ! defined (HAVE_NS)
+#ifndef HAVE_EXT_TOOL_BAR
 
 /* Get information about the tool-bar item which is displayed in GLYPH
    on frame F.  Return in *PROP_IDX the index where tool-bar item
@@ -13233,7 +13208,7 @@ note_tool_bar_highlight (struct frame *f, int x, int y)
     help_echo_string = AREF (f->tool_bar_items, prop_idx + TOOL_BAR_ITEM_CAPTION);
 }
 
-#endif /* !USE_GTK && !HAVE_NS */
+#endif /* ! (HAVE_EXT_TOOL_BAR) */
 
 #endif /* HAVE_WINDOW_SYSTEM */
 
@@ -17695,8 +17670,7 @@ redisplay_window (Lisp_Object window, bool just_this_one_p)
 
       if (FRAME_WINDOW_P (f))
 	{
-#if defined (USE_X_TOOLKIT) || defined (HAVE_NTGUI) \
-    || defined (HAVE_NS) || defined (USE_GTK)
+#ifdef HAVE_EXT_MENU_BAR
 	  redisplay_menu_p = FRAME_EXTERNAL_MENU_BAR (f);
 #else
 	  redisplay_menu_p = FRAME_MENU_BAR_LINES (f) > 0;
@@ -17711,7 +17685,7 @@ redisplay_window (Lisp_Object window, bool just_this_one_p)
 #ifdef HAVE_WINDOW_SYSTEM
       if (FRAME_WINDOW_P (f))
         {
-#if defined (USE_GTK) || defined (HAVE_NS)
+#ifdef HAVE_EXT_TOOL_BAR
 	  if (FRAME_EXTERNAL_TOOL_BAR (f))
 	    redisplay_tool_bar (f);
 #else
@@ -19746,7 +19720,7 @@ If there's no tool-bar, or if the tool-bar is not drawn by Emacs,
 do nothing.  */)
   (Lisp_Object row, Lisp_Object glyphs)
 {
-#if defined (HAVE_WINDOW_SYSTEM) && ! defined (USE_GTK) && ! defined (HAVE_NS)
+#if defined (HAVE_WINDOW_SYSTEM) && ! defined (HAVE_EXT_TOOL_BAR)
   struct frame *sf = SELECTED_FRAME ();
   struct glyph_matrix *m = XWINDOW (sf->tool_bar_window)->current_matrix;
   EMACS_INT vpos;
@@ -20372,7 +20346,7 @@ extend_face_to_end_of_line (struct it *it)
       /* Mode line and the header line don't have margins, and
 	 likewise the frame's tool-bar window, if there is any.  */
       if (!(it->glyph_row->mode_line_p
-#if defined (HAVE_WINDOW_SYSTEM) && ! defined (USE_GTK) && ! defined (HAVE_NS)
+#if defined (HAVE_WINDOW_SYSTEM) && ! defined (HAVE_EXT_TOOL_BAR)
 	    || (WINDOWP (f->tool_bar_window)
 		&& it->w == XWINDOW (f->tool_bar_window))
 #endif
@@ -20615,7 +20589,7 @@ highlight_trailing_whitespace (struct it *it)
       else
 	{
 	  while (glyph <= start
-		 && glyph->type == CHAR_GLYPH
+		 && (glyph->type == CHAR_GLYPH || glyph->type == STRETCH_GLYPH)
 		 && NILP (glyph->object))
 	    ++glyph;
 	}
@@ -24312,7 +24286,7 @@ are the selected window and the WINDOW's buffer).  */)
   return unbind_to (count, str);
 }
 
-/* Write a null-terminated, right justified decimal representation of
+/* Write a NUL-terminated, right justified decimal representation of
    the positive integer D to BUF using a minimal field width WIDTH.  */
 
 static void
@@ -24342,7 +24316,7 @@ pint2str (register char *buf, register int width, register ptrdiff_t d)
     }
 }
 
-/* Write a null-terminated, right justified decimal and "human
+/* Write a NUL-terminated, right justified decimal and "human
    readable" representation of the nonnegative integer D to BUF using
    a minimal field width WIDTH.  D should be smaller than 999.5e24. */
 
@@ -24562,7 +24536,7 @@ decode_mode_spec (struct window *w, register int c, int field_width,
      produce strings from numerical values, so limit preposterously
      large values of FIELD_WIDTH to avoid overrunning the buffer's
      end.  The size of the buffer is enough for FRAME_MESSAGE_BUF_SIZE
-     bytes plus the terminating null.  */
+     bytes plus the terminating NUL.  */
   int width = min (field_width, FRAME_MESSAGE_BUF_SIZE (f));
   struct buffer *b = current_buffer;
 
@@ -30067,7 +30041,7 @@ show_mouse_face (Mouse_HLInfo *hlinfo, enum draw_glyphs_face draw)
   /* Change the mouse cursor.  */
   if (FRAME_WINDOW_P (f) && NILP (do_mouse_tracking))
     {
-#if ! defined (USE_GTK) && ! defined (HAVE_NS)
+#ifndef HAVE_EXT_TOOL_BAR
       if (draw == DRAW_NORMAL_TEXT
 	  && !EQ (hlinfo->mouse_face_window, f->tool_bar_window))
 	FRAME_RIF (f)->define_frame_cursor (f, FRAME_X_OUTPUT (f)->text_cursor);
@@ -31469,7 +31443,7 @@ note_mouse_highlight (struct frame *f, int x, int y)
   w = XWINDOW (window);
   frame_to_window_pixel_xy (w, &x, &y);
 
-#if defined (HAVE_WINDOW_SYSTEM) && ! defined (USE_GTK) && ! defined (HAVE_NS)
+#if defined (HAVE_WINDOW_SYSTEM) && ! defined (HAVE_EXT_TOOL_BAR)
   /* Handle tool-bar window differently since it doesn't display a
      buffer.  */
   if (EQ (window, f->tool_bar_window))
@@ -32494,7 +32468,7 @@ expose_frame (struct frame *f, int x, int y, int w, int h)
   TRACE ((stderr, "(%d, %d, %d, %d)\n", r.x, r.y, r.width, r.height));
   mouse_face_overwritten_p = expose_window_tree (XWINDOW (f->root_window), &r);
 
-#if ! defined (USE_GTK) && ! defined (HAVE_NS)
+#ifndef HAVE_EXT_TOOL_BAR
   if (WINDOWP (f->tool_bar_window))
     mouse_face_overwritten_p
       |= expose_window (XWINDOW (f->tool_bar_window), &r);
@@ -32956,14 +32930,12 @@ and is used only on frames for which no explicit name has been set
 \(see `modify-frame-parameters').  */);
   Vicon_title_format
     = Vframe_title_format
-    = listn (CONSTYPE_PURE, 3,
-	     intern_c_string ("multiple-frames"),
-	     build_pure_c_string ("%b"),
-	     listn (CONSTYPE_PURE, 4,
-		    empty_unibyte_string,
-		    intern_c_string ("invocation-name"),
-		    build_pure_c_string ("@"),
-		    intern_c_string ("system-name")));
+    = pure_list (intern_c_string ("multiple-frames"),
+		 build_pure_c_string ("%b"),
+		 pure_list (empty_unibyte_string,
+			    intern_c_string ("invocation-name"),
+			    build_pure_c_string ("@"),
+			    intern_c_string ("system-name")));
 
   DEFVAR_LISP ("message-log-max", Vmessage_log_max,
     doc: /* Maximum number of lines to keep in the message log buffer.
@@ -33110,7 +33082,11 @@ A value of nil means don't automatically resize mini-windows.
 A value of t means resize them to fit the text displayed in them.
 A value of `grow-only', the default, means let mini-windows grow only;
 they return to their normal size when the minibuffer is closed, or the
-echo area becomes empty.  */);
+echo area becomes empty.
+
+This variable does not affect resizing of the minibuffer window of
+minibuffer-only frames.  These are handled by 'resize-mini-frames'
+only.  */);
   /* Contrary to the doc string, we initialize this to nil, so that
      loading loadup.el won't try to resize windows before loading
      window.el, where some functions we need to call for this live.

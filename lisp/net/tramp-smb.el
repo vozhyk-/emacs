@@ -41,10 +41,6 @@
   (tramp--with-startup
    (add-to-list 'tramp-methods
                 `(,tramp-smb-method
-                  ;; We define an empty command, because
-                  ;; `tramp-smb-call-winexe' opens already the powershell.
-                  ;; Used in `tramp-handle-shell-command'.
-                  (tramp-remote-shell "")
                   ;; This is just a guess.  We don't know whether the share "C$"
                   ;; is available for public use, and whether the user has write
                   ;; access.
@@ -692,6 +688,8 @@ PRESERVE-UID-GID and PRESERVE-EXTENDED-ATTRIBUTES are completely ignored."
   "Like `expand-file-name' for Tramp files."
   ;; If DIR is not given, use DEFAULT-DIRECTORY or "/".
   (setq dir (or dir default-directory "/"))
+  ;; Handle empty NAME.
+  (when (zerop (length name)) (setq name "."))
   ;; Unless NAME is absolute, concat DIR and NAME.
   (unless (file-name-absolute-p name)
     (setq name (concat (file-name-as-directory dir) name)))

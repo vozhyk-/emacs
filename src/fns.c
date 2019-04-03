@@ -413,7 +413,7 @@ Symbols are also allowed; their print names are used instead.  */)
 
   while ((cmp = filevercmp (p1, p2)) == 0)
     {
-      /* If the strings are identical through their first null bytes,
+      /* If the strings are identical through their first NUL bytes,
 	 skip past identical prefixes and try again.  */
       ptrdiff_t size = strlen (p1) + 1;
       p1 += size;
@@ -4915,13 +4915,7 @@ DEFUN ("secure-hash-algorithms", Fsecure_hash_algorithms,
        doc: /* Return a list of all the supported `secure_hash' algorithms. */)
   (void)
 {
-  return listn (CONSTYPE_HEAP, 6,
-                Qmd5,
-                Qsha1,
-                Qsha224,
-                Qsha256,
-                Qsha384,
-                Qsha512);
+  return list (Qmd5, Qsha1, Qsha224, Qsha256, Qsha384, Qsha512);
 }
 
 /* Extract data from a string or a buffer. SPEC is a list of

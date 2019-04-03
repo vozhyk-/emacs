@@ -642,14 +642,14 @@ Do the right thing if the file has been compressed or zipped."
 	  (insert-file-contents-literally fullname visit)
 	  (let ((inhibit-read-only t)
 		(coding-system-for-write 'no-conversion)
-		(inhibit-null-byte-detection t) ; Index nodes include null bytes
+		(inhibit-nul-byte-detection t) ; Index nodes include null bytes
 		(default-directory (or (file-name-directory fullname)
 				       default-directory)))
 	    (or (consp decoder)
 		(setq decoder (list decoder)))
 	    (apply #'call-process-region (point-min) (point-max)
 		   (car decoder) t t nil (cdr decoder))))
-      (let ((inhibit-null-byte-detection t)) ; Index nodes include null bytes
+      (let ((inhibit-nul-byte-detection t)) ; Index nodes include null bytes
 	(insert-file-contents fullname visit)))
 
     ;; Clear the caches of modified Info files.
@@ -1377,7 +1377,7 @@ is non-nil)."
 			  ;; Index nodes include null bytes.  DIR
 			  ;; files should not have indices, but who
 			  ;; knows...
-			  (let ((inhibit-null-byte-detection t))
+			  (let ((inhibit-nul-byte-detection t))
 			    (insert-file-contents file)
 			    (setq Info-dir-file-name file)
 			    (push (current-buffer) buffers)
@@ -1531,7 +1531,7 @@ is non-nil)."
 	    (save-restriction
 	      (narrow-to-region start (point))
 	      (goto-char (point-min))
-	      (while (re-search-forward "^* \\([^:\n]+:\\(:\\|[^.\n]+\\).\\)" nil 'move)
+	      (while (re-search-forward "^\\* \\([^:\n]+:\\(:\\|[^.\n]+\\).\\)" nil 'move)
 		;; Fold case straight away; `member-ignore-case' here wasteful.
 		(let ((x (downcase (match-string 1))))
 		  (if (member x seen)
@@ -1602,7 +1602,7 @@ is non-nil)."
   "Unescape double quotes and backslashes in VALUE."
   (let ((start 0)
 	(unquote value))
-    (while (string-match "[^\\\"]*\\(\\\\\\)[\\\\\"]" unquote start)
+    (while (string-match "[^\\\"]*\\(\\\\\\)[\\\"]" unquote start)
       (setq unquote (replace-match "" t t unquote 1))
       (setq start (- (match-end 0) 1)))
     unquote))
@@ -1619,7 +1619,7 @@ escaped (\\\",\\\\)."
   (let ((start 0)
 	(parameter-alist))
     (while (string-match
-	    "\\s *\\([^=]+\\)=\\(?:\\([^\\s \"]+\\)\\|\\(?:\"\\(\\(?:[^\\\"]\\|\\\\[\\\\\"]\\)*\\)\"\\)\\)"
+	    "\\s *\\([^=]+\\)=\\(?:\\([^\\s \"]+\\)\\|\\(?:\"\\(\\(?:[^\\\"]\\|\\\\[\\\"]\\)*\\)\"\\)\\)"
 	    parameter-string start)
       (setq start (match-end 0))
       (push (cons (match-string 1 parameter-string)
@@ -5204,7 +5204,7 @@ The INDENT level is ignored."
 TEXT is the text of the button we clicked on, a + or - item.
 TOKEN is data related to this node (NAME . FILE).
 INDENT is the current indentation depth."
-  (cond ((string-match "+" text)	;we have to expand this file
+  (cond ((string-match "\\+" text)	;we have to expand this file
 	 (speedbar-change-expand-button-char ?-)
 	 (if (speedbar-with-writable
 	      (save-excursion

@@ -37,6 +37,12 @@ functions 'json-serialize', 'json-insert', 'json-parse-string', and
 'json-parse-buffer' are typically much faster than their Lisp
 counterparts from json.el.
 
+** Several configure options now accept an option-argument 'ifavailable'.
+For example, './configure --with-xpm=ifavailable' now configures Emacs
+to attempt to use libxpm but to continue building even if libxpm is absent.
+The other affected options are --with-gif, --with-gnutls, --with-jpeg,
+--with-png, and --with-tiff.
+
 ** The etags program now uses the C library's regular expression matcher
 when possible, and a compatible regex substitute otherwise.  This will
 let developers maintain Emacs's own regex code without having to also
@@ -236,6 +242,13 @@ regular expression was previously invalid, but is now accepted:
 ---
 ** New input methods 'hawaiian-postfix' and 'hawaiian-prefix'.
 
+---
+** New input methods for several variants of the Sami language.
+The Sami input methods include: 'norwegian-sami-prefix',
+'bergsland-hasselbrink-sami-prefix', 'southern-sami-prefix',
+'ume-sami-prefix', 'northern-sami-prefix', 'inari-sami-prefix',
+'skolt-sami-prefix', and 'kildin-sami-prefix'.
+
 +++
 ** In Japanese environments that do not specify encodings and are not
 based on MS-Windows, the default encoding is now utf-8 instead of
@@ -278,6 +291,17 @@ An implementation of popular "flx/fuzzy/scatter" completion which
 matches strings where the pattern appears as a subsequence.  Put
 simply, makes "foo" complete to both "barfoo" and "frodo".  Add 'flex'
 to 'completion-styles' or 'completion-category-overrides' to use it.
+
+** Connection-local variables
+
++++
+*** Connection-local variables are applied by default like file-local
+and directory-local variables.
+
++++
+*** The macro 'with-connection-local-variables' has been renamed from
+'with-connection-local-profiles'.  No argument 'profiles' needed any
+longer.
 
 
 * Editing Changes in Emacs 27.1
@@ -352,8 +376,18 @@ region using a given replacement-function in a non-destructive manner
 arguments mitigating performance issues when operating on huge
 buffers.
 
+** The command 'delete-indentation' now operates on the active region.
+If the region is active, the command joins all the lines in the
+region.  When there's no active region, the command works on the
+current and the previous or the next line, as before.
+
++++
 
 * Changes in Specialized Modes and Packages in Emacs 27.1
+
+** cl-lib
++++
+*** cl-defstruct has a new :noinline argument to prevent inlining its functions
 
 ** doc-view-mode
 *** New commands doc-view-presentation and doc-view-fit-window-to-page
@@ -371,6 +405,9 @@ buffers.
 ** seq.el
 New convenience functions 'seq-first' and 'seq-rest' give easy access
 to respectively the first and all but the first elements of sequences.
+
+The new predicate function 'seq-contains-p' should be used instead of
+the now obsolete 'seq-contains'.
 
 ---
 ** Follow mode
@@ -478,9 +515,20 @@ and compares their entire trees.
 *** New user option 'vc-hg-revert-switches' specifies switches to pass
 to hg revert.
 
+*** 'C-x v M D' ('vc-diff-mergebase') and 'C-x v M L' ('vc-log-mergebase')
+print diffs and logs between the merge base (common ancestor) of two
+given revisions.
+
 ** Diff mode
-*** Hunks are now automatically refined by default.
-To disable it, set the new defcustom 'diff-font-lock-refine' to nil.
++++
+*** Hunks are now automatically refined by font-lock.
+To disable refinement, set the new defcustom 'diff-refine' to nil.
+To get back the old behavior where hunks are refined as you navigate
+through a diff, set 'diff-refine' to the symbol 'navigate'.
++++
+*** 'diff-auto-refine-mode' is deprecated in favor of 'diff-refine'.
+It is no longer enabled by default and binding it no longer has any
+effect.
 
 +++
 *** Better syntax highlighting of Diff hunks.
@@ -636,6 +684,10 @@ mouse click event, and is intended to be bound to a mouse event.
 *** Changing 'xref-marker-ring-length' works after 'xref.el' is loaded.
 Previously, setting 'xref-marker-ring-length' would only take effect
 if set before 'xref.el' was loaded.
+
+---
+*** xref-find-definitions now sets the mark at the buffer position
+where it was invoked
 
 ** Ecomplete
 
@@ -898,7 +950,7 @@ been instrumented by Edebug.
 the XTerm window title.  This feature is experimental and is disabled
 by default.
 
-** grep
+** Grep
 
 +++
 *** rgrep, lgrep and zrgrep now hide part of the command line
@@ -960,6 +1012,11 @@ default, and not just the opening element.
 
 ** Eshell
 
+*** TAB completion uses the standard completion-at-point rather than pcomplete
+Its UI is slightly different but can be customized to behave similarly,
+e.g. Pcomplete's default cycling can be obtained with
+(setq completion-cycle-threshold 5).
+
 ---
 *** Expansion of history event designators is disabled by default.
 To restore the old behavior, use
@@ -987,7 +1044,12 @@ followed when Emacs writes the relevant history variables to the disk.
 ---
 *** Program name completion inside remote shells works now as expected.
 
++++
+*** The variable 'shell-file-name' can be set now as connection-local
+variable for remote shells.  It still defaults to "/bin/sh".
+
 ** Pcomplete
+
 *** The function 'pcomplete-uniquify-list' has been renamed from
 'pcomplete-uniqify-list'.
 
@@ -1159,6 +1221,27 @@ the 128...255 range, as expected.
 +++
 *** New command 'make-frame-on-monitor' makes a frame on the specified monitor.
 
++++
+*** New value of 'minibuffer' frame parameter 'child-frame'.
+This allows to create and parent immediately a minibuffer-only child
+frame when making a frame.
+
+** Tabulated List mode
+
++++
+*** New user options for tabulated list sort indicators.
+You can now customize which sorting indicator character to display
+near the current column in Tabulated Lists (see variables
+'tabulated-list-gui-sort-indicator-asc',
+'tabulated-list-gui-sort-indicator-desc',
+'tabulated-list-tty-sort-indicator-asc', and
+'tabulated-list-tty-sort-indicator-desc').
+
+** Text mode
+
++++
+*** 'text-mode-variant' is now obsolete, use 'derived-mode-p' instead.
+
 
 * New Modes and Packages in Emacs 27.1
 
@@ -1290,8 +1373,32 @@ they are now allocated like any other pseudovector.  As a result, the
 'misc' component, and the 'misc-objects-consed' variable has been
 removed.
 
++++
+** Reversed character ranges are no longer permitted in rx.
+Previously, ranges where the starting character is greater than the
+ending character were silently omitted.
+For example, '(rx (any "@z-a" (?9 . ?0)))' would match '@' only.
+Now, such rx expressions generate an error.
+
++++
+** 'text-mode' no longer sets the value of 'indent-line-function'.
+The global value of 'indent-line-function', which defaults to
+'indent-relative', will no longer be reset locally when turning on
+'text-mode'.
+
+To get back the old behavior, add a function to 'text-mode-hook' which
+performs (setq-local indent-line-function #'indent-relative).
+
 
 * Lisp Changes in Emacs 27.1
+
+** i18n (internationalization)
+
+*** ngettext can be used now to return the right plural form
+according to the given numeric value.
+
++++
+** inhibit-null-byte-detection is renamed to inhibit-nul-byte-detection
 
 +++
 ** 'self-insert-command' takes the char to insert as (optional) argument.
@@ -1412,18 +1519,20 @@ displaying the same buffer.  See the node "(elisp) Face Remapping"
 of the Emacs Lisp Reference manual for more detail.
 
 +++
-** Window change functions have been redesigned completely.
+** Window change functions have been redesigned.
 
 Hooks reacting to window changes run now only when redisplay detects
-that a change has actually occurred.  The five hooks provided are:
+that a change has actually occurred.  Six hooks are now provided:
 'window-buffer-change-functions' (run after window buffers have
 changed), 'window-size-change-functions' (run after a window was
 assigned a new buffer or size), 'window-configuration-change-hook'
 (like the former but run also when a window was deleted),
 'window-selection-change-functions' (run when the selected window
-changed) and 'window-state-change-functions' (run when any of the
-preceding ones is run).  'window-scroll-functions' are unaffected by
-these changes.
+changed) and 'window-state-change-functions' and
+'window-state-change-hook' (run when any of the preceding ones is
+run).  Applications can enforce running the latter two using the new
+function 'set-frame-window-state-change'.  'window-scroll-functions'
+are unaffected by these changes.
 
 In addition, a number of functions now allow the caller to detect what
 has changed since last redisplay: 'window-old-buffer' returns for any
@@ -1435,10 +1544,13 @@ during last redisplay.  'window-old-pixel-width' (renamed from
 'window-old-body-pixel-width' and 'window-old-body-pixel-height'
 return the total and body sizes of any window during last redisplay.
 
-One consequence of these changes is that all window change functions
-run now after functions run by 'post-command-hook'.  See the section
-"(elisp) Window Hooks" in the Elisp manual for a detailed explanation
-of the new behavior.
+See the section "(elisp) Window Hooks" in the Elisp manual for a
+detailed explanation of the new behavior.
+
++++
+*** New option 'resize-mini-frames'.
+This option allows to automatically resize minibuffer-only frames
+similarly to how minibuffer windows are resized on "normal" frames.
 
 +++
 ** New buffer display action alist entry 'dedicated'.
@@ -1462,10 +1574,10 @@ between two strings.
 '(quote x)' instead of 'x you will have to bind it to nil where applicable.
 
 +++
-** Numbers formatted via '%o' or '%x' may now be formatted as signed integers.
+** Numbers formatted via '%o' or '%x' are now formatted as signed integers.
 This avoids problems in calls like '(read (format "#x%x" -1))', and is
-more compatible with bignums, a planned feature.  To get this
-behavior, set the experimental variable 'binary-as-unsigned' to nil,
+more compatible with bignums.  To get the traditional machine-dependent
+behavior, set the experimental variable 'binary-as-unsigned' to t,
 and if the new behavior breaks your code please email
 32252@debbugs.gnu.org.  Because '%o' and '%x' can now format signed
 integers, they now support the '+' and space flags.
@@ -1560,6 +1672,12 @@ are implemented in C using the Jansson library.
 and 'flatten' it such that the result is a list of all the terminal
 nodes.
 
++++
+** 'zlib-decompress-region' can partially decompress corrupted data.
+If the new optional ALLOW-PARTIAL argument is passed, then the data
+that was decompressed successfully before failing will be inserted
+into the buffer.
+
 ** Mailcap
 
 ---
@@ -1624,9 +1742,9 @@ the process.  That way 'make-process' can start remote processes.
 +++
 ** Emacs now supports resizing (scaling) of images without ImageMagick.
 All modern systems are supported by this feature.  (On GNU and Unix
-systems, the XRender extension to X11 is required for this to be
-available; the configure script will test for it and, if found, enable
-scaling.)
+systems, Cairo drawing or the XRender extension to X11 is required for
+this to be available; the configure script will test for it and, if
+found, enable scaling.)
 
 The new function 'image-scaling-p' can be used to test whether any
 given frame supports resizing.
@@ -1684,6 +1802,14 @@ as Emacs subprocesses, which by now is not supported on modern
 versions of MS-Windows.  Set this variable to 50 if for some reason
 you need the old behavior (and please report such situations to Emacs
 developers).
+
+---
+** New variable 'w32-multibyte-code-page'.
+This variable holds the value of the multibyte code page used by the
+system.  It is usually zero, which indicates that 'w32-ansi-code-page'
+is being used, except in Far Eastern locales.  When this variable is
+non-zero, Emacs at startup sets 'locale-coding-system' to the
+corresponding encoding, instead of using 'w32-ansi-code-page'.
 
 +++
 ** On NS the behaviour of drag and drop can now be modified by use of

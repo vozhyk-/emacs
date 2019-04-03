@@ -61,7 +61,7 @@ If a list, it is a list of the types of messages to be logged."
 
 ;;;###autoload
 (defun url-debug (tag &rest args)
-  (if quit-flag
+  (if (eq quit-flag t)
       (error "Interrupted!"))
   (if (or (eq url-debug t)
 	  (numberp url-debug)
@@ -503,7 +503,7 @@ WIDTH defaults to the current frame width."
 	 (urlobj nil))
     ;; The first thing that can go are the search strings
     (if (and (>= str-width fr-width)
-	     (string-match "?" url))
+	     (string-match "\\?" url))
 	(setq url (concat (substring url 0 (match-beginning 0)) "?...")
 	      str-width (length url)))
     (if (< str-width fr-width)

@@ -1007,7 +1007,7 @@ font_expand_wildcards (Lisp_Object *field, int n)
 }
 
 
-/* Parse NAME (null terminated) as XLFD and store information in FONT
+/* Parse NAME (NUL terminated) as XLFD and store information in FONT
    (font-spec or font-entity).  Size property of FONT is set as
    follows:
 	specified XLFD fields		FONT property
@@ -1353,7 +1353,7 @@ font_unparse_xlfd (Lisp_Object font, int pixel_size, char *name, int nbytes)
   return len < nbytes ? len : -1;
 }
 
-/* Parse NAME (null terminated) and store information in FONT
+/* Parse NAME (NUL terminated) and store information in FONT
    (font-spec or font-entity).  NAME is supplied in either the
    Fontconfig or GTK font name format.  If NAME is successfully
    parsed, return 0.  Otherwise return -1.
@@ -1725,7 +1725,7 @@ font_unparse_fcname (Lisp_Object font, int pixel_size, char *name, int nbytes)
 
 #endif
 
-/* Parse NAME (null terminated) and store information in FONT
+/* Parse NAME (NUL terminated) and store information in FONT
    (font-spec or font-entity).  If NAME is successfully parsed, return
    0.  Otherwise return -1.  */
 
@@ -2781,7 +2781,7 @@ font_list_entities (struct frame *f, Lisp_Object spec)
 	  {
 	    Lisp_Object copy;
 
-	    val = driver_list->driver->list (f, scratch_font_spec);
+	    val = (driver_list->driver->list) (f, scratch_font_spec);
 	    /* We put zero_vector in the font-cache to indicate that
 	       no fonts matching SPEC were found on the system.
 	       Failure to have this indication in the font cache can

@@ -1639,7 +1639,7 @@ file_name_absolute_p (const char *filename)
 }
 
 /* Put into BUF the concatenation of DIR and FILE, with an intervening
-   directory separator if needed.  Return a pointer to the null byte
+   directory separator if needed.  Return a pointer to the NUL byte
    at the end of the concatenated string.  */
 char *
 splice_dir_file (char *buf, char const *dir, char const *file)
@@ -4854,7 +4854,7 @@ choose_write_coding_system (Lisp_Object start, Lisp_Object end, Lisp_Object file
   val = coding_inherit_eol_type (val, eol_parent);
   setup_coding_system (val, coding);
 
-  if (!STRINGP (start) && !NILP (BVAR (current_buffer, selective_display)))
+  if (!STRINGP (start) && EQ (Qt, BVAR (current_buffer, selective_display)))
     coding->mode |= CODING_MODE_SELECTIVE_DISPLAY;
   return val;
 }

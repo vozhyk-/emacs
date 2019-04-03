@@ -181,7 +181,7 @@ struct frame
   Lisp_Object menu_bar_window;
 #endif
 
-#if defined (HAVE_WINDOW_SYSTEM) && ! defined (USE_GTK) && ! defined (HAVE_NS)
+#if defined (HAVE_WINDOW_SYSTEM) && ! defined (HAVE_EXT_TOOL_BAR)
   /* A window used to display the tool-bar of a frame.  */
   Lisp_Object tool_bar_window;
 
@@ -209,7 +209,7 @@ struct frame
   /* Cache of realized faces.  */
   struct face_cache *face_cache;
 
-#if defined (HAVE_WINDOW_SYSTEM) && ! defined (USE_GTK) && ! defined (HAVE_NS)
+#if defined (HAVE_WINDOW_SYSTEM) && ! defined (HAVE_EXT_TOOL_BAR)
   /* Tool-bar item index of the item on which a mouse button was pressed.  */
   int last_tool_bar_item;
 #endif
@@ -257,13 +257,13 @@ struct frame
   /* Set to true when current redisplay has updated frame.  */
   bool_bf updated_p : 1;
 
-#if defined (HAVE_WINDOW_SYSTEM) && ! defined (USE_GTK) && ! defined (HAVE_NS)
+#if defined (HAVE_WINDOW_SYSTEM) && ! defined (HAVE_EXT_TOOL_BAR)
   /* Set to true to minimize tool-bar height even when
      auto-resize-tool-bar is set to grow-only.  */
   bool_bf minimize_tool_bar_window_p : 1;
 #endif
 
-#if defined (USE_GTK) || defined (HAVE_NS)
+#ifdef HAVE_EXT_TOOL_BAR
   /* True means using a tool bar that comes from the toolkit.  */
   bool_bf external_tool_bar : 1;
 #endif
@@ -278,9 +278,8 @@ struct frame
   /* True if it needs to be redisplayed.  */
   bool_bf redisplay : 1;
 
-#if defined (USE_X_TOOLKIT) || defined (HAVE_NTGUI)	\
-    || defined (HAVE_NS) || defined (USE_GTK)
-  /* True means using a menu bar that comes from the X toolkit.  */
+#ifdef HAVE_EXT_MENU_BAR
+  /* True means using a menu bar that comes from the toolkit.  */
   bool_bf external_menu_bar : 1;
 #endif
 
@@ -333,6 +332,10 @@ struct frame
      either this flag is true or a window selection happened on this
      frame.  */
   bool_bf window_change : 1;
+
+  /* True if running window state change functions has been explicitly
+     requested for this frame since last redisplay.  */
+  bool_bf window_state_change : 1;
 
   /* True if the mouse has moved on this display device
      since the last time we checked.  */
@@ -711,7 +714,7 @@ fset_tool_bar_position (struct frame *f, Lisp_Object val)
   f->tool_bar_position = val;
 }
 #endif /* USE_GTK */
-#if defined (HAVE_WINDOW_SYSTEM) && ! defined (USE_GTK) && ! defined (HAVE_NS)
+#if defined (HAVE_WINDOW_SYSTEM) && ! defined (HAVE_EXT_TOOL_BAR)
 INLINE void
 fset_tool_bar_window (struct frame *f, Lisp_Object val)
 {
@@ -887,7 +890,7 @@ default_pixels_per_inch_y (void)
 
 /* True if this frame should display a tool bar
    in a way that does not use any text lines.  */
-#if defined (USE_GTK) || defined (HAVE_NS)
+#ifdef HAVE_EXT_TOOL_BAR
 #define FRAME_EXTERNAL_TOOL_BAR(f) (f)->external_tool_bar
 #else
 #define FRAME_EXTERNAL_TOOL_BAR(f) false
@@ -916,8 +919,7 @@ default_pixels_per_inch_y (void)
 
 /* True if this frame should display a menu bar
    in a way that does not use any text lines.  */
-#if defined (USE_X_TOOLKIT) || defined (HAVE_NTGUI) \
-     || defined (HAVE_NS) || defined (USE_GTK)
+#ifdef HAVE_EXT_MENU_BAR
 #define FRAME_EXTERNAL_MENU_BAR(f) (f)->external_menu_bar
 #else
 #define FRAME_EXTERNAL_MENU_BAR(f) false
@@ -952,6 +954,10 @@ default_pixels_per_inch_y (void)
 /* True if at least one window changed on frame F since the last time
    window change functions were run on F.  */
 #define FRAME_WINDOW_CHANGE(f) (f)->window_change
+
+/* True if running window state change functions has been explicitly
+   requested for this frame since last redisplay.  */
+#define FRAME_WINDOW_STATE_CHANGE(f) (f)->window_state_change
 
 /* The minibuffer window of frame F, if it has one; otherwise nil.  */
 #define FRAME_MINIBUF_WINDOW(f) f->minibuffer_window
@@ -1259,7 +1265,7 @@ SET_FRAME_VISIBLE (struct frame *f, int v)
 extern Lisp_Object selected_frame;
 extern Lisp_Object old_selected_frame;
 
-#if ! (defined USE_GTK || defined HAVE_NS)
+#ifndef HAVE_EXT_TOOL_BAR
 extern int frame_default_tool_bar_height;
 #endif
 

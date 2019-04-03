@@ -910,7 +910,7 @@ essential information. Note that this can never set the `ignored'
 state."
   (let (file status missing)
     (goto-char (point-min))
-    (while (looking-at "? \\(.*\\)")
+    (while (looking-at "\\? \\(.*\\)")
       (setq file (expand-file-name (match-string 1)))
       (vc-file-setprop file 'vc-state 'unregistered)
       (forward-line 1))
@@ -1087,7 +1087,7 @@ CVS/Entries should only be accessed through this function."
   ;; an uppercase or lowercase letter and can contain uppercase and
   ;; lowercase letters, digits, `-', and `_'.
   (and (string-match "^[a-zA-Z]" tag)
-       (not (string-match "[^a-z0-9A-Z-_]" tag))))
+       (not (string-match "[^a-z0-9A-Z_-]" tag))))
 
 (defun vc-cvs-valid-revision-number-p (tag)
   "Return non-nil if TAG is a valid revision number."

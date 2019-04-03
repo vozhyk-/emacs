@@ -800,29 +800,32 @@ x_after_update_window_line (struct window *w, struct glyph_row *desired_row)
 	  height > 0))
     {
       int y = WINDOW_TO_FRAME_PIXEL_Y (w, max (0, desired_row->y));
+      int face_id =
+	!NILP (Vface_remapping_alist)
+	? lookup_basic_face (NULL, f, INTERNAL_BORDER_FACE_ID)
+	: INTERNAL_BORDER_FACE_ID;
+      struct face *face = FACE_FROM_ID_OR_NULL (f, face_id);
 
       block_input ();
-      {
-	HDC hdc = get_frame_dc (f);
-	struct face *face = FACE_FROM_ID_OR_NULL (f, INTERNAL_BORDER_FACE_ID);
 
-	if (face)
-	  {
-	    /* Fill border with internal border face.  */
-	    unsigned long color = face->background;
+      HDC hdc = get_frame_dc (f);
+      if (face)
+	{
+	  /* Fill border with internal border face.  */
+	  unsigned long color = face->background;
 
-	    w32_fill_area (f, hdc, color, 0, y, width, height);
-	    w32_fill_area (f, hdc, color, FRAME_PIXEL_WIDTH (f) - width,
-			   y, width, height);
-	  }
-	else
-	  {
-	    w32_clear_area (f, hdc, 0, y, width, height);
-	    w32_clear_area (f, hdc, FRAME_PIXEL_WIDTH (f) - width,
-			    y, width, height);
-	  }
-	release_frame_dc (f, hdc);
-      }
+	  w32_fill_area (f, hdc, color, 0, y, width, height);
+	  w32_fill_area (f, hdc, color, FRAME_PIXEL_WIDTH (f) - width,
+			 y, width, height);
+	}
+      else
+	{
+	  w32_clear_area (f, hdc, 0, y, width, height);
+	  w32_clear_area (f, hdc, FRAME_PIXEL_WIDTH (f) - width,
+			  y, width, height);
+	}
+      release_frame_dc (f, hdc);
+
       unblock_input ();
     }
 }
@@ -1893,6 +1896,24 @@ x_draw_image_foreground (struct glyph_string *s)
 	  orig_height = s->slice.height;
 	}
 
+      double w_factor = 1.0, h_factor = 1.0;
+      bool scaled = false;
+      int orig_slice_width  = s->slice.width,
+	  orig_slice_height = s->slice.height;
+      int orig_slice_x = s->slice.x, orig_slice_y = s->slice.y;
+      /* For scaled images we need to restore the original slice's
+	 dimensions and origin coordinates, from before the scaling.  */
+      if (s->img->width != orig_width || s->img->height != orig_height)
+	{
+	  scaled = true;
+	  w_factor = (double) orig_width  / (double) s->img->width;
+	  h_factor = (double) orig_height / (double) s->img->height;
+	  orig_slice_width = s->slice.width * w_factor + 0.5;
+	  orig_slice_height = s->slice.height * h_factor + 0.5;
+	  orig_slice_x = s->slice.x * w_factor + 0.5;
+	  orig_slice_y = s->slice.y * h_factor + 0.5;
+	}
+
       if (s->img->mask)
 	{
 	  HDC mask_dc = CreateCompatibleDC (s->hdc);
@@ -1900,7 +1921,7 @@ x_draw_image_foreground (struct glyph_string *s)
 
 	  SetTextColor (s->hdc, RGB (255, 255, 255));
 	  SetBkColor (s->hdc, RGB (0, 0, 0));
-	  if (s->slice.width == orig_width && s->slice.height == orig_height)
+	  if (!scaled)
 	    {
 	      BitBlt (s->hdc, x, y, s->slice.width, s->slice.height,
 		      compat_hdc, s->slice.x, s->slice.y, SRCINVERT);
@@ -1919,14 +1940,14 @@ x_draw_image_foreground (struct glyph_string *s)
 		  && (pmode = SetStretchBltMode (s->hdc, HALFTONE)) != 0)
 		SetBrushOrgEx (s->hdc, 0, 0, NULL);
 	      StretchBlt (s->hdc, x, y, s->slice.width, s->slice.height,
-			  compat_hdc, s->slice.x, s->slice.y,
-			  orig_width, orig_height, SRCINVERT);
+			  compat_hdc, orig_slice_x, orig_slice_y,
+			  orig_slice_width, orig_slice_height, SRCINVERT);
 	      StretchBlt (s->hdc, x, y, s->slice.width, s->slice.height,
-			  mask_dc, s->slice.x, s->slice.y,
-			  orig_width, orig_height, SRCAND);
+			  mask_dc, orig_slice_x, orig_slice_y,
+			  orig_slice_width, orig_slice_height, SRCAND);
 	      StretchBlt (s->hdc, x, y, s->slice.width, s->slice.height,
-			  compat_hdc, s->slice.x, s->slice.y,
-			  orig_width, orig_height, SRCINVERT);
+			  compat_hdc, orig_slice_x, orig_slice_y,
+			  orig_slice_width, orig_slice_height, SRCINVERT);
 	      if (pmode)
 		SetStretchBltMode (s->hdc, pmode);
 	    }
@@ -1937,7 +1958,7 @@ x_draw_image_foreground (struct glyph_string *s)
 	{
 	  SetTextColor (s->hdc, s->gc->foreground);
 	  SetBkColor (s->hdc, s->gc->background);
-	  if (s->slice.width == orig_width && s->slice.height == orig_height)
+	  if (!scaled)
 	    BitBlt (s->hdc, x, y, s->slice.width, s->slice.height,
 		    compat_hdc, s->slice.x, s->slice.y, SRCCOPY);
 	  else
@@ -1948,8 +1969,8 @@ x_draw_image_foreground (struct glyph_string *s)
 		  && (pmode = SetStretchBltMode (s->hdc, HALFTONE)) != 0)
 		SetBrushOrgEx (s->hdc, 0, 0, NULL);
 	      StretchBlt (s->hdc, x, y, s->slice.width, s->slice.height,
-			  compat_hdc, s->slice.x, s->slice.y,
-			  orig_width, orig_height, SRCCOPY);
+			  compat_hdc, orig_slice_x, orig_slice_y,
+			  orig_slice_width, orig_slice_height, SRCCOPY);
 	      if (pmode)
 		SetStretchBltMode (s->hdc, pmode);
 	    }
@@ -3669,7 +3690,7 @@ x_window_to_scroll_bar (Window window_id, int type)
 			       ! NILP (bar));
 	   bar = XSCROLL_BAR (bar)->next)
 	if (SCROLL_BAR_W32_WINDOW (XSCROLL_BAR (bar)) == window_id
-	    && (type = 2
+	    && (type == 2
 		|| (type == 1 && XSCROLL_BAR (bar)->horizontal)
 		|| (type == 0 && !XSCROLL_BAR (bar)->horizontal)))
 	  return XSCROLL_BAR (bar);

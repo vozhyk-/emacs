@@ -723,12 +723,18 @@ You thought
 @end example
 @end deffn
 
-@deffn Command delete-indentation &optional join-following-p
+@deffn Command delete-indentation &optional join-following-p beg end
 This function joins the line point is on to the previous line, deleting
 any whitespace at the join and in some cases replacing it with one
 space.  If @var{join-following-p} is non-@code{nil},
 @code{delete-indentation} joins this line to the following line
-instead.  The function returns @code{nil}.
+instead.  Otherwise, if @var{beg} and @var{end} are non-@code{nil},
+this function joins all lines in the region they define.
+
+In an interactive call, @var{join-following-p} is the prefix argument,
+and @var{beg} and @var{end} are, respectively, the start and end of
+the region if it is active, else @code{nil}.  The function returns
+@code{nil}.
 
 If there is a fill prefix, and the second of the lines being joined
 starts with the prefix, then @code{delete-indentation} deletes the
@@ -4507,14 +4513,17 @@ This function returns non-@code{nil} if built-in zlib decompression is
 available.
 @end defun
 
-@defun zlib-decompress-region start end
+@defun zlib-decompress-region start end &optional allow-partial
 This function decompresses the region between @var{start} and
 @var{end}, using built-in zlib decompression.  The region should
 contain data that were compressed with gzip or zlib.  On success, the
 function replaces the contents of the region with the decompressed
-data.  On failure, the function leaves the region unchanged and
-returns @code{nil}.  This function can be called only in unibyte
-buffers.
+data.  If @var{allow-partial} is @code{nil} or omitted, then on
+failure, the function leaves the region unchanged and returns
+@code{nil}.  Otherwise, it returns the number of bytes that were not
+decompressed and replaces the region text by whatever data was
+successfully decompressed.  This function can be called only in
+unibyte buffers.
 @end defun
 
 

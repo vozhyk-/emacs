@@ -81,6 +81,7 @@ the default storage location, e.g. \"$HOME/.sh_history\"."
                  (const :tag "Unset HISTFILE" t)
                  (string :tag "Redirect to a file")))
 
+;;;###tramp-autoload
 (defconst tramp-display-escape-sequence-regexp "\e[[;0-9]+m"
   "Terminal control escape sequences for display attributes.")
 
@@ -2716,6 +2717,8 @@ If the localname part of the given file name starts with \"/../\" then
 the result will be a local, non-Tramp, file name."
   ;; If DIR is not given, use `default-directory' or "/".
   (setq dir (or dir default-directory "/"))
+  ;; Handle empty NAME.
+  (when (zerop (length name)) (setq name "."))
   ;; Unless NAME is absolute, concat DIR and NAME.
   (unless (file-name-absolute-p name)
     (setq name (concat (file-name-as-directory dir) name)))
@@ -3616,7 +3619,7 @@ Fall back to normal file name handler if no Tramp handler exists."
 	      sequence `(,command "monitor" ,localname)))
        ;; "gvfs-monitor-dir".
        ((setq command (tramp-get-remote-gvfs-monitor-dir v))
-	(setq filter 'tramp-sh-gvfs-monitor-dir-process-filter
+	(setq filter #'tramp-sh-gvfs-monitor-dir-process-filter
 	      events
 	      (cond
 	       ((and (memq 'change flags) (memq 'attribute-change flags))
@@ -4883,7 +4886,7 @@ connection if a previous connection has died for some reason."
 			     (list tramp-encoding-shell))))))
 
 		;; Set sentinel and query flag.  Initialize variables.
-		(set-process-sentinel p 'tramp-process-sentinel)
+		(set-process-sentinel p #'tramp-process-sentinel)
 		(process-put p 'vector vec)
 		(process-put p 'adjust-window-size-function #'ignore)
 		(set-process-query-on-exit-flag p nil)
@@ -5311,87 +5314,90 @@ Return ATTR."
 (defun tramp-get-remote-path (vec)
   "Compile list of remote directories for $PATH.
 Nonexistent directories are removed from spec."
-  (with-tramp-connection-property
-      ;; When `tramp-own-remote-path' is in `tramp-remote-path', we
-      ;; cache the result for the session only.  Otherwise, the result
-      ;; is cached persistently.
-      (if (memq 'tramp-own-remote-path tramp-remote-path)
-	  (tramp-get-connection-process vec)
-	vec)
-      "remote-path"
-    (let* ((remote-path (copy-tree tramp-remote-path))
-	   (elt1 (memq 'tramp-default-remote-path remote-path))
-	   (elt2 (memq 'tramp-own-remote-path remote-path))
-	   (default-remote-path
-	     (when elt1
-	       (or
-		(tramp-send-command-and-read
-		 vec "echo \\\"`getconf PATH 2>/dev/null`\\\"" 'noerror)
-		;; Default if "getconf" is not available.
-		(progn
-		  (tramp-message
-		   vec 3
-		   "`getconf PATH' not successful, using default value \"%s\"."
-		   "/bin:/usr/bin")
-		  "/bin:/usr/bin"))))
-	   (own-remote-path
-	    ;; The login shell could return more than just the $PATH
-	    ;; string.  So we use `tramp-end-of-heredoc' as marker.
-	    (when elt2
-	      (or
-	       (tramp-send-command-and-read
-		vec
-		(format
-		 "%s %s %s 'echo %s \\\"$PATH\\\"'"
-		 (tramp-get-method-parameter vec 'tramp-remote-shell)
-		 (mapconcat
-		  #'identity
-		  (tramp-get-method-parameter vec 'tramp-remote-shell-login)
-		  " ")
-		 (mapconcat
-		  #'identity
-		  (tramp-get-method-parameter vec 'tramp-remote-shell-args)
-		  " ")
-		 (tramp-shell-quote-argument tramp-end-of-heredoc))
-		'noerror (regexp-quote tramp-end-of-heredoc))
-	       (progn
-		 (tramp-message
-		  vec 2 "Could not retrieve `tramp-own-remote-path'")
-		 nil)))))
+  (with-current-buffer (tramp-get-connection-buffer vec)
+    ;; Expand connection-local variables.
+    (tramp-set-connection-local-variables vec)
+    (with-tramp-connection-property
+	;; When `tramp-own-remote-path' is in `tramp-remote-path', we
+	;; cache the result for the session only.  Otherwise, the
+	;; result is cached persistently.
+	(if (memq 'tramp-own-remote-path tramp-remote-path)
+	    (tramp-get-connection-process vec)
+	  vec)
+	"remote-path"
+      (let* ((remote-path (copy-tree tramp-remote-path))
+	     (elt1 (memq 'tramp-default-remote-path remote-path))
+	     (elt2 (memq 'tramp-own-remote-path remote-path))
+	     (default-remote-path
+	       (when elt1
+		 (or
+		  (tramp-send-command-and-read
+		   vec "echo \\\"`getconf PATH 2>/dev/null`\\\"" 'noerror)
+		  ;; Default if "getconf" is not available.
+		  (progn
+		    (tramp-message
+		     vec 3
+		     "`getconf PATH' not successful, using default value \"%s\"."
+		     "/bin:/usr/bin")
+		    "/bin:/usr/bin"))))
+	     (own-remote-path
+	      ;; The login shell could return more than just the $PATH
+	      ;; string.  So we use `tramp-end-of-heredoc' as marker.
+	      (when elt2
+		(or
+		 (tramp-send-command-and-read
+		  vec
+		  (format
+		   "%s %s %s 'echo %s \\\"$PATH\\\"'"
+		   (tramp-get-method-parameter vec 'tramp-remote-shell)
+		   (mapconcat
+		    #'identity
+		    (tramp-get-method-parameter vec 'tramp-remote-shell-login)
+		    " ")
+		   (mapconcat
+		    #'identity
+		    (tramp-get-method-parameter vec 'tramp-remote-shell-args)
+		    " ")
+		   (tramp-shell-quote-argument tramp-end-of-heredoc))
+		  'noerror (regexp-quote tramp-end-of-heredoc))
+		 (progn
+		   (tramp-message
+		    vec 2 "Could not retrieve `tramp-own-remote-path'")
+		   nil)))))
 
-      ;; Replace place holder `tramp-default-remote-path'.
-      (when elt1
-	(setcdr elt1
-		(append
-                 (split-string (or default-remote-path "") ":" 'omit)
-		 (cdr elt1)))
-	(setq remote-path (delq 'tramp-default-remote-path remote-path)))
+	;; Replace place holder `tramp-default-remote-path'.
+	(when elt1
+	  (setcdr elt1
+		  (append
+                   (split-string (or default-remote-path "") ":" 'omit)
+		   (cdr elt1)))
+	  (setq remote-path (delq 'tramp-default-remote-path remote-path)))
 
-      ;; Replace place holder `tramp-own-remote-path'.
-      (when elt2
-	(setcdr elt2
-		(append
-                 (split-string (or own-remote-path "") ":" 'omit)
-		 (cdr elt2)))
-	(setq remote-path (delq 'tramp-own-remote-path remote-path)))
+	;; Replace place holder `tramp-own-remote-path'.
+	(when elt2
+	  (setcdr elt2
+		  (append
+                   (split-string (or own-remote-path "") ":" 'omit)
+		   (cdr elt2)))
+	  (setq remote-path (delq 'tramp-own-remote-path remote-path)))
 
-      ;; Remove double entries.
-      (setq elt1 remote-path)
-      (while (consp elt1)
-	(while (and (car elt1) (setq elt2 (member (car elt1) (cdr elt1))))
-	  (setcar elt2 nil))
-	(setq elt1 (cdr elt1)))
+	;; Remove double entries.
+	(setq elt1 remote-path)
+	(while (consp elt1)
+	  (while (and (car elt1) (setq elt2 (member (car elt1) (cdr elt1))))
+	    (setcar elt2 nil))
+	  (setq elt1 (cdr elt1)))
 
-      ;; Remove non-existing directories.
-      (delq
-       nil
-       (mapcar
-	(lambda (x)
-	  (and
-	   (stringp x)
-	   (file-directory-p (tramp-make-tramp-file-name vec x 'nohop))
-	   x))
-	remote-path)))))
+	;; Remove non-existing directories.
+	(delq
+	 nil
+	 (mapcar
+	  (lambda (x)
+	    (and
+	     (stringp x)
+	     (file-directory-p (tramp-make-tramp-file-name vec x 'nohop))
+	     x))
+	  remote-path))))))
 
 (defun tramp-get-remote-locale (vec)
   "Determine remote locale, supporting UTF8 if possible."
