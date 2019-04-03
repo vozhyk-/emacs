@@ -3067,9 +3067,9 @@ Create_Pixmap_From_Bitmap_Data (struct frame *f, struct image *img, char *data,
   img->pixmap = ns_image_from_XBM (data, img->width, img->height, fg, bg);
 
 #elif defined (HAVE_PGTK)
-  unsigned char *pix = xmalloc(img->width * img->height * 4);
+  cairo_surface_t *surface = create_cairo_image_surface(img->width, img->height);
+  uint32_t *dp = (uint32_t *) cairo_image_surface_get_data (surface);
   int x, y;
-  uint32_t *dp = (uint32_t *) pix;
   unsigned char *sp = (unsigned char *) data;
   int mask = 0x01;
   for (y = 0; y < img->height; y++) {
@@ -3086,7 +3086,6 @@ Create_Pixmap_From_Bitmap_Data (struct frame *f, struct image *img, char *data,
       mask = 0x01;
     }
   }
-  create_cairo_image_surface(img, pix, img->width, img->height);
 #else
   img->pixmap =
    (x_check_image_size (0, img->width, img->height)
