@@ -1320,7 +1320,7 @@ if it is a string, only list groups matching REGEXP."
 	      gnus-group-listed-groups)
       ;; List living groups, according to order in `gnus-group-list'.
       (dolist (g (cdr gnus-group-list))
-	(setq info (nth 1 (gethash g gnus-newsrc-hashtb))
+        (setq info (gnus-get-info g)
 	      group (gnus-info-group info)
 	      params (gnus-info-params info)
 	      unread (gnus-group-unread group))
@@ -1389,39 +1389,35 @@ if it is a string, only list groups matching REGEXP."
   ;; List zombies and killed lists somewhat faster, which was
   ;; suggested by Jack Vinson <vinson@unagi.cis.upenn.edu>.  It does
   ;; this by ignoring the group format specification altogether.
-  (let (group)
-    (if (> (length groups) gnus-group-listing-limit)
-	(while groups
-	  (setq group (pop groups))
-	  (when (gnus-group-prepare-logic
-		 group
-		 (or (not regexp)
-		     (and (stringp regexp) (string-match regexp group))
-		     (and (functionp regexp) (funcall regexp group))))
-	    (add-text-properties
-	     (point) (prog1 (1+ (point))
-		       (insert " " mark "     *: "
-			       (gnus-group-decoded-name group)
-			       "\n"))
-	     (list 'gnus-group (gethash group gnus-active-hashtb)
-		   'gnus-unread t
-		   'gnus-level level))))
-      (while groups
-	(setq group (pop groups))
+  (if (nthcdr gnus-group-listing-limit groups)
+      (dolist (group groups)
 	(when (gnus-group-prepare-logic
 	       group
-	       (or (not regexp)
-		   (and (stringp regexp) (string-match regexp group))
-		   (and (functionp regexp) (funcall regexp group))))
-	  (gnus-group-insert-group-line
-	   group level nil
-	   (let ((active (gnus-active group)))
-	     (if active
-		 (if (zerop (cdr active))
-		     0
-		   (- (1+ (cdr active)) (car active)))
-	       nil))
-	   (gnus-method-simplify (gnus-find-method-for-group group))))))))
+               (cond ((not regexp))
+                     ((stringp regexp) (string-match-p regexp group))
+                     ((functionp regexp) (funcall regexp group))))
+          (add-text-properties
+           (point) (prog1 (1+ (point))
+                     (insert " " mark "     *: "
+                             (gnus-group-decoded-name group)
+                             "\n"))
+           (list 'gnus-group group
+                 'gnus-unread t
+                 'gnus-level level))))
+    (dolist (group groups)
+      (when (gnus-group-prepare-logic
+             group
+             (cond ((not regexp))
+                   ((stringp regexp) (string-match-p regexp group))
+                   ((functionp regexp) (funcall regexp group))))
+        (gnus-group-insert-group-line
+         group level nil
+         (let ((active (gnus-active group)))
+           (and active
+                (if (zerop (cdr active))
+                    0
+                  (- (cdr active) (car active) -1))))
+         (gnus-method-simplify (gnus-find-method-for-group group)))))))
 
 (defun gnus-group-update-group-line ()
   "Update the current line in the group buffer."
@@ -1527,7 +1523,7 @@ if it is a string, only list groups matching REGEXP."
 	      (int-to-string (max 0 (- gnus-tmp-number-total number)))
 	    "*"))
 	 (gnus-tmp-subscribed
-	  (cond ((<= gnus-tmp-level gnus-level-subscribed) ? )
+          (cond ((<= gnus-tmp-level gnus-level-subscribed) ?\s)
 		((<= gnus-tmp-level gnus-level-unsubscribed) ?U)
 		((= gnus-tmp-level gnus-level-zombie) ?Z)
 		(t ?K)))
@@ -1546,7 +1542,7 @@ if it is a string, only list groups matching REGEXP."
 	 (gnus-tmp-moderated
 	  (if (and gnus-moderated-hashtb
 		   (gethash gnus-tmp-group gnus-moderated-hashtb))
-	      ?m ? ))
+              ?m ?\s))
 	 (gnus-tmp-moderated-string
 	  (if (eq gnus-tmp-moderated ?m) "(m)" ""))
          (gnus-tmp-group-icon (gnus-group-get-icon gnus-tmp-group))
@@ -1560,15 +1556,15 @@ if it is a string, only list groups matching REGEXP."
 	  (if (and (numberp number)
 		   (zerop number)
 		   (cdr (assq 'tick gnus-tmp-marked)))
-	      ?* ? ))
+              ?* ?\s))
 	 (gnus-tmp-summary-live
 	  (if (and (not gnus-group-is-exiting-p)
 		   (gnus-buffer-live-p (gnus-summary-buffer-name
 					gnus-tmp-group)))
-	      ?* ? ))
+              ?* ?\s))
 	 (gnus-tmp-process-marked
 	  (if (member gnus-tmp-group gnus-group-marked)
-	      gnus-process-mark ? ))
+              gnus-process-mark ?\s))
 	 (buffer-read-only nil)
 	 beg end
          gnus-tmp-header)	  ; passed as parameter to user-funcs.
@@ -1768,10 +1764,8 @@ already.  If INFO-UNCHANGED is non-nil, dribble buffer is not updated."
 (defun gnus-group-group-name ()
   "Get the name of the newsgroup on the current line."
   (let ((group (get-text-property (point-at-bol) 'gnus-group)))
-    (when group
-      (if (stringp group)
-	  group
-	(symbol-name group)))))
+    (cond ((stringp group) group)
+          (group (symbol-name group)))))
 
 (defun gnus-group-group-level ()
   "Get the level of the newsgroup on the current line."
@@ -1791,7 +1785,7 @@ already.  If INFO-UNCHANGED is non-nil, dribble buffer is not updated."
 (defun gnus-group-new-mail (group)
   (if (nnmail-new-mail-p (gnus-group-real-name group))
       gnus-new-mail-mark
-    ? ))
+    ?\s))
 
 (defun gnus-group-level (group)
   "Return the estimated level of GROUP."
@@ -1881,7 +1875,7 @@ If FIRST-TOO, the current line is also eligible as a target."
 	(if unmark
 	    (progn
 	      (setq gnus-group-marked (delete group gnus-group-marked))
-	      (insert-char ? 1 t))
+              (insert-char ?\s 1 t))
 	   (setq gnus-group-marked
 		 (cons group (delete group gnus-group-marked)))
 	   (insert-char gnus-process-mark 1 t)))
@@ -2555,33 +2549,33 @@ If PROMPT (the prefix) is a number, use the prompt specified in
     (gnus-group-position-point)))
 
 (defun gnus-group-goto-group (group &optional far test-marked)
-  "Goto to newsgroup GROUP.
+  "Go to newsgroup GROUP.
 If FAR, it is likely that the group is not on the current line.
-If TEST-MARKED, the line must be marked."
+If TEST-MARKED, the line must be marked.
+
+Return nil if GROUP is not found."
   (when group
-    (let ((start (point))
-	  (active (and (gethash group gnus-active-hashtb)
-		       group)))
+    (let ((start (point)))
       (beginning-of-line)
       (cond
        ;; It's quite likely that we are on the right line, so
        ;; we check the current line first.
        ((and (not far)
-	     (equal (get-text-property (point) 'gnus-group) active)
+	     (equal (get-text-property (point) 'gnus-group) group)
 	     (or (not test-marked) (gnus-group-mark-line-p)))
 	(point))
        ;; Previous and next line are also likely, so we check them as well.
        ((and (not far)
 	     (save-excursion
 	       (forward-line -1)
-	       (and (equal (get-text-property (point) 'gnus-group) active)
+	       (and (equal (get-text-property (point) 'gnus-group) group)
 		    (or (not test-marked) (gnus-group-mark-line-p)))))
 	(forward-line -1)
 	(point))
        ((and (not far)
 	     (save-excursion
 	       (forward-line 1)
-	       (and (equal (get-text-property (point) 'gnus-group) active)
+	       (and (equal (get-text-property (point) 'gnus-group) group)
 		    (or (not test-marked) (gnus-group-mark-line-p)))))
 	(forward-line 1)
 	(point))
@@ -2590,7 +2584,7 @@ If TEST-MARKED, the line must be marked."
 	(let (found)
 	  (while (and (not found)
 		      (gnus-text-property-search
-		       'gnus-group active 'forward 'goto))
+		       'gnus-group group 'forward 'goto))
 	    (if (gnus-group-mark-line-p)
 		(setq found t)
 	      (forward-line 1)))
@@ -2598,7 +2592,7 @@ If TEST-MARKED, the line must be marked."
        (t
 	;; Search through the entire buffer.
 	(if (gnus-text-property-search
-	     'gnus-group active nil 'goto)
+	     'gnus-group group nil 'goto)
 	    (point)
 	  (goto-char start)
 	  nil))))))
@@ -4009,15 +4003,9 @@ entail asking the server for the groups."
 	  (gnus-agent gnus-plugged)); If we're actually plugged, store the active file in the agent.
       (gnus-read-active-file)))
   ;; Find all groups and sort them.
-  (let ((groups
-	 (sort
-	  (hash-table-keys gnus-active-hashtb)
-	  'string<))
-	(buffer-read-only nil)
-	group)
+  (let ((buffer-read-only nil))
     (erase-buffer)
-    (while groups
-      (setq group (pop groups))
+    (dolist (group (sort (hash-table-keys gnus-active-hashtb) #'string<))
       (add-text-properties
        (point) (prog1 (1+ (point))
 		 (insert "       *: "
@@ -4145,20 +4133,19 @@ If DONT-SCAN is non-nil, scan non-activated groups as well."
   (when (not (or gnus-description-hashtb
 		 (gnus-read-all-descriptions-files)))
     (error "Couldn't request descriptions file"))
-  (let ((buffer-read-only nil)
-	(groups (sort (hash-table-keys gnus-description-hashtb)))
-	b)
+  (let ((buffer-read-only nil))
     (erase-buffer)
-    (dolist (group groups)
-      (setq b (point))
-      (let ((charset (gnus-group-name-charset nil group)))
+    (dolist (group (sort (hash-table-keys gnus-description-hashtb) #'string<))
+      (let ((b (point))
+            (desc (gethash group gnus-description-hashtb))
+            (charset (gnus-group-name-charset nil group)))
 	(insert (format "      *: %-20s %s\n"
 			(gnus-group-name-decode group charset)
-			(gnus-group-name-decode group charset))))
-      (add-text-properties
-       b (1+ b) (list 'gnus-group (intern group gnus-description-hashtb)
-		      'gnus-unread t 'gnus-marked nil
-		      'gnus-level (1+ gnus-level-subscribed))))
+                        (gnus-group-name-decode desc charset)))
+        (add-text-properties
+         b (1+ b) (list 'gnus-group group
+                        'gnus-unread t 'gnus-marked nil
+                        'gnus-level (1+ gnus-level-subscribed)))))
     (goto-char (point-min))
     (gnus-group-position-point)))
 

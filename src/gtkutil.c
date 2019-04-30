@@ -66,58 +66,7 @@ typedef struct pgtk_output xp_output;
 #include <X11/extensions/Xdbe.h>
 #endif
 
-#ifndef HAVE_GTK_WIDGET_SET_HAS_WINDOW
-#define gtk_widget_set_has_window(w, b) \
-  (gtk_fixed_set_has_window (GTK_FIXED (w), b))
-#endif
-#ifndef HAVE_GTK_DIALOG_GET_ACTION_AREA
-#define gtk_dialog_get_action_area(w) ((w)->action_area)
-#define gtk_dialog_get_content_area(w) ((w)->vbox)
-#endif
-#ifndef HAVE_GTK_WIDGET_GET_SENSITIVE
-#define gtk_widget_get_sensitive(w) (GTK_WIDGET_SENSITIVE (w))
-#endif
-#ifndef HAVE_GTK_ADJUSTMENT_GET_PAGE_SIZE
-#define gtk_adjustment_set_page_size(w, s) ((w)->page_size = (s))
-#define gtk_adjustment_set_page_increment(w, s) ((w)->page_increment = (s))
-#define gtk_adjustment_get_step_increment(w) ((w)->step_increment)
-#define gtk_adjustment_set_step_increment(w, s) ((w)->step_increment = (s))
-#endif
-#if GTK_CHECK_VERSION (2, 12, 0)
-#define remove_submenu(w) gtk_menu_item_set_submenu ((w), NULL)
-#else
-#define remove_submenu(w) gtk_menu_item_remove_submenu ((w))
-#endif
-
-#if ! GTK_CHECK_VERSION (2, 14, 0)
-#define gtk_adjustment_configure(adj, xvalue, xlower,            \
-                                 xupper, xstep_increment,        \
-                                 xpage_increment, xpagesize)     \
-  do {                                                           \
-    adj->lower = xlower;                                         \
-    adj->upper = xupper;                                         \
-    adj->page_size = xpagesize;                                  \
-    gtk_adjustment_set_value (adj, xvalue);                      \
-    adj->page_increment = xpage_increment;                       \
-    adj->step_increment = xstep_increment;                       \
-  } while (0)
-#endif /* < Gtk+ 2.14 */
-
-#ifdef HAVE_FREETYPE
-#if GTK_CHECK_VERSION (3, 2, 0)
-#define USE_NEW_GTK_FONT_CHOOSER 1
-#else
-#define USE_NEW_GTK_FONT_CHOOSER 0
-#define gtk_font_chooser_dialog_new(x, y) \
-  gtk_font_selection_dialog_new (x)
-#undef GTK_FONT_CHOOSER
-#define GTK_FONT_CHOOSER(x) GTK_FONT_SELECTION_DIALOG (x)
-#define  gtk_font_chooser_set_font(x, y) \
-  gtk_font_selection_dialog_set_font_name (x, y)
-#endif
-#endif /* HAVE_FREETYPE */
-
-#if GTK_CHECK_VERSION (3, 10, 0)
+#ifdef HAVE_GTK3
 #define XG_TEXT_CANCEL "Cancel"
 #define XG_TEXT_OK     "OK"
 #define XG_TEXT_OPEN   "Open"
@@ -128,22 +77,24 @@ typedef struct pgtk_output xp_output;
 #endif
 
 #ifndef HAVE_GTK3
-#ifdef USE_GTK_TOOLTIP
-#define gdk_window_get_screen(w) gdk_drawable_get_screen (w)
+
+#ifdef HAVE_FREETYPE
+#define gtk_font_chooser_dialog_new(x, y) \
+  gtk_font_selection_dialog_new (x)
+#undef GTK_FONT_CHOOSER
+#define GTK_FONT_CHOOSER(x) GTK_FONT_SELECTION_DIALOG (x)
+#define  gtk_font_chooser_set_font(x, y) \
+  gtk_font_selection_dialog_set_font_name (x, y)
 #endif
+
 #define gdk_window_get_geometry(w, a, b, c, d) \
   gdk_window_get_geometry (w, a, b, c, d, 0)
-#define gdk_x11_window_lookup_for_display(d, w) \
-  gdk_xid_table_lookup_for_display (d, w)
 #define gtk_box_new(ori, spacing)                                       \
   ((ori) == GTK_ORIENTATION_HORIZONTAL                                  \
    ? gtk_hbox_new (FALSE, (spacing)) : gtk_vbox_new (FALSE, (spacing)))
 #define gtk_scrollbar_new(ori, spacing)                                 \
   ((ori) == GTK_ORIENTATION_HORIZONTAL                                  \
    ? gtk_hscrollbar_new ((spacing)) : gtk_vscrollbar_new ((spacing)))
-#ifndef GDK_KEY_g
-#define GDK_KEY_g GDK_g
-#endif
 #endif /* HAVE_GTK3 */
 
 #define XG_BIN_CHILD(x) gtk_bin_get_child (GTK_BIN (x))
@@ -265,7 +216,7 @@ xg_get_gdk_scale (void)
 int
 xg_get_scale (struct frame *f)
 {
-#if GTK_CHECK_VERSION (3, 10, 0)
+#ifdef HAVE_GTK3
   if (FRAME_GTK_WIDGET (f))
     return gtk_widget_get_scale_factor (FRAME_GTK_WIDGET (f));
 #endif
@@ -304,15 +255,7 @@ xg_display_close (GdkDisplay *gdpy)
       gdpy_def = gdpy_new;
     }
 
-#if GTK_CHECK_VERSION (2, 0, 0) && ! GTK_CHECK_VERSION (2, 10, 0)
-  /* GTK 2.2-2.8 has a bug that makes gdk_display_close crash
-     <https://gitlab.gnome.org/GNOME/gtk/issues/221>.  This way we
-     can continue running, but there will be memory leaks.  */
-  g_object_run_dispose (G_OBJECT (gdpy));
-#else
-  /* This seems to be fixed in GTK 2.10. */
   gdk_display_close (gdpy);
-#endif
 
 #else
 
@@ -337,7 +280,6 @@ xg_display_close (GdkDisplay *gdpy)
     }
 
   gdk_display_close (gdpy);
-
 #endif
 }
 
@@ -448,7 +390,7 @@ xg_get_image_for_pixmap (struct frame *f,
                          GtkWidget *widget,
                          GtkImage *old_widget)
 {
-#if defined USE_CAIRO && GTK_CHECK_VERSION (3, 10, 0)
+#if defined USE_CAIRO && defined HAVE_GTK3
   cairo_surface_t *surface;
 #else
   GdkPixbuf *icon_buf;
@@ -480,7 +422,7 @@ xg_get_image_for_pixmap (struct frame *f,
      on a monochrome display, and sometimes bad on all displays with
      certain themes.  */
 
-#if defined USE_CAIRO && GTK_CHECK_VERSION (3, 10, 0)
+#if defined USE_CAIRO && defined HAVE_GTK3
   surface = img->cr_data;
 
   if (surface)
@@ -728,8 +670,6 @@ xg_check_special_colors (struct frame *f,
    We use that to pop down the tooltip.  This happens if Gtk+ for some
    reason wants to change or hide the tooltip.  */
 
-#ifdef USE_GTK_TOOLTIP
-
 static void
 hierarchy_ch_cb (GtkWidget *widget,
                  GtkWidget *previous_toplevel,
@@ -796,8 +736,6 @@ qttip_cb (GtkWidget  *widget,
   return FALSE;
 }
 
-#endif /* USE_GTK_TOOLTIP */
-
 /* Prepare a tooltip to be shown, i.e. calculate WIDTH and HEIGHT.
    Return true if a system tooltip is available.  */
 
@@ -853,7 +791,7 @@ xg_prepare_tooltip (struct frame *f,
   unblock_input ();
 
   return TRUE;
-#endif /* USE_GTK_TOOLTIP */
+#endif
 }
 
 /* Show the tooltip at ROOT_X and ROOT_Y.
@@ -907,8 +845,8 @@ xg_hide_tooltip (struct frame *f)
 
       return TRUE;
     }
-#endif
   return FALSE;
+#endif
 }
 
 
@@ -1332,7 +1270,7 @@ xg_create_frame_widgets (struct frame *f)
      has backported it to Gtk+ 2.0 and they add the resize grip for
      Gtk+ 2.0 applications also.  But it has a bug that makes Emacs loop
      forever, so disable the grip.  */
-#if (! GTK_CHECK_VERSION (3, 0, 0) \
+#if (! defined HAVE_GTK3 \
      && defined HAVE_GTK_WINDOW_SET_HAS_RESIZE_GRIP)
   gtk_window_set_has_resize_grip (GTK_WINDOW (wtop), FALSE);
 #endif
@@ -1484,14 +1422,12 @@ xg_create_frame_widgets (struct frame *f)
 	gdk_window_set_override_redirect (gwin, TRUE);
     }
 
-#ifdef USE_GTK_TOOLTIP
   /* Steal a tool tip window we can move ourselves.  */
   f->output_data.xp->ttip_widget = 0;
   f->output_data.xp->ttip_lbl = 0;
   f->output_data.xp->ttip_window = 0;
   gtk_widget_set_tooltip_text (wtop, "Dummy text");
   g_signal_connect (wtop, "query-tooltip", G_CALLBACK (qttip_cb), f);
-#endif
 
   {
     GdkScreen *screen = gtk_widget_get_screen (wtop);
@@ -1561,7 +1497,6 @@ x_wm_set_size_hint (struct frame *f, long int flags, bool user_position)
   GdkGeometry size_hints;
   gint hint_flags = 0;
   int base_width, base_height;
-  int min_rows = 0, min_cols = 0;
   int win_gravity = f->win_gravity;
   Lisp_Object fs_state, frame;
   int scale = xg_get_scale (f);
@@ -1612,13 +1547,10 @@ x_wm_set_size_hint (struct frame *f, long int flags, bool user_position)
   base_height = FRAME_TEXT_LINES_TO_PIXEL_HEIGHT (f, 1)
     + FRAME_MENUBAR_HEIGHT (f) + FRAME_TOOLBAR_HEIGHT (f);
 
-  if (min_cols > 0) --min_cols; /* We used one col in base_width = ... 1); */
-  if (min_rows > 0) --min_rows; /* We used one row in base_height = ... 1); */
-
   size_hints.base_width = base_width;
   size_hints.base_height = base_height;
-  size_hints.min_width  = base_width + min_cols * FRAME_COLUMN_WIDTH (f);
-  size_hints.min_height = base_height + min_rows * FRAME_LINE_HEIGHT (f);
+  size_hints.min_width  = base_width;
+  size_hints.min_height = base_height;
 
   /* These currently have a one to one mapping with the X values, but I
      don't think we should rely on that.  */
@@ -1727,7 +1659,6 @@ xg_set_undecorated (struct frame *f, Lisp_Object undecorated)
 void
 xg_frame_restack (struct frame *f1, struct frame *f2, bool above_flag)
 {
-#if GTK_CHECK_VERSION (2, 18, 0)
   block_input ();
   if (FRAME_GTK_OUTER_WIDGET (f1) && FRAME_GTK_OUTER_WIDGET (f2))
     {
@@ -1746,7 +1677,6 @@ xg_frame_restack (struct frame *f1, struct frame *f2, bool above_flag)
 #endif
     }
   unblock_input ();
-#endif
 }
 
 
@@ -2388,7 +2318,7 @@ xg_get_file_name (struct frame *f,
 
 #ifdef HAVE_FREETYPE
 
-#if USE_NEW_GTK_FONT_CHOOSER
+#ifdef HAVE_GTK3
 
 #define XG_WEIGHT_TO_SYMBOL(w)			\
   (w <= PANGO_WEIGHT_THIN ? Qextra_light	\
@@ -2405,7 +2335,7 @@ xg_get_file_name (struct frame *f,
    : s == PANGO_STYLE_ITALIC ? Qitalic		\
    : Qnormal)
 
-#endif /* USE_NEW_GTK_FONT_CHOOSER */
+#endif /* HAVE_GTK3 */
 
 
 static char *x_last_font_name;
@@ -2452,7 +2382,7 @@ xg_get_font (struct frame *f, const char *default_name)
   done = xg_dialog_run (f, w);
   if (done == GTK_RESPONSE_OK)
     {
-#if USE_NEW_GTK_FONT_CHOOSER
+#ifdef HAVE_GTK3
       /* Use the GTK3 font chooser.  */
       PangoFontDescription *desc
 	= gtk_font_chooser_get_font_desc (GTK_FONT_CHOOSER (w));
@@ -2496,7 +2426,7 @@ xg_get_font (struct frame *f, const char *default_name)
 	  g_free (x_last_font_name);
 	  x_last_font_name = font_name;
 	}
-#endif /* USE_NEW_GTK_FONT_CHOOSER */
+#endif /* HAVE_GTK3 */
     }
 
   gtk_widget_destroy (w);
@@ -3217,9 +3147,7 @@ xg_update_menubar (GtkWidget *menubar,
              bridge that might be loaded) that the item's label has
              changed.  */
           gtk_label_set_text (wlabel, utf8_label);
-#if GTK_CHECK_VERSION (2, 16, 0)
           g_object_notify (G_OBJECT (witem), "label");
-#endif
           if (utf8_label) g_free (utf8_label);
           iter = g_list_next (iter);
           val = val->next;
@@ -3398,10 +3326,8 @@ xg_update_menu_item (widget_value *val,
         }
     }
 
-#if GTK_CHECK_VERSION (2, 16, 0)
   if (label_changed) /* See comment in xg_update_menubar.  */
     g_object_notify (G_OBJECT (w), "label");
-#endif
 }
 
 /* Update the toggle menu item W so it corresponds to VAL.  */
@@ -3500,7 +3426,7 @@ xg_update_submenu (GtkWidget *submenu,
           {
             /* Not a submenu anymore.  */
             g_object_ref (G_OBJECT (sub));
-            remove_submenu (witem);
+            gtk_menu_item_set_submenu (witem, NULL);
             gtk_widget_destroy (sub);
           }
         else if (cur->contents)
@@ -4736,14 +4662,6 @@ xg_tool_bar_item_expose_callback (GtkWidget *w,
 }
 #endif
 
-#ifdef HAVE_GTK_ORIENTABLE_SET_ORIENTATION
-#define toolbar_set_orientation(w, o) \
-  gtk_orientable_set_orientation (GTK_ORIENTABLE (w), o)
-#else
-#define toolbar_set_orientation(w, o) \
-  gtk_toolbar_set_orientation (GTK_TOOLBAR (w), o)
-#endif
-
 /* Attach a tool bar to frame F.  */
 
 static void
@@ -4753,10 +4671,10 @@ xg_pack_tool_bar (struct frame *f, Lisp_Object pos)
   bool into_hbox = EQ (pos, Qleft) || EQ (pos, Qright);
   GtkWidget *top_widget = x->toolbar_widget;
 
-  toolbar_set_orientation (x->toolbar_widget,
-                           into_hbox
-                           ? GTK_ORIENTATION_VERTICAL
-                           : GTK_ORIENTATION_HORIZONTAL);
+  gtk_orientable_set_orientation (GTK_ORIENTABLE (x->toolbar_widget),
+                                  into_hbox
+                                  ? GTK_ORIENTATION_VERTICAL
+                                  : GTK_ORIENTATION_HORIZONTAL);
 
   if (into_hbox)
     {
@@ -4809,7 +4727,7 @@ static void
 xg_create_tool_bar (struct frame *f)
 {
   xp_output *x = f->output_data.xp;
-#if GTK_CHECK_VERSION (3, 3, 6)
+#ifdef HAVE_GTK3
   GtkStyleContext *gsty;
 #endif
   struct xg_frame_tb_info *tbinfo
@@ -4833,10 +4751,11 @@ xg_create_tool_bar (struct frame *f)
   gtk_widget_set_name (x->toolbar_widget, "emacs-toolbar");
 
   gtk_toolbar_set_style (GTK_TOOLBAR (x->toolbar_widget), GTK_TOOLBAR_ICONS);
-  toolbar_set_orientation (x->toolbar_widget, GTK_ORIENTATION_HORIZONTAL);
+  gtk_orientable_set_orientation (GTK_ORIENTABLE (x->toolbar_widget),
+                                  GTK_ORIENTATION_HORIZONTAL);
   g_signal_connect (x->toolbar_widget, "size-allocate",
                     G_CALLBACK (tb_size_cb), f);
-#if GTK_CHECK_VERSION (3, 3, 6)
+#ifdef HAVE_GTK3
   gsty = gtk_widget_get_style_context (x->toolbar_widget);
   gtk_style_context_add_class (gsty, "primary-toolbar");
 #endif
@@ -4890,7 +4809,7 @@ xg_make_tool_item (struct frame *f,
   GtkWidget *wb = gtk_button_new ();
   /* The eventbox is here so we can have tooltips on disabled items.  */
   GtkWidget *weventbox = gtk_event_box_new ();
-#if GTK_CHECK_VERSION (3, 3, 6)
+#ifdef HAVE_GTK3
   GtkCssProvider *css_prov = gtk_css_provider_new ();
   GtkStyleContext *gsty;
 
@@ -5024,7 +4943,7 @@ xg_tool_item_stale_p (GtkWidget *wbutton, const char *stock_name,
     {
       gpointer gold_img = g_object_get_data (G_OBJECT (wimage),
                                              XG_TOOL_BAR_IMAGE_DATA);
-#if defined USE_CAIRO && GTK_CHECK_VERSION (3, 10, 0)
+#if defined USE_CAIRO && defined HAVE_GTK3
       void *old_img = (void *) gold_img;
       if (old_img != img->cr_data)
 	return 1;
@@ -5098,7 +5017,7 @@ find_icon_from_name (char *name,
                      GtkIconTheme *icon_theme,
                      char **icon_name)
 {
-#if ! GTK_CHECK_VERSION (3, 10, 0)
+#ifndef HAVE_GTK3
   GtkStockItem stock_item;
 #endif
 
@@ -5111,7 +5030,7 @@ find_icon_from_name (char *name,
         *icon_name = NULL;
     }
 
-#if ! GTK_CHECK_VERSION (3, 10, 0)
+#ifndef HAVE_GTK3
   else if (gtk_stock_lookup (name, &stock_item))
     *icon_name = NULL;
 #endif
@@ -5327,7 +5246,7 @@ update_frame_tool_bar (struct frame *f)
           prepare_image_for_display (f, img);
 
           if (img->load_failed_p
-#if defined USE_CAIRO && GTK_CHECK_VERSION (3, 10, 0)
+#if defined USE_CAIRO && defined HAVE_GTK3
 	      || img->cr_data == NULL
 #else
 	      || img->pixmap == None
@@ -5362,7 +5281,7 @@ update_frame_tool_bar (struct frame *f)
 	  else if (stock_name)
             {
 
-#if GTK_CHECK_VERSION (3, 10, 0)
+#ifdef HAVE_GTK3
               w = gtk_image_new_from_icon_name (stock_name, icon_size);
 #else
               w = gtk_image_new_from_stock (stock_name, icon_size);
@@ -5382,7 +5301,7 @@ update_frame_tool_bar (struct frame *f)
             {
               w = xg_get_image_for_pixmap (f, img, x->widget, NULL);
               g_object_set_data (G_OBJECT (w), XG_TOOL_BAR_IMAGE_DATA,
-#if defined USE_CAIRO && GTK_CHECK_VERSION (3, 10, 0)
+#if defined USE_CAIRO && defined HAVE_GTK3
                                  (gpointer)img->cr_data
 #else
                                  (gpointer)img->pixmap
@@ -5559,7 +5478,7 @@ xg_initialize (void)
 
   settings = gtk_settings_get_for_screen (gdk_display_get_default_screen
                                           (gdk_display_get_default ()));
-#if ! GTK_CHECK_VERSION (3, 10, 0)
+#ifndef HAVE_GTK3
   /* Remove F10 as a menu accelerator, it does not mix well with Emacs key
      bindings.  It doesn't seem to be any way to remove properties,
      so we set it to "" which in means "no key".  */

@@ -60,7 +60,7 @@ struct font_info
   double scale;
 
 #ifdef USE_CAIRO
-  cairo_font_face_t *cr_font_face;
+  cairo_scaled_font_t *cr_scaled_font;
   /* To prevent cairo from cluttering the activated FT_Size maintained
      in ftfont.c, we activate this special FT_Size before drawing.  */
   FT_Size ft_size_draw;

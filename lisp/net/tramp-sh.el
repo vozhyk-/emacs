@@ -2769,15 +2769,6 @@ the result will be a local, non-Tramp, file name."
 
 ;;; Remote commands:
 
-(defun tramp-process-sentinel (proc event)
-  "Flush file caches."
-  (unless (process-live-p proc)
-    (let ((vec (process-get proc 'vector)))
-      (when vec
-	(tramp-message vec 5 "Sentinel called: `%S' `%s'" proc event)
-        (tramp-flush-connection-properties proc)
-        (tramp-flush-directory-properties vec "")))))
-
 ;; We use BUFFER also as connection buffer during setup. Because of
 ;; this, its original contents must be saved, and restored once
 ;; connection has been setup.
@@ -2790,7 +2781,6 @@ the result will be a local, non-Tramp, file name."
 	    (command (plist-get args :command))
 	    (coding (plist-get args :coding))
 	    (noquery (plist-get args :noquery))
-	    (stop (plist-get args :stop))
 	    (connection-type (plist-get args :connection-type))
 	    (filter (plist-get args :filter))
 	    (sentinel (plist-get args :sentinel))
@@ -2926,6 +2916,9 @@ the result will be a local, non-Tramp, file name."
 			(let ((pid (tramp-send-command-and-read v "echo $$")))
 			  (process-put p 'remote-pid pid)
 			  (tramp-set-connection-property p "remote-pid" pid))
+			;; `tramp-maybe-open-connection' and
+			;; `tramp-send-command-and-read' could have
+			;; trashed the connection buffer.  Remove this.
 			(widen)
 			(delete-region mark (point-max))
 			(narrow-to-region (point-max) (point-max))
@@ -2939,9 +2932,6 @@ the result will be a local, non-Tramp, file name."
 			     v 'file-error
 			     "pty association is not supported for `%s'"
 			     name))))
-		      ;; Stop process if indicated.
-		      (when stop
-			(stop-process p))
 		      ;; Set sentinel and filter.
 		      (when sentinel
 			(set-process-sentinel p sentinel))

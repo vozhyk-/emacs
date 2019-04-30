@@ -2801,14 +2801,14 @@ for all methods.  Resulting data are derived from default settings."
 	 :port method :require '(:port) :max most-positive-fixnum))))
 
 ;; Generic function.
-(defun tramp-parse-group (regexp match-level skip-regexp)
+(defun tramp-parse-group (regexp match-level skip-chars)
    "Return a (user host) tuple allowed to access.
 User is always nil."
    (let (result)
      (when (re-search-forward regexp (point-at-eol) t)
        (setq result (list nil (match-string match-level))))
      (or
-      (> (skip-chars-forward skip-regexp) 0)
+      (> (skip-chars-forward skip-chars) 0)
       (forward-line 1))
      result))
 
@@ -2864,7 +2864,7 @@ User is always nil."
    (tramp-parse-group
     (concat "\\(?:^[ \t]*Host\\)" "\\|" "\\(?:^.+\\)"
 	    "\\|" "\\(" tramp-host-regexp "\\)")
-    1 "[ \t]+"))
+    1 " \t"))
 
 ;; Generic function.
 (defun tramp-parse-shostkeys-sknownhosts (dirname regexp)
@@ -3638,17 +3638,24 @@ support symbolic links."
 	(erase-buffer)))
 
     (if (and (not current-buffer-p) (integerp asynchronous))
-	(prog1
-	    ;; Run the process.
-	    (setq p (start-file-process-shell-command
-		     (buffer-name output-buffer) buffer command))
-	  ;; Display output.
-	  (with-current-buffer output-buffer
-	    (display-buffer output-buffer '(nil (allow-no-window . t)))
-	    (setq mode-line-process '(":%s"))
-	    (shell-mode)
-	    (set-process-sentinel p #'shell-command-sentinel)
-	    (set-process-filter p #'comint-output-filter)))
+	(let ((tramp-remote-process-environment
+	       ;; `shell-command-width' has been introduced with Emacs 27.1.
+	       (if (natnump (bound-and-true-p shell-command-width))
+		   (cons (format "COLUMNS=%d"
+				 (bound-and-true-p shell-command-width))
+			 tramp-remote-process-environment)
+		 tramp-remote-process-environment)))
+	  (prog1
+	      ;; Run the process.
+	      (setq p (start-file-process-shell-command
+		       (buffer-name output-buffer) buffer command))
+	    ;; Display output.
+	    (with-current-buffer output-buffer
+	      (display-buffer output-buffer '(nil (allow-no-window . t)))
+	      (setq mode-line-process '(":%s"))
+	      (shell-mode)
+	      (set-process-sentinel p #'shell-command-sentinel)
+	      (set-process-filter p #'comint-output-filter))))
 
       (prog1
 	  ;; Run the process.
@@ -4211,6 +4218,19 @@ the remote host use line-endings as defined in the variable
 	  (process-send-string p string)))
       ;; Reenable the timers.
       (with-timeout-unsuspend stimers))))
+
+(defun tramp-process-sentinel (proc event)
+  "Flush file caches and remove shell prompt."
+  (unless (process-live-p proc)
+    (let ((vec (process-get proc 'vector))
+	  (prompt (tramp-get-connection-property proc "prompt" nil)))
+      (when vec
+	(tramp-message vec 5 "Sentinel called: `%S' `%s'" proc event)
+        (tramp-flush-connection-properties proc)
+        (tramp-flush-directory-properties vec ""))
+      (goto-char (point-max))
+      (when (and prompt (re-search-backward (regexp-quote prompt) nil t))
+	(delete-region (point) (point-max))))))
 
 (defun tramp-get-inode (vec)
   "Returns the virtual inode number.

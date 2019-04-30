@@ -245,7 +245,6 @@ See also `xml-get-attribute-or-nil'."
 ;; [54] AttType    ::= StringType | TokenizedType | EnumeratedType
 ;; [55] StringType ::= 'CDATA'
 (defconst xml-att-type-re (concat "\\(?:CDATA\\|" xml-tokenized-type-re
-				  "\\|" xml-notation-type-re
 				  "\\|" xml-enumerated-type-re "\\)"))
 
 ;; [60] DefaultDecl ::= '#REQUIRED' | '#IMPLIED' | (('#FIXED' S)? AttValue)
@@ -718,10 +717,10 @@ This follows the rule [28] in the XML specifications."
     (cond ((looking-at "PUBLIC\\s-+")
 	   (goto-char (match-end 0))
 	   (unless (or (re-search-forward
-			"\\=\"\\([[:space:][:alnum:]-'()+,./:=?;!*#@$_%]*\\)\""
+			"\\=\"\\([[:space:][:alnum:]'()+,./:=?;!*#@$_%-]*\\)\""
 			nil t)
 		       (re-search-forward
-			"\\='\\([[:space:][:alnum:]-()+,./:=?;!*#@$_%]*\\)'"
+			"\\='\\([[:space:][:alnum:]()+,./:=?;!*#@$_%-]*\\)'"
 			nil t))
 	     (error "XML: Missing Public ID"))
 	   (let ((pubid (match-string-no-properties 1)))

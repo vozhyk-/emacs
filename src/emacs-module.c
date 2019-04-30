@@ -17,6 +17,54 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 
+/*
+The public module API is defined in the header emacs-module.h.  The
+configure script generates emacs-module.h from emacs-module.h.in and
+the version-specific environment fragments in module-env-*.h.
+
+If you want to change the module API, please abide to the following
+rules:
+
+- Don't remove publicly documented declarations from the headers.
+
+- Don't remove, reorder, or rename structure fields, as such changes
+  break ABI compatibility.
+
+- Don't change the types of structure fields.
+
+- Add structure fields only at the end of structures.
+
+- For every Emacs major version there is a new fragment file
+  module-env-VER.h.  Add functions solely at the end of the fragment
+  file for the next (not yet released) major version of Emacs.  For
+  example, if the current Emacs release is 26.2, add functions only to
+  emacs-env-27.h.
+
+- emacs-module.h should only depend on standard C headers.  In
+  particular, don't include config.h or lisp.h from emacs-module.h.
+
+- Prefix all names in emacs-module.h with "emacs_" or "EMACS_".
+
+To add a new module function, proceed as follows:
+
+1. Add a new function pointer field at the end of the emacs-env-*.h
+   file for the next major version of Emacs.
+
+2. Run config.status or configure to regenerate emacs-module.h.
+
+3. Create a corresponding implementation function in this file.  See
+   "Implementation of runtime and environment functions" below for
+   further rules.
+
+4. Assign the new field in the initialize_environment function.
+
+5. Add a test function that calls your new function to
+   test/data/emacs-module/mod-test.c.  Add a unit test that invokes
+   your new test function to test/src/emacs-module-tests.el.
+
+6. Document your new function in the manual and in etc/NEWS.
+*/
+
 #include <config.h>
 
 #include "emacs-module.h"
@@ -147,15 +195,14 @@ static enum emacs_funcall_exit module_non_local_exit_check (emacs_env *);
 static void module_assert_thread (void);
 static void module_assert_runtime (struct emacs_runtime *);
 static void module_assert_env (emacs_env *);
-static _Noreturn void module_abort (const char *format, ...)
-  ATTRIBUTE_FORMAT_PRINTF(1, 2);
+static AVOID module_abort (const char *, ...) ATTRIBUTE_FORMAT_PRINTF (1, 2);
 static emacs_env *initialize_environment (emacs_env *,
 					  struct emacs_env_private *);
 static void finalize_environment (emacs_env *);
 static void finalize_environment_unwind (void *);
 static void finalize_runtime_unwind (void *);
-static void module_handle_signal (emacs_env *, Lisp_Object);
-static void module_handle_throw (emacs_env *, Lisp_Object);
+static void module_handle_nonlocal_exit (emacs_env *, enum nonlocal_exit,
+                                         Lisp_Object);
 static void module_non_local_exit_signal_1 (emacs_env *,
 					    Lisp_Object, Lisp_Object);
 static void module_non_local_exit_throw_1 (emacs_env *,
@@ -184,11 +231,8 @@ static bool module_assertions = false;
    or a pointer to handle non-local exits.  The function must have an
    ENV parameter.  The function will return the specified value if a
    signal or throw is caught.  */
-/* TODO: Have Fsignal check for CATCHER_ALL so we only have to install
-   one handler.  */
 #define MODULE_HANDLE_NONLOCAL_EXIT(retval)                     \
-  MODULE_SETJMP (CONDITION_CASE, module_handle_signal, retval); \
-  MODULE_SETJMP (CATCHER_ALL, module_handle_throw, retval)
+  MODULE_SETJMP (CATCHER_ALL, module_handle_nonlocal_exit, retval)
 
 #define MODULE_SETJMP(handlertype, handlerfunc, retval)			       \
   MODULE_SETJMP_1 (handlertype, handlerfunc, retval,			       \
@@ -224,7 +268,7 @@ static bool module_assertions = false;
     = c0;								\
   if (sys_setjmp (c->jmp))						\
     {									\
-      (handlerfunc) (env, c->val);					\
+      (handlerfunc) (env, c->nonlocal_exit, c->val);                    \
       return retval;							\
     }									\
   do { } while (false)
@@ -304,6 +348,8 @@ module_get_environment (struct emacs_runtime *ert)
 
 /* To make global refs (GC-protected global values) keep a hash that
    maps global Lisp objects to reference counts.  */
+
+static Lisp_Object Vmodule_refs_hash;
 
 static emacs_value
 module_make_global_ref (emacs_env *env, emacs_value ref)
@@ -427,7 +473,7 @@ static struct Lisp_Module_Function *
 allocate_module_function (void)
 {
   return ALLOCATE_PSEUDOVECTOR (struct Lisp_Module_Function,
-                                min_arity, PVEC_MODULE_FUNCTION);
+                                documentation, PVEC_MODULE_FUNCTION);
 }
 
 #define XSET_MODULE_FUNCTION(var, ptr) \
@@ -715,6 +761,10 @@ module_signal_or_throw (struct emacs_env_private *env)
       eassume (false);
     }
 }
+
+/* Live runtime and environment objects, for assertions.  */
+static Lisp_Object Vmodule_runtimes;
+static Lisp_Object Vmodule_environments;
 
 DEFUN ("module-load", Fmodule_load, Smodule_load, 1, 1, 0,
        doc: /* Load module FILE.  */)
@@ -1136,20 +1186,22 @@ module_reset_handlerlist (struct handler **phandlerlist)
   handlerlist = handlerlist->next;
 }
 
-/* Called on `signal'.  ERR is a pair (SYMBOL . DATA), which gets
-   stored in the environment.  Set the pending non-local exit flag.  */
+/* Called on `signal' and `throw'.  DATA is a pair
+   (ERROR-SYMBOL . ERROR-DATA) or (TAG . VALUE), which gets stored in
+   the environment.  Set the pending non-local exit flag.  */
 static void
-module_handle_signal (emacs_env *env, Lisp_Object err)
+module_handle_nonlocal_exit (emacs_env *env, enum nonlocal_exit type,
+                             Lisp_Object data)
 {
-  module_non_local_exit_signal_1 (env, XCAR (err), XCDR (err));
-}
-
-/* Called on `throw'.  TAG_VAL is a pair (TAG . VALUE), which gets
-   stored in the environment.  Set the pending non-local exit flag.  */
-static void
-module_handle_throw (emacs_env *env, Lisp_Object tag_val)
-{
-  module_non_local_exit_throw_1 (env, XCAR (tag_val), XCDR (tag_val));
+  switch (type)
+    {
+    case NONLOCAL_EXIT_SIGNAL:
+      module_non_local_exit_signal_1 (env, XCAR (data), XCDR (data));
+      break;
+    case NONLOCAL_EXIT_THROW:
+      module_non_local_exit_throw_1 (env, XCAR (data), XCDR (data));
+      break;
+    }
 }
 
 
@@ -1163,8 +1215,7 @@ init_module_assertions (bool enable)
   initialize_storage (&global_storage);
 }
 
-static _Noreturn void
-ATTRIBUTE_FORMAT_PRINTF(1, 2)
+static AVOID ATTRIBUTE_FORMAT_PRINTF (1, 2)
 module_abort (const char *format, ...)
 {
   fputs ("Emacs module assertion: ", stderr);
@@ -1183,31 +1234,17 @@ module_abort (const char *format, ...)
 void
 syms_of_module (void)
 {
-  DEFSYM (Qmodule_refs_hash, "module-refs-hash");
-  DEFVAR_LISP ("module-refs-hash", Vmodule_refs_hash,
-	       doc: /* Module global reference table.  */);
-
+  staticpro (&Vmodule_refs_hash);
   Vmodule_refs_hash
     = make_hash_table (hashtest_eq, DEFAULT_HASH_SIZE,
 		       DEFAULT_REHASH_SIZE, DEFAULT_REHASH_THRESHOLD,
 		       Qnil, false);
-  Funintern (Qmodule_refs_hash, Qnil);
 
-  DEFSYM (Qmodule_runtimes, "module-runtimes");
-  DEFVAR_LISP ("module-runtimes", Vmodule_runtimes,
-               doc: /* List of active module runtimes.  */);
+  staticpro (&Vmodule_runtimes);
   Vmodule_runtimes = Qnil;
-  /* Unintern `module-runtimes' because it is only used
-     internally.  */
-  Funintern (Qmodule_runtimes, Qnil);
 
-  DEFSYM (Qmodule_environments, "module-environments");
-  DEFVAR_LISP ("module-environments", Vmodule_environments,
-               doc: /* List of active module environments.  */);
+  staticpro (&Vmodule_environments);
   Vmodule_environments = Qnil;
-  /* Unintern `module-environments' because it is only used
-     internally.  */
-  Funintern (Qmodule_environments, Qnil);
 
   DEFSYM (Qmodule_load_failed, "module-load-failed");
   Fput (Qmodule_load_failed, Qerror_conditions,
@@ -1245,10 +1282,6 @@ syms_of_module (void)
   Fput (Qinvalid_arity, Qerror_conditions, pure_list (Qinvalid_arity, Qerror));
   Fput (Qinvalid_arity, Qerror_message,
         build_pure_c_string ("Invalid function arity"));
-
-  /* Unintern `module-refs-hash' because it is internal-only and Lisp
-     code or modules should not access it.  */
-  Funintern (Qmodule_refs_hash, Qnil);
 
   DEFSYM (Qmodule_function_p, "module-function-p");
 
