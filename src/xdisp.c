@@ -12858,7 +12858,9 @@ redisplay_tool_bar (struct frame *f)
 
       if (new_height != WINDOW_PIXEL_HEIGHT (w))
 	{
+#ifndef HAVE_PGTK
 	  x_change_tool_bar_height (f, new_height);
+#endif
 	  frame_default_tool_bar_height = new_height;
 	  /* Always do that now.  */
 	  clear_glyph_matrix (w->desired_matrix);
@@ -12953,7 +12955,9 @@ redisplay_tool_bar (struct frame *f)
 
 	  if (change_height_p)
 	    {
+#ifndef HAVE_PGTK
 	      x_change_tool_bar_height (f, new_height);
+#endif
 	      frame_default_tool_bar_height = new_height;
 	      clear_glyph_matrix (w->desired_matrix);
 	      f->n_tool_bar_rows = nrows;
