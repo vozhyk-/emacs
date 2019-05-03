@@ -1145,31 +1145,34 @@ ftfont_open2 (struct frame *f,
   color = is_color_font(ft_face);
   if (!color)
     {
-      int min_distance = INT_MAX;
-      bool magnify = true;
-
-      for (FT_Int i = 0; i < ft_face->num_fixed_sizes; i++)
+      if (FT_Set_Pixel_Sizes (ft_face, size, size) != 0)
 	{
-	  int distance = ft_face->available_sizes[i].height - (int) size;
+	  int min_distance = INT_MAX;
+	  bool magnify = true;
 
-	  /* Prefer down-scaling to upscaling.  */
-	  if (magnify == (distance < 0) ? abs (distance) <= min_distance
-	      : magnify)
+	  for (FT_Int i = 0; i < ft_face->num_fixed_sizes; i++)
 	    {
-	      magnify = distance < 0;
-	      min_distance = abs (distance);
-	      strike_index = i;
-	    }
-	}
+	      int distance = ft_face->available_sizes[i].height - (int) size;
 
-      if (strike_index < 0 || FT_Select_Size (ft_face, strike_index) != 0)
-	{
-	  if (cache_data->face_refcount == 0)
-	    {
-	      FT_Done_Face (ft_face);
-	      cache_data->ft_face = NULL;
+	      /* Prefer down-scaling to upscaling.  */
+	      if (magnify == (distance < 0) ? abs (distance) <= min_distance
+		  : magnify)
+		{
+		  magnify = distance < 0;
+		  min_distance = abs (distance);
+		  strike_index = i;
+		}
 	    }
-	  return Qnil;
+
+	  if (strike_index < 0 || FT_Select_Size (ft_face, strike_index) != 0)
+	    {
+	      if (cache_data->face_refcount == 0)
+		{
+		  FT_Done_Face (ft_face);
+		  cache_data->ft_face = NULL;
+		}
+	      return Qnil;
+	    }
 	}
     }
   else
@@ -1182,7 +1185,7 @@ ftfont_open2 (struct frame *f,
 	      cache_data->ft_face = NULL;
 	    }
 	  return Qnil;
-	}
+       }
     }
 
   cache_data->face_refcount++;

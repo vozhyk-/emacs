@@ -517,12 +517,12 @@ x_set_window_size (struct frame *f,
 }
 
 void
-x_iconify_frame (struct frame *f)
+pgtk_iconify_frame (struct frame *f)
 /* --------------------------------------------------------------------------
      External: Iconify window
    -------------------------------------------------------------------------- */
 {
-  PGTK_TRACE("x_iconify_frame");
+  PGTK_TRACE("pgtk_iconify_frame");
 
   /* Don't keep the highlight on an invisible frame.  */
   if (FRAME_DISPLAY_INFO (f)->highlight_frame == f)
@@ -579,12 +579,12 @@ x_iconify_frame (struct frame *f)
 }
 
 void
-x_make_frame_visible (struct frame *f)
+pgtk_make_frame_visible (struct frame *f)
 /* --------------------------------------------------------------------------
      External: Show the window (X11 semantics)
    -------------------------------------------------------------------------- */
 {
-  PGTK_TRACE("x_make_frame_visible");
+  PGTK_TRACE("pgtk_make_frame_visible");
 #if 0
   NSTRACE ("x_make_frame_visible");
   /* XXX: at some points in past this was not needed, as the only place that
@@ -633,12 +633,12 @@ x_make_frame_visible (struct frame *f)
 
 
 void
-x_make_frame_invisible (struct frame *f)
+pgtk_make_frame_invisible (struct frame *f)
 /* --------------------------------------------------------------------------
      External: Hide the window (X11 semantics)
    -------------------------------------------------------------------------- */
 {
-  PGTK_TRACE("x_make_frame_invisible");
+  PGTK_TRACE("pgtk_make_frame_invisible");
 #if 0
   NSView *view;
   NSTRACE ("x_make_frame_invisible");
@@ -651,9 +651,9 @@ x_make_frame_invisible (struct frame *f)
 }
 
 Lisp_Object
-x_new_font (struct frame *f, Lisp_Object font_object, int fontset)
+pgtk_new_font (struct frame *f, Lisp_Object font_object, int fontset)
 {
-  PGTK_TRACE("x_new_font");
+  PGTK_TRACE("pgtk_new_font");
   struct font *font = XFONT_OBJECT (font_object);
   // EmacsView *view = FRAME_NS_VIEW (f);
   int font_ascent, font_descent;
@@ -2921,6 +2921,7 @@ pgtk_draw_window_cursor (struct window *w, struct glyph_row *glyph_row, int x,
   PGTK_TRACE("draw_window_cursor: %d, %d, %d, %d, %d, %d.",
 	       x, y, cursor_type, cursor_width, on_p, active_p);
   struct frame *f = XFRAME (WINDOW_FRAME (w));
+  PGTK_TRACE("%p\n", f->output_data.pgtk);
 
   if (on_p)
     {
@@ -3614,10 +3615,10 @@ extern frame_parm_handler pgtk_frame_parm_handlers[];
 static struct redisplay_interface pgtk_redisplay_interface =
 {
   pgtk_frame_parm_handlers,
-  produce_glyphs,
-  write_glyphs,
-  insert_glyphs,
-  clear_end_of_line,
+  gui_produce_glyphs,
+  gui_write_glyphs,
+  gui_insert_glyphs,
+  gui_clear_end_of_line,
   pgtk_scroll_run,
   pgtk_after_update_window_line,
   pgtk_update_window_begin,
@@ -3633,6 +3634,7 @@ static struct redisplay_interface pgtk_redisplay_interface =
   pgtk_draw_glyph_string,
   pgtk_define_frame_cursor,
   pgtk_clear_frame_area,
+  pgtk_clear_under_internal_border,
   pgtk_draw_window_cursor,
   pgtk_draw_vertical_window_border,
   pgtk_draw_window_divider,
@@ -4680,6 +4682,12 @@ pgtk_create_terminal (struct pgtk_display_info *dpyinfo)
   terminal->delete_terminal_hook = pgtk_delete_terminal;
   terminal->query_frame_background_color = pgtk_query_frame_background_color;
   terminal->defined_color_hook = pgtk_defined_color;
+  terminal->set_new_font_hook = pgtk_new_font;
+  terminal->implicit_set_name_hook = pgtk_implicitly_set_name;
+  terminal->iconify_frame_hook = pgtk_iconify_frame;
+  terminal->set_scroll_bar_default_width_hook = pgtk_set_scroll_bar_default_width;
+  terminal->set_scroll_bar_default_height_hook = pgtk_set_scroll_bar_default_height;
+
   /* Other hooks are NULL by default.  */
 
   return terminal;

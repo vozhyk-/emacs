@@ -521,7 +521,8 @@ extern char *pgtk_xlfd_to_fontname (const char *xlfd);
 /* Implemented in pgtkfns. */
 extern void pgtk_set_doc_edited (void);
 extern const char *pgtk_get_defaults_value (const char *key);
-extern char *pgtk_get_string_resource (XrmDatabase rdb, const char *name, const char *class);
+extern const char *pgtk_get_string_resource (XrmDatabase rdb, const char *name, const char *class);
+extern void pgtk_implicitly_set_name (struct frame *f, Lisp_Object arg, Lisp_Object oldval);
 
 /* Color management implemented in pgtkterm. */
 extern bool pgtk_defined_color (struct frame *f,
@@ -579,5 +580,14 @@ extern void nxatoms_of_pgtkselect (void);
 extern void init_pgtkterm (void);
 extern void mark_pgtkterm(void);
 extern void pgtk_delete_terminal (struct terminal *terminal);
+
+extern void pgtk_make_frame_visible (struct frame *f);
+extern void pgtk_make_frame_invisible (struct frame *f);
+extern void x_wm_set_size_hint (struct frame *, long, bool);
+extern void x_free_frame_resources (struct frame *);
+extern void pgtk_iconify_frame (struct frame *f);
+extern void x_focus_frame (struct frame *f, bool noactivate);
+extern void pgtk_set_scroll_bar_default_width (struct frame *f);
+extern void pgtk_set_scroll_bar_default_height (struct frame *f);
 
 #endif	/* HAVE_PGTK */

@@ -349,7 +349,7 @@ x_explicitly_set_name (struct frame *f, Lisp_Object arg, Lisp_Object oldval)
    name; names set this way will never override names set by the user's
    lisp code.  */
 void
-x_implicitly_set_name (struct frame *f, Lisp_Object arg, Lisp_Object oldval)
+pgtk_implicitly_set_name (struct frame *f, Lisp_Object arg, Lisp_Object oldval)
 {
   PGTK_TRACE ("x_implicitly_set_name");
 
@@ -805,11 +805,11 @@ x_set_override_redirect (struct frame *f, Lisp_Object new_value, Lisp_Object old
     {
       /* Here (xfwm) override_redirect can be changed for invisible
 	 frames only.  */
-      x_make_frame_invisible (f);
+      pgtk_make_frame_invisible (f);
 
       xg_set_override_redirect (f, new_value);
 
-      x_make_frame_visible (f);
+      pgtk_make_frame_visible (f);
       FRAME_OVERRIDE_REDIRECT (f) = !NILP (new_value);
     }
 }
@@ -1510,14 +1510,14 @@ This function is an internal primitive--use `make-frame' instead.  */)
 	= gui_display_get_arg (dpyinfo, parms, Qvisibility, 0, 0, RES_TYPE_SYMBOL);
 
       if (EQ (visibility, Qicon))
-	x_iconify_frame (f);
+	pgtk_iconify_frame (f);
       else
 	{
 	  if (EQ (visibility, Qunbound))
 	    visibility = Qt;
 
 	  if (!NILP (visibility))
-	    x_make_frame_visible (f);
+	    pgtk_make_frame_visible (f);
 	}
 
       store_frame_param (f, Qvisibility, visibility);
@@ -1982,7 +1982,7 @@ check_x_display_info (Lisp_Object frame)
 
 
 void
-x_set_scroll_bar_default_width (struct frame *f)
+pgtk_set_scroll_bar_default_width (struct frame *f)
 {
   int unit = FRAME_COLUMN_WIDTH (f);
   int minw = xg_get_default_scrollbar_width (f);
@@ -1992,7 +1992,7 @@ x_set_scroll_bar_default_width (struct frame *f)
 }
 
 void
-x_set_scroll_bar_default_height (struct frame *f)
+pgtk_set_scroll_bar_default_height (struct frame *f)
 {
   int height = FRAME_LINE_HEIGHT (f);
   int min_height = xg_get_default_scrollbar_height (f);
@@ -2002,7 +2002,7 @@ x_set_scroll_bar_default_height (struct frame *f)
 }
 
 /* terms impl this instead of x-get-resource directly */
-char *
+const char *
 pgtk_get_string_resource (XrmDatabase rdb, const char *name, const char *class)
 {
   /* remove appname prefix; TODO: allow for !="Emacs" */
@@ -2412,7 +2412,7 @@ x_hide_tip (bool delete)
 	      tip_frame = Qnil;
 	    }
 	  else
-	    x_make_frame_invisible (XFRAME (tip_frame));
+	    pgtk_make_frame_invisible (XFRAME (tip_frame));
 
 	  was_open = Qt;
 	}
