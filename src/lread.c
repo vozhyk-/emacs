@@ -1034,12 +1034,12 @@ load_error_old_style_backquotes (void)
 static void
 load_warn_unescaped_character_literals (Lisp_Object file)
 {
-  Lisp_Object warning
-    = call0 (Qbyte_run_unescaped_character_literals_warning);
-  if (NILP (warning))
-    return;
-  Lisp_Object format = build_string ("Loading `%s': %s");
-  CALLN (Fmessage, format, file, warning);
+  Lisp_Object warning = call0 (Qbyte_run_unescaped_character_literals_warning);
+  if (!NILP (warning))
+    {
+      AUTO_STRING (format, "Loading `%s': %s");
+      CALLN (Fmessage, format, file, warning);
+    }
 }
 
 DEFUN ("get-load-suffixes", Fget_load_suffixes, Sget_load_suffixes, 0, 0, 0,
@@ -1301,8 +1301,8 @@ Return t if the file exists and loads successfully.  */)
   specbind (Qlread_unescaped_character_literals, Qnil);
   record_unwind_protect (load_warn_unescaped_character_literals, file);
 
-  int is_elc;
-  if ((is_elc = suffix_p (found, ".elc")) != 0
+  bool is_elc = suffix_p (found, ".elc");
+  if (is_elc
       /* version = 1 means the file is empty, in which case we can
 	 treat it as not byte-compiled.  */
       || (fd >= 0 && (version = safe_to_load_version (fd)) > 1))
@@ -1439,6 +1439,10 @@ Return t if the file exists and loads successfully.  */)
   specbind (Qinhibit_file_name_operation, Qnil);
   specbind (Qload_in_progress, Qt);
 
+  /* Declare here rather than inside the else-part because the storage
+     might be accessed by the unbind_to call below.  */
+  struct infile input;
+
   if (is_module)
     {
 #ifdef HAVE_MODULES
@@ -1453,7 +1457,6 @@ Return t if the file exists and loads successfully.  */)
     }
   else
     {
-      struct infile input;
       input.stream = stream;
       input.lookahead = 0;
       infile = &input;
@@ -3779,7 +3782,7 @@ string_to_number (char const *string, int base, ptrdiff_t *plen)
 	      state |= E_EXP;
 	      cp += 3;
 	      union ieee754_double u
-		= { .ieee_nan = { .exponent = -1, .quiet_nan = 1,
+		= { .ieee_nan = { .exponent = 0x7ff, .quiet_nan = 1,
 				  .mantissa0 = n >> 31 >> 1, .mantissa1 = n }};
 	      value = u.d;
 	    }

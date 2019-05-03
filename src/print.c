@@ -1410,7 +1410,6 @@ print_vectorlike (Lisp_Object obj, Lisp_Object printcharfun, bool escapeflag,
       printchar ('>', printcharfun);
       break;
 
-#ifdef HAVE_MODULES
     case PVEC_USER_PTR:
       {
 	print_c_string ("#<user-ptr ", printcharfun);
@@ -1421,7 +1420,6 @@ print_vectorlike (Lisp_Object obj, Lisp_Object printcharfun, bool escapeflag,
 	printchar ('>', printcharfun);
       }
       break;
-#endif
 
     case PVEC_FINALIZER:
       print_c_string ("#<finalizer", printcharfun);
@@ -1789,8 +1787,8 @@ print_vectorlike (Lisp_Object obj, Lisp_Object printcharfun, bool escapeflag,
     case PVEC_MODULE_FUNCTION:
       {
 	print_c_string ("#<module function ", printcharfun);
-	void *ptr = XMODULE_FUNCTION (obj)->subr;
-	const char *file = NULL;
+        module_funcptr ptr = module_function_address (XMODULE_FUNCTION (obj));
+        const char *file = NULL;
 	const char *symbol = NULL;
 	dynlib_addr (ptr, &file, &symbol);
 

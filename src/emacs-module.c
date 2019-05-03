@@ -32,6 +32,9 @@ rules:
 
 - Don't change the types of structure fields.
 
+- Likewise, the presence, order, and type of structure fields may not
+  depend on preprocessor macros.
+
 - Add structure fields only at the end of structures.
 
 - For every Emacs major version there is a new fragment file
@@ -67,6 +70,12 @@ To add a new module function, proceed as follows:
 
 #include <config.h>
 
+#ifndef HAVE_GMP
+#include "mini-gmp.h"
+#define EMACS_MODULE_HAVE_MPZ_T
+#endif
+
+#define EMACS_MODULE_GMP
 #include "emacs-module.h"
 
 #include <stdarg.h>
@@ -74,8 +83,10 @@ To add a new module function, proceed as follows:
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <time.h>
 
 #include "lisp.h"
+#include "bignum.h"
 #include "dynlib.h"
 #include "coding.h"
 #include "keyboard.h"
@@ -209,6 +220,9 @@ static void module_non_local_exit_throw_1 (emacs_env *,
 					   Lisp_Object, Lisp_Object);
 static void module_out_of_memory (emacs_env *);
 static void module_reset_handlerlist (struct handler **);
+static bool value_storage_contains_p (const struct emacs_value_storage *,
+                                      emacs_value, ptrdiff_t *);
+static Lisp_Object module_encode (Lisp_Object);
 
 static bool module_assertions = false;
 
@@ -222,26 +236,19 @@ static bool module_assertions = false;
    not prepared for long jumps (e.g., the behavior in C++ is undefined
    if objects with nontrivial destructors would be skipped).
    Therefore, catch all non-local exits.  There are two kinds of
-   non-local exits: `signal' and `throw'.  The macros in this section
-   can be used to catch both.  Use macros to avoid additional variants
+   non-local exits: `signal' and `throw'.  The macro in this section
+   can be used to catch both.  Use a macro to avoid additional variants
    of `internal_condition_case' etc., and to avoid worrying about
    passing information to the handler functions.  */
+
+#if !__has_attribute (cleanup)
+ #error "__attribute__ ((cleanup)) not supported by this compiler; try GCC"
+#endif
 
 /* Place this macro at the beginning of a function returning a number
    or a pointer to handle non-local exits.  The function must have an
    ENV parameter.  The function will return the specified value if a
    signal or throw is caught.  */
-#define MODULE_HANDLE_NONLOCAL_EXIT(retval)                     \
-  MODULE_SETJMP (CATCHER_ALL, module_handle_nonlocal_exit, retval)
-
-#define MODULE_SETJMP(handlertype, handlerfunc, retval)			       \
-  MODULE_SETJMP_1 (handlertype, handlerfunc, retval,			       \
-		   internal_handler_##handlertype,			       \
-		   internal_cleanup_##handlertype)
-
-#if !__has_attribute (cleanup)
- #error "__attribute__ ((cleanup)) not supported by this compiler; try GCC"
-#endif
 
 /* It is very important that pushing the handler doesn't itself raise
    a signal.  Install the cleanup only after the handler has been
@@ -251,24 +258,28 @@ static bool module_assertions = false;
    The do-while forces uses of the macro to be followed by a semicolon.
    This macro cannot enclose its entire body inside a do-while, as the
    code after the macro may longjmp back into the macro, which means
-   its local variable C must stay live in later code.  */
+   its local variable INTERNAL_CLEANUP must stay live in later code.  */
 
-/* TODO: Make backtraces work if this macros is used.  */
+/* TODO: Make backtraces work if this macro is used.  */
 
-#define MODULE_SETJMP_1(handlertype, handlerfunc, retval, c0, c)	\
+#define MODULE_HANDLE_NONLOCAL_EXIT(retval)                             \
   if (module_non_local_exit_check (env) != emacs_funcall_exit_return)	\
     return retval;							\
-  struct handler *c0 = push_handler_nosignal (Qt, handlertype);		\
-  if (!c0)								\
+  struct handler *internal_handler =                                    \
+    push_handler_nosignal (Qt, CATCHER_ALL);                            \
+  if (!internal_handler)                                                \
     {									\
       module_out_of_memory (env);					\
       return retval;							\
     }									\
-  struct handler *c __attribute__ ((cleanup (module_reset_handlerlist))) \
-    = c0;								\
-  if (sys_setjmp (c->jmp))						\
+  struct handler *internal_cleanup                                      \
+    __attribute__ ((cleanup (module_reset_handlerlist)))                \
+    = internal_handler;                                                 \
+  if (sys_setjmp (internal_cleanup->jmp))                               \
     {									\
-      (handlerfunc) (env, c->nonlocal_exit, c->val);                    \
+      module_handle_nonlocal_exit (env,                                 \
+                                   internal_cleanup->nonlocal_exit,     \
+                                   internal_cleanup->val);              \
       return retval;							\
     }									\
   do { } while (false)
@@ -403,16 +414,8 @@ module_free_global_ref (emacs_env *env, emacs_value ref)
   if (module_assertions)
     {
       ptrdiff_t count = 0;
-      for (struct emacs_value_frame *frame = &global_storage.initial;
-           frame != NULL; frame = frame->next)
-        {
-          for (int i = 0; i < frame->offset; ++i)
-            {
-              if (&frame->objects[i] == ref)
-                return;
-              ++count;
-            }
-        }
+      if (value_storage_contains_p (&global_storage, ref, &count))
+        return;
       module_abort ("Global value was not found in list of %"pD"d globals",
                     count);
     }
@@ -469,6 +472,30 @@ module_non_local_exit_throw (emacs_env *env, emacs_value tag, emacs_value value)
 				   value_to_lisp (value));
 }
 
+/* Function prototype for the module Lisp functions.  */
+typedef emacs_value (*emacs_subr) (emacs_env *, ptrdiff_t,
+				   emacs_value [], void *);
+
+/* Module function.  */
+
+/* A function environment is an auxiliary structure returned by
+   `module_make_function' to store information about a module
+   function.  It is stored in a pseudovector.  Its members correspond
+   to the arguments given to `module_make_function'.  */
+
+struct Lisp_Module_Function
+{
+  union vectorlike_header header;
+
+  /* Fields traced by GC; these must come first.  */
+  Lisp_Object documentation;
+
+  /* Fields ignored by GC.  */
+  ptrdiff_t min_arity, max_arity;
+  emacs_subr subr;
+  void *data;
+} GCALIGNED_STRUCT;
+
 static struct Lisp_Module_Function *
 allocate_module_function (void)
 {
@@ -503,11 +530,7 @@ module_make_function (emacs_env *env, ptrdiff_t min_arity, ptrdiff_t max_arity,
   function->data = data;
 
   if (documentation)
-    {
-      AUTO_STRING (unibyte_doc, documentation);
-      function->documentation =
-        code_convert_string_norecord (unibyte_doc, Qutf_8, false);
-    }
+    function->documentation = build_string_from_utf8 (documentation);
 
   Lisp_Object result;
   XSET_MODULE_FUNCTION (result, function);
@@ -609,7 +632,7 @@ module_copy_string_contents (emacs_env *env, emacs_value value, char *buffer,
   Lisp_Object lisp_str = value_to_lisp (value);
   CHECK_STRING (lisp_str);
 
-  Lisp_Object lisp_str_utf8 = ENCODE_UTF_8 (lisp_str);
+  Lisp_Object lisp_str_utf8 = module_encode (lisp_str);
   ptrdiff_t raw_size = SBYTES (lisp_str_utf8);
   ptrdiff_t required_buf_size = raw_size + 1;
 
@@ -621,8 +644,11 @@ module_copy_string_contents (emacs_env *env, emacs_value value, char *buffer,
 
   if (*length < required_buf_size)
     {
+      ptrdiff_t actual = *length;
       *length = required_buf_size;
-      xsignal0 (Qargs_out_of_range);
+      args_out_of_range_3 (INT_TO_INTEGER (actual),
+                           INT_TO_INTEGER (required_buf_size),
+                           INT_TO_INTEGER (PTRDIFF_MAX));
     }
 
   *length = required_buf_size;
@@ -637,11 +663,8 @@ module_make_string (emacs_env *env, const char *str, ptrdiff_t length)
   MODULE_FUNCTION_BEGIN (NULL);
   if (! (0 <= length && length <= STRING_BYTES_BOUND))
     overflow_error ();
-  /* FIXME: AUTO_STRING_WITH_LEN requires STR to be NUL-terminated,
-     but we shouldn't require that.  */
-  AUTO_STRING_WITH_LEN (lstr, str, length);
-  return lisp_to_value (env,
-                        code_convert_string_norecord (lstr, Qutf_8, false));
+  Lisp_Object lstr = make_string_from_utf8 (str, length);
+  return lisp_to_value (env, lstr);
 }
 
 static emacs_value
@@ -739,6 +762,41 @@ module_process_input (emacs_env *env)
   MODULE_FUNCTION_BEGIN (emacs_process_input_quit);
   maybe_quit ();
   return emacs_process_input_continue;
+}
+
+static struct timespec
+module_extract_time (emacs_env *env, emacs_value value)
+{
+  MODULE_FUNCTION_BEGIN ((struct timespec) {0});
+  return lisp_time_argument (value_to_lisp (value));
+}
+
+static emacs_value
+module_make_time (emacs_env *env, struct timespec time)
+{
+  MODULE_FUNCTION_BEGIN (NULL);
+  return lisp_to_value (env, timespec_to_lisp (time));
+}
+
+static void
+module_extract_big_integer (emacs_env *env, emacs_value value,
+                            struct emacs_mpz *result)
+{
+  MODULE_FUNCTION_BEGIN ();
+  Lisp_Object o = value_to_lisp (value);
+  CHECK_INTEGER (o);
+  if (FIXNUMP (o))
+    mpz_set_intmax (result->value, XFIXNUM (o));
+  else
+    mpz_set (result->value, XBIGNUM (o)->value);
+}
+
+static emacs_value
+module_make_big_integer (emacs_env *env, const struct emacs_mpz *value)
+{
+  MODULE_FUNCTION_BEGIN (NULL);
+  mpz_set (mpz[0], value->value);
+  return lisp_to_value (env, make_integer_mpz ());
 }
 
 
@@ -844,6 +902,11 @@ funcall_module (Lisp_Object function, ptrdiff_t nargs, Lisp_Object *arglist)
 	memory_full (sizeof *args[i]);
     }
 
+  /* The only possibility of getting an error until here is failure to
+     allocate memory for the arguments, but then we already should
+     have signaled an error before.  */
+  eassert (priv.pending_non_local_exit == emacs_funcall_exit_return);
+
   emacs_value ret = func->subr (env, nargs, args, func->data);
 
   eassert (&priv == env->private_members);
@@ -863,6 +926,18 @@ module_function_arity (const struct Lisp_Module_Function *const function)
   ptrdiff_t maxargs = function->max_arity;
   return Fcons (make_fixnum (minargs),
 		maxargs == MANY ? Qmany : make_fixnum (maxargs));
+}
+
+Lisp_Object
+module_function_documentation (const struct Lisp_Module_Function *function)
+{
+  return function->documentation;
+}
+
+module_funcptr
+module_function_address (const struct Lisp_Module_Function *function)
+{
+  return (module_funcptr) function->subr;
 }
 
 
@@ -949,6 +1024,12 @@ module_out_of_memory (emacs_env *env)
 				  XCDR (Vmemory_signal_data));
 }
 
+static Lisp_Object
+module_encode (Lisp_Object string)
+{
+  return code_convert_string (string, Qutf_8_unix, Qt, true, true, true);
+}
+
 
 /* Value conversion.  */
 
@@ -978,29 +1059,13 @@ value_to_lisp (emacs_value v)
           if (&priv->non_local_exit_symbol == v
               || &priv->non_local_exit_data == v)
             goto ok;
-          for (struct emacs_value_frame *frame = &priv->storage.initial;
-               frame != NULL; frame = frame->next)
-            {
-              for (int i = 0; i < frame->offset; ++i)
-                {
-                  if (&frame->objects[i] == v)
-                    goto ok;
-                  ++num_values;
-                }
-            }
+          if (value_storage_contains_p (&priv->storage, v, &num_values))
+            goto ok;
           ++num_environments;
         }
       /* Also check global values.  */
-      for (struct emacs_value_frame *frame = &global_storage.initial;
-           frame != NULL; frame = frame->next)
-        {
-          for (int i = 0; i < frame->offset; ++i)
-            {
-              if (&frame->objects[i] == v)
-                goto ok;
-              ++num_values;
-            }
-        }
+      if (value_storage_contains_p (&global_storage, v, &num_values))
+        goto ok;
       module_abort (("Emacs value not found in %"pD"d values "
 		     "of %"pD"d environments"),
                     num_values, num_environments);
@@ -1142,6 +1207,10 @@ initialize_environment (emacs_env *env, struct emacs_env_private *priv)
   env->vec_size = module_vec_size;
   env->should_quit = module_should_quit;
   env->process_input = module_process_input;
+  env->extract_time = module_extract_time;
+  env->make_time = module_make_time;
+  env->extract_big_integer = module_extract_big_integer;
+  env->make_big_integer = module_make_big_integer;
   Vmodule_environments = Fcons (make_mint_ptr (env), Vmodule_environments);
   return env;
 }
@@ -1213,6 +1282,26 @@ init_module_assertions (bool enable)
      storing the globals.  This environment is never freed.  */
   module_assertions = enable;
   initialize_storage (&global_storage);
+}
+
+/* Return whether STORAGE contains VALUE.  Used to check module
+   assertions.  Increment *COUNT by the number of values searched.  */
+
+static bool
+value_storage_contains_p (const struct emacs_value_storage *storage,
+                          emacs_value value, ptrdiff_t *count)
+{
+  for (const struct emacs_value_frame *frame = &storage->initial; frame != NULL;
+       frame = frame->next)
+    {
+      for (int i = 0; i < frame->offset; ++i)
+        {
+          if (&frame->objects[i] == value)
+            return true;
+          ++*count;
+        }
+    }
+  return false;
 }
 
 static AVOID ATTRIBUTE_FORMAT_PRINTF (1, 2)
