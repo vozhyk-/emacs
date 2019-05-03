@@ -4688,6 +4688,10 @@ pgtk_create_terminal (struct pgtk_display_info *dpyinfo)
   terminal->set_scroll_bar_default_width_hook = pgtk_set_scroll_bar_default_width;
   terminal->set_scroll_bar_default_height_hook = pgtk_set_scroll_bar_default_height;
   terminal->set_window_size_hook = pgtk_set_window_size;
+  // terminal->query_colors = pgtk_query_colors;
+  terminal->get_focus_frame = x_get_focus_frame;
+  // terminal->focus_frame_hook = x_focus_frame;
+  // terminal->set_frame_offset_hook = x_set_offset;
 
   /* Other hooks are NULL by default.  */
 
