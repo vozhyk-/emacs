@@ -398,7 +398,7 @@ x_set_offset (struct frame *f, int xoff, int yoff, int change_gravity)
 }
 
 void
-x_set_window_size (struct frame *f,
+pgtk_set_window_size (struct frame *f,
                    bool change_gravity,
                    int width,
                    int height,
@@ -409,7 +409,7 @@ x_set_window_size (struct frame *f,
      internal clipping.
    -------------------------------------------------------------------------- */
 {
-  PGTK_TRACE("x_set_window_size(%dx%d, %s)", width, height, pixelwise ? "pixel" : "char");
+  PGTK_TRACE("pgtk_set_window_size(%dx%d, %s)", width, height, pixelwise ? "pixel" : "char");
   int pixelwidth, pixelheight;
 
   block_input ();
@@ -451,7 +451,7 @@ x_set_window_size (struct frame *f,
   gtk_widget_set_size_request(FRAME_GTK_WIDGET(f), pixelwidth, pixelheight);
 #else
   // gtk_widget_set_size_request(FRAME_GTK_OUTER_WIDGET(f), pixelwidth, pixelheight);
-  PGTK_TRACE("x_set_window_size: %p: %dx%d.", f, width, height);
+  PGTK_TRACE("pgtk_set_window_size: %p: %dx%d.", f, width, height);
   gtk_window_resize(GTK_WINDOW(FRAME_GTK_OUTER_WIDGET(f)), pixelwidth, pixelheight);
   x_wm_set_size_hint(f, 0, 0);
 #endif
@@ -4687,6 +4687,7 @@ pgtk_create_terminal (struct pgtk_display_info *dpyinfo)
   terminal->iconify_frame_hook = pgtk_iconify_frame;
   terminal->set_scroll_bar_default_width_hook = pgtk_set_scroll_bar_default_width;
   terminal->set_scroll_bar_default_height_hook = pgtk_set_scroll_bar_default_height;
+  terminal->set_window_size_hook = pgtk_set_window_size;
 
   /* Other hooks are NULL by default.  */
 

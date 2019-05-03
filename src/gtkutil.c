@@ -1538,6 +1538,7 @@ x_wm_set_size_hint (struct frame *f, long int flags, bool user_position)
   base_width = FRAME_TEXT_COLS_TO_PIXEL_WIDTH (f, 1) + FRAME_TOOLBAR_WIDTH (f);
   base_height = FRAME_TEXT_LINES_TO_PIXEL_HEIGHT (f, 1)
     + FRAME_MENUBAR_HEIGHT (f) + FRAME_TOOLBAR_HEIGHT (f);
+  PGTK_TRACE("base: %dx%d\n", base_width, base_height);
 
   size_hints.base_width = base_width;
   size_hints.base_height = base_height;
