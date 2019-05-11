@@ -4647,6 +4647,12 @@ pgtk_query_frame_background_color (struct frame *f, XColor *bgcolor)
   pgtk_query_color (f, bgcolor);
 }
 
+static void
+pgtk_free_pixmap (struct frame *_f, Pixmap pixmap)
+{
+  pgtk_image_destroy(pixmap);
+}
+
 static struct terminal *
 pgtk_create_terminal (struct pgtk_display_info *dpyinfo)
 /* --------------------------------------------------------------------------
@@ -4692,6 +4698,7 @@ pgtk_create_terminal (struct pgtk_display_info *dpyinfo)
   terminal->get_focus_frame = x_get_focus_frame;
   // terminal->focus_frame_hook = x_focus_frame;
   // terminal->set_frame_offset_hook = x_set_offset;
+  terminal->free_pixmap = pgtk_free_pixmap;
 
   /* Other hooks are NULL by default.  */
 

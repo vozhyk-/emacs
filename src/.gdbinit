@@ -1062,8 +1062,10 @@ end
 define xprintsym
   xsymname $arg0
   xgetptr $symname
-  set $sym_name = (struct Lisp_String *) $ptr
-  xprintstr $sym_name
+  if $ptr != 0
+    set $sym_name = (struct Lisp_String *) $ptr
+    xprintstr $sym_name
+  end
 end
 document xprintsym
   Print argument as a symbol.

@@ -1278,30 +1278,6 @@ four_corners_best (XImagePtr_or_DC ximg, int *corners,
   return best;
 }
 
-/* Portability macros */
-
-#ifdef HAVE_NTGUI
-
-#define Free_Pixmap(display, pixmap) \
-  DeleteObject (pixmap)
-
-#elif defined (HAVE_NS)
-
-#define Free_Pixmap(display, pixmap) \
-  ns_release_object (pixmap)
-
-#elif defined (HAVE_PGTK)
-
-#define Free_Pixmap(display, pixmap) pgtk_image_destroy(pixmap)
-
-#else
-
-#define Free_Pixmap(display, pixmap) \
-  XFreePixmap (display, pixmap)
-
-#endif /* !HAVE_NTGUI && !HAVE_NS */
-
-
 /* Return the `background' field of IMG.  If IMG doesn't have one yet,
    it is guessed heuristically.  If non-zero, XIMG is an existing
    XImage object (or device context with the image selected on W32) to
@@ -1389,7 +1365,7 @@ image_clear_image_1 (struct frame *f, struct image *img, int flags)
     {
       if (img->pixmap)
 	{
-	  Free_Pixmap (FRAME_X_DISPLAY (f), img->pixmap);
+	  FRAME_TERMINAL (f)->free_pixmap (f, img->pixmap);
 	  img->pixmap = NO_PIXMAP;
 	  /* NOTE (HAVE_NS): background color is NOT an indexed color! */
 	  img->background_valid = 0;
@@ -1408,7 +1384,7 @@ image_clear_image_1 (struct frame *f, struct image *img, int flags)
     {
       if (img->mask)
 	{
-	  Free_Pixmap (FRAME_X_DISPLAY (f), img->mask);
+	  FRAME_TERMINAL (f)->free_pixmap (f, img->mask);
 	  img->mask = NO_PIXMAP;
 	  img->background_transparent_valid = 0;
 	}
@@ -6858,7 +6834,7 @@ my_error_exit (j_common_ptr cinfo)
 
 
 /* Init source method for JPEG data source manager.  Called by
-   jpeg_read_header() before any data is actually read.  See
+   jpeg_read_header before any data is actually read.  See
    libjpeg.doc from the JPEG lib distribution.  */
 
 static void
@@ -6868,7 +6844,7 @@ our_common_init_source (j_decompress_ptr cinfo)
 
 
 /* Method to terminate data source.  Called by
-   jpeg_finish_decompress() after all data has been processed.  */
+   jpeg_finish_decompress after all data has been processed.  */
 
 static void
 our_common_term_source (j_decompress_ptr cinfo)
@@ -9371,6 +9347,11 @@ svg_image_p (Lisp_Object object)
 
 # include <librsvg/rsvg.h>
 
+/* librsvg is too old for us if it doesn't define this macro.  */
+# ifndef LIBRSVG_CHECK_VERSION
+#  define LIBRSVG_CHECK_VERSION(v, w, x) false
+# endif
+
 # ifdef WINDOWSNT
 
 /* Restore the original definition of __MINGW_MAJOR_VERSION.  */
@@ -9579,7 +9560,18 @@ svg_load_image (struct frame *f, struct image *img, char *contents,
      See rsvg bug 596114 - "image refs are relative to curdir, not .svg file"
      <https://gitlab.gnome.org/GNOME/librsvg/issues/33>. */
   if (filename)
-    rsvg_handle_set_base_uri(rsvg_handle, filename);
+    rsvg_handle_set_base_uri (rsvg_handle, filename);
+
+  /* Suppress GCC deprecation warnings starting in librsvg 2.45.1 for
+     rsvg_handle_write and rsvg_handle_close.  FIXME: Use functions
+     like rsvg_handle_new_from_gfile_sync on newer librsvg versions,
+     and remove this hack.  */
+  #if GNUC_PREREQ (4, 6, 0)
+   #pragma GCC diagnostic push
+  #endif
+  #if LIBRSVG_CHECK_VERSION (2, 45, 1) && GNUC_PREREQ (4, 2, 0)
+   #pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+  #endif
 
   /* Parse the contents argument and fill in the rsvg_handle.  */
   rsvg_handle_write (rsvg_handle, (unsigned char *) contents, size, &err);
@@ -9589,6 +9581,10 @@ svg_load_image (struct frame *f, struct image *img, char *contents,
      for further writes.  */
   rsvg_handle_close (rsvg_handle, &err);
   if (err) goto rsvg_error;
+
+  #if GNUC_PREREQ (4, 6, 0)
+   #pragma GCC diagnostic pop
+  #endif
 
   rsvg_handle_get_dimensions (rsvg_handle, &dimension_data);
   if (! check_image_size (f, dimension_data.width, dimension_data.height))
