@@ -19,14 +19,14 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 
 #ifdef HAVE_PGTK
 
-extern Pixmap pgtk_image_create(int width, int height, int depth);
-extern void pgtk_image_destroy(Pixmap pixmap);
-extern unsigned long pgtk_image_get_pixel(Pixmap pixmap, int x, int y);
-extern void pgtk_image_put_pixel(Pixmap pixmap, int x, int y, unsigned long pixel);
-extern Pixmap pgtk_image_create_from_xbm(char *bits, unsigned int width, unsigned int height, unsigned long fg, unsigned long bg);
+extern Emacs_Pixmap pgtk_image_create(int width, int height, int depth);
+extern void pgtk_image_destroy(Emacs_Pixmap pixmap);
+extern unsigned long pgtk_image_get_pixel(Emacs_Pixmap pixmap, int x, int y);
+extern void pgtk_image_put_pixel(Emacs_Pixmap pixmap, int x, int y, unsigned long pixel);
+extern Emacs_Pixmap pgtk_image_create_from_xbm(char *bits, unsigned int width, unsigned int height, unsigned long fg, unsigned long bg);
 #if 0
-extern Pixmap pgtk_image_convert_from_xbm(char *bits, unsigned int width, unsigned int height);
+extern Emacs_Pixmap pgtk_image_convert_from_xbm(char *bits, unsigned int width, unsigned int height);
 #endif
-extern void pgtk_image_set_alpha(Pixmap pixmap, int x, int y, int alpha);
+extern void pgtk_image_set_alpha(Emacs_Pixmap pixmap, int x, int y, int alpha);
 
 #endif

@@ -1374,7 +1374,7 @@ static void
 x_draw_glyphless_glyph_string_foreground (struct glyph_string *s)
 {
   struct glyph *glyph = s->first_glyph;
-  XChar2b char2b[8];
+  unsigned char2b[8];
   int x, i, j;
 
   /* If first glyph of S has a left box line, start drawing the text
@@ -1389,7 +1389,13 @@ x_draw_glyphless_glyph_string_foreground (struct glyph_string *s)
 
   for (i = 0; i < s->nchars; i++, glyph++)
     {
-      char buf[7], *str = NULL;
+#ifdef GCC_LINT
+      enum { PACIFY_GCC_BUG_81401 = 1 };
+#else
+      enum { PACIFY_GCC_BUG_81401 = 0 };
+#endif
+      char buf[7 + PACIFY_GCC_BUG_81401];
+      char *str = NULL;
       int len = glyph->u.glyphless.len;
 
       if (glyph->u.glyphless.method == GLYPHLESS_DISPLAY_ACRONYM)
@@ -1419,14 +1425,10 @@ x_draw_glyphless_glyph_string_foreground (struct glyph_string *s)
       if (str)
 	{
 	  int upper_len = (len + 1) / 2;
-	  unsigned code;
 
 	  /* It is assured that all LEN characters in STR is ASCII.  */
 	  for (j = 0; j < len; j++)
-	    {
-	      code = s->font->driver->encode_char (s->font, str[j]);
-	      STORE_XCHAR2B (char2b + j, code >> 8, code & 0xFF);
-	    }
+            char2b[j] = s->font->driver->encode_char (s->font, str[j]) & 0xFFFF;
 	  s->font->driver->draw (s, 0, upper_len,
 				 x + glyph->slice.glyphless.upper_xoff,
 				 s->ybase + glyph->slice.glyphless.upper_yoff,
@@ -1469,7 +1471,7 @@ x_draw_glyphless_glyph_string_foreground (struct glyph_string *s)
 static bool
 x_alloc_lighter_color (struct frame *f, unsigned long *pixel, double factor, int delta)
 {
-  XColor color, new;
+  Emacs_Color color, new;
   long bright;
   bool success_p;
 
@@ -2724,7 +2726,7 @@ static void pgtk_draw_glyph_string(struct glyph_string *s)
 /* RIF: Define cursor CURSOR on frame F.  */
 
 static void
-pgtk_define_frame_cursor (struct frame *f, Cursor cursor)
+pgtk_define_frame_cursor (struct frame *f, Emacs_Cursor cursor)
 {
   if (!f->pointer_invisible
       && FRAME_X_OUTPUT(f)->current_cursor != cursor)
@@ -4641,14 +4643,14 @@ pgtk_delete_terminal (struct terminal *terminal)
 
 /* Store F's background color into *BGCOLOR.  */
 static void
-pgtk_query_frame_background_color (struct frame *f, XColor *bgcolor)
+pgtk_query_frame_background_color (struct frame *f, Emacs_Color *bgcolor)
 {
   bgcolor->pixel = FRAME_BACKGROUND_PIXEL (f);
   pgtk_query_color (f, bgcolor);
 }
 
 static void
-pgtk_free_pixmap (struct frame *_f, Pixmap pixmap)
+pgtk_free_pixmap (struct frame *_f, Emacs_Pixmap pixmap)
 {
   pgtk_image_destroy(pixmap);
 }
@@ -6693,7 +6695,7 @@ pgtk_xlfd_to_fontname (const char *xlfd)
 bool
 pgtk_defined_color (struct frame *f,
                   const char *name,
-                  XColor *color_def,
+                  Emacs_Color *color_def,
                   bool alloc,
                   bool makeIndex)
 /* --------------------------------------------------------------------------
@@ -6721,7 +6723,7 @@ pgtk_defined_color (struct frame *f,
    and names we've actually looked up; list-colors-display is probably
    the most color-intensive case we're likely to hit.  */
 
-int pgtk_parse_color (const char *color_name, XColor *color)
+int pgtk_parse_color (const char *color_name, Emacs_Color *color)
 {
   // PGTK_TRACE("pgtk_parse_color: %s", color_name);
 
@@ -6741,7 +6743,7 @@ int pgtk_parse_color (const char *color_name, XColor *color)
 }
 
 int
-pgtk_lisp_to_color (Lisp_Object color, XColor *col)
+pgtk_lisp_to_color (Lisp_Object color, Emacs_Color *col)
 /* --------------------------------------------------------------------------
      Convert a Lisp string object to a NS color
    -------------------------------------------------------------------------- */
@@ -6758,7 +6760,7 @@ pgtk_lisp_to_color (Lisp_Object color, XColor *col)
    colors in COLORS.  On W32, we no longer try to map colors to
    a palette.  */
 void
-pgtk_query_colors (struct frame *f, XColor *colors, int ncolors)
+pgtk_query_colors (struct frame *f, Emacs_Color *colors, int ncolors)
 {
   PGTK_TRACE("pgtk_query_colors");
   int i;
@@ -6777,7 +6779,7 @@ pgtk_query_colors (struct frame *f, XColor *colors, int ncolors)
 }
 
 void
-pgtk_query_color (struct frame *f, XColor *color)
+pgtk_query_color (struct frame *f, Emacs_Color *color)
 {
   PGTK_TRACE("pgtk_query_color");
   pgtk_query_colors (f, color, 1);
@@ -6972,7 +6974,7 @@ void
 pgtk_set_cr_source_with_color (struct frame *f, unsigned long color)
 {
   PGTK_TRACE("pgtk_set_cr_source_with_color: %08lx.", color);
-  XColor col;
+  Emacs_Color col;
   col.pixel = color;
   pgtk_query_color(f, &col);
   cairo_set_source_rgb (FRAME_CR_CONTEXT (f), col.red / 65535.0,

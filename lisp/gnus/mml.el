@@ -702,9 +702,7 @@ be \"related\" or \"alternate\"."
 				  filename)))))
 	       (t
 		(let ((contents (cdr (assq 'contents cont))))
-		  (if (if (featurep 'xemacs)
-			  (string-match "[^\000-\377]" contents)
-			(multibyte-string-p contents))
+		  (if (multibyte-string-p contents)
 		      (progn
 			(set-buffer-multibyte t)
 			(insert contents)
@@ -906,8 +904,14 @@ be \"related\" or \"alternate\"."
 	      (or disposition
 		  (mml-content-disposition type (cdr (assq 'filename cont)))))
       (when parameters
-	(mml-insert-parameter-string
-	 cont mml-content-disposition-parameters))
+	(let ((cont (copy-sequence cont)))
+	  ;; Set the file name to what's specified by the user.
+	  (when-let ((recipient-filename (cdr (assq 'recipient-filename cont))))
+	    (setcdr cont
+		    (cons (cons 'filename recipient-filename)
+			  (cdr cont))))
+	  (mml-insert-parameter-string
+	   cont mml-content-disposition-parameters)))
       (insert "\n"))
     (unless (eq encoding '7bit)
       (insert (format "Content-Transfer-Encoding: %s\n" encoding)))

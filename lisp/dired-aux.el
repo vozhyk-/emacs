@@ -4,7 +4,6 @@
 ;; Foundation, Inc.
 
 ;; Author: Sebastian Kremer <sk@thp.uni-koeln.de>.
-;; Maintainer: emacs-devel@gnu.org
 ;; Keywords: files
 ;; Package: emacs
 
@@ -2849,6 +2848,8 @@ is part of a file name (i.e., has the text property `dired-filename')."
   (multi-isearch-files-regexp
    (dired-get-marked-files nil nil 'dired-nondirectory-p nil t)))
 
+(declare-function fileloop-continue "fileloop" ())
+
 ;;;###autoload
 (defun dired-do-search (regexp)
   "Search through all marked files for a match for REGEXP.
@@ -2904,15 +2905,18 @@ REGEXP should use constructs supported by your local `grep' command."
                           #'file-name-as-directory
                           (rgrep-find-ignored-directories default-directory))
                          grep-find-ignored-files))
-         (xrefs (mapcan
-                 (lambda (file)
-                   (xref-collect-matches regexp "*" file
-                                         (and (file-directory-p file)
-                                              ignores)))
-                 files)))
-    (unless xrefs
-      (user-error "No matches for: %s" regexp))
-    (xref--show-xrefs xrefs nil t)))
+         (fetcher
+          (lambda ()
+            (let ((xrefs (mapcan
+                          (lambda (file)
+                            (xref-collect-matches regexp "*" file
+                                                  (and (file-directory-p file)
+                                                       ignores)))
+                          files)))
+              (unless xrefs
+                (user-error "No matches for: %s" regexp))
+              xrefs))))
+    (xref--show-xrefs fetcher nil)))
 
 ;;;###autoload
 (defun dired-do-find-regexp-and-replace (from to)

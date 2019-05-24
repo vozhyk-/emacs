@@ -180,10 +180,10 @@ struct pgtk_display_info
   XrmDatabase rdb;
 
   /* The cursor to use for vertical scroll bars. */
-  Cursor vertical_scroll_bar_cursor;
+  Emacs_Cursor vertical_scroll_bar_cursor;
 
   /* The cursor to use for horizontal scroll bars. */
-  Cursor horizontal_scroll_bar_cursor;
+  Emacs_Cursor horizontal_scroll_bar_cursor;
 
   /* Information about the range of text currently shown in
      mouse-face.  */
@@ -240,25 +240,25 @@ struct pgtk_output
   void *toolbar;
 
   /* Cursors */
-  Cursor current_cursor;
-  Cursor text_cursor;
-  Cursor nontext_cursor;
-  Cursor modeline_cursor;
-  Cursor hand_cursor;
-  Cursor hourglass_cursor;
-  Cursor horizontal_drag_cursor;
-  Cursor vertical_drag_cursor;
-  Cursor left_edge_cursor;
-  Cursor top_left_corner_cursor;
-  Cursor top_edge_cursor;
-  Cursor top_right_corner_cursor;
-  Cursor right_edge_cursor;
-  Cursor bottom_right_corner_cursor;
-  Cursor bottom_edge_cursor;
-  Cursor bottom_left_corner_cursor;
+  Emacs_Cursor current_cursor;
+  Emacs_Cursor text_cursor;
+  Emacs_Cursor nontext_cursor;
+  Emacs_Cursor modeline_cursor;
+  Emacs_Cursor hand_cursor;
+  Emacs_Cursor hourglass_cursor;
+  Emacs_Cursor horizontal_drag_cursor;
+  Emacs_Cursor vertical_drag_cursor;
+  Emacs_Cursor left_edge_cursor;
+  Emacs_Cursor top_left_corner_cursor;
+  Emacs_Cursor top_edge_cursor;
+  Emacs_Cursor top_right_corner_cursor;
+  Emacs_Cursor right_edge_cursor;
+  Emacs_Cursor bottom_right_corner_cursor;
+  Emacs_Cursor bottom_edge_cursor;
+  Emacs_Cursor bottom_left_corner_cursor;
 
   /* PGTK-specific */
-  Cursor current_pointer;
+  Emacs_Cursor current_pointer;
 
   /* Widget whose cursor is hourglass_cursor.  This widget is temporarily
      mapped to display an hourglass cursor.  */
@@ -527,12 +527,12 @@ extern void pgtk_implicitly_set_name (struct frame *f, Lisp_Object arg, Lisp_Obj
 /* Color management implemented in pgtkterm. */
 extern bool pgtk_defined_color (struct frame *f,
 				const char *name,
-				XColor *color_def, bool alloc,
+				Emacs_Color *color_def, bool alloc,
 				bool makeIndex);
-extern void pgtk_query_color (struct frame *f, XColor *color);
-extern void pgtk_query_colors (struct frame *f, XColor *colors, int ncolors);
-extern int pgtk_parse_color (const char *color_name, XColor *color);
-extern int pgtk_lisp_to_color (Lisp_Object color, XColor *col);
+extern void pgtk_query_color (struct frame *f, Emacs_Color *color);
+extern void pgtk_query_colors (struct frame *f, Emacs_Color *colors, int ncolors);
+extern int pgtk_parse_color (const char *color_name, Emacs_Color *color);
+extern int pgtk_lisp_to_color (Lisp_Object color, Emacs_Color *col);
 
 /* Implemented in pgtkterm.c */
 extern void pgtk_clear_area (struct frame *f, int x, int y, int width, int height);

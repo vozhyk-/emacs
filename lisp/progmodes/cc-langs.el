@@ -945,7 +945,7 @@ file name in angle brackets or quotes."
 	 (c-make-keywords-re 'appendable
 	   (c-lang-const c-cpp-include-directives))
 	 "[ \t]*")
-      "a\\`"))				; Doesn't match anything
+      regexp-unmatchable))
 (c-lang-defvar c-cpp-include-key (c-lang-const c-cpp-include-key))
 
 (c-lang-defconst c-opt-cpp-macro-define
@@ -1331,7 +1331,7 @@ operators."
 	   (c--set-difference (c-lang-const c-assignment-operators)
 			      '("=")
 			      :test 'string-equal)))
-      "a\\`"))				; Doesn't match anything.
+      regexp-unmatchable))
 (c-lang-defvar c-assignment-op-regexp
   (c-lang-const c-assignment-op-regexp))
 
@@ -1554,7 +1554,7 @@ properly."
   ;; language)
   t (if (c-lang-const c-block-comment-ender)
 	(regexp-quote (c-lang-const c-block-comment-ender))
-      "a\\`"))				; Doesn't match anything.
+      regexp-unmatchable))
 (c-lang-defvar c-block-comment-ender-regexp
 	       (c-lang-const c-block-comment-ender-regexp))
 
@@ -1565,7 +1565,7 @@ properly."
   ;; `font-lock-comment-delimiter-face'.
   t (if (c-lang-const c-block-comment-ender)
 	(concat "[ \t]*" (c-lang-const c-block-comment-ender-regexp))
-      "a\\`"))				; Doesn't match anything.
+      regexp-unmatchable))
 (c-lang-setvar font-lock-comment-end-skip
 	       (c-lang-const c-font-lock-comment-end-skip))
 
@@ -1584,7 +1584,7 @@ properly."
   ;; language)
   t (if (c-lang-const c-block-comment-starter)
 	(regexp-quote (c-lang-const c-block-comment-starter))
-      "a\\`"))				; Doesn't match anything.
+      regexp-unmatchable))
 (c-lang-defvar c-block-comment-start-regexp
   (c-lang-const c-block-comment-start-regexp))
 
@@ -1593,7 +1593,7 @@ properly."
   ;; language; it does in all 7 CC Mode languages).
   t (if (c-lang-const c-line-comment-starter)
 	(regexp-quote (c-lang-const c-line-comment-starter))
-      "a\\`"))				; Doesn't match anything.
+      regexp-unmatchable))
 (c-lang-defvar c-line-comment-start-regexp
 	       (c-lang-const c-line-comment-start-regexp))
 
@@ -1628,7 +1628,7 @@ starter."
 
 (c-lang-defconst c-doc-comment-start-regexp
   "Regexp to match the start of documentation comments."
-  t    "a\\`"	; Doesn't match anything.
+  t    regexp-unmatchable
   ;; From font-lock.el: `doxygen' uses /*! while others use /**.
   (c c++ objc) "/\\*[*!]"
   java "/\\*\\*"
@@ -3112,7 +3112,7 @@ Note that Java specific rules are currently applied to tell this from
   "Regexp matching a keyword that is followed by a colon, where
   the whole construct can precede a declaration.
   E.g. \"public:\" in C++."
-  t "a\\`"				; Doesn't match anything.
+  t regexp-unmatchable
   c++ (c-make-keywords-re t (c-lang-const c-protection-kwds)))
 (c-lang-defvar c-decl-start-colon-kwd-re
   (c-lang-const c-decl-start-colon-kwd-re))
@@ -3309,7 +3309,7 @@ Identifier syntax is in effect when this is matched \(see
   t (if (c-lang-const c-type-modifier-kwds)
 	(concat (regexp-opt (c-lang-const c-type-modifier-kwds) t) "\\>")
       ;; Default to a regexp that never matches.
-      "a\\`")
+      regexp-unmatchable)
   ;; Check that there's no "=" afterwards to avoid matching tokens
   ;; like "*=".
   (c objc) (concat "\\("
@@ -3347,7 +3347,7 @@ that might precede the identifier in a declaration, e.g. the
 as the end of the operator.  Identifier syntax is in effect when
 this is matched \(see `c-identifier-syntax-table')."
   t ;; Default to a regexp that never matches.
-    "a\\`"
+    regexp-unmatchable
   ;; Check that there's no "=" afterwards to avoid matching tokens
   ;; like "*=".
   (c objc) (concat "\\(\\*\\)"
@@ -3506,7 +3506,7 @@ list."
 (c-lang-defconst c-pre-id-bracelist-key
   "A regexp matching tokens which, preceding an identifier, signify a bracelist.
 "
-  t "a\\`"				; Doesn't match anything.
+  t regexp-unmatchable
   c++ "new\\([^[:alnum:]_$]\\|$\\)\\|&&?\\(\\S.\\|$\\)")
 (c-lang-defvar c-pre-id-bracelist-key (c-lang-const c-pre-id-bracelist-key))
 
@@ -3562,7 +3562,7 @@ the invalidity of the putative template construct."
 	 ;; before the '{' of the enum list, to avoid searching too far.
 	 "[^][{};/#=]*"
 	 "{")
-      "a\\`"))				; Doesn't match anything.
+      regexp-unmatchable))
 (c-lang-defvar c-enum-clause-introduction-re
 	       (c-lang-const c-enum-clause-introduction-re))
 
@@ -3674,11 +3674,36 @@ i.e. before \":\".  Only used if `c-recognize-colon-labels' is set."
   c++ (concat "\\s(\\|\"\\|" (c-lang-const c-nonlabel-token-key)))
 (c-lang-defvar c-nonlabel-token-key (c-lang-const c-nonlabel-token-key))
 
+(c-lang-defconst c-nonlabel-nonparen-token-key
+  "Regexp matching things that can't occur in generic colon labels,
+neither in a statement nor in a declaration context, with the
+exception of an open parenthesis.  The regexp is tested at the
+beginning of every sexp in a suspected label, i.e. before \":\".
+Only used if `c-recognize-colon-labels' is set."
+  ;; This lang const is the same as `c-nonlabel-token-key', except for a
+  ;; slight difference in the c++-mode value.
+  t (concat
+     ;; All keywords except `c-label-kwds' and `c-protection-kwds'.
+     (c-make-keywords-re t
+       (c--set-difference (c-lang-const c-keywords)
+			  (append (c-lang-const c-label-kwds)
+				  (c-lang-const c-protection-kwds))
+			  :test 'string-equal)))
+  ;; Don't allow string literals, except in AWK and Java.  Character constants are OK.
+  (c objc pike idl) (concat "\"\\|"
+			    (c-lang-const c-nonlabel-nonparen-token-key))
+  ;; Also check for open parens in C++, to catch member init lists in
+  ;; constructors.  We normally allow it so that macros with arguments
+  ;; work in labels.
+  c++ (concat "[{[]\\|\"\\|" (c-lang-const c-nonlabel-nonparen-token-key)))
+(c-lang-defvar c-nonlabel-nonparen-token-key
+  (c-lang-const c-nonlabel-nonparen-token-key))
+
 (c-lang-defconst c-nonlabel-token-2-key
   "Regexp matching things that can't occur two symbols before a colon in
 a label construct.  This catches C++'s inheritance construct \"class foo
 : bar\".  Only used if `c-recognize-colon-labels' is set."
-  t "a\\`"				; Doesn't match anything.
+  t regexp-unmatchable
   c++ (c-make-keywords-re t '("class")))
 (c-lang-defvar c-nonlabel-token-2-key (c-lang-const c-nonlabel-token-2-key))
 

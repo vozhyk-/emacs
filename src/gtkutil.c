@@ -600,7 +600,7 @@ get_utf8_string (const char *str)
 bool
 xg_check_special_colors (struct frame *f,
                          const char *color_name,
-                         XColor *color)
+                         Emacs_Color *color)
 {
   bool success_p = 0;
   bool get_bg = strcmp ("gtk_selection_bg_color", color_name) == 0;
@@ -1127,7 +1127,7 @@ static void
 xg_set_widget_bg (struct frame *f, GtkWidget *w, unsigned long pixel)
 {
 #ifdef HAVE_GTK3
-  XColor xbg;
+  Emacs_Color xbg;
   xbg.pixel = pixel;
 #ifndef HAVE_PGTK
   if (XQueryColor (FRAME_X_DISPLAY (f), FRAME_X_COLORMAP (f), &xbg))

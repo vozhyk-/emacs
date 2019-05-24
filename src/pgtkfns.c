@@ -133,7 +133,7 @@ pgtk_display_info_for_name (Lisp_Object name)
 static void
 x_set_foreground_color (struct frame *f, Lisp_Object arg, Lisp_Object oldval)
 {
-  XColor col;
+  Emacs_Color col;
 
   /* Must block_input, because pgtk_lisp_to_color does block/unblock_input
      which means that col may be deallocated in its unblock_input if there
@@ -164,7 +164,7 @@ x_set_foreground_color (struct frame *f, Lisp_Object arg, Lisp_Object oldval)
 static void
 x_set_background_color (struct frame *f, Lisp_Object arg, Lisp_Object oldval)
 {
-  XColor col;
+  Emacs_Color col;
   struct face *face;
 
   block_input ();
@@ -199,7 +199,7 @@ x_set_cursor_color (struct frame *f, Lisp_Object arg, Lisp_Object oldval)
 {
   unsigned long fore_pixel, pixel;
   struct pgtk_output *x = f->output_data.pgtk;
-  XColor col;
+  Emacs_Color col;
 
   if (!NILP (Vx_cursor_fore_pixel))
     {
@@ -956,7 +956,7 @@ get_geometry_from_preferences (struct pgtk_display_info *dpyinfo,
 static int
 x_decode_color (struct frame *f, Lisp_Object color_name, int mono_color)
 {
-  XColor cdef;
+  Emacs_Color cdef;
 
   CHECK_STRING (color_name);
 
@@ -2046,7 +2046,7 @@ DEFUN ("xw-color-defined-p", Fxw_color_defined_p, Sxw_color_defined_p, 1, 2, 0,
        doc: /* Internal function called by `color-defined-p', which see.  */)
      (Lisp_Object color, Lisp_Object frame)
 {
-  XColor col;
+  Emacs_Color col;
   return pgtk_lisp_to_color (color, &col) ? Qnil : Qt;
 }
 
@@ -2055,7 +2055,7 @@ DEFUN ("xw-color-values", Fxw_color_values, Sxw_color_values, 1, 2, 0,
        doc: /* Internal function called by `color-values', which see.  */)
      (Lisp_Object color, Lisp_Object frame)
 {
-  XColor col;
+  Emacs_Color col;
 
   CHECK_STRING (color);
 

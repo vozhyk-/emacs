@@ -27,7 +27,7 @@ struct pgtk_image_t {
   int depth;
 };
 
-Pixmap pgtk_image_create(int width, int height, int depth)
+Emacs_Pixmap pgtk_image_create(int width, int height, int depth)
 {
   struct pgtk_image_t *img;
   if ((img = xmalloc(sizeof *img)) == NULL)
@@ -42,14 +42,14 @@ Pixmap pgtk_image_create(int width, int height, int depth)
   return img;
 }
 
-void pgtk_image_destroy(Pixmap pixmap)
+void pgtk_image_destroy(Emacs_Pixmap pixmap)
 {
   struct pgtk_image_t *img = pixmap;
   xfree(img->data);
   xfree(img);
 }
 
-unsigned long pgtk_image_get_pixel(Pixmap pixmap, int x, int y)
+unsigned long pgtk_image_get_pixel(Emacs_Pixmap pixmap, int x, int y)
 {
   struct pgtk_image_t *img = pixmap;
   if (x < 0 || x >= img->width)
@@ -61,7 +61,7 @@ unsigned long pgtk_image_get_pixel(Pixmap pixmap, int x, int y)
   return p[3] << 24 | p[2] << 16 | p[1] << 8 | p[0];   // little endian.
 }
 
-void pgtk_image_put_pixel(Pixmap pixmap, int x, int y, unsigned long pixel)
+void pgtk_image_put_pixel(Emacs_Pixmap pixmap, int x, int y, unsigned long pixel)
 {
   struct pgtk_image_t *img = pixmap;
   if (x < 0 || x >= img->width)
@@ -76,7 +76,7 @@ void pgtk_image_put_pixel(Pixmap pixmap, int x, int y, unsigned long pixel)
   p[3] = pixel >> 24;
 }
 
-Pixmap pgtk_image_create_from_xbm(char *bits, unsigned int width, unsigned int height, unsigned long fg, unsigned long bg)
+Emacs_Pixmap pgtk_image_create_from_xbm(char *bits, unsigned int width, unsigned int height, unsigned long fg, unsigned long bg)
 {
   PGTK_TRACE("create_from_xbm: 0");
   struct pgtk_image_t *img = pgtk_image_create(width, height, 32);
@@ -101,7 +101,7 @@ Pixmap pgtk_image_create_from_xbm(char *bits, unsigned int width, unsigned int h
 }
 
 #if 0
-Pixmap pgtk_image_convert_from_xbm(char *bits, unsigned int width, unsigned int height)
+Emacs_Pixmap pgtk_image_convert_from_xbm(char *bits, unsigned int width, unsigned int height)
 {
   struct pgtk_image_t *img = pgtk_image_create(width, height, 1);
   char *p = bits;
@@ -125,7 +125,7 @@ Pixmap pgtk_image_convert_from_xbm(char *bits, unsigned int width, unsigned int 
 }
 #endif
 
-void pgtk_image_set_alpha(Pixmap pixmap, int x, int y, int alpha)
+void pgtk_image_set_alpha(Emacs_Pixmap pixmap, int x, int y, int alpha)
 {
   PGTK_TRACE("set_alpha: (%d,%d)=%d.", x, y, alpha);
   struct pgtk_image_t *img = pixmap;

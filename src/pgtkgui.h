@@ -58,11 +58,9 @@ typedef XGCValues * GC;
 #define GCBackground 0x02
 #define GCFont 0x03
 
-typedef void *Pixmap;
+typedef void *Emacs_Pixmap;
 
-typedef void *Cursor;
-
-#define No_Cursor (0)
+typedef void *Emacs_Cursor;
 
 typedef void * Color;
 typedef int Window;
@@ -120,5 +118,26 @@ typedef double CGFloat;
 #define PAspect		(1L << 7) /* program specified min, max aspect ratios */
 #define PBaseSize	(1L << 8) /* program specified base for incrementing */
 #define PWinGravity	(1L << 9) /* program specified window gravity */
+
+
+#define NativeRectangle XRectangle
+
+#define CONVERT_TO_EMACS_RECT(xr, nr)		\
+  ((xr).x     = (nr).x,				\
+   (xr).y     = (nr).y,				\
+   (xr).width = (nr).width,			\
+   (xr).height = (nr).height)
+
+#define CONVERT_FROM_EMACS_RECT(xr, nr)		\
+  ((nr).x      = (xr).x,			\
+   (nr).y      = (xr).y,			\
+   (nr).width  = (xr).width,			\
+   (nr).height = (xr).height)
+
+#define STORE_NATIVE_RECT(nr, px, py, pwidth, pheight)	\
+  ((nr).x      = (px),					\
+   (nr).y      = (py),					\
+   (nr).width  = (pwidth),				\
+   (nr).height = (pheight))
 
 #endif  /* __PGTKGUI_H__ */

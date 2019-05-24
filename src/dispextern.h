@@ -34,16 +34,45 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #ifdef HAVE_XRENDER
 # include <X11/extensions/Xrender.h>
 #endif
+
+typedef XColor Emacs_Color;
+typedef Cursor Emacs_Cursor;
+#define No_Cursor (None)
+typedef Pixmap Emacs_Pixmap;
+typedef XRectangle Emacs_Rectangle;
+typedef XGCValues Emacs_GC;
 #else /* !HAVE_X_WINDOWS */
 
-/* X-related stuff used by non-X gui code.  */
+/* XColor-like struct used by non-X code.  */
 
-typedef struct {
+typedef struct
+{
   unsigned long pixel;
   unsigned short red, green, blue;
-  char flags;
-  char pad;
-} XColor;
+} Emacs_Color;
+
+/* Accommodate X's usage of None as a null resource ID.  */
+#define No_Cursor (NULL)
+
+/* XRectangle-like struct used by non-X GUI code.  */
+typedef struct
+{
+  int x, y;
+  unsigned width, height;
+} Emacs_Rectangle;
+
+/* XGCValues-like struct used by non-X GUI code.  */
+typedef struct
+{
+  unsigned long foreground;
+  unsigned long background;
+} Emacs_GC;
+
+/* Mask values to select foreground/background.  */
+/* FIXME: The GC handling in w32 really should be redesigned as to not
+   need these.  */
+#define GCForeground 0x01
+#define GCBackground 0x02
 
 #endif /* HAVE_X_WINDOWS */
 
@@ -63,16 +92,16 @@ xstrcasecmp (char const *a, char const *b)
 #ifdef HAVE_X_WINDOWS
 #include <X11/Xresource.h> /* for XrmDatabase */
 typedef struct x_display_info Display_Info;
-typedef XImage * XImagePtr;
-typedef XImagePtr XImagePtr_or_DC;
+typedef XImage *Emacs_Pix_Container;
+typedef XImage *Emacs_Pix_Context;
 #define NativeRectangle XRectangle
 #endif
 
 #ifdef HAVE_NTGUI
 #include "w32gui.h"
 typedef struct w32_display_info Display_Info;
-typedef XImage *XImagePtr;
-typedef HDC XImagePtr_or_DC;
+typedef XImage *Emacs_Pix_Container;
+typedef HDC Emacs_Pix_Context;
 #endif
 
 #ifdef HAVE_NS
@@ -80,8 +109,8 @@ typedef HDC XImagePtr_or_DC;
 #define FACE_COLOR_TO_PIXEL(face_color, frame) ns_color_index_to_rgba(face_color, frame)
 /* Following typedef needed to accommodate the MSDOS port, believe it or not.  */
 typedef struct ns_display_info Display_Info;
-typedef Pixmap XImagePtr;
-typedef XImagePtr XImagePtr_or_DC;
+typedef Emacs_Pixmap Emacs_Pix_Container;
+typedef Emacs_Pixmap Emacs_Pix_Context;
 #else
 #define FACE_COLOR_TO_PIXEL(face_color, frame) face_color
 #endif
@@ -90,9 +119,10 @@ typedef XImagePtr XImagePtr_or_DC;
 #include "pgtkgui.h"
 /* Following typedef needed to accommodate the MSDOS port, believe it or not.  */
 typedef struct pgtk_display_info Display_Info;
-typedef Pixmap XImagePtr;
+typedef Emacs_Pixmap XImagePtr;
 typedef XImagePtr XImagePtr_or_DC;
-#define NativeRectangle XRectangle
+typedef Emacs_Pixmap Emacs_Pix_Container;
+typedef Emacs_Pixmap Emacs_Pix_Context;
 #endif
 
 #ifdef HAVE_WINDOW_SYSTEM
@@ -101,8 +131,7 @@ typedef XImagePtr XImagePtr_or_DC;
 #endif
 
 #ifndef HAVE_WINDOW_SYSTEM
-typedef int Cursor;
-#define No_Cursor (0)
+typedef void *Emacs_Cursor;
 #endif
 
 #ifndef NativeRectangle
@@ -1049,7 +1078,7 @@ struct glyph_row
 #ifdef HAVE_WINDOW_SYSTEM
   /* Non-NULL means the current clipping area.  This is temporarily
      set while exposing a region.  Coordinates are frame-relative.  */
-  XRectangle *clip;
+  const Emacs_Rectangle *clip;
 #endif
 };
 
@@ -1298,7 +1327,7 @@ struct glyph_string
   enum glyph_row_area area;
 
   /* Characters to be drawn, and number of characters.  */
-  XChar2b *char2b;
+  unsigned *char2b;
   int nchars;
 
   /* A face-override for drawing cursors, mouse face and similar.  */
@@ -1359,7 +1388,7 @@ struct glyph_string
   GC gc;
 #endif
 #if defined (HAVE_NTGUI)
-  XGCValues *gc;
+  Emacs_GC *gc;
   HDC hdc;
 #endif
 #if defined (HAVE_PGTK)
@@ -1604,8 +1633,11 @@ struct face
 
   /* If non-zero, this is a GC that we can use without modification for
      drawing the characters in this face.  */
+# ifdef HAVE_X_WINDOWS
   GC gc;
-
+# else
+  Emacs_GC *gc;
+# endif
   /* Background stipple or bitmap used for this face.  This is
      an id as returned from load_pixmap.  */
   ptrdiff_t stipple;
@@ -2900,7 +2932,7 @@ struct redisplay_interface
   void (*draw_glyph_string) (struct glyph_string *s);
 
   /* Define cursor CURSOR on frame F.  */
-  void (*define_frame_cursor) (struct frame *f, Cursor cursor);
+  void (*define_frame_cursor) (struct frame *f, Emacs_Cursor cursor);
 
   /* Clear the area at (X,Y,WIDTH,HEIGHT) of frame F.  */
   void (*clear_frame_area) (struct frame *f, int x, int y,
@@ -2967,7 +2999,7 @@ struct image
   struct timespec timestamp;
 
   /* Pixmaps of the image.  */
-  Pixmap pixmap, mask;
+  Emacs_Pixmap pixmap, mask;
 
 #ifdef USE_CAIRO
   void *cr_data;
@@ -2977,7 +3009,7 @@ struct image
      Non-NULL means it and its Pixmap counterpart may be out of sync
      and the latter is outdated.  NULL means the X image has been
      synchronized to Pixmap.  */
-  XImagePtr ximg, mask_img;
+  XImage *ximg, *mask_img;
 
 # ifdef HAVE_NATIVE_SCALING
   /* Picture versions of pixmap and mask for compositing.  */
@@ -3048,7 +3080,7 @@ struct image
   int hmargin, vmargin;
 
   /* Reference to the type of the image.  */
-  struct image_type *type;
+  struct image_type const *type;
 
   /* True means that loading the image failed.  Don't try again.  */
   bool load_failed_p;
@@ -3323,7 +3355,9 @@ extern void handle_tool_bar_click (struct frame *,
                                    int, int, bool, int);
 
 extern void expose_frame (struct frame *, int, int, int, int);
-extern bool gui_intersect_rectangles (XRectangle *, XRectangle *, XRectangle *);
+extern bool gui_intersect_rectangles (const Emacs_Rectangle *,
+                                      const Emacs_Rectangle *,
+                                      Emacs_Rectangle *);
 #endif	/* HAVE_WINDOW_SYSTEM */
 
 extern void note_mouse_highlight (struct frame *, int, int);
@@ -3375,10 +3409,10 @@ extern void image_destroy_bitmap (struct frame *, ptrdiff_t);
 extern void image_destroy_all_bitmaps (Display_Info *);
 #ifdef HAVE_X_WINDOWS
 extern void x_create_bitmap_mask (struct frame *, ptrdiff_t);
+extern void x_kill_gs_process (Pixmap, struct frame *);
 #endif
 extern Lisp_Object image_find_image_file (Lisp_Object);
 
-void x_kill_gs_process (Pixmap, struct frame *);
 struct image_cache *make_image_cache (void);
 void free_image_cache (struct frame *);
 void clear_image_caches (Lisp_Object);
@@ -3396,9 +3430,9 @@ ptrdiff_t lookup_image (struct frame *, Lisp_Object);
 #endif
 
 RGB_PIXEL_COLOR image_background (struct image *, struct frame *,
-                                XImagePtr_or_DC ximg);
+                                  Emacs_Pix_Context img);
 int image_background_transparent (struct image *, struct frame *,
-                                  XImagePtr_or_DC mask);
+                                  Emacs_Pix_Context mask);
 
 int image_ascent (struct image *, struct face *, struct glyph_slice *);
 
@@ -3422,8 +3456,8 @@ void x_free_colors (struct frame *, unsigned long *, int);
 
 void update_face_from_frame_parameter (struct frame *, Lisp_Object,
                                        Lisp_Object);
-extern bool tty_defined_color (struct frame *f, const char *, XColor *, bool,
-                               bool);
+extern bool tty_defined_color (struct frame *, const char *, Emacs_Color *,
+                               bool, bool);
 
 Lisp_Object tty_color_name (struct frame *, int);
 void clear_face_cache (bool);
