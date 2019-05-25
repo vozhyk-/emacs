@@ -2,10 +2,6 @@
 
 In this fork, I'm working to make Emacs support pure-gtk3, in order to support Wayland.
 
-Maybe It's only for Wayland now.
-
-The work is in progress.
-
 ## Building
 
 You need cairo.
@@ -73,26 +69,6 @@ Not implemented:
 
 Those may not be developed because I don't use them.
 
-## ImageMagick
-
-Emacs doesn't support ImageMagick 7.
-
-I wrote this code in configure.ac:
-
-```sh
-    if test $HAVE_IMAGEMAGICK != yes; then
-      IMAGEMAGICK_MODULE="MagickWand-6.Q16HDRI >= 6.3.5 MagickWand-6.Q16HDRI != 6.8.2 MagickWand-6.Q16HDRI < 7 MagickCore-6.Q16HDRI >= 6.9.9 MagickCore-6.Q16HDRI < 7"
-      EMACS_CHECK_MODULES([IMAGEMAGICK], [$IMAGEMAGICK_MODULE])
-    fi
-```
-
-However, MagickWand-6.Q16HDRI requires MagickCore, which may be ImageMagick 7.
-So, you may need to fix `Requires:` in `/usr/lib/pkgconfig/MagickWand-6.Q16HDRI.pc`:
-
-```
-Requires: MagickCore-6.Q16HDRI
-```
-
 ## Debugging
 
 Edit src/pgtkterm.h to uncomment:
@@ -101,7 +77,7 @@ Edit src/pgtkterm.h to uncomment:
 #define PGTK_DEBUG 1
 ```
 
-It enables so many debugging outputs.
+It enables so much debugging outputs.
 
 On gdb, you may want to do:
 
@@ -111,13 +87,13 @@ On gdb, you may want to do:
 
 ## Supporting Color Emoji Fonts
 
-By default, color fonts are ignored for stability.
+By default, color fonts are ignored.
 
 To use them, you can write this code in `~/.emacs`:
 
 ```elisp
-(if (featurep 'pgtk)
-    (setq xft-ignore-color-fonts nil))
+(when (featurep 'pgtk)
+  (setq xft-ignore-color-fonts nil))
 ```
 
 Changing this variable on the fly may not work.
@@ -127,14 +103,15 @@ You may need build and install cairo from git repo. 1.15.12 is insufficient.
 ## My Environment
 
 - archlinux
-- gtk+-3.22.30
-- glib-2.56.1
-- gnome-shell 3.28.1
-- gcc 7.3.1
-- wayland 1.14.0
-- wayland-protocols 1.13
-- cairo 1.15.12
-- freetype2 2.9
+- gtk+ 3.24.8
+- glib2 2.60.2
+- gnome-shell 3.32.2
+- gcc 8.3.0
+- wayland 1.17.0
+- wayland-protocols 1.17
+- cairo 1.16.0
+- freetype2 2.10.0
+- imagemagick 7.0.8.45
 
 ## Notice
 
