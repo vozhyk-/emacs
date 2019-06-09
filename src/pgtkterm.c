@@ -2289,10 +2289,9 @@ x_draw_image_glyph_string (struct glyph_string *s)
       int y = s->y + s->img->vmargin;
       int width = s->background_width;
 
-      cairo_set_source_surface (cr, s->img->cr_data,
-                                x - s->slice.x,
-                                y - s->slice.y);
-      cairo_rectangle (cr, x, y, width, height);
+      cairo_translate (cr, x - s->slice.x, y - s->slice.y);
+      cairo_set_source (cr, s->img->cr_data);
+      cairo_rectangle (cr, 0, 0, width, height);
       cairo_fill (cr);
       pgtk_end_cr_clip (s->f);
     }
@@ -4652,7 +4651,7 @@ pgtk_query_frame_background_color (struct frame *f, Emacs_Color *bgcolor)
 static void
 pgtk_free_pixmap (struct frame *_f, Emacs_Pixmap pixmap)
 {
-  pgtk_image_destroy(pixmap);
+  // pgtk_image_destroy(pixmap);
 }
 
 static struct terminal *

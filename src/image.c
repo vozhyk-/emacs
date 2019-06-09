@@ -61,10 +61,6 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include TERM_HEADER
 #endif /* HAVE_WINDOW_SYSTEM */
 
-#ifdef HAVE_PGTK
-#include <pgtkimage.h>
-#endif
-
 /* Work around GCC bug 54561.  */
 #if GNUC_PREREQ (4, 3, 0)
 # pragma GCC diagnostic ignored "-Wclobbered"
@@ -134,19 +130,10 @@ typedef struct ns_bitmap_record Bitmap_Record;
 
 #ifdef HAVE_PGTK
 typedef struct pgtk_bitmap_record Bitmap_Record;
-
-#define GET_PIXEL(ximg, x, y) XGetPixel (ximg, x, y)
-#define NO_PIXMAP 0
-
-#define PIX_MASK_RETAIN	0
-#define PIX_MASK_DRAW	1
-
-#define x_defined_color(f, name, color_def, alloc) \
-  pgtk_defined_color (f, name, color_def, alloc, 0)
 #endif /* HAVE_PGTK */
 
 #if (defined HAVE_X_WINDOWS \
-     && ! (defined HAVE_NTGUI || defined USE_CAIRO || defined HAVE_NS || defined HAVE_PGTK))
+     && ! (defined HAVE_NTGUI || defined USE_CAIRO || defined HAVE_NS))
 /* W32_TODO : Color tables on W32.  */
 # define COLOR_TABLE_SUPPORT 1
 #endif
@@ -302,22 +289,6 @@ XPutPixel (Emacs_Pix_Container image, int x, int y, unsigned long pixel)
 }
 #endif /* HAVE_NS */
 
-#ifdef HAVE_PGTK
-/* Use with pgtk_image.  */
-static unsigned long
-XGetPixel (XImagePtr ximage, int x, int y)
-{
-  return pgtk_image_get_pixel (ximage, x, y);
-}
-
-/* Use with pgtk_image.  */
-static void
-XPutPixel (XImagePtr ximage, int x, int y, unsigned long pixel)
-{
-  pgtk_image_put_pixel (ximage, x, y, pixel);
-}
-#endif /* HAVE_PGTK */
-
 /* Code to deal with bitmaps.  Bitmaps are referenced by their bitmap
    id, which is just an int that this section returns.  Bitmaps are
    reference counted so they can be shared among frames.
@@ -461,9 +432,11 @@ image_create_bitmap_from_data (struct frame *f, char *bits,
 #endif
 
 #ifdef HAVE_PGTK
-  void *bitmap = pgtk_image_create_from_xbm (bits, width, height, 0xffffffff, 0xff000000);
-  if (!bitmap)
-      return -1;
+  Emacs_Pixmap bitmap = image_pix_container_create_from_bitmap_data(f, bits,
+								    width,
+								    height,
+								    0xffffffff,
+								    0xff000000);
 #endif
 
   id = image_allocate_bitmap_record (f);
@@ -606,8 +579,8 @@ free_bitmap_record (Display_Info *dpyinfo, Bitmap_Record *bm)
   ns_release_object (bm->img);
 #endif
 
-#ifdef HAVE_NS
-  pgtk_image_destroy (bm->img);
+#ifdef HAVE_PGTK
+  // pgtk_image_destroy (bm->img);
 #endif
 
   if (bm->file)
@@ -2755,18 +2728,6 @@ image_create_x_image_and_pixmap_1 (struct frame *f, int width, int height, int d
   *pimg = *pixmap;
   return 1;
 #endif
-
-#ifdef HAVE_PGTK
-  *pixmap = pgtk_image_create(width, height, depth);
-  if (*pixmap == 0)
-    {
-      *pimg = NULL;
-      image_error ("Unable to allocate pgtk_image for XPM pixmap");
-      return 0;
-    }
-  *pimg = *pixmap;
-  return 1;
-#endif
 }
 
 
@@ -2792,7 +2753,7 @@ image_destroy_x_image (Emacs_Pix_Container pimg)
       ns_release_object (pimg);
 #endif /* HAVE_NS */
 #ifdef HAVE_PGTK
-      pgtk_image_destroy (pimg);
+      // pgtk_image_destroy (pimg);
 #endif /* HAVE_PGTK */
     }
 #endif
@@ -2830,10 +2791,6 @@ gui_put_x_image (struct frame *f, Emacs_Pix_Container pimg,
 #ifdef HAVE_NS
   eassert (pimg == pixmap);
   ns_retain_object (pimg);
-#endif
-
-#ifdef HAVE_PGTK
-  eassert (pimg == pixmap);
 #endif
 }
 
@@ -2952,9 +2909,6 @@ image_get_x_image (struct frame *f, struct image *img, bool mask_p)
   Emacs_Pix_Container pixmap = !mask_p ? img->pixmap : img->mask;
 
   ns_retain_object (pixmap);
-  return pixmap;
-#elif defined (HAVE_PGTK)
-  XImagePtr pixmap = !mask_p ? img->pixmap : img->mask;
   return pixmap;
 #endif
 }
@@ -3664,14 +3618,12 @@ xbm_load_image (struct frame *f, struct image *img, char *contents, char *end)
 	img->pixmap = NO_PIXMAP;
       xfree (data);
 
-#ifndef HAVE_PGTK
       if (img->pixmap == NO_PIXMAP)
 	{
 	  image_clear_image (f, img);
 	  image_error ("Unable to create X pixmap for `%s'", img->spec);
 	}
       else
-#endif
 	success_p = 1;
     }
   else
@@ -4736,7 +4688,7 @@ xpm_load_image (struct frame *f,
   Lisp_Object (*get_color_table) (Lisp_Object, const char *, int);
   Lisp_Object frame, color_symbols, color_table;
   int best_key;
-#if !defined(HAVE_NS) && !defined(HAVE_PGTK)
+#if !defined(HAVE_NS)
   bool have_mask = false;
 #endif
   Emacs_Pix_Container ximg = NULL, mask_img = NULL;
@@ -4790,7 +4742,7 @@ xpm_load_image (struct frame *f,
     }
 
   if (!image_create_x_image_and_pixmap (f, img, width, height, 0, &ximg, 0)
-#if !defined(HAVE_NS) && !defined(HAVE_PGTK)
+#if !defined(HAVE_NS)
       || !image_create_x_image_and_pixmap (f, img, width, height, 1,
 					   &mask_img, 1)
 #endif
@@ -4918,13 +4870,10 @@ xpm_load_image (struct frame *f,
 
 	  PUT_PIXEL (ximg, x, y,
 		     FIXNUMP (color_val) ? XFIXNUM (color_val) : frame_fg);
-#if !defined(HAVE_NS) && !defined(HAVE_PGTK)
+#if !defined(HAVE_NS)
 	  PUT_PIXEL (mask_img, x, y,
 		     (!EQ (color_val, Qt) ? PIX_MASK_DRAW
 		      : (have_mask = true, PIX_MASK_RETAIN)));
-#elif defined(HAVE_PGTK)
-          if (EQ (color_val, Qt))
-            pgtk_image_set_alpha (ximg, x, y, 0);
 #else
           if (EQ (color_val, Qt))
             ns_set_alpha (ximg, x, y, 0);
@@ -4942,7 +4891,7 @@ xpm_load_image (struct frame *f,
     IMAGE_BACKGROUND (img, f, ximg);
 
   image_put_x_image (f, img, ximg, 0);
-#if !defined(HAVE_NS) && !defined(HAVE_PGTK)
+#if !defined(HAVE_NS)
   if (have_mask)
     {
       /* Fill in the background_transparent field while we have the
@@ -5673,7 +5622,7 @@ image_disable_image (struct frame *f, struct image *img)
   if (n_planes < 2 || cross_disabled_images)
     {
 #ifndef HAVE_NTGUI
-#if !defined(HAVE_NS) && !defined(HAVE_PGTK)  /* TODO: NS support, however this not needed for toolbars */
+#if !defined(HAVE_NS)  /* TODO: NS support, however this not needed for toolbars */
 
 #ifndef USE_CAIRO
 #define CrossForeground(f) BLACK_PIX_DEFAULT (f)
@@ -5740,7 +5689,7 @@ image_build_heuristic_mask (struct frame *f, struct image *img,
   HGDIOBJ prev;
   char *mask_img;
   int row_width;
-#elif !defined HAVE_NS && !defined HAVE_PGTK
+#elif !defined HAVE_NS
   Emacs_Pix_Container mask_img;
 #endif
   int x, y;
@@ -5751,7 +5700,7 @@ image_build_heuristic_mask (struct frame *f, struct image *img,
     image_clear_image_1 (f, img, CLEAR_IMAGE_MASK);
 
 #ifndef HAVE_NTGUI
-#if !defined HAVE_NS && !defined HAVE_PGTK
+#if !defined HAVE_NS
   /* Create an image and pixmap serving as mask.  */
   if (! image_create_x_image_and_pixmap (f, img, img->width, img->height, 1,
 					 &mask_img, 1))
@@ -5806,17 +5755,14 @@ image_build_heuristic_mask (struct frame *f, struct image *img,
 #ifndef HAVE_NTGUI
   for (y = 0; y < img->height; ++y)
     for (x = 0; x < img->width; ++x)
-#ifdef HAVE_PGTK
-      if (XGetPixel (ximg, x, y) == bg)
-        pgtk_image_set_alpha (ximg, x, y, 0);
-#elif !defined HAVE_NS
+#ifndef HAVE_NS
       PUT_PIXEL (mask_img, x, y, (GET_PIXEL (ximg, x, y) != bg
 				  ? PIX_MASK_DRAW : PIX_MASK_RETAIN));
 #else
       if (XGetPixel (ximg, x, y) == bg)
         ns_set_alpha (ximg, x, y, 0);
 #endif /* HAVE_NS */
-#if !defined HAVE_NS && !defined HAVE_PGTK
+#if !defined HAVE_NS
   /* Fill in the background_transparent field while we have the mask handy. */
   image_background_transparent (img, f, mask_img);
 
@@ -9080,7 +9026,7 @@ imagemagick_load_image (struct frame *f, struct image *img,
 
   init_color_table ();
 
-#if defined (HAVE_MAGICKEXPORTIMAGEPIXELS) && ! defined (HAVE_NS) && !defined (HAVE_PGTK)
+#if defined (HAVE_MAGICKEXPORTIMAGEPIXELS) && ! defined (HAVE_NS)
   if (imagemagick_render_type != 0)
     {
       /* Magicexportimage is normally faster than pixelpushing.  This

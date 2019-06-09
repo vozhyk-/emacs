@@ -64,12 +64,6 @@ struct pgtk_bitmap_record
 #define GREEN_FROM_ULONG(color) (((color) >> 8) & 0xff)
 #define BLUE_FROM_ULONG(color) ((color) & 0xff)
 
-/* Do not change `* 0x101' in the following lines to `<< 8'.  If
-   changed, image masks in 1-bit depth will not work. */
-#define RED16_FROM_ULONG(color) (RED_FROM_ULONG(color) * 0x101)
-#define GREEN16_FROM_ULONG(color) (GREEN_FROM_ULONG(color) * 0x101)
-#define BLUE16_FROM_ULONG(color) (BLUE_FROM_ULONG(color) * 0x101)
-
 struct scroll_bar
 {
   /* These fields are shared by all vectors.  */

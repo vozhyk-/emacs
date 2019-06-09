@@ -138,8 +138,6 @@ typedef Emacs_Pixmap Emacs_Pix_Context;
 typedef struct pgtk_display_info Display_Info;
 typedef Emacs_Pixmap XImagePtr;
 typedef XImagePtr XImagePtr_or_DC;
-typedef Emacs_Pixmap Emacs_Pix_Container;
-typedef Emacs_Pixmap Emacs_Pix_Context;
 #endif
 
 #ifdef HAVE_WINDOW_SYSTEM

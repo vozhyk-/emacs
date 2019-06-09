@@ -58,8 +58,6 @@ typedef XGCValues * GC;
 #define GCBackground 0x02
 #define GCFont 0x03
 
-typedef void *Emacs_Pixmap;
-
 typedef void *Emacs_Cursor;
 
 typedef void * Color;
