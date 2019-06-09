@@ -7,6 +7,8 @@
 ;; Version: 1.0
 ;; Package: thunk
 
+;; Maintainer: emacs-devel@gnu.org
+
 ;; This file is part of GNU Emacs.
 
 ;; GNU Emacs is free software: you can redistribute it and/or modify
@@ -52,16 +54,15 @@
   "Delay the evaluation of BODY."
   (declare (debug t))
   (cl-assert lexical-binding)
-  (let ((forced (make-symbol "forced"))
-        (val (make-symbol "val")))
-    `(let (,forced ,val)
-       (lambda (&optional check)
-         (if check
-             ,forced
-           (unless ,forced
-             (setf ,val (progn ,@body))
-             (setf ,forced t))
-           ,val)))))
+  `(let (forced
+         (val (lambda () ,@body)))
+     (lambda (&optional check)
+       (if check
+           forced
+         (unless forced
+           (setf val (funcall val))
+           (setf forced t))
+         val))))
 
 (defun thunk-force (delayed)
   "Force the evaluation of DELAYED.

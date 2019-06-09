@@ -107,6 +107,7 @@ ac_cv_func_pthread_sigmask=yes
 gl_threads_api=posix
 gl_cv_func_pthread_sigmask_return_works=yes
 gl_cv_func_pthread_sigmask_unblock_works="not relevant"
+gl_cv_func_pthread_sigmask_macro=no
 # Implemented in w32proc.c
 emacs_cv_langinfo_codeset=yes
 emacs_cv_langinfo__nl_paper_width=yes
@@ -135,3 +136,8 @@ ac_cv_func_getrlimit=yes
 ac_cv_func_setrlimit=yes
 # GCC warnings that produce too much noise
 gl_cv_warn_c__Wredundant_decls=no
+# We don't want to compile lib/copy-file-range.c because it isn't used
+# on Windows, and because compiling it triggers a warning about a
+# missing prototype, since lib/unistd.h, where Gnulib has its
+# prototype, isn't built on Windows.
+gl_cv_func_copy_file_range=yes

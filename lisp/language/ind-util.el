@@ -2,7 +2,6 @@
 
 ;; Copyright (C) 2001-2019 Free Software Foundation, Inc.
 
-;; Maintainer:  KAWABATA, Taichi <kawabata@m17n.org>
 ;; Keywords: multilingual, Indian, Devanagari
 
 ;; This file is part of GNU Emacs.
@@ -829,6 +828,9 @@ Returns new end position."
       (let ((pos from) newpos func (max to))
 	(narrow-to-region from to)
 	(while (< pos max)
+          ;; FIXME: The below seems to assume
+          ;; composition-function-table holds functions?  That is no
+          ;; longer true, since long ago.
 	  (setq func (aref composition-function-table (char-after pos)))
 	  (if (fboundp func)
 	      (setq newpos (funcall func pos nil)

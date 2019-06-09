@@ -3780,16 +3780,22 @@ This function is an internal primitive--use `make-frame' instead.  */)
 
 #ifdef USE_CAIRO
   register_font_driver (&ftcrfont_driver, f);
+#ifdef HAVE_HARFBUZZ
+  register_font_driver (&ftcrhbfont_driver, f);
+#endif	/* HAVE_HARFBUZZ */
 #else
 #ifdef HAVE_FREETYPE
 #ifdef HAVE_XFT
   register_font_driver (&xftfont_driver, f);
+#ifdef HAVE_HARFBUZZ
+  register_font_driver (&xfthbfont_driver, f);
+#endif
 #else	/* not HAVE_XFT */
   register_font_driver (&ftxfont_driver, f);
 #endif	/* not HAVE_XFT */
 #endif	/* HAVE_FREETYPE */
-  register_font_driver (&xfont_driver, f);
 #endif	/* not USE_CAIRO */
+  register_font_driver (&xfont_driver, f);
 
   image_cache_refcount =
     FRAME_IMAGE_CACHE (f) ? FRAME_IMAGE_CACHE (f)->refcount : 0;
@@ -6205,15 +6211,21 @@ x_create_tip_frame (struct x_display_info *dpyinfo, Lisp_Object parms)
 
 #ifdef USE_CAIRO
   register_font_driver (&ftcrfont_driver, f);
+#ifdef HAVE_HARFBUZZ
+  register_font_driver (&ftcrhbfont_driver, f);
+#endif	/* HAVE_HARFBUZZ */
 #else
-  register_font_driver (&xfont_driver, f);
 #ifdef HAVE_FREETYPE
 #ifdef HAVE_XFT
   register_font_driver (&xftfont_driver, f);
+#ifdef HAVE_HARFBUZZ
+  register_font_driver (&xfthbfont_driver, f);
+#endif
 #else	/* not HAVE_XFT */
   register_font_driver (&ftxfont_driver, f);
 #endif	/* not HAVE_XFT */
 #endif	/* HAVE_FREETYPE */
+  register_font_driver (&xfont_driver, f);
 #endif	/* not USE_CAIRO */
 
   image_cache_refcount =

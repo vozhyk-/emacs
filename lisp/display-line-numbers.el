@@ -2,6 +2,7 @@
 
 ;; Copyright (C) 2017-2019 Free Software Foundation, Inc.
 
+;; Maintainer: emacs-devel@gnu.org
 ;; Keywords: convenience
 
 ;; This file is part of GNU Emacs.
@@ -91,9 +92,7 @@ the mode is on, set `display-line-numbers' directly."
 
 (defun display-line-numbers--turn-on ()
   "Turn on `display-line-numbers-mode'."
-  (unless (or (minibufferp)
-              ;; taken from linum.el
-              (and (daemonp) (null (frame-parameter nil 'client))))
+  (unless (minibufferp)
     (display-line-numbers-mode)))
 
 ;;;###autoload

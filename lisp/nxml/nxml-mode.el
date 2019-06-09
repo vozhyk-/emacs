@@ -424,6 +424,15 @@ reference.")
     (when rng-validate-mode
       (rng-validate-while-idle (current-buffer)))))
 
+(defvar nxml-prolog-end) ;; nxml-rap.el
+
+(defun nxml-syntax-propertize (start end)
+  "Syntactic keywords for `nxml-mode'."
+  ;; Like `sgml-syntax-propertize', but rescan prolog if needed.
+  (when (< start nxml-prolog-end)
+    (nxml-scan-prolog))
+  (sgml-syntax-propertize start end))
+
 (defvar tildify-space-string)
 (defvar tildify-foreach-region-function)
 
@@ -518,7 +527,7 @@ Many aspects this mode can be customized using
 	(nxml-with-invisible-motion
 	  (nxml-scan-prolog)))))
   (setq-local syntax-ppss-table sgml-tag-syntax-table)
-  (setq-local syntax-propertize-function #'sgml-syntax-propertize)
+  (setq-local syntax-propertize-function #'nxml-syntax-propertize)
   (add-hook 'change-major-mode-hook #'nxml-cleanup nil t)
 
   ;; Emacs 23 handles the encoding attribute on the xml declaration
@@ -540,7 +549,9 @@ Many aspects this mode can be customized using
           nil  ; no special syntax table
           (font-lock-extend-region-functions . (nxml-extend-region))
           (jit-lock-contextually . t)
-          (font-lock-unfontify-region-function . nxml-unfontify-region)))
+          (font-lock-unfontify-region-function . nxml-unfontify-region)
+          (font-lock-syntactic-face-function
+           . sgml-font-lock-syntactic-face)))
 
   (with-demoted-errors (rng-nxml-mode-init)))
 

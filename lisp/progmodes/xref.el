@@ -695,7 +695,7 @@ references displayed in the current *xref* buffer."
     ;; suggested by Johan Claesson "to further reduce finger movement":
     (define-key map (kbd ".") #'xref-next-line)
     (define-key map (kbd ",") #'xref-prev-line)
-    (define-key map (kbd "g") #'xref--revert-xref-buffer)
+    (define-key map (kbd "g") #'xref-revert-buffer)
     map))
 
 (define-derived-mode xref--xref-buffer-mode special-mode "XREF"
@@ -782,7 +782,11 @@ Return an alist of the form ((FILENAME . (XREF ...)) ...)."
                   #'equal))
 
 (defun xref--show-xref-buffer (fetcher alist)
-  (let* ((xrefs (if (functionp fetcher) (funcall fetcher) fetcher))
+  (cl-assert (functionp fetcher))
+  (let* ((xrefs
+          (or
+           (assoc-default 'fetched-xrefs alist)
+           (funcall fetcher)))
          (xref-alist (xref--analyze xrefs)))
     (with-current-buffer (get-buffer-create xref-buffer-name)
       (setq buffer-undo-list nil)
@@ -795,14 +799,12 @@ Return an alist of the form ((FILENAME . (XREF ...)) ...)."
         (goto-char (point-min))
         (setq xref--original-window (assoc-default 'window alist)
               xref--original-window-intent (assoc-default 'display-action alist))
-        (when (functionp fetcher)
-          (setq xref--fetcher fetcher))
+        (setq xref--fetcher fetcher)
         (current-buffer)))))
 
-(defun xref--revert-xref-buffer ()
+(defun xref-revert-buffer ()
+  "Refresh the search results in the current buffer."
   (interactive)
-  (unless xref--fetcher
-    (user-error "Reverting not supported"))
   (let ((inhibit-read-only t)
         (buffer-undo-list t))
     (save-excursion
@@ -817,20 +819,40 @@ Return an alist of the form ((FILENAME . (XREF ...)) ...)."
            'face 'error))))
       (goto-char (point-min)))))
 
-(defun xref--show-defs-buffer (xrefs alist)
-  (cond
-   ((not (cdr xrefs))
-    (xref--pop-to-location (car xrefs)
-                           (assoc-default 'display-action alist)))
-   (t
-    (xref--show-xref-buffer xrefs alist))))
+(defun xref--show-defs-buffer (fetcher alist)
+  (let ((xrefs (funcall fetcher)))
+    (cond
+     ((not (cdr xrefs))
+      (xref--pop-to-location (car xrefs)
+                             (assoc-default 'display-action alist)))
+     (t
+      (xref--show-xref-buffer fetcher
+                              (cons (cons 'fetched-xrefs xrefs)
+                                    alist))))))
 
 
 (defvar xref-show-xrefs-function 'xref--show-xref-buffer
-  "Function to display a list of search results.")
+  "Function to display a list of search results.
+
+It should accept two arguments: FETCHER and ALIST.
+
+FETCHER is a function of no arguments that returns a list of xref
+values.  It must not depend on the current buffer or selected
+window.
+
+ALIST can include, but limited to, the following keys:
+
+WINDOW for the window that was selected before the current
+command was called.
+
+DISPLAY-ACTION indicates where the target location should be
+displayed.  The possible values are nil, `window' meaning the
+other window, or `frame' meaning the other frame.")
 
 (defvar xref-show-definitions-function 'xref--show-defs-buffer
-  "Function to display a list of definitions.")
+  "Function to display a list of definitions.
+
+Accepts the same arguments as `xref-show-xrefs-function'.")
 
 (defvar xref--read-identifier-history nil)
 
@@ -885,28 +907,39 @@ Return an alist of the form ((FILENAME . (XREF ...)) ...)."
 ;;; Commands
 
 (defun xref--find-xrefs (input kind arg display-action)
+  (xref--show-xrefs
+   (xref--create-fetcher input kind arg)
+   display-action))
+
+(defun xref--find-definitions (id display-action)
+  (xref--show-defs
+   (xref--create-fetcher id 'definitions id)
+   display-action))
+
+(defun xref--create-fetcher (input kind arg)
+  "Return an xref list fetcher function.
+
+It revisits the saved position and delegates the finding logic to
+the xref backend method indicated by KIND and passes ARG to it."
   (let* ((orig-buffer (current-buffer))
          (orig-position (point))
          (backend (xref-find-backend))
-         (method (intern (format "xref-backend-%s" kind)))
-         (fetcher (lambda ()
-                    (save-excursion
-                      (when (buffer-live-p orig-buffer)
-                        (set-buffer orig-buffer)
-                        (ignore-errors (goto-char orig-position)))
-                      (let ((xrefs (funcall method backend arg)))
-                        (unless xrefs
-                          (xref--not-found-error kind input))
-                        xrefs)))))
-    (xref--show-xrefs fetcher display-action)))
-
-(defun xref--find-definitions (id display-action)
-  (let ((xrefs (funcall #'xref-backend-definitions
-                        (xref-find-backend)
-                        id)))
-    (unless xrefs
-      (xref--not-found-error 'definitions id))
-    (xref--show-defs xrefs display-action)))
+         (method (intern (format "xref-backend-%s" kind))))
+    (lambda ()
+      (save-excursion
+        ;; Xref methods are generally allowed to depend on the text
+        ;; around point, not just on their explicit arguments.
+        ;;
+        ;; There is only so much we can do, however, to recreate that
+        ;; context, given that the user is free to change the buffer
+        ;; contents freely in the meantime.
+        (when (buffer-live-p orig-buffer)
+          (set-buffer orig-buffer)
+          (ignore-errors (goto-char orig-position)))
+        (let ((xrefs (funcall method backend arg)))
+          (unless xrefs
+            (xref--not-found-error kind input))
+          xrefs)))))
 
 (defun xref--not-found-error (kind input)
   (user-error "No %s found for: %s" (symbol-name kind) input))

@@ -1,10 +1,11 @@
-;;; studly.el --- StudlyCaps (tm)(r)(c)(xxx)
+;;; studly.el --- StudlyCaps (tm)(r)(c)(xxx)  -*- lexical-binding: t -*-
 
 ;;; This is in the public domain, since it was distributed
 ;;; by its author in 1986 without a copyright notice.
 
 ;; This file is part of GNU Emacs.
 
+;; Maintainer: emacs-devel@gnu.org
 ;; Keywords: games
 
 ;;; Commentary:

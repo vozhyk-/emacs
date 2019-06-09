@@ -6,6 +6,7 @@
 ;; Author: Don Morrison
 ;;	Lars Lindberg
 ;; (according to ack.texi)
+;; Maintainer: emacs-devel@gnu.org
 ;; Created: 16 Mars 1992
 ;; Lindberg's last update version: 5.7
 ;; Keywords: abbrev expand completion convenience
@@ -81,7 +82,7 @@
 ;;  [hymie]	Hyman Rosen <marks!hymie@jyacc.jyacc.com>
 ;;  [burgett]	Steve Burgett <burgett@bizet.eecs.berkeley.edu>
 ;;  [jules]	Julian Gosnell <jules@x.co.uk>
-;;  [kifer]	Michael Kifer <kifer@sbcs.sunysb.edu>
+;;  [kifer]	Michael Kifer <kifer@cs.stonybrook.edu>
 ;;  [ake]	Ake Stenhoff <extaksf@aom.ericsson.se>
 ;;  [alon]	Alon Albert <al%imercury@uunet.uu.net>
 ;;  [tromey]	Tom Tromey <tromey@busco.lanl.gov>

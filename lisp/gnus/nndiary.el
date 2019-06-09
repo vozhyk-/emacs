@@ -2,8 +2,7 @@
 
 ;; Copyright (C) 1999-2019 Free Software Foundation, Inc.
 
-;; Author:        Didier Verna <didier@xemacs.org>
-;; Maintainer:    Didier Verna <didier@xemacs.org>
+;; Author:        Didier Verna <didier@didierverna.net>
 ;; Created:       Fri Jul 16 18:55:42 1999
 ;; Keywords:      calendar mail news
 
@@ -1016,7 +1015,7 @@ all.  This may very well take some time.")
 (defun nndiary-save-nov ()
   (save-excursion
     (while nndiary-nov-buffer-alist
-      (when (buffer-name (cdar nndiary-nov-buffer-alist))
+      (when (buffer-live-p (cdar nndiary-nov-buffer-alist))
 	(set-buffer (cdar nndiary-nov-buffer-alist))
 	(when (buffer-modified-p)
 	  (nnmail-write-region 1 (point-max) nndiary-nov-buffer-file-name

@@ -2,6 +2,7 @@
 
 ;; Copyright (C) 1998-2019 Free Software Foundation, Inc.
 
+;; Maintainer: emacs-devel@gnu.org
 ;; Keywords: multimedia
 ;; Package: emacs
 
@@ -991,11 +992,12 @@ default is 20%."
     image))
 
 (defun image--get-imagemagick-and-warn ()
-  (unless (or (fboundp 'imagemagick-types) (image-scaling-p))
+  (unless (or (fboundp 'imagemagick-types) (image-transforms-p))
     (error "Cannot rescale images on this terminal"))
   (let ((image (image--get-image)))
     (image-flush image)
-    (when (fboundp 'imagemagick-types)
+    (when (and (fboundp 'imagemagick-types)
+               (not (image-transforms-p)))
       (plist-put (cdr image) :type 'imagemagick))
     image))
 

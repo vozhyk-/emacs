@@ -1435,6 +1435,12 @@ default values are used."
 	    (setq v (make-tramp-file-name
 		     :method method :user user :domain domain :host host
 		     :port port :localname localname :hop hop))
+	  ;; The method must be known.
+	  (unless (or (tramp-completion-mode-p)
+		      (string-equal method tramp-default-method-marker)
+		      (assoc method tramp-methods))
+	    (tramp-user-error
+	     v "Method `%s' is not known." method))
 	  ;; Only some methods from tramp-sh.el do support multi-hops.
 	  (when (and
 		 hop
@@ -2175,17 +2181,16 @@ Must be handled by the callers."
     (if (file-name-absolute-p (nth 0 args))
 	(nth 0 args)
       default-directory))
+   ;; STRING FILE.
+   ;; Starting with Emacs 26.1, just the 2nd argument of
+   ;; `make-symbolic-link' matters.
+   ((eq operation 'make-symbolic-link) (nth 1 args))
    ;; FILE DIRECTORY resp FILE1 FILE2.
    ((member operation
 	    '(add-name-to-file copy-directory copy-file
 	      file-equal-p file-in-directory-p
 	      file-name-all-completions file-name-completion
-	      ;; Starting with Emacs 26.1, just the 2nd argument of
-	      ;; `make-symbolic-link' matters.  For backward
-	      ;; compatibility, we still accept the first argument as
-	      ;; file name to be checked.  Handled properly in
-	      ;; `tramp-handle-*-make-symbolic-link'.
-	      file-newer-than-file-p make-symbolic-link rename-file))
+	      file-newer-than-file-p rename-file))
     (cond
      ((tramp-tramp-file-p (nth 0 args)) (nth 0 args))
      ((tramp-tramp-file-p (nth 1 args)) (nth 1 args))
@@ -2280,7 +2285,10 @@ preventing reentrant calls of Tramp.")
 (defun tramp-file-name-handler (operation &rest args)
   "Invoke Tramp file name handler.
 Falls back to normal file name handler if no Tramp file name handler exists."
-  (let ((filename (apply #'tramp-file-name-for-operation operation args)))
+  (let ((filename (apply #'tramp-file-name-for-operation operation args))
+	;; `file-remote-p' is called for everything, even for symbolic
+	;; links which look remote.  We don't want to get an error.
+	(non-essential (or non-essential (eq operation 'file-remote-p))))
     (if (tramp-tramp-file-p filename)
 	(save-match-data
           (setq filename (tramp-replace-environment-variables filename))
@@ -4637,6 +4645,7 @@ It always returns a return code.  The Lisp error raised when
 PROGRAM is nil is trapped also, returning 1.  Furthermore, traces
 are written with verbosity of 6."
   (let ((default-directory (tramp-compat-temporary-file-directory))
+	(process-environment (default-toplevel-value 'process-environment))
 	(destination (if (eq destination t) (current-buffer) destination))
 	(vec (or vec (car tramp-current-connection)))
 	output error result)
@@ -4670,6 +4679,7 @@ It always returns a return code.  The Lisp error raised when
 PROGRAM is nil is trapped also, returning 1.  Furthermore, traces
 are written with verbosity of 6."
   (let ((default-directory (tramp-compat-temporary-file-directory))
+	(process-environment (default-toplevel-value 'process-environment))
 	(buffer (if (eq buffer t) (current-buffer) buffer))
 	result)
     (tramp-message
@@ -4699,6 +4709,7 @@ are written with verbosity of 6."
 If an error occurs, it returns nil.  Traces are written with
 verbosity of 6."
   (let ((default-directory (tramp-compat-temporary-file-directory))
+	(process-environment (default-toplevel-value 'process-environment))
 	(vec (or vec (car tramp-current-connection)))
 	result)
     (if args

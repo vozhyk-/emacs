@@ -4,6 +4,7 @@
 ;; Foundation, Inc.
 
 ;; Author: Sebastian Kremer <sk@thp.uni-koeln.de>.
+;; Maintainer: emacs-devel@gnu.org
 ;; Keywords: files
 ;; Package: emacs
 
@@ -2898,6 +2899,7 @@ directories.
 REGEXP should use constructs supported by your local `grep' command."
   (interactive "sSearch marked files (regexp): ")
   (require 'grep)
+  (require 'xref)
   (defvar grep-find-ignored-files)
   (declare-function rgrep-find-ignored-directories "grep" (dir))
   (let* ((files (dired-get-marked-files nil nil nil nil t))

@@ -30,6 +30,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 
 #include <setjmp.h>
 
+#include <stdint.h>
 #include <c-ctype.h>
 #include <flexmember.h>
 
@@ -71,12 +72,36 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 
 #ifdef HAVE_X_WINDOWS
 typedef struct x_bitmap_record Bitmap_Record;
+#ifndef USE_CAIRO
 #define GET_PIXEL(ximg, x, y) XGetPixel (ximg, x, y)
+#define PUT_PIXEL XPutPixel
 #define NO_PIXMAP None
 
 #define PIX_MASK_RETAIN	0
 #define PIX_MASK_DRAW	1
+#endif	/* !USE_CAIRO */
 #endif /* HAVE_X_WINDOWS */
+
+#ifdef USE_CAIRO
+#define GET_PIXEL image_pix_context_get_pixel
+#define PUT_PIXEL image_pix_container_put_pixel
+#define NO_PIXMAP 0
+
+#define PIX_MASK_RETAIN	0
+#define PIX_MASK_DRAW	255
+
+#define RGB_TO_ULONG(r, g, b) (((r) << 16) | ((g) << 8) | (b))
+#define ARGB_TO_ULONG(a, r, g, b) (((a) << 24) | ((r) << 16) | ((g) << 8) | (b))
+#define RED_FROM_ULONG(color)	(((color) >> 16) & 0xff)
+#define GREEN_FROM_ULONG(color)	(((color) >> 8) & 0xff)
+#define BLUE_FROM_ULONG(color)	((color) & 0xff)
+#define RED16_FROM_ULONG(color)		(RED_FROM_ULONG (color) * 0x101)
+#define GREEN16_FROM_ULONG(color)	(GREEN_FROM_ULONG (color) * 0x101)
+#define BLUE16_FROM_ULONG(color)	(BLUE_FROM_ULONG (color) * 0x101)
+
+static unsigned long image_alloc_image_color (struct frame *, struct image *,
+					      Lisp_Object, unsigned long);
+#endif	/* USE_CAIRO */
 
 #ifdef HAVE_NTGUI
 
@@ -88,6 +113,7 @@ typedef struct x_bitmap_record Bitmap_Record;
 
 typedef struct w32_bitmap_record Bitmap_Record;
 #define GET_PIXEL(ximg, x, y) GetPixel (ximg, x, y)
+#define PUT_PIXEL XPutPixel
 #define NO_PIXMAP 0
 
 #define PIX_MASK_RETAIN	0
@@ -99,6 +125,7 @@ typedef struct w32_bitmap_record Bitmap_Record;
 typedef struct ns_bitmap_record Bitmap_Record;
 
 #define GET_PIXEL(ximg, x, y) XGetPixel (ximg, x, y)
+#define PUT_PIXEL XPutPixel
 #define NO_PIXMAP 0
 
 #define PIX_MASK_RETAIN	0
@@ -135,16 +162,128 @@ static void free_color_table (void);
 static unsigned long *colors_in_color_table (int *n);
 #endif
 
-/* Code to deal with bitmaps.  Bitmaps are referenced by their bitmap
-   id, which is just an int that this section returns.  Bitmaps are
-   reference counted so they can be shared among frames.
+#ifdef USE_CAIRO
 
-   Bitmap indices are guaranteed to be > 0, so a negative number can
-   be used to indicate no bitmap.
+static Emacs_Pix_Container
+image_create_pix_container (struct frame *f, unsigned int width,
+			    unsigned int height, unsigned int depth)
+{
+  Emacs_Pix_Container pimg;
 
-   If you use image_create_bitmap_from_data, then you must keep track
-   of the bitmaps yourself.  That is, creating a bitmap from the same
-   data more than once will not be caught.  */
+  pimg = xmalloc (sizeof (*pimg));
+  pimg->width = width;
+  pimg->height = height;
+  pimg->bits_per_pixel = depth == 1 ? 8 : 32;
+  pimg->bytes_per_line = cairo_format_stride_for_width ((depth == 1
+							 ? CAIRO_FORMAT_A8
+							 : CAIRO_FORMAT_RGB24),
+							width);
+  pimg->data = xmalloc (pimg->bytes_per_line * height);
+
+  return pimg;
+}
+
+static void
+image_pix_container_put_pixel (Emacs_Pix_Container image,
+			       int x, int y, unsigned long pixel)
+{
+  if (image->bits_per_pixel == 32)
+    ((uint32_t *)(image->data + y * image->bytes_per_line))[x] = pixel;
+  else
+    ((uint8_t *)(image->data + y * image->bytes_per_line))[x] = pixel;
+}
+
+static unsigned long
+image_pix_context_get_pixel (Emacs_Pix_Context image, int x, int y)
+{
+  if (image->bits_per_pixel == 32)
+    return ((uint32_t *)(image->data + y * image->bytes_per_line))[x];
+  else
+    return ((uint8_t *)(image->data + y * image->bytes_per_line))[x];
+}
+
+static Emacs_Pix_Container
+image_pix_container_create_from_bitmap_data (struct frame *f,
+					     char *data, unsigned int width,
+					     unsigned int height,
+					     unsigned long fg,
+					     unsigned long bg)
+{
+  Emacs_Pix_Container pimg = image_create_pix_container (f, width, height, 0);
+  int bytes_per_line = (width + (CHAR_BIT - 1)) / CHAR_BIT;
+
+  for (int y = 0; y < height; y++)
+    {
+      for (int x = 0; x < width; x++)
+	PUT_PIXEL (pimg, x, y,
+		   (data[x / CHAR_BIT] >> (x % CHAR_BIT)) & 1 ? fg : bg);
+      data += bytes_per_line;
+    }
+
+  return pimg;
+}
+
+static cairo_surface_t *
+cr_create_surface_from_pix_containers (Emacs_Pix_Container pimg,
+				       Emacs_Pix_Container mask)
+{
+  cairo_surface_t *surface;
+
+  if (mask)
+    {
+      int x, y;
+
+      for (y = 0; y < pimg->height; y++)
+	for (x = 0; x < pimg->width; x++)
+	  {
+	    unsigned long color, alpha;
+	    int r, g, b;
+
+	    color = GET_PIXEL (pimg, x, y);
+	    alpha = GET_PIXEL (mask, x, y);
+	    r = (RED_FROM_ULONG (color) * alpha + 0x7f) / 0xff;
+	    g = (GREEN_FROM_ULONG (color) * alpha + 0x7f) / 0xff;
+	    b = (BLUE_FROM_ULONG (color) * alpha + 0x7f) / 0xff;
+	    PUT_PIXEL (pimg, x, y, ARGB_TO_ULONG (alpha, r, g, b));
+	  }
+      xfree (mask->data);
+      mask->data = NULL;
+    }
+  surface = cairo_image_surface_create_for_data ((unsigned char *) pimg->data,
+						 (mask ? CAIRO_FORMAT_ARGB32
+						  : CAIRO_FORMAT_RGB24),
+						 pimg->width, pimg->height,
+						 pimg->bytes_per_line);
+  static const cairo_user_data_key_t key;
+  cairo_surface_set_user_data (surface, &key, pimg->data, xfree);
+  pimg->data = NULL;
+
+  return surface;
+}
+
+static void
+cr_put_image_to_cr_data (struct image *img)
+{
+  cairo_pattern_t *pattern = NULL;
+  cairo_surface_t *surface = cr_create_surface_from_pix_containers (img->pixmap,
+								    img->mask);
+  if (surface)
+    {
+      pattern = cairo_pattern_create_for_surface (surface);
+      if (img->cr_data)
+	{
+	  cairo_matrix_t matrix;
+	  cairo_pattern_get_matrix (img->cr_data, &matrix);
+	  cairo_pattern_set_matrix (pattern, &matrix);
+	  cairo_pattern_destroy (img->cr_data);
+	}
+      cairo_surface_destroy (surface);
+    }
+
+  img->cr_data = pattern;
+}
+
+#endif	/* USE_CAIRO */
 
 #ifdef HAVE_NS
 /* Use with images created by ns_image_for_XPM.  */
@@ -179,6 +318,16 @@ XPutPixel (XImagePtr ximage, int x, int y, unsigned long pixel)
 }
 #endif /* HAVE_PGTK */
 
+/* Code to deal with bitmaps.  Bitmaps are referenced by their bitmap
+   id, which is just an int that this section returns.  Bitmaps are
+   reference counted so they can be shared among frames.
+
+   Bitmap indices are guaranteed to be > 0, so a negative number can
+   be used to indicate no bitmap.
+
+   If you use image_create_bitmap_from_data, then you must keep track
+   of the bitmaps yourself.  That is, creating a bitmap from the same
+   data more than once will not be caught.  */
 
 /* Functions to access the contents of a bitmap, given an id.  */
 
@@ -194,6 +343,41 @@ x_bitmap_width (struct frame *f, ptrdiff_t id)
 {
   return FRAME_DISPLAY_INFO (f)->bitmaps[id - 1].width;
 }
+
+#ifdef USE_CAIRO
+cairo_pattern_t *
+x_bitmap_stipple (struct frame *f, Pixmap pixmap)
+{
+  Display_Info *dpyinfo = FRAME_DISPLAY_INFO (f);
+
+  for (ptrdiff_t i = 0; i < dpyinfo->bitmaps_last; i++)
+    {
+      struct x_bitmap_record *bm = dpyinfo->bitmaps + i;
+
+      if (bm->refcount && bm->pixmap == pixmap && bm->depth == 1)
+	{
+	  if (bm->stipple == NULL)
+	    {
+	      cairo_surface_t *surface
+		= cairo_xlib_surface_create_for_bitmap (FRAME_X_DISPLAY (f),
+							pixmap,
+							FRAME_X_SCREEN (f),
+							bm->width, bm->height);
+	      cairo_pattern_t *pattern
+		= cairo_pattern_create_for_surface (surface);
+	      cairo_surface_destroy (surface);
+	      cairo_pattern_set_extend (pattern, CAIRO_EXTEND_REPEAT);
+	      bm->stipple = pattern;
+	    }
+
+	  return bm->stipple;
+	}
+    }
+
+  return NULL;
+}
+
+#endif	/* USE_CAIRO */
 #endif
 
 #if defined (HAVE_X_WINDOWS) || defined (HAVE_NTGUI)
@@ -303,6 +487,9 @@ image_create_bitmap_from_data (struct frame *f, char *bits,
   dpyinfo->bitmaps[id - 1].pixmap = bitmap;
   dpyinfo->bitmaps[id - 1].have_mask = false;
   dpyinfo->bitmaps[id - 1].depth = 1;
+#ifdef USE_CAIRO
+  dpyinfo->bitmaps[id - 1].stipple = NULL;
+#endif	/* USE_CAIRO */
 #endif /* HAVE_X_WINDOWS */
 
 #ifdef HAVE_NTGUI
@@ -388,6 +575,9 @@ image_create_bitmap_from_file (struct frame *f, Lisp_Object file)
   dpyinfo->bitmaps[id - 1].depth = 1;
   dpyinfo->bitmaps[id - 1].height = height;
   dpyinfo->bitmaps[id - 1].width = width;
+#ifdef USE_CAIRO
+  dpyinfo->bitmaps[id - 1].stipple = NULL;
+#endif	/* USE_CAIRO */
 
   return id;
 #endif /* HAVE_X_WINDOWS */
@@ -402,6 +592,10 @@ free_bitmap_record (Display_Info *dpyinfo, Bitmap_Record *bm)
   XFreePixmap (dpyinfo->display, bm->pixmap);
   if (bm->have_mask)
     XFreePixmap (dpyinfo->display, bm->mask);
+#ifdef USE_CAIRO
+  if (bm->stipple)
+    cairo_pattern_destroy (bm->stipple);
+#endif	/* USE_CAIRO */
 #endif /* HAVE_X_WINDOWS */
 
 #ifdef HAVE_NTGUI
@@ -485,16 +679,17 @@ static void image_unget_x_image (struct image *, bool, Emacs_Pix_Container);
 
 #ifdef HAVE_X_WINDOWS
 
+#ifndef USE_CAIRO
 static void image_sync_to_pixmaps (struct frame *, struct image *);
+#endif	/* !USE_CAIRO */
 
-/* Useful functions defined in the section
-   `Image type independent image structures' below. */
+/* We are working on X-specific data structures here even with cairo.
+   So we use X-specific versions of image construction/destruction
+   functions and inline the specific case of four_corners_best.  */
 
-static unsigned long four_corners_best (XImage *ximg,
-                                        int *corners,
-                                        unsigned long width,
-                                        unsigned long height);
-
+static bool x_create_x_image_and_pixmap (struct frame *, int, int, int,
+					 XImage **, Pixmap *);
+static void x_destroy_x_image (XImage *);
 
 /* Create a mask of a bitmap. Note is this not a perfect mask.
    It's nicer with some borders in this context */
@@ -506,7 +701,7 @@ x_create_bitmap_mask (struct frame *f, ptrdiff_t id)
   XImage *ximg, *mask_img;
   unsigned long width, height;
   bool result;
-  unsigned long bg;
+  unsigned long bg UNINIT;
   unsigned long x, y, xp, xm, yp, ym;
   GC gc;
 
@@ -529,8 +724,7 @@ x_create_bitmap_mask (struct frame *f, ptrdiff_t id)
       return;
     }
 
-  result = image_create_x_image_and_pixmap_1 (f, width, height, 1,
-                                              &mask_img, &mask, NULL);
+  result = x_create_x_image_and_pixmap (f, width, height, 1, &mask_img, &mask);
 
   unblock_input ();
   if (!result)
@@ -539,7 +733,23 @@ x_create_bitmap_mask (struct frame *f, ptrdiff_t id)
       return;
     }
 
-  bg = four_corners_best (ximg, NULL, width, height);
+  unsigned long corner_pixels[4];
+  corner_pixels[0] = XGetPixel (ximg, 0, 0);
+  corner_pixels[1] = XGetPixel (ximg, width - 1, 0);
+  corner_pixels[2] = XGetPixel (ximg, width - 1, height - 1);
+  corner_pixels[3] = XGetPixel (ximg, 0, height - 1);
+  int i, best_count;
+  for (i = best_count = 0; i < 4; ++i)
+    {
+      int j, n;
+
+      for (j = n = 0; j < 4; ++j)
+	if (corner_pixels[i] == corner_pixels[j])
+	  ++n;
+
+      if (n > best_count)
+	bg = corner_pixels[i], best_count = n;
+    }
 
   for (y = 0; y < ximg->height; ++y)
     {
@@ -574,7 +784,7 @@ x_create_bitmap_mask (struct frame *f, ptrdiff_t id)
   dpyinfo->bitmaps[id - 1].mask = mask;
 
   XDestroyImage (ximg);
-  image_destroy_x_image (mask_img);
+  x_destroy_x_image (mask_img);
 }
 
 #endif /* HAVE_X_WINDOWS */
@@ -1011,7 +1221,7 @@ free_image (struct frame *f, struct image *img)
 
       c->images[img->id] = NULL;
 
-#ifdef HAVE_XRENDER
+#if !defined USE_CAIRO && defined HAVE_XRENDER
       if (img->picture)
         XRenderFreePicture (FRAME_X_DISPLAY (f), img->picture);
       if (img->mask_picture)
@@ -1067,20 +1277,34 @@ prepare_image_for_display (struct frame *f, struct image *img)
   /* We're about to display IMG, so set its timestamp to `now'.  */
   img->timestamp = current_timespec ();
 
-#ifndef USE_CAIRO
   /* If IMG doesn't have a pixmap yet, load it now, using the image
      type dependent loader function.  */
   if (img->pixmap == NO_PIXMAP && !img->load_failed_p)
     img->load_failed_p = ! img->type->load (f, img);
 
-#ifdef HAVE_X_WINDOWS
+#ifdef USE_CAIRO
+  if (!img->load_failed_p)
+    {
+      block_input ();
+      if (img->cr_data == NULL || (cairo_pattern_get_type (img->cr_data)
+				   != CAIRO_PATTERN_TYPE_SURFACE))
+	{
+	  cr_put_image_to_cr_data (img);
+	  if (img->cr_data == NULL)
+	    {
+	      img->load_failed_p = 1;
+	      img->type->free (f, img);
+	    }
+	}
+      unblock_input ();
+    }
+#elif defined HAVE_X_WINDOWS
   if (!img->load_failed_p)
     {
       block_input ();
       image_sync_to_pixmaps (f, img);
       unblock_input ();
     }
-#endif
 #endif
 }
 
@@ -1127,53 +1351,6 @@ image_ascent (struct image *img, struct face *face, struct glyph_slice *slice)
 
   return ascent;
 }
-
-#ifdef USE_CAIRO
-static uint32_t
-emacs_color_to_argb32 (Emacs_Color *ec)
-{
-  return ((0xffu << 24) | ((ec->red / 256) << 16)
-	  | ((ec->green / 256) << 8) | (ec->blue / 256));
-}
-
-static uint32_t
-get_spec_bg_or_alpha_as_argb (struct image *img,
-                              struct frame *f)
-{
-  uint32_t bgcolor = 0;
-  Emacs_Color xbgcolor;
-  Lisp_Object bg = image_spec_value (img->spec, QCbackground, NULL);
-
-#ifndef HAVE_PGTK
-  if (STRINGP (bg) && x_parse_color (f, SSDATA (bg), &xbgcolor))
-    bgcolor = emacs_color_to_argb32 (&xbgcolor);
-#else
-  if (STRINGP (bg) && pgtk_parse_color (SSDATA (bg), &xbgcolor))
-    bgcolor = emacs_color_to_argb32 (&xbgcolor);
-#endif
-
-  return bgcolor;
-}
-
-static cairo_surface_t *
-create_cairo_image_surface (int width, int height)
-{
-  cairo_format_t format = CAIRO_FORMAT_ARGB32;
-  eassert (cairo_format_stride_for_width (format, width) == width * 4);
-
-  return cairo_image_surface_create (format, width, height);
-}
-
-static void
-set_cairo_image_surface (struct image *img, cairo_surface_t *surface)
-{
-  cairo_surface_mark_dirty (surface);
-  img->width = cairo_image_surface_get_width (surface);
-  img->height = cairo_image_surface_get_height (surface);
-  img->cr_data = surface;
-  img->pixmap = 0;
-}
-#endif
 
 
 
@@ -1241,7 +1418,19 @@ image_background (struct image *img, struct frame *f, Emacs_Pix_Context pimg)
       if (free_pimg)
 	pimg = image_get_x_image_or_dc (f, img, 0, &prev);
 
-      img->background = four_corners_best (pimg, img->corners, img->width, img->height);
+      RGB_PIXEL_COLOR bg
+	= four_corners_best (pimg, img->corners, img->width, img->height);
+#ifdef USE_CAIRO
+      {
+	char color_name[30];
+	sprintf (color_name, "#%04x%04x%04x",
+		 (unsigned int) RED16_FROM_ULONG (bg),
+		 (unsigned int) GREEN16_FROM_ULONG (bg),
+		 (unsigned int) BLUE16_FROM_ULONG (bg));
+	bg = image_alloc_image_color (f, img, build_string (color_name), 0);
+      }
+#endif
+      img->background = bg;
 
       if (free_pimg)
 	image_unget_x_image_or_dc (img, 0, pimg, prev);
@@ -1316,7 +1505,7 @@ image_clear_image_1 (struct frame *f, struct image *img, int flags)
 	  /* NOTE (HAVE_NS): background color is NOT an indexed color! */
 	  img->background_valid = 0;
 	}
-#ifdef HAVE_X_WINDOWS
+#if defined HAVE_X_WINDOWS && !defined USE_CAIRO
       if (img->ximg)
 	{
 	  image_destroy_x_image (img->ximg);
@@ -1334,7 +1523,7 @@ image_clear_image_1 (struct frame *f, struct image *img, int flags)
 	  img->mask = NO_PIXMAP;
 	  img->background_transparent_valid = 0;
 	}
-#ifdef HAVE_X_WINDOWS
+#if defined HAVE_X_WINDOWS && !defined USE_CAIRO
       if (img->mask_img)
 	{
 	  image_destroy_x_image (img->mask_img);
@@ -1347,14 +1536,21 @@ image_clear_image_1 (struct frame *f, struct image *img, int flags)
   if ((flags & CLEAR_IMAGE_COLORS) && img->ncolors)
     {
       /* W32_TODO: color table support.  */
-#ifdef HAVE_X_WINDOWS
+#if defined HAVE_X_WINDOWS && !defined USE_CAIRO
       x_free_colors (f, img->colors, img->ncolors);
-#endif /* HAVE_X_WINDOWS */
+#endif /* HAVE_X_WINDOWS && !USE_CAIRO */
       xfree (img->colors);
       img->colors = NULL;
       img->ncolors = 0;
     }
 
+#ifdef USE_CAIRO
+  if (img->cr_data)
+    {
+      cairo_pattern_destroy (img->cr_data);
+      img->cr_data = NULL;
+    }
+#endif	/* USE_CAIRO */
 }
 
 /* Free X resources of image IMG which is used on frame F.  */
@@ -1363,10 +1559,6 @@ static void
 image_clear_image (struct frame *f, struct image *img)
 {
   block_input ();
-#ifdef USE_CAIRO
-  if (img->cr_data)
-    cairo_surface_destroy ((cairo_surface_t *)img->cr_data);
-#endif
   image_clear_image_1 (f, img,
 		   CLEAR_IMAGE_PIXMAP | CLEAR_IMAGE_MASK | CLEAR_IMAGE_COLORS);
   unblock_input ();
@@ -1726,7 +1918,7 @@ postprocess_image (struct frame *f, struct image *img)
     }
 }
 
-#if defined (HAVE_IMAGEMAGICK) || defined (HAVE_NATIVE_SCALING)
+#if defined (HAVE_IMAGEMAGICK) || defined (HAVE_NATIVE_TRANSFORMS)
 /* Scale an image size by returning SIZE / DIVISOR * MULTIPLIER,
    safely rounded and clipped to int range.  */
 
@@ -1825,58 +2017,280 @@ compute_image_size (size_t width, size_t height,
   *d_width = desired_width;
   *d_height = desired_height;
 }
-#endif /* HAVE_IMAGEMAGICK || HAVE_NATIVE_SCALING */
+#endif /* HAVE_IMAGEMAGICK || HAVE_NATIVE_TRANSFORMS */
+
+typedef double matrix3x3[3][3];
 
 static void
-image_set_image_size (struct frame *f, struct image *img)
+matrix3x3_copy (matrix3x3 a, matrix3x3 b)
 {
-#ifdef HAVE_NATIVE_SCALING
+  memcpy (b, a, sizeof (matrix3x3));
+}
+
+static void
+matrix3x3_mult (matrix3x3 a, matrix3x3 b, matrix3x3 result)
+{
+  for (int i = 0; i < 3; i++)
+    for (int j = 0; j < 3; j++)
+      {
+	double sum = 0;
+	for (int k = 0; k < 3; k++)
+	  sum += a[i][k] * b[k][j];
+	result[i][j] = sum;
+      }
+}
+
+static void
+image_set_rotation (struct image *img, matrix3x3 tm)
+{
+#ifdef HAVE_NATIVE_TRANSFORMS
+# ifdef HAVE_IMAGEMAGICK
+  /* ImageMagick images are already rotated.  */
+  if (EQ (image_spec_value (img->spec, QCtype, NULL), Qimagemagick))
+    return;
+# endif
+
+# if !defined USE_CAIRO && defined HAVE_XRENDER
+  if (!img->picture)
+    return;
+# endif
+
+  int rotation, cos_r, sin_r, width, height;
+
+  Lisp_Object value = image_spec_value (img->spec, QCrotation, NULL);
+  if (! NUMBERP (value))
+    return;
+
+  Lisp_Object reduced_angle = Fmod (value, make_fixnum (360));
+  if (! FLOATP (reduced_angle))
+    rotation = XFIXNUM (reduced_angle);
+  else
+    {
+      rotation = XFLOAT_DATA (reduced_angle);
+      if (rotation != XFLOAT_DATA (reduced_angle))
+	goto not_a_multiple_of_90;
+    }
+
+  if (rotation == 0)
+    return;
+
+  if (rotation == 90)
+    {
+      width = img->height;
+      height = img->width;
+
+      cos_r = 0;
+      sin_r = 1;
+    }
+  else if (rotation == 180)
+    {
+      width = img->width;
+      height = img->height;
+
+      cos_r = -1;
+      sin_r = 0;
+    }
+  else if (rotation == 270)
+    {
+      width = img->height;
+      height = img->width;
+
+      cos_r = 0;
+      sin_r = -1;
+    }
+  else
+    {
+    not_a_multiple_of_90:
+      image_error ("Native image rotation supports "
+		   "only multiples of 90 degrees");
+      return;
+    }
+
+  /* Translate so (0, 0) is in the center of the image.  */
+  matrix3x3 t
+    = { [0][0] = 1,
+				  [1][1] = 1,
+	[2][0] = img->width >> 1, [2][1] = img->height >> 1, [2][2] = 1 };
+  matrix3x3 tmp;
+  matrix3x3_mult (t, tm, tmp);
+
+  /* Rotate.  */
+  matrix3x3 rot = { [0][0] = cos_r, [0][1] = -sin_r,
+		    [1][0] = sin_r, [1][1] = cos_r,
+						     [2][2] = 1 };
+  matrix3x3 tmp2;
+  matrix3x3_mult (rot, tmp, tmp2);
+
+  /* Translate back.  */
+  t[2][0] = - (width >> 1);
+  t[2][1] = - (height >> 1);
+  matrix3x3_mult (t, tmp2, tm);
+
+  img->width = width;
+  img->height = height;
+#endif
+}
+
+static void
+image_set_crop (struct image *img, matrix3x3 tm)
+{
+#ifdef HAVE_NATIVE_TRANSFORMS
+# ifdef HAVE_IMAGEMAGICK
+  /* ImageMagick images are already cropped.  */
+  if (EQ (image_spec_value (img->spec, QCtype, NULL), Qimagemagick))
+    return;
+# endif
+
+# if !defined USE_CAIRO && defined HAVE_XRENDER
+  if (!img->picture)
+    return;
+# endif
+
+  Lisp_Object crop = image_spec_value (img->spec, QCcrop, NULL);
+
+  if (!CONSP (crop))
+    return;
+
+  Lisp_Object w = XCAR (crop), h = Qnil, x = Qnil, y = Qnil;
+  crop = XCDR (crop);
+  if (CONSP (crop))
+    {
+      h = XCAR (crop);
+      crop = XCDR (crop);
+      if (CONSP (crop))
+	{
+	  x = XCAR (crop);
+	  crop = XCDR (crop);
+	  if (CONSP (crop))
+	    y = XCAR (crop);
+	}
+    }
+
+  int width = img->width;
+  if (FIXNATP (w) && XFIXNAT (w) < img->width)
+    width = XFIXNAT (w);
+  int left;
+  if (TYPE_RANGED_FIXNUMP (int, x))
+    {
+      left = XFIXNUM (x);
+      if (left < 0)
+        left = img->width - width + left;
+    }
+  else
+    left = (img->width - width) >> 1;
+
+  int height = img->height;
+  if (FIXNATP (h) && XFIXNAT (h) < img->height)
+    height = XFIXNAT (h);
+  int top;
+  if (TYPE_RANGED_FIXNUMP (int, y))
+    {
+      top = XFIXNUM (y);
+      if (top < 0)
+        top = img->height - height + top;
+    }
+  else
+    top = (img->height - height) >> 1;
+
+  /* Negative values operate from the right and bottom of the image
+     instead of the left and top.  */
+  if (left < 0)
+    {
+      width = img->width + left;
+      left = 0;
+    }
+
+  if (width + left > img->width)
+    width = img->width - left;
+
+  if (top < 0)
+    {
+      height = img->height + top;
+      top = 0;
+    }
+
+  if (height + top > img->height)
+    height = img->height - top;
+
+  matrix3x3 tmp, m = { [0][0] = 1,
+				      [1][1] = 1,
+		       [2][0] = left, [2][1] = top, [2][2] = 1 };
+  matrix3x3_mult (m, tm, tmp);
+  matrix3x3_copy (tmp, tm);
+
+  img->width = width;
+  img->height = height;
+#endif
+}
+
+static void
+image_set_size (struct image *img, matrix3x3 tm)
+{
+#ifdef HAVE_NATIVE_TRANSFORMS
 # ifdef HAVE_IMAGEMAGICK
   /* ImageMagick images are already the correct size.  */
   if (EQ (image_spec_value (img->spec, QCtype, NULL), Qimagemagick))
     return;
 # endif
 
-  int width, height;
-  compute_image_size (img->width, img->height, img->spec, &width, &height);
-
-# ifdef HAVE_NS
-  ns_image_set_size (img->pixmap, width, height);
-  img->width = width;
-  img->height = height;
+# if !defined USE_CAIRO && defined HAVE_XRENDER
+  if (!img->picture)
+    return;
 # endif
 
-# ifdef USE_CAIRO
+  int width, height;
+
+  compute_image_size (img->width, img->height, img->spec, &width, &height);
+
+  double xscale = img->width / (double) width;
+  double yscale = img->height / (double) height;
+
+  matrix3x3 tmp, rm = { [0][0] = xscale, [1][1] = yscale, [2][2] = 1 };
+  matrix3x3_mult (rm, tm, tmp);
+  matrix3x3_copy (tmp, tm);
+
   img->width = width;
   img->height = height;
-# elif defined HAVE_XRENDER
+#endif
+}
+
+static void
+image_set_transform (struct frame *f, struct image *img, matrix3x3 matrix)
+{
+  /* TODO: Add MS Windows support.  */
+#ifdef HAVE_NATIVE_TRANSFORMS
+# if defined (HAVE_NS)
+  /* Under NS the transform is applied to the drawing surface at
+     drawing time, so store it for later.  */
+  ns_image_set_transform (img->pixmap, matrix);
+# elif defined USE_CAIRO
+  cairo_matrix_t cr_matrix = {matrix[0][0], matrix[0][1], matrix[1][0],
+			      matrix[1][1], matrix[2][0], matrix[2][1]};
+  cairo_pattern_t *pattern = cairo_pattern_create_rgb (0, 0, 0);
+  cairo_pattern_set_matrix (pattern, &cr_matrix);
+  /* Dummy solid color pattern just to record pattern matrix.  */
+  img->cr_data = pattern;
+# elif defined (HAVE_XRENDER)
   if (img->picture)
     {
-      double xscale = img->width / (double) width;
-      double yscale = img->height / (double) height;
-
       XTransform tmat
-	= {{{XDoubleToFixed (xscale), XDoubleToFixed (0), XDoubleToFixed (0)},
-	    {XDoubleToFixed (0), XDoubleToFixed (yscale), XDoubleToFixed (0)},
-	    {XDoubleToFixed (0), XDoubleToFixed (0), XDoubleToFixed (1)}}};
+	= {{{XDoubleToFixed (matrix[0][0]),
+             XDoubleToFixed (matrix[1][0]),
+             XDoubleToFixed (matrix[2][0])},
+	    {XDoubleToFixed (matrix[0][1]),
+             XDoubleToFixed (matrix[1][1]),
+             XDoubleToFixed (matrix[2][1])},
+	    {XDoubleToFixed (matrix[0][2]),
+             XDoubleToFixed (matrix[1][2]),
+             XDoubleToFixed (matrix[2][2])}}};
 
       XRenderSetPictureFilter (FRAME_X_DISPLAY (f), img->picture, FilterBest,
 			       0, 0);
       XRenderSetPictureTransform (FRAME_X_DISPLAY (f), img->picture, &tmat);
-
-      img->width = width;
-      img->height = height;
     }
-# endif
-# ifdef HAVE_NTGUI
-  /* Under HAVE_NTGUI, we will scale the image on the fly, when we
-     draw it.  See w32term.c:x_draw_image_foreground.  */
-  img->width = width;
-  img->height = height;
 # endif
 #endif
 }
-
 
 /* Return the id of image with Lisp specification SPEC on frame F.
    SPEC must be a valid Lisp image specification (see valid_image_p).  */
@@ -1932,7 +2346,14 @@ lookup_image (struct frame *f, Lisp_Object spec)
 	     `:background COLOR'.  */
 	  Lisp_Object ascent, margin, relief, bg;
 	  int relief_bound;
-          image_set_image_size (f, img);
+
+#ifdef HAVE_NATIVE_TRANSFORMS
+          matrix3x3 transform_matrix = { [0][0] = 1, [1][1] = 1, [2][2] = 1 };
+          image_set_size (img, transform_matrix);
+          image_set_crop (img, transform_matrix);
+          image_set_rotation (img, transform_matrix);
+          image_set_transform (f, img, transform_matrix);
+#endif
 
 	  ascent = image_spec_value (spec, QCascent, NULL);
 	  if (FIXNUMP (ascent))
@@ -2057,14 +2478,10 @@ mark_image_cache (struct image_cache *c)
 			  X / NS / W32 support code
  ***********************************************************************/
 
-/* Return true if XIMG's size WIDTH x HEIGHT doesn't break the
-   windowing system.
-   WIDTH and HEIGHT must both be positive.
-   If XIMG is null, assume it is a bitmap.  */
-static bool
-image_check_image_size (Emacs_Pix_Container ximg, int width, int height)
-{
 #ifdef HAVE_X_WINDOWS
+static bool
+x_check_image_size (XImage *ximg, int width, int height)
+{
   /* Respect Xlib's limits: it cannot deal with images that have more
      than INT_MAX (and/or UINT_MAX) bytes.  And respect Emacs's limits
      of PTRDIFF_MAX (and/or SIZE_MAX) bytes for any object.  */
@@ -2089,6 +2506,77 @@ image_check_image_size (Emacs_Pix_Container ximg, int width, int height)
     }
   return (width <= (INT_MAX - (bitmap_pad - 1)) / depth
 	  && height <= X_IMAGE_BYTES_MAX / bytes_per_line);
+}
+
+static bool
+x_create_x_image_and_pixmap (struct frame *f, int width, int height, int depth,
+			     XImage **ximg, Pixmap *pixmap)
+{
+  Display *display = FRAME_X_DISPLAY (f);
+  Drawable drawable = FRAME_X_DRAWABLE (f);
+  Screen *screen = FRAME_X_SCREEN (f);
+
+  eassert (input_blocked_p ());
+
+  if (depth <= 0)
+    depth = DefaultDepthOfScreen (screen);
+  *ximg = XCreateImage (display, DefaultVisualOfScreen (screen),
+			depth, ZPixmap, 0, NULL, width, height,
+			depth > 16 ? 32 : depth > 8 ? 16 : 8, 0);
+  if (*ximg == NULL)
+    {
+      image_error ("Unable to allocate X image");
+      return 0;
+    }
+
+  if (! x_check_image_size (*ximg, width, height))
+    {
+      x_destroy_x_image (*ximg);
+      *ximg = NULL;
+      image_error ("Image too large (%dx%d)",
+		   make_fixnum (width), make_fixnum (height));
+      return 0;
+    }
+
+  /* Allocate image raster.  */
+  (*ximg)->data = xmalloc ((*ximg)->bytes_per_line * height);
+
+  /* Allocate a pixmap of the same size.  */
+  *pixmap = XCreatePixmap (display, drawable, width, height, depth);
+  if (*pixmap == NO_PIXMAP)
+    {
+      x_destroy_x_image (*ximg);
+      *ximg = NULL;
+      image_error ("Unable to create X pixmap");
+      return 0;
+    }
+
+  return 1;
+}
+
+static void
+x_destroy_x_image (XImage *ximg)
+{
+  eassert (input_blocked_p ());
+  if (ximg)
+    {
+      xfree (ximg->data);
+      ximg->data = NULL;
+    }
+}
+
+#endif	/* HAVE_X_WINDOWS */
+
+/* Return true if XIMG's size WIDTH x HEIGHT doesn't break the
+   windowing system.
+   WIDTH and HEIGHT must both be positive.
+   If XIMG is null, assume it is a bitmap.  */
+
+static bool
+image_check_image_size (Emacs_Pix_Container ximg, int width, int height)
+{
+#if defined HAVE_X_WINDOWS && !defined USE_CAIRO
+  return x_check_image_size (ximg, width, height);
 #else
   /* FIXME: Implement this check for the HAVE_NS and HAVE_NTGUI cases.
      For now, assume that every image size is allowed on these systems.  */
@@ -2111,50 +2599,30 @@ image_create_x_image_and_pixmap_1 (struct frame *f, int width, int height, int d
                                    Emacs_Pix_Container *pimg,
                                    Emacs_Pixmap *pixmap, Picture *picture)
 {
-#ifdef HAVE_X_WINDOWS
-  Display *display = FRAME_X_DISPLAY (f);
-  Drawable drawable = FRAME_X_DRAWABLE (f);
-  Screen *screen = FRAME_X_SCREEN (f);
-
+#ifdef USE_CAIRO
   eassert (input_blocked_p ());
 
-  if (depth <= 0)
-    depth = DefaultDepthOfScreen (screen);
-  *pimg = XCreateImage (display, DefaultVisualOfScreen (screen),
-			depth, ZPixmap, 0, NULL, width, height,
-			depth > 16 ? 32 : depth > 8 ? 16 : 8, 0);
-  if (*pimg == NULL)
-    {
-      image_error ("Unable to allocate X image");
-      return 0;
-    }
-
-  if (! image_check_image_size (*pimg, width, height))
-    {
-      image_destroy_x_image (*pimg);
-      *pimg = NULL;
-      image_error ("Image too large (%dx%d)",
-		   make_fixnum (width), make_fixnum (height));
-      return 0;
-    }
-
-  /* Allocate image raster.  */
-  (*pimg)->data = xmalloc ((*pimg)->bytes_per_line * height);
-
   /* Allocate a pixmap of the same size.  */
-  *pixmap = XCreatePixmap (display, drawable, width, height, depth);
+  *pixmap = image_create_pix_container (f, width, height, depth);
   if (*pixmap == NO_PIXMAP)
     {
-      image_destroy_x_image (*pimg);
       *pimg = NULL;
-      image_error ("Unable to create X pixmap");
+      image_error ("Unable to create X pixmap", Qnil, Qnil);
       return 0;
     }
 
+  *pimg = *pixmap;
+  return 1;
+#elif defined HAVE_X_WINDOWS
+  if (!x_create_x_image_and_pixmap (f, width, height, depth, pimg, pixmap))
+    return 0;
 # ifdef HAVE_XRENDER
+  Display *display = FRAME_X_DISPLAY (f);
   int event_basep, error_basep;
   if (picture && XRenderQueryExtension (display, &event_basep, &error_basep))
     {
+      if (depth <= 0)
+	depth = DefaultDepthOfScreen (FRAME_X_SCREEN (f));
       if (depth == 32 || depth == 24 || depth == 8)
         {
           XRenderPictFormat *format;
@@ -2307,14 +2775,14 @@ image_create_x_image_and_pixmap_1 (struct frame *f, int width, int height, int d
 static void
 image_destroy_x_image (Emacs_Pix_Container pimg)
 {
+#if defined HAVE_X_WINDOWS && !defined USE_CAIRO
+  x_destroy_x_image (pimg);
+#else
   eassert (input_blocked_p ());
   if (pimg)
     {
-#ifdef HAVE_X_WINDOWS
-      xfree (pimg->data);
-      pimg->data = NULL;
-      XDestroyImage (pimg);
-#endif /* HAVE_X_WINDOWS */
+#ifdef USE_CAIRO
+#endif	/* USE_CAIRO */
 #ifdef HAVE_NTGUI
       /* Data will be freed by DestroyObject.  */
       pimg->data = NULL;
@@ -2327,6 +2795,7 @@ image_destroy_x_image (Emacs_Pix_Container pimg)
       pgtk_image_destroy (pimg);
 #endif /* HAVE_PGTK */
     }
+#endif
 }
 
 
@@ -2338,7 +2807,9 @@ static void
 gui_put_x_image (struct frame *f, Emacs_Pix_Container pimg,
                  Emacs_Pixmap pixmap, int width, int height)
 {
-#ifdef HAVE_X_WINDOWS
+#ifdef USE_CAIRO
+  eassert (pimg == pixmap);
+#elif defined HAVE_X_WINDOWS
   GC gc;
 
   eassert (input_blocked_p ());
@@ -2377,7 +2848,7 @@ image_create_x_image_and_pixmap (struct frame *f, struct image *img,
   eassert ((!mask_p ? img->pixmap : img->mask) == NO_PIXMAP);
 
   Picture *picture = NULL;
-#ifdef HAVE_XRENDER
+#if !defined USE_CAIRO && defined HAVE_XRENDER
   picture = !mask_p ? &img->picture : &img->mask_picture;
 #endif
   return image_create_x_image_and_pixmap_1 (f, width, height, depth, ximg,
@@ -2395,7 +2866,7 @@ static void
 image_put_x_image (struct frame *f, struct image *img, Emacs_Pix_Container ximg,
 		   bool mask_p)
 {
-#ifdef HAVE_X_WINDOWS
+#if defined HAVE_X_WINDOWS && !defined USE_CAIRO
   if (!mask_p)
     {
       eassert (img->ximg == NULL);
@@ -2413,7 +2884,7 @@ image_put_x_image (struct frame *f, struct image *img, Emacs_Pix_Container ximg,
 #endif
 }
 
-#ifdef HAVE_X_WINDOWS
+#if defined HAVE_X_WINDOWS && !defined USE_CAIRO
 /* Put the X images recorded in IMG on frame F into pixmaps, then free
    the X images and their buffers.  */
 
@@ -2467,7 +2938,9 @@ image_unget_x_image_or_dc (struct image *img, bool mask_p,
 static Emacs_Pix_Container
 image_get_x_image (struct frame *f, struct image *img, bool mask_p)
 {
-#ifdef HAVE_X_WINDOWS
+#ifdef USE_CAIRO
+  return !mask_p ? img->pixmap : img->mask;
+#elif defined HAVE_X_WINDOWS
   XImage *ximg_in_img = !mask_p ? img->ximg : img->mask_img;
 
   if (ximg_in_img)
@@ -2489,7 +2962,8 @@ image_get_x_image (struct frame *f, struct image *img, bool mask_p)
 static void
 image_unget_x_image (struct image *img, bool mask_p, Emacs_Pix_Container ximg)
 {
-#ifdef HAVE_X_WINDOWS
+#ifdef USE_CAIRO
+#elif defined HAVE_X_WINDOWS
   XImage *ximg_in_img = !mask_p ? img->ximg : img->mask_img;
 
   if (ximg_in_img)
@@ -2948,48 +3422,32 @@ Create_Pixmap_From_Bitmap_Data (struct frame *f, struct image *img, char *data,
 				RGB_PIXEL_COLOR fg, RGB_PIXEL_COLOR bg,
 				bool non_default_colors)
 {
-#ifdef HAVE_NTGUI
+#ifdef USE_CAIRO
+  Emacs_Color fgbg[] = {{.pixel = fg}, {.pixel = bg}};
+  FRAME_TERMINAL (f)->query_colors (f, fgbg, ARRAYELTS (fgbg));
+  fg = lookup_rgb_color (f, fgbg[0].red, fgbg[0].green, fgbg[0].blue);
+  bg = lookup_rgb_color (f, fgbg[1].red, fgbg[1].green, fgbg[1].blue);
+  img->pixmap
+    = image_pix_container_create_from_bitmap_data (f, data, img->width,
+						   img->height, fg, bg);
+#elif defined HAVE_X_WINDOWS
+  img->pixmap
+    = XCreatePixmapFromBitmapData (FRAME_X_DISPLAY (f),
+				   FRAME_X_DRAWABLE (f),
+				   data,
+				   img->width, img->height,
+				   fg, bg,
+				   DefaultDepthOfScreen (FRAME_X_SCREEN (f)));
+#elif defined HAVE_NTGUI
   img->pixmap
     = w32_create_pixmap_from_bitmap_data (img->width, img->height, data);
 
   /* If colors were specified, transfer the bitmap to a color one.  */
   if (non_default_colors)
     convert_mono_to_color_image (f, img, fg, bg);
-
-#elif defined (HAVE_NS)
+#elif defined HAVE_NS
   img->pixmap = ns_image_from_XBM (data, img->width, img->height, fg, bg);
-
-#elif defined (HAVE_PGTK)
-  cairo_surface_t *surface = create_cairo_image_surface(img->width, img->height);
-  uint32_t *dp = (uint32_t *) cairo_image_surface_get_data (surface);
-  int x, y;
-  unsigned char *sp = (unsigned char *) data;
-  int mask = 0x01;
-  for (y = 0; y < img->height; y++) {
-    for (x = 0; x < img->width; x++) {
-      *dp++ = (*sp & mask) ? fg : bg;
-
-      if ((mask <<= 1) >= 0x100) {
-	sp++;
-	mask = 0x01;
-      }
-    }
-    if (mask != 0x01) {
-      sp++;
-      mask = 0x01;
-    }
-  }
-#else
-  img->pixmap =
-   (image_check_image_size (0, img->width, img->height)
-    ? XCreatePixmapFromBitmapData (FRAME_X_DISPLAY (f),
-                                   FRAME_X_DRAWABLE (f),
-				   data,
-				   img->width, img->height,
-				   fg, bg,
-				   DefaultDepthOfScreen (FRAME_X_SCREEN (f)))
-    : NO_PIXMAP);
-#endif /* !HAVE_NTGUI && !HAVE_NS */
+#endif
 }
 
 
@@ -3198,9 +3656,12 @@ xbm_load_image (struct frame *f, struct image *img, char *contents, char *end)
 	  non_default_colors = 1;
 	}
 
-      Create_Pixmap_From_Bitmap_Data (f, img, data,
-				      foreground, background,
-				      non_default_colors);
+      if (image_check_image_size (0, img->width, img->height))
+	Create_Pixmap_From_Bitmap_Data (f, img, data,
+					foreground, background,
+					non_default_colors);
+      else
+	img->pixmap = NO_PIXMAP;
       xfree (data);
 
 #ifndef HAVE_PGTK
@@ -3423,7 +3884,7 @@ static bool xpm_load (struct frame *f, struct image *img);
 #endif /* not HAVE_NTGUI */
 #endif /* HAVE_XPM */
 
-#if defined (HAVE_XPM) || defined (HAVE_NS)
+#if defined HAVE_XPM || defined USE_CAIRO || defined HAVE_NS
 
 /* Indices of image specification fields in xpm_format, below.  */
 
@@ -3461,19 +3922,17 @@ static const struct image_keyword xpm_format[XPM_LAST] =
   {":background",	IMAGE_STRING_OR_NIL_VALUE,		0}
 };
 
-#ifdef HAVE_X_WINDOWS
+#if defined HAVE_X_WINDOWS && !defined USE_CAIRO
 
 /* Define ALLOC_XPM_COLORS if we can use Emacs' own color allocation
    functions for allocating image colors.  Our own functions handle
    color allocation failures more gracefully than the ones on the XPM
    lib.  */
 
-#ifndef USE_CAIRO
 #if defined XpmAllocColor && defined XpmFreeColors && defined XpmColorClosure
 #define ALLOC_XPM_COLORS
 #endif
-#endif /* USE_CAIRO */
-#endif /* HAVE_X_WINDOWS */
+#endif /* HAVE_X_WINDOWS && !USE_CAIRO */
 
 #ifdef ALLOC_XPM_COLORS
 
@@ -3722,7 +4181,7 @@ xpm_image_p (Lisp_Object object)
 	      || xpm_valid_color_symbols_p (fmt[XPM_COLOR_SYMBOLS].value)));
 }
 
-#endif /* HAVE_XPM || HAVE_NS */
+#endif /* HAVE_XPM || USE_CAIRO || HAVE_NS */
 
 #if defined HAVE_XPM && defined HAVE_X_WINDOWS && !defined USE_GTK
 ptrdiff_t
@@ -3766,6 +4225,9 @@ x_create_bitmap_from_xpm_data (struct frame *f, const char **bits)
   dpyinfo->bitmaps[id - 1].width = attrs.width;
   dpyinfo->bitmaps[id - 1].depth = attrs.depth;
   dpyinfo->bitmaps[id - 1].refcount = 1;
+#ifdef USE_CAIRO
+  dpyinfo->bitmaps[id - 1].stipple = NULL;
+#endif	/* USE_CAIRO */
 
 #ifdef ALLOC_XPM_COLORS
   xpm_free_color_cache ();
@@ -3778,7 +4240,7 @@ x_create_bitmap_from_xpm_data (struct frame *f, const char **bits)
 /* Load image IMG which will be displayed on frame F.  Value is
    true if successful.  */
 
-#ifdef HAVE_XPM
+#if defined HAVE_XPM && !defined USE_CAIRO
 
 static bool
 xpm_load (struct frame *f, struct image *img)
@@ -3946,44 +4408,6 @@ xpm_load (struct frame *f, struct image *img)
 #endif /* HAVE_NTGUI */
     }
 
-#ifdef USE_CAIRO
-  /* Load very specific Xpm:s.  */
-  if (rc == XpmSuccess
-      && img->ximg->format == ZPixmap
-      && img->ximg->bits_per_pixel == 32
-      && (! img->mask_img || img->mask_img->bits_per_pixel == 1))
-    {
-      int width = img->ximg->width;
-      int height = img->ximg->height;
-      cairo_surface_t *surface = create_cairo_image_surface (width, height);
-      int i;
-      uint32_t *od = (uint32_t *) cairo_image_surface_get_data (surface);
-      uint32_t *id = (uint32_t *) img->ximg->data;
-      char *mid = img->mask_img ? img->mask_img->data : 0;
-      uint32_t bgcolor = get_spec_bg_or_alpha_as_argb (img, f);
-
-      for (i = 0; i < height; ++i)
-        {
-          int k;
-          for (k = 0; k < width; ++k)
-            {
-              int idx = i * img->ximg->bytes_per_line/4 + k;
-              int maskidx = mid ? i * img->mask_img->bytes_per_line + k/8 : 0;
-              int mask = mid ? mid[maskidx] & (1 << (k % 8)) : 1;
-
-              if (mask) od[idx] = id[idx] + 0xff000000; /* ff => full alpha */
-              else od[idx] = bgcolor;
-            }
-        }
-
-      set_cairo_image_surface (img, surface);
-    }
-  else
-    {
-      rc = XpmFileInvalid;
-      image_clear_image (f, img);
-    }
-#else
 #ifdef HAVE_X_WINDOWS
   if (rc == XpmSuccess)
     {
@@ -4009,7 +4433,6 @@ xpm_load (struct frame *f, struct image *img)
 	}
     }
 #endif
-#endif /* ! USE_CAIRO */
 
   if (rc == XpmSuccess)
     {
@@ -4112,9 +4535,9 @@ xpm_load (struct frame *f, struct image *img)
   return rc == XpmSuccess;
 }
 
-#endif /* HAVE_XPM */
+#endif /* HAVE_XPM && !USE_CAIRO */
 
-#if defined (HAVE_NS) && !defined (HAVE_XPM)
+#if defined USE_CAIRO || (defined HAVE_NS && !defined HAVE_XPM)
 
 /* XPM support functions for NS where libxpm is not available.
    Only XPM version 3 (without any extensions) is supported.  */
@@ -4454,7 +4877,9 @@ xpm_load_image (struct frame *f,
 		color_val = Qt;
 	      else if (FRAME_TERMINAL (f)->defined_color_hook
                        (f, SSDATA (XCDR (specified_color)), &cdef, false, false))
-		color_val = make_fixnum (cdef.pixel);
+		color_val
+		  = make_fixnum (lookup_rgb_color (f, cdef.red, cdef.green,
+						   cdef.blue));
 	    }
 	}
       if (NILP (color_val) && max_key > 0)
@@ -4463,7 +4888,8 @@ xpm_load_image (struct frame *f,
 	    color_val = Qt;
 	  else if (FRAME_TERMINAL (f)->defined_color_hook
                    (f, max_color, &cdef, false, false))
-	    color_val = make_fixnum (cdef.pixel);
+	    color_val = make_fixnum (lookup_rgb_color (f, cdef.red, cdef.green,
+						       cdef.blue));
 	}
       if (!NILP (color_val))
 	(*put_color_table) (color_table, beg, chars_per_pixel, color_val);
@@ -4471,6 +4897,14 @@ xpm_load_image (struct frame *f,
       expect (',');
     }
 
+  unsigned long frame_fg = FRAME_FOREGROUND_PIXEL (f);
+#ifdef USE_CAIRO
+  {
+    Emacs_Color color = {.pixel = frame_fg};
+    FRAME_TERMINAL (f)->query_colors (f, &color, 1);
+    frame_fg = lookup_rgb_color (f, color.red, color.green, color.blue);
+  }
+#endif
   for (y = 0; y < height; y++)
     {
       expect (XPM_TK_STRING);
@@ -4482,11 +4916,10 @@ xpm_load_image (struct frame *f,
 	  Lisp_Object color_val =
 	    (*get_color_table) (color_table, str, chars_per_pixel);
 
-	  XPutPixel (ximg, x, y,
-		     (FIXNUMP (color_val) ? XFIXNUM (color_val)
-		      : FRAME_FOREGROUND_PIXEL (f)));
+	  PUT_PIXEL (ximg, x, y,
+		     FIXNUMP (color_val) ? XFIXNUM (color_val) : frame_fg);
 #if !defined(HAVE_NS) && !defined(HAVE_PGTK)
-	  XPutPixel (mask_img, x, y,
+	  PUT_PIXEL (mask_img, x, y,
 		     (!EQ (color_val, Qt) ? PIX_MASK_DRAW
 		      : (have_mask = true, PIX_MASK_RETAIN)));
 #elif defined(HAVE_PGTK)
@@ -4846,10 +5279,8 @@ lookup_rgb_color (struct frame *f, int r, int g, int b)
 {
 #ifdef HAVE_NTGUI
   return PALETTERGB (r >> 8, g >> 8, b >> 8);
-#elif defined HAVE_NS || defined HAVE_PGTK
+#elif defined USE_CAIRO || defined HAVE_NS
   return RGB_TO_ULONG (r >> 8, g >> 8, b >> 8);
-#elif defined USE_CAIRO
-  return (0xffu << 24) | (r << 16) | (g << 8) | b;
 #else
   xsignal1 (Qfile_error,
 	    build_string ("This Emacs mishandles this image file type"));
@@ -4921,7 +5352,7 @@ image_to_emacs_colors (struct frame *f, struct image *img, bool rgb_p)
   p = colors;
   for (y = 0; y < img->height; ++y)
     {
-#if defined (HAVE_X_WINDOWS) || defined (HAVE_NTGUI)
+#if !defined USE_CAIRO && !defined HAVE_NS
       Emacs_Color *row = p;
       for (x = 0; x < img->width; ++x, ++p)
 	p->pixel = GET_PIXEL (ximg, x, y);
@@ -4929,11 +5360,9 @@ image_to_emacs_colors (struct frame *f, struct image *img, bool rgb_p)
         {
           FRAME_TERMINAL (f)->query_colors (f, row, img->width);
         }
-#else
-
+#else  /* USE_CAIRO || HAVE_NS */
       for (x = 0; x < img->width; ++x, ++p)
 	{
-	  /* W32_TODO: palette support needed here?  */
 	  p->pixel = GET_PIXEL (ximg, x, y);
 	  if (rgb_p)
 	    {
@@ -4942,7 +5371,7 @@ image_to_emacs_colors (struct frame *f, struct image *img, bool rgb_p)
 	      p->blue = BLUE16_FROM_ULONG (p->pixel);
 	    }
 	}
-#endif /* HAVE_X_WINDOWS */
+#endif	/* USE_CAIRO || HAVE_NS */
     }
 
   image_unget_x_image_or_dc (img, 0, ximg, prev);
@@ -5018,7 +5447,7 @@ image_from_emacs_colors (struct frame *f, struct image *img, Emacs_Color *colors
       {
 	unsigned long pixel;
 	pixel = lookup_rgb_color (f, p->red, p->green, p->blue);
-	XPutPixel (oimg, x, y, pixel);
+	PUT_PIXEL (oimg, x, y, pixel);
       }
 
   xfree (colors);
@@ -5167,6 +5596,44 @@ image_edge_detection (struct frame *f, struct image *img,
 }
 
 
+#if defined HAVE_X_WINDOWS || defined USE_CAIRO
+static void
+image_pixmap_draw_cross (struct frame *f, Emacs_Pixmap pixmap,
+			 int x, int y, unsigned int width, unsigned int height,
+			 unsigned long color)
+{
+#ifdef USE_CAIRO
+  cairo_surface_t *surface
+    = cairo_image_surface_create_for_data ((unsigned char *) pixmap->data,
+					   (pixmap->bits_per_pixel == 32
+					    ? CAIRO_FORMAT_RGB24
+					    : CAIRO_FORMAT_A8),
+					   pixmap->width, pixmap->height,
+					   pixmap->bytes_per_line);
+  cairo_t *cr = cairo_create (surface);
+  cairo_surface_destroy (surface);
+  cairo_set_source_rgb (cr, RED_FROM_ULONG (color) / 255.0,
+			GREEN_FROM_ULONG (color) / 255.0,
+			BLUE_FROM_ULONG (color) / 255.0);
+  cairo_move_to (cr, x + 0.5, y + 0.5);
+  cairo_rel_line_to (cr, width - 1, height - 1);
+  cairo_rel_move_to (cr, 0, - (height - 1));
+  cairo_rel_line_to (cr, - (width - 1), height - 1);
+  cairo_set_line_width (cr, 1);
+  cairo_stroke (cr);
+  cairo_destroy (cr);
+#elif HAVE_X_WINDOWS
+  Display *dpy = FRAME_X_DISPLAY (f);
+  GC gc = XCreateGC (dpy, pixmap, 0, NULL);
+
+  XSetForeground (dpy, gc, color);
+  XDrawLine (dpy, pixmap, gc, x, y, x + width - 1, y + height - 1);
+  XDrawLine (dpy, pixmap, gc, x, y + height - 1, x + width - 1, y);
+  XFreeGC (dpy, gc);
+#endif	/* HAVE_X_WINDOWS */
+}
+#endif	/* HAVE_X_WINDOWS || USE_CAIRO */
+
 /* Transform image IMG on frame F so that it looks disabled.  */
 
 static void
@@ -5208,30 +5675,22 @@ image_disable_image (struct frame *f, struct image *img)
 #ifndef HAVE_NTGUI
 #if !defined(HAVE_NS) && !defined(HAVE_PGTK)  /* TODO: NS support, however this not needed for toolbars */
 
+#ifndef USE_CAIRO
+#define CrossForeground(f) BLACK_PIX_DEFAULT (f)
 #define MaskForeground(f)  WHITE_PIX_DEFAULT (f)
+#else  /* USE_CAIRO */
+#define CrossForeground(f) 0
+#define MaskForeground(f)  PIX_MASK_DRAW
+#endif	/* USE_CAIRO */
 
-      Display *dpy = FRAME_X_DISPLAY (f);
-      GC gc;
-
+#ifndef USE_CAIRO
       image_sync_to_pixmaps (f, img);
-      gc = XCreateGC (dpy, img->pixmap, 0, NULL);
-      XSetForeground (dpy, gc, BLACK_PIX_DEFAULT (f));
-      XDrawLine (dpy, img->pixmap, gc, 0, 0,
-		 img->width - 1, img->height - 1);
-      XDrawLine (dpy, img->pixmap, gc, 0, img->height - 1,
-		 img->width - 1, 0);
-      XFreeGC (dpy, gc);
-
+#endif	/* !USE_CAIRO */
+      image_pixmap_draw_cross (f, img->pixmap, 0, 0, img->width, img->height,
+			       CrossForeground (f));
       if (img->mask)
-	{
-	  gc = XCreateGC (dpy, img->mask, 0, NULL);
-	  XSetForeground (dpy, gc, MaskForeground (f));
-	  XDrawLine (dpy, img->mask, gc, 0, 0,
-		     img->width - 1, img->height - 1);
-	  XDrawLine (dpy, img->mask, gc, 0, img->height - 1,
-		     img->width - 1, 0);
-	  XFreeGC (dpy, gc);
-	}
+	image_pixmap_draw_cross (f, img->mask, 0, 0, img->width, img->height,
+				 MaskForeground (f));
 #endif /* !HAVE_NS */
 #else
       HDC hdc, bmpdc;
@@ -5323,6 +5782,7 @@ image_build_heuristic_mask (struct frame *f, struct image *img,
 
       if (i == 3 && NILP (how))
 	{
+#ifndef USE_CAIRO
 	  char color_name[30];
 	  sprintf (color_name, "#%04x%04x%04x",
 		   rgb[0] + 0u, rgb[1] + 0u, rgb[2] + 0u);
@@ -5331,6 +5791,9 @@ image_build_heuristic_mask (struct frame *f, struct image *img,
 		0x00ffffff & /* Filter out palette info.  */
 #endif /* HAVE_NTGUI */
 		image_alloc_image_color (f, img, build_string (color_name), 0));
+#else  /* USE_CAIRO */
+	  bg = lookup_rgb_color (f, rgb[0], rgb[1], rgb[2]);
+#endif	/* USE_CAIRO */
 	  use_img_background = 0;
 	}
     }
@@ -5347,7 +5810,7 @@ image_build_heuristic_mask (struct frame *f, struct image *img,
       if (XGetPixel (ximg, x, y) == bg)
         pgtk_image_set_alpha (ximg, x, y, 0);
 #elif !defined HAVE_NS
-      XPutPixel (mask_img, x, y, (XGetPixel (ximg, x, y) != bg
+      PUT_PIXEL (mask_img, x, y, (GET_PIXEL (ximg, x, y) != bg
 				  ? PIX_MASK_DRAW : PIX_MASK_RETAIN));
 #else
       if (XGetPixel (ximg, x, y) == bg)
@@ -5520,9 +5983,7 @@ pbm_load (struct frame *f, struct image *img)
   enum {PBM_MONO, PBM_GRAY, PBM_COLOR} type;
   char *contents = NULL;
   char *end, *p;
-#ifndef USE_CAIRO
   Emacs_Pix_Container ximg;
-#endif
 
   specified_file = image_spec_value (img->spec, QCfile, NULL);
 
@@ -5606,11 +6067,6 @@ pbm_load (struct frame *f, struct image *img)
   width = pbm_scan_number (&p, end);
   height = pbm_scan_number (&p, end);
 
-#ifdef USE_CAIRO
-  cairo_surface_t *surface = create_cairo_image_surface (width, height);
-  uint32_t *dataptr = (uint32_t *) cairo_image_surface_get_data (surface);
-#endif
-
   if (type != PBM_MONO)
     {
       max_color_idx = pbm_scan_number (&p, end);
@@ -5627,10 +6083,8 @@ pbm_load (struct frame *f, struct image *img)
       goto error;
     }
 
-#ifndef USE_CAIRO
   if (!image_create_x_image_and_pixmap (f, img, width, height, 0, &ximg, 0))
     goto error;
-#endif
 
   /* Initialize the color hash table.  */
   init_color_table ();
@@ -5642,50 +6096,11 @@ pbm_load (struct frame *f, struct image *img)
       struct image_keyword fmt[PBM_LAST];
       unsigned long fg = FRAME_FOREGROUND_PIXEL (f);
       unsigned long bg = FRAME_BACKGROUND_PIXEL (f);
-#ifdef USE_CAIRO
-      Emacs_Color xfg, xbg;
-      int fga32, bga32;
-#endif
       /* Parse the image specification.  */
       memcpy (fmt, pbm_format, sizeof fmt);
       parse_image_spec (img->spec, fmt, PBM_LAST, Qpbm);
 
       /* Get foreground and background colors, maybe allocate colors.  */
-#ifdef USE_CAIRO
-      if (! fmt[PBM_FOREGROUND].count
-          || ! STRINGP (fmt[PBM_FOREGROUND].value)
-          || ! FRAME_TERMINAL (f)->defined_color_hook (f,
-                                                       SSDATA (fmt[PBM_FOREGROUND].value),
-                                                       &xfg,
-                                                       false,
-                                                       false))
-        {
-          xfg.pixel = fg;
-#ifndef HAVE_PGTK
-          x_query_colors (f, &xfg);
-#else
-          pgtk_query_colors (f, &xfg, 1);
-#endif
-        }
-      fga32 = emacs_color_to_argb32 (&xfg);
-
-      if (! fmt[PBM_BACKGROUND].count
-          || ! STRINGP (fmt[PBM_BACKGROUND].value)
-          || ! FRAME_TERMINAL (f)->defined_color_hook (f,
-                                                       SSDATA (fmt[PBM_BACKGROUND].value),
-                                                       &xbg,
-                                                       false,
-                                                       false))
-	{
-          xbg.pixel = bg;
-#ifndef HAVE_PGTK
-          x_query_colors (f, &xbg, 1);
-#else
-          pgtk_query_colors (f, &xbg, 1);
-#endif
-	}
-      bga32 = emacs_color_to_argb32 (&xbg);
-#else
       if (fmt[PBM_FOREGROUND].count
 	  && STRINGP (fmt[PBM_FOREGROUND].value))
 	fg = image_alloc_image_color (f, img, fmt[PBM_FOREGROUND].value, fg);
@@ -5696,8 +6111,15 @@ pbm_load (struct frame *f, struct image *img)
 	  img->background = bg;
 	  img->background_valid = 1;
 	}
-#endif
 
+#ifdef USE_CAIRO
+      {
+	Emacs_Color fgbg[] = {{.pixel = fg}, {.pixel = bg}};
+	FRAME_TERMINAL (f)->query_colors (f, fgbg, ARRAYELTS (fgbg));
+	fg = lookup_rgb_color (f, fgbg[0].red, fgbg[0].green, fgbg[0].blue);
+	bg = lookup_rgb_color (f, fgbg[1].red, fgbg[1].green, fgbg[1].blue);
+      }
+#endif
       for (y = 0; y < height; ++y)
 	for (x = 0; x < width; ++x)
 	  {
@@ -5707,11 +6129,7 @@ pbm_load (struct frame *f, struct image *img)
 		  {
 		    if (p >= end)
 		      {
-#ifdef USE_CAIRO
-                        cairo_surface_destroy (surface);
-#else
 			image_destroy_x_image (ximg);
-#endif
 			image_clear_image (f, img);
 			image_error ("Invalid image size in image `%s'",
 				     img->spec);
@@ -5735,11 +6153,7 @@ pbm_load (struct frame *f, struct image *img)
 		  g = 0;
 	      }
 
-#ifdef USE_CAIRO
-            *dataptr++ = g ? fga32 : bga32;
-#else
-	    XPutPixel (ximg, x, y, g ? fg : bg);
-#endif
+	    PUT_PIXEL (ximg, x, y, g ? fg : bg);
 	  }
     }
   else
@@ -5753,11 +6167,7 @@ pbm_load (struct frame *f, struct image *img)
 
       if (raw_p && p + expected_size > end)
 	{
-#ifdef USE_CAIRO
-          cairo_surface_destroy (surface);
-#else
 	  image_destroy_x_image (ximg);
-#endif
 	  image_clear_image (f, img);
 	  image_error ("Invalid image size in image `%s'", img->spec);
 	  goto error;
@@ -5787,28 +6197,17 @@ pbm_load (struct frame *f, struct image *img)
 
 	    if (r < 0 || g < 0 || b < 0)
 	      {
-#ifdef USE_CAIRO
-                cairo_surface_destroy (surface);
-#else
 		image_destroy_x_image (ximg);
-#endif
 		image_error ("Invalid pixel value in image `%s'", img->spec);
 		goto error;
 	      }
 
-#ifdef USE_CAIRO
-	    r = (double) r * 255 / max_color_idx;
-	    g = (double) g * 255 / max_color_idx;
-	    b = (double) b * 255 / max_color_idx;
-            *dataptr++ = (0xffu << 24) | (r << 16) | (g << 8) | b;
-#else
 	    /* RGB values are now in the range 0..max_color_idx.
 	       Scale this to the range 0..0xffff supported by X.  */
 	    r = (double) r * 65535 / max_color_idx;
 	    g = (double) g * 65535 / max_color_idx;
 	    b = (double) b * 65535 / max_color_idx;
-	    XPutPixel (ximg, x, y, lookup_rgb_color (f, r, g, b));
-#endif
+	    PUT_PIXEL (ximg, x, y, lookup_rgb_color (f, r, g, b));
 	  }
     }
 
@@ -5824,16 +6223,12 @@ pbm_load (struct frame *f, struct image *img)
 
   /* Maybe fill in the background field while we have ximg handy.  */
 
-#ifdef USE_CAIRO
-  set_cairo_image_surface (img, surface);
-#else
   if (NILP (image_spec_value (img->spec, QCbackground, NULL)))
     /* Casting avoids a GCC warning.  */
     IMAGE_BACKGROUND (img, f, (Emacs_Pix_Context)ximg);
 
   /* Put ximg into the image.  */
   image_put_x_image (f, img, ximg, 0);
-#endif
 
   /* X and W32 versions did it here, MAC version above.  ++kfs
      img->width = width;
@@ -6152,13 +6547,7 @@ png_load_body (struct frame *f, struct image *img, struct png_load_context *c)
   bool transparent_p;
   struct png_memory_storage tbr;  /* Data to be read */
   ptrdiff_t nbytes;
-
-#ifdef USE_CAIRO
-  cairo_surface_t *surface;
-  uint32_t *dataptr;
-#else
   Emacs_Pix_Container ximg, mask_img = NULL;
-#endif
 
   /* Find out what file to load.  */
   specified_file = image_spec_value (img->spec, QCfile, NULL);
@@ -6276,12 +6665,10 @@ png_load_body (struct frame *f, struct image *img, struct png_load_context *c)
       goto error;
     }
 
-#ifndef USE_CAIRO
   /* Create the X image and pixmap now, so that the work below can be
      omitted if the image is too large for X.  */
   if (!image_create_x_image_and_pixmap (f, img, width, height, 0, &ximg, 0))
     goto error;
-#endif
 
   /* If image contains simply transparency data, we prefer to
      construct a clipping mask.  */
@@ -6373,10 +6760,6 @@ png_load_body (struct frame *f, struct image *img, struct png_load_context *c)
       c->fp = NULL;
     }
 
-#ifdef USE_CAIRO
-  surface = create_cairo_image_surface (width, height);
-  dataptr = (uint32_t *) cairo_image_surface_get_data (surface);
-#else
   /* Create an image and pixmap serving as mask if the PNG image
      contains an alpha channel.  */
   if (channels == 4
@@ -6388,7 +6771,6 @@ png_load_body (struct frame *f, struct image *img, struct png_load_context *c)
       image_clear_image_1 (f, img, CLEAR_IMAGE_PIXMAP);
       goto error;
     }
-#endif
 
   /* Fill the X image and mask from PNG data.  */
   init_color_table ();
@@ -6401,18 +6783,10 @@ png_load_body (struct frame *f, struct image *img, struct png_load_context *c)
 	{
 	  int r, g, b;
 
-#ifdef USE_CAIRO
-          int a = 0xff;
-	  r = *p++;
-	  g = *p++;
-	  b = *p++;
-          if (channels == 4) a = *p++;
-          *dataptr++ = (a << 24) | (r << 16) | (g << 8) | b;
-#else
 	  r = *p++ << 8;
 	  g = *p++ << 8;
 	  b = *p++ << 8;
-	  XPutPixel (ximg, x, y, lookup_rgb_color (f, r, g, b));
+	  PUT_PIXEL (ximg, x, y, lookup_rgb_color (f, r, g, b));
 	  /* An alpha channel, aka mask channel, associates variable
 	     transparency with an image.  Where other image formats
 	     support binary transparency---fully transparent or fully
@@ -6432,10 +6806,9 @@ png_load_body (struct frame *f, struct image *img, struct png_load_context *c)
 	  if (channels == 4)
 	    {
 	      if (mask_img)
-		XPutPixel (mask_img, x, y, *p > 0 ? PIX_MASK_DRAW : PIX_MASK_RETAIN);
+		PUT_PIXEL (mask_img, x, y, *p > 0 ? PIX_MASK_DRAW : PIX_MASK_RETAIN);
 	      ++p;
 	    }
-#endif
 	}
     }
 
@@ -6446,7 +6819,14 @@ png_load_body (struct frame *f, struct image *img, struct png_load_context *c)
       png_color_16 *bg;
       if (png_get_bKGD (png_ptr, info_ptr, &bg))
 	{
+#ifndef USE_CAIRO
 	  img->background = lookup_rgb_color (f, bg->red, bg->green, bg->blue);
+#else  /* USE_CAIRO */
+	  char color_name[30];
+	  sprintf (color_name, "#%04x%04x%04x", bg->red, bg->green, bg->blue);
+	  img->background
+	    = image_alloc_image_color (f, img, build_string (color_name), 0);
+#endif /* USE_CAIRO */
 	  img->background_valid = 1;
 	}
     }
@@ -6465,9 +6845,6 @@ png_load_body (struct frame *f, struct image *img, struct png_load_context *c)
   img->width = width;
   img->height = height;
 
-#ifdef USE_CAIRO
-  set_cairo_image_surface (img, surface);
-#else
   /* Maybe fill in the background field while we have ximg handy.
      Casting avoids a GCC warning.  */
   IMAGE_BACKGROUND (img, f, (Emacs_Pix_Context)ximg);
@@ -6484,7 +6861,6 @@ png_load_body (struct frame *f, struct image *img, struct png_load_context *c)
 
       image_put_x_image (f, img, mask_img, 1);
     }
-#endif
 
   return 1;
 }
@@ -6900,10 +7276,8 @@ jpeg_load_body (struct frame *f, struct image *img,
   int row_stride, x, y;
   int width, height;
   int i, ir, ig, ib;
-#ifndef USE_CAIRO
   unsigned long *colors;
   Emacs_Pix_Container ximg = NULL;
-#endif
 
   /* Open the JPEG file.  */
   specified_file = image_spec_value (img->spec, QCfile, NULL);
@@ -6963,9 +7337,7 @@ jpeg_load_body (struct frame *f, struct image *img,
       jpeg_destroy_decompress (&mgr->cinfo);
 
       /* If we already have an XImage, free that.  */
-#ifndef USE_CAIRO
       image_destroy_x_image (ximg);
-#endif
       /* Free pixmap and colors.  */
       image_clear_image (f, img);
       return 0;
@@ -6996,23 +7368,19 @@ jpeg_load_body (struct frame *f, struct image *img,
       sys_longjmp (mgr->setjmp_buffer, 1);
     }
 
-#ifndef USE_CAIRO
   /* Create X image and pixmap.  */
   if (!image_create_x_image_and_pixmap (f, img, width, height, 0, &ximg, 0))
     {
       mgr->failure_code = MY_JPEG_CANNOT_CREATE_X;
       sys_longjmp (mgr->setjmp_buffer, 1);
     }
-#endif
 
   /* Allocate colors.  When color quantization is used,
      mgr->cinfo.actual_number_of_colors has been set with the number of
      colors generated, and mgr->cinfo.colormap is a two-dimensional array
      of color indices in the range 0..mgr->cinfo.actual_number_of_colors.
      No more than 255 colors will be generated.  */
-#ifndef USE_CAIRO
   USE_SAFE_ALLOCA;
-#endif
   {
     if (mgr->cinfo.out_color_components > 2)
       ir = 0, ig = 1, ib = 2;
@@ -7021,7 +7389,6 @@ jpeg_load_body (struct frame *f, struct image *img,
     else
       ir = 0, ig = 0, ib = 0;
 
-#ifndef USE_CAIRO
     /* Use the color table mechanism because it handles colors that
        cannot be allocated nicely.  Such colors will be replaced with
        a default color, and we don't have to care about which colors
@@ -7038,7 +7405,6 @@ jpeg_load_body (struct frame *f, struct image *img,
 	int b = mgr->cinfo.colormap[ib][i] << 8;
 	colors[i] = lookup_rgb_color (f, r, g, b);
       }
-#endif
 
 #ifdef COLOR_TABLE_SUPPORT
     /* Remember those colors actually allocated.  */
@@ -7051,36 +7417,12 @@ jpeg_load_body (struct frame *f, struct image *img,
   row_stride = width * mgr->cinfo.output_components;
   buffer = mgr->cinfo.mem->alloc_sarray ((j_common_ptr) &mgr->cinfo,
 					 JPOOL_IMAGE, row_stride, 1);
-#ifdef USE_CAIRO
-  {
-    cairo_surface_t *surface = create_cairo_image_surface (width, height);
-    uint32_t *dataptr = (uint32_t *) cairo_image_surface_get_data (surface);
-    int r, g, b;
-
-    for (y = 0; y < height; ++y)
-      {
-        jpeg_read_scanlines (&mgr->cinfo, buffer, 1);
-
-        for (x = 0; x < width; ++x)
-          {
-            i = buffer[0][x];
-            r = mgr->cinfo.colormap[ir][i];
-            g = mgr->cinfo.colormap[ig][i];
-            b = mgr->cinfo.colormap[ib][i];
-            *dataptr++ = (0xffu << 24) | (r << 16) | (g << 8) | b;
-          }
-      }
-
-    set_cairo_image_surface (img, surface);
-  }
-#else
   for (y = 0; y < height; ++y)
     {
       jpeg_read_scanlines (&mgr->cinfo, buffer, 1);
       for (x = 0; x < mgr->cinfo.output_width; ++x)
-	XPutPixel (ximg, x, y, colors[buffer[0][x]]);
+	PUT_PIXEL (ximg, x, y, colors[buffer[0][x]]);
     }
-#endif
 
   /* Clean up.  */
   jpeg_finish_decompress (&mgr->cinfo);
@@ -7088,7 +7430,6 @@ jpeg_load_body (struct frame *f, struct image *img,
   if (fp)
     fclose (fp);
 
-#ifndef USE_CAIRO
   /* Maybe fill in the background field while we have ximg handy. */
   if (NILP (image_spec_value (img->spec, QCbackground, NULL)))
     /* Casting avoids a GCC warning.  */
@@ -7097,7 +7438,6 @@ jpeg_load_body (struct frame *f, struct image *img,
   /* Put ximg into the image.  */
   image_put_x_image (f, img, ximg, 0);
   SAFE_FREE ();
-#endif
   return 1;
 }
 
@@ -7510,28 +7850,6 @@ tiff_load (struct frame *f, struct image *img)
       return 0;
     }
 
-#ifdef USE_CAIRO
-  {
-    cairo_surface_t *surface = create_cairo_image_surface (width, height);
-    uint32_t *dataptr = (uint32_t *) cairo_image_surface_get_data (surface);
-
-    for (y = 0; y < height; ++y)
-      {
-        uint32 *row = buf + (height - 1 - y) * width;
-        for (x = 0; x < width; ++x)
-          {
-            uint32 abgr = row[x];
-            int r = TIFFGetR (abgr);
-            int g = TIFFGetG (abgr);
-            int b = TIFFGetB (abgr);
-            int a = TIFFGetA (abgr);
-            *dataptr++ = (a << 24) | (r << 16) | (g << 8) | b;
-          }
-      }
-
-    set_cairo_image_surface (img, surface);
-  }
-#else
   /* Initialize the color table.  */
   init_color_table ();
 
@@ -7546,7 +7864,7 @@ tiff_load (struct frame *f, struct image *img)
 	  int r = TIFFGetR (abgr) << 8;
 	  int g = TIFFGetG (abgr) << 8;
 	  int b = TIFFGetB (abgr) << 8;
-	  XPutPixel (ximg, x, height - 1 - y, lookup_rgb_color (f, r, g, b));
+	  PUT_PIXEL (ximg, x, height - 1 - y, lookup_rgb_color (f, r, g, b));
 	}
     }
 
@@ -7566,8 +7884,6 @@ tiff_load (struct frame *f, struct image *img)
 
   /* Put ximg into the image.  */
   image_put_x_image (f, img, ximg, 0);
-
-#endif /* ! USE_CAIRO */
 
   xfree (buf);
   return 1;
@@ -7945,26 +8261,6 @@ gif_load (struct frame *f, struct image *img)
 	}
     }
 
-#ifdef USE_CAIRO
-  cairo_surface_t *surface = create_cairo_image_surface (width, height);
-  uint32_t *data32 = (uint32_t *) cairo_image_surface_get_data (surface);
-  if (STRINGP (specified_bg))
-    {
-      Emacs_Color color;
-      if (FRAME_TERMINAL (f)->defined_color_hook
-          (f, SSDATA (specified_bg), &color, false, false))
-        {
-          uint32_t *dataptr = data32;
-          int r = color.red/256;
-          int g = color.green/256;
-          int b = color.blue/256;
-
-          for (y = 0; y < height; ++y)
-            for (x = 0; x < width; ++x)
-              *dataptr++ = (0xffu << 24) | (r << 16) | (g << 8) | b;
-        }
-    }
-#else
   /* Create the X image and pixmap.  */
   Emacs_Pix_Container ximg;
   if (!image_create_x_image_and_pixmap (f, img, width, height, 0, &ximg, 0))
@@ -7977,22 +8273,31 @@ gif_load (struct frame *f, struct image *img)
      Full animated GIF support requires more here (see the gif89 spec,
      disposal methods).  Let's simply assume that the part not covered
      by a sub-image is in the frame's background color.  */
+  unsigned long frame_bg;
+#ifndef USE_CAIRO
+  frame_bg = FRAME_BACKGROUND_PIXEL (f);
+#else  /* USE_CAIRO */
+  {
+    Emacs_Color color;
+    FRAME_TERMINAL (f)->query_frame_background_color (f, &color);
+    frame_bg = lookup_rgb_color (f, color.red, color.green, color.blue);
+  }
+#endif	/* USE_CAIRO */
   for (y = 0; y < img->corners[TOP_CORNER]; ++y)
     for (x = 0; x < width; ++x)
-      XPutPixel (ximg, x, y, FRAME_BACKGROUND_PIXEL (f));
+      PUT_PIXEL (ximg, x, y, frame_bg);
 
   for (y = img->corners[BOT_CORNER]; y < height; ++y)
     for (x = 0; x < width; ++x)
-      XPutPixel (ximg, x, y, FRAME_BACKGROUND_PIXEL (f));
+      PUT_PIXEL (ximg, x, y, frame_bg);
 
   for (y = img->corners[TOP_CORNER]; y < img->corners[BOT_CORNER]; ++y)
     {
       for (x = 0; x < img->corners[LEFT_CORNER]; ++x)
-	XPutPixel (ximg, x, y, FRAME_BACKGROUND_PIXEL (f));
+	PUT_PIXEL (ximg, x, y, frame_bg);
       for (x = img->corners[RIGHT_CORNER]; x < width; ++x)
-	XPutPixel (ximg, x, y, FRAME_BACKGROUND_PIXEL (f));
+	PUT_PIXEL (ximg, x, y, frame_bg);
     }
-#endif
 
   /* Read the GIF image into the X image.   */
 
@@ -8003,12 +8308,17 @@ gif_load (struct frame *f, struct image *img)
 
   init_color_table ();
 
-#ifndef USE_CAIRO
   unsigned long bgcolor UNINIT;
   if (STRINGP (specified_bg))
-    bgcolor = image_alloc_image_color (f, img, specified_bg,
-                                       FRAME_BACKGROUND_PIXEL (f));
+    {
+      bgcolor = image_alloc_image_color (f, img, specified_bg,
+					 FRAME_BACKGROUND_PIXEL (f));
+#ifdef USE_CAIRO
+      Emacs_Color color = {.pixel = bgcolor};
+      FRAME_TERMINAL (f)->query_colors (f, &color, 1);
+      bgcolor = lookup_rgb_color (f, color.red, color.green, color.blue);
 #endif
+    }
 
   for (j = 0; j <= idx; ++j)
     {
@@ -8056,7 +8366,6 @@ gif_load (struct frame *f, struct image *img)
       if (!gif_color_map)
 	gif_color_map = gif->SColorMap;
 
-#ifndef USE_CAIRO
       /* Allocate subimage colors.  */
       unsigned long pixel_colors[256] = { 0, };
 
@@ -8065,7 +8374,7 @@ gif_load (struct frame *f, struct image *img)
 	  {
 	    if (transparency_color_index == i)
 	      pixel_colors[i] = STRINGP (specified_bg)
-		? bgcolor : FRAME_BACKGROUND_PIXEL (f);
+		? bgcolor : frame_bg;
 	    else
 	      {
 		int r = gif_color_map->Colors[i].Red << 8;
@@ -8074,7 +8383,6 @@ gif_load (struct frame *f, struct image *img)
 		pixel_colors[i] = lookup_rgb_color (f, r, g, b);
 	      }
 	  }
-#endif
 
       /* Apply the pixel values.  */
       if (GIFLIB_MAJOR < 5 && gif->SavedImages[j].ImageDesc.Interlace)
@@ -8093,21 +8401,9 @@ gif_load (struct frame *f, struct image *img)
 		  int c = raster[y * subimg_width + x];
 		  if (transparency_color_index != c || disposal != 1)
                     {
-#ifdef USE_CAIRO
-                      uint32_t *dataptr =
-                        (data32 + ((row + subimg_top) * width
-				   + x + subimg_left));
-                      int r = gif_color_map->Colors[c].Red;
-                      int g = gif_color_map->Colors[c].Green;
-                      int b = gif_color_map->Colors[c].Blue;
-
-                      if (transparency_color_index != c)
-                        *dataptr = (0xffu << 24) | (r << 16) | (g << 8) | b;
-#else
-                      XPutPixel (ximg, x + subimg_left, row + subimg_top,
+                      PUT_PIXEL (ximg, x + subimg_left, row + subimg_top,
                                  pixel_colors[c]);
-#endif
-                   }
+		    }
 		}
 	    }
 	}
@@ -8119,19 +8415,8 @@ gif_load (struct frame *f, struct image *img)
 		int c = raster[y * subimg_width + x];
 		if (transparency_color_index != c || disposal != 1)
                   {
-#ifdef USE_CAIRO
-                    uint32_t *dataptr =
-                      (data32 + ((y + subimg_top) * width
-				 + x + subimg_left));
-                    int r = gif_color_map->Colors[c].Red;
-                    int g = gif_color_map->Colors[c].Green;
-                    int b = gif_color_map->Colors[c].Blue;
-                    if (transparency_color_index != c)
-                      *dataptr = (0xffu << 24) | (r << 16) | (g << 8) | b;
-#else
-                    XPutPixel (ximg, x + subimg_left, y + subimg_top,
+                    PUT_PIXEL (ximg, x + subimg_left, y + subimg_top,
                                pixel_colors[c]);
-#endif
                   }
 	      }
 	}
@@ -8190,9 +8475,6 @@ gif_load (struct frame *f, struct image *img)
 #endif
     }
 
-#ifdef USE_CAIRO
-  set_cairo_image_surface (img, surface);
-#else
   /* Maybe fill in the background field while we have ximg handy. */
   if (NILP (image_spec_value (img->spec, QCbackground, NULL)))
     /* Casting avoids a GCC warning.  */
@@ -8200,7 +8482,6 @@ gif_load (struct frame *f, struct image *img)
 
   /* Put ximg into the image.  */
   image_put_x_image (f, img, ximg, 0);
-#endif
 
   return 1;
 }
@@ -8579,9 +8860,7 @@ imagemagick_load_image (struct frame *f, struct image *img,
   int width, height;
   size_t image_width, image_height;
   MagickBooleanType status;
-#ifndef USE_CAIRO
   Emacs_Pix_Container ximg;
-#endif
   int x, y;
   MagickWand *image_wand;
   PixelIterator *iterator;
@@ -8595,9 +8874,6 @@ imagemagick_load_image (struct frame *f, struct image *img,
   double rotation;
   char hint_buffer[MaxTextExtent];
   char *filename_hint = NULL;
-#ifdef USE_CAIRO
-  cairo_surface_t *surface;
-#endif
 
   /* Initialize the ImageMagick environment.  */
   static bool imagemagick_initialized;
@@ -8811,11 +9087,6 @@ imagemagick_load_image (struct frame *f, struct image *img,
          method is also well tested.  Some aspects of this method are
          ad-hoc and needs to be more researched. */
       void *dataptr;
-#ifdef USE_CAIRO
-      surface = create_cairo_image_surface (width, height);
-      const char *exportdepth = "BGRA";
-      dataptr = cairo_image_surface_get_data (surface);
-#else
       int imagedepth = 24; /*MagickGetImageDepth(image_wand);*/
       const char *exportdepth = imagedepth <= 8 ? "I" : "BGRP"; /*"RGBP";*/
       /* Try to create a x pixmap to hold the imagemagick pixmap.  */
@@ -8829,7 +9100,6 @@ imagemagick_load_image (struct frame *f, struct image *img,
 	  goto imagemagick_error;
 	}
       dataptr = ximg->data;
-#endif /* not USE_CAIRO */
 
       /* Oddly, the below code doesn't seem to work:*/
       /* switch(ximg->bitmap_unit){ */
@@ -8860,11 +9130,6 @@ imagemagick_load_image (struct frame *f, struct image *img,
       size_t image_height;
       double quantum_range = QuantumRange;
       MagickRealType color_scale = 65535.0 / quantum_range;
-#ifdef USE_CAIRO
-      surface = create_cairo_image_surface (width, height);
-      uint32_t *dataptr = (uint32_t *) cairo_image_surface_get_data (surface);
-      color_scale /= 256;
-#else
       /* Try to create a x pixmap to hold the imagemagick pixmap.  */
       if (!image_create_x_image_and_pixmap (f, img, width, height, 0,
 					    &ximg, 0))
@@ -8875,7 +9140,6 @@ imagemagick_load_image (struct frame *f, struct image *img,
           image_error ("Imagemagick X bitmap allocation failure");
           goto imagemagick_error;
         }
-#endif
 
       /* Copy imagemagick image to x with primitive yet robust pixel
          pusher loop.  This has been tested a lot with many different
@@ -8888,9 +9152,7 @@ imagemagick_load_image (struct frame *f, struct image *img,
 #ifdef COLOR_TABLE_SUPPORT
 	  free_color_table ();
 #endif
-#ifndef USE_CAIRO
 	  image_destroy_x_image (ximg);
-#endif
           image_error ("Imagemagick pixel iterator creation failed");
           goto imagemagick_error;
         }
@@ -8906,27 +9168,16 @@ imagemagick_load_image (struct frame *f, struct image *img,
 	  for (x = 0; x < xlim; x++)
             {
               PixelGetMagickColor (pixels[x], &pixel);
-#ifdef USE_CAIRO
-	      dataptr[width * y + x] =
-		lookup_rgb_color (f,
-				  color_scale * pixel.red,
-				  color_scale * pixel.green,
-				  color_scale * pixel.blue);
-#else
-              XPutPixel (ximg, x, y,
+              PUT_PIXEL (ximg, x, y,
                          lookup_rgb_color (f,
 					   color_scale * pixel.red,
 					   color_scale * pixel.green,
 					   color_scale * pixel.blue));
-#endif
             }
         }
       DestroyPixelIterator (iterator);
     }
 
-#ifdef USE_CAIRO
-  set_cairo_image_surface (img, surface);
-#else
 #ifdef COLOR_TABLE_SUPPORT
   /* Remember colors allocated for this image.  */
   img->colors = colors_in_color_table (&img->ncolors);
@@ -8938,7 +9189,6 @@ imagemagick_load_image (struct frame *f, struct image *img,
 
   /* Put ximg into the image.  */
   image_put_x_image (f, img, ximg, 0);
-#endif
 
   /* Final cleanup. image_wand should be the only resource left. */
   DestroyMagickWand (image_wand);
@@ -9383,33 +9633,6 @@ svg_load_image (struct frame *f, struct image *img, char *contents,
   eassert (gdk_pixbuf_get_bits_per_sample (pixbuf) == 8);
 
   {
-#ifdef USE_CAIRO
-    cairo_surface_t *surface = create_cairo_image_surface (width, height);
-    uint32_t *dataptr = (uint32_t *) cairo_image_surface_get_data (surface);
-    uint32_t bgcolor = get_spec_bg_or_alpha_as_argb (img, f);
-
-    for (int y = 0; y < height; ++y)
-      {
-        const guchar *iconptr = pixels + y * rowstride;
-
-        for (int x = 0; x < width; ++x)
-          {
-            if (iconptr[3] == 0)
-              *dataptr = bgcolor;
-            else
-              *dataptr = (iconptr[0] << 16)
-                | (iconptr[1] << 8)
-                | iconptr[2]
-                | (iconptr[3] << 24);
-
-            iconptr += 4;
-            ++dataptr;
-          }
-      }
-
-    set_cairo_image_surface (img, surface);
-    g_object_unref (pixbuf);
-#else
     /* Try to create a x pixmap to hold the svg pixmap.  */
     Emacs_Pix_Container ximg;
     if (!image_create_x_image_and_pixmap (f, img, width, height, 0, &ximg, 0))
@@ -9459,7 +9682,7 @@ svg_load_image (struct frame *f, struct image *img, char *contents,
 	    blue  = ((blue * opacity)
 		     + (background.blue * ((1 << 8) - opacity)));
 
-	    XPutPixel (ximg, x, y, lookup_rgb_color (f, red, green, blue));
+	    PUT_PIXEL (ximg, x, y, lookup_rgb_color (f, red, green, blue));
 	  }
 
 	pixels += rowstride - 4 * width;
@@ -9482,7 +9705,6 @@ svg_load_image (struct frame *f, struct image *img, char *contents,
 
     /* Put ximg into the image.  */
     image_put_x_image (f, img, ximg, 0);
-#endif /* ! USE_CAIRO */
   }
 
   return 1;
@@ -9505,9 +9727,9 @@ svg_load_image (struct frame *f, struct image *img, char *contents,
 				Ghostscript
  ***********************************************************************/
 
-#ifdef HAVE_X_WINDOWS
+#if defined HAVE_X_WINDOWS && !defined USE_CAIRO
 #define HAVE_GHOSTSCRIPT 1
-#endif /* HAVE_X_WINDOWS */
+#endif /* HAVE_X_WINDOWS && !USE_CAIRO */
 
 #ifdef HAVE_GHOSTSCRIPT
 
@@ -9798,9 +10020,9 @@ DEFUN ("lookup-image", Flookup_image, Slookup_image, 1, 1, 0,
 			    Initialization
  ***********************************************************************/
 
-DEFUN ("image-scaling-p", Fimage_scaling_p, Simage_scaling_p, 0, 1, 0,
-       doc: /* Test whether FRAME supports resizing images.
-Return t if FRAME supports native scaling, nil otherwise.  */)
+DEFUN ("image-transforms-p", Fimage_transforms_p, Simage_transforms_p, 0, 1, 0,
+       doc: /* Test whether FRAME supports image transformation.
+Return t if FRAME supports native transforms, nil otherwise.  */)
      (Lisp_Object frame)
 {
 #if defined (USE_CAIRO) || defined (HAVE_NS) || defined (HAVE_NTGUI)
@@ -10060,7 +10282,7 @@ non-numeric, there is no explicit limit on the size of images.  */);
   defsubr (&Slookup_image);
 #endif
 
-  defsubr (&Simage_scaling_p);
+  defsubr (&Simage_transforms_p);
 
   DEFVAR_BOOL ("cross-disabled-images", cross_disabled_images,
     doc: /* Non-nil means always draw a cross over disabled images.

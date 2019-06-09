@@ -5,6 +5,7 @@
 
 ;; Author: Jamie Zawinski <jwz@lucid.com>
 ;;	Hallvard Furuseth <hbf@ulrik.uio.no>
+;; Maintainer: emacs-devel@gnu.org
 ;; Keywords: lisp
 ;; Package: emacs
 
@@ -1400,7 +1401,9 @@ when printing the error message."
 (defun byte-compile-callargs-warn (form)
   (let* ((def (or (byte-compile-fdefinition (car form) nil)
 		  (byte-compile-fdefinition (car form) t)))
-	 (sig (byte-compile--function-signature def))
+         (sig (cond (def (byte-compile--function-signature def))
+                    ((subrp (symbol-function (car form)))
+                     (subr-arity (symbol-function (car form))))))
 	 (ncall (length (cdr form))))
     ;; Check many or unevalled from subr-arity.
     (if (and (cdr-safe sig)
@@ -4090,8 +4093,8 @@ that suppresses all warnings during execution of BODY."
   ;; and the other is a constant expression whose value can be
   ;; compared with `eq' (with `macroexp-const-p').
   (or
-   (and (symbolp obj1) (macroexp-const-p obj2) (cons obj1 obj2))
-   (and (symbolp obj2) (macroexp-const-p obj1) (cons obj2 obj1))))
+   (and (symbolp obj1) (macroexp-const-p obj2) (cons obj1 (eval obj2)))
+   (and (symbolp obj2) (macroexp-const-p obj1) (cons obj2 (eval obj1)))))
 
 (defconst byte-compile--default-val (cons nil nil) "A unique object.")
 
@@ -4120,12 +4123,11 @@ Return a list of the form ((TEST . VAR)  ((VALUE BODY) ...))"
                (unless prev-test
                  (setq prev-test test))
                (if (and obj1 (memq test '(eq eql equal))
-                        (consp condition)
                         (eq test prev-test)
-                        (eq obj1 prev-var)
-                        ;; discard duplicate clauses
-                        (not (assq obj2 cases)))
-                   (push (list (if (consp obj2) (eval obj2) obj2) body) cases)
+                        (eq obj1 prev-var))
+                   ;; discard duplicate clauses
+                   (unless (assoc obj2 cases test)
+                     (push (list obj2 body) cases))
                  (if (and (macroexp-const-p condition) condition)
 		     (progn (push (list byte-compile--default-val
 					(or body `(,condition)))

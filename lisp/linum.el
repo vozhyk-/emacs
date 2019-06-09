@@ -3,6 +3,7 @@
 ;; Copyright (C) 2008-2019 Free Software Foundation, Inc.
 
 ;; Author: Markus Triska <markus.triska@gmx.at>
+;; Maintainer: emacs-devel@gnu.org
 ;; Keywords: convenience
 ;; Version: 0.9x
 
@@ -118,6 +119,10 @@ Linum mode is a buffer-local minor mode."
               ;; if some large buffer was under linum-mode when
               ;; desktop was saved.  So we disable linum-mode for
               ;; non-client frames in a daemon session.
+
+              ;; Note that nowadays, this actually doesn't show line
+              ;; numbers in client frames at all, because we visit the
+              ;; file before creating the client frame.  See bug#35726.
               (and (daemonp) (null (frame-parameter nil 'client))))
     (linum-mode 1)))
 

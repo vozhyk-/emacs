@@ -1319,7 +1319,7 @@ casts and declarations are fontified.  Used on level 2 and higher."
   ;;(message "c-font-lock-declarations search from %s to %s" (point) limit)
   (c-skip-comments-and-strings limit)
   (when (< (point) limit)
-  
+
     (save-restriction
       (let (;; The position where `c-find-decl-spots' last stopped.
 	    start-pos
@@ -1681,7 +1681,7 @@ casts and declarations are fontified.  Used on level 2 and higher."
   ;; font-lock-keyword-face.  It always returns NIL to inhibit this and
   ;; prevent a repeat invocation.  See elisp/lispref page "Search-based
   ;; Fontification".
-  (let* ((state (c-state-semi-pp-to-literal (point)))
+  (let* ((state (c-semi-pp-to-literal (point)))
 	 (string-start (and (eq (cadr state) 'string)
 			    (car (cddr state))))
 	 (raw-id (and string-start
@@ -2773,7 +2773,7 @@ need for `pike-font-lock-extra-types'.")
 			      (copy-marker (1+ start))))
       t)))
 
-;; GtkDoc patterns contributed by Masatake YAMATO <jet@gyve.org>.
+;; GtkDoc patterns contributed by Masatake YAMATO <yamato@redhat.com>.
 
 (defconst gtkdoc-font-lock-doc-comments
   (let ((symbol "[a-zA-Z0-9_]+")
