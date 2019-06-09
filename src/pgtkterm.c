@@ -4651,7 +4651,11 @@ pgtk_query_frame_background_color (struct frame *f, Emacs_Color *bgcolor)
 static void
 pgtk_free_pixmap (struct frame *_f, Emacs_Pixmap pixmap)
 {
-  // pgtk_image_destroy(pixmap);
+  if (pixmap)
+    {
+      xfree (pixmap->data);
+      xfree (pixmap);
+    }
 }
 
 static struct terminal *

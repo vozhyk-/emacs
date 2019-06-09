@@ -580,7 +580,6 @@ free_bitmap_record (Display_Info *dpyinfo, Bitmap_Record *bm)
 #endif
 
 #ifdef HAVE_PGTK
-  // pgtk_image_destroy (bm->img);
 #endif
 
   if (bm->file)
@@ -2752,9 +2751,6 @@ image_destroy_x_image (Emacs_Pix_Container pimg)
 #ifdef HAVE_NS
       ns_release_object (pimg);
 #endif /* HAVE_NS */
-#ifdef HAVE_PGTK
-      // pgtk_image_destroy (pimg);
-#endif /* HAVE_PGTK */
     }
 #endif
 }
