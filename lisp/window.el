@@ -181,7 +181,7 @@ This construct is similar to `with-output-to-temp-buffer' but,
 neither runs `temp-buffer-setup-hook' which usually puts the
 buffer in Help mode, nor `temp-buffer-show-function' (the ACTION
 argument replaces this)."
-  (declare (debug t))
+  (declare (debug t) (indent 3))
   (let ((buffer (make-symbol "buffer"))
 	(window (make-symbol "window"))
 	(value (make-symbol "value")))
@@ -204,7 +204,7 @@ argument replaces this)."
 This construct is like `with-temp-buffer-window' but unlike that,
 makes the buffer specified by BUFFER-OR-NAME current for running
 BODY."
-  (declare (debug t))
+  (declare (debug t) (indent 3))
   (let ((buffer (make-symbol "buffer"))
 	(window (make-symbol "window"))
 	(value (make-symbol "value")))
@@ -226,7 +226,7 @@ BODY."
   "Show a buffer BUFFER-OR-NAME and evaluate BODY in that buffer.
 This construct is like `with-current-buffer-window' but unlike that,
 displays the buffer specified by BUFFER-OR-NAME before running BODY."
-  (declare (debug t))
+  (declare (debug t) (indent 3))
   (let ((buffer (make-symbol "buffer"))
 	(window (make-symbol "window"))
 	(value (make-symbol "value")))
@@ -7783,8 +7783,11 @@ selected frame if `display-buffer-reuse-frames' and
 terminal if either of those variables is non-nil.
 
 If ALIST has a `previous-window' entry, the window specified by
-that entry will override any other window found by the methods
-above, even if that window never showed BUFFER before."
+that entry may override any other window found by the methods
+above, even if that window never showed BUFFER before.
+
+Avoid using the selected window if another eligible window has
+shown BUFFER before."
   (let* ((alist-entry (assq 'reusable-frames alist))
 	 (inhibit-same-window
 	  (cdr (assq 'inhibit-same-window alist)))

@@ -580,6 +580,11 @@ remapped to these, respectively.
 +++
 *** New command 'dired-create-empty-file'.
 
+** Find-Dired
+
+*** New customizable variable 'find-dired-refine-function'.
+The default value is 'find-dired-sort-by-filename'.
+
 ** Change Logs and VC
 
 *** Recording ChangeLog entries doesn't require an actual file.
@@ -1507,6 +1512,18 @@ the new variable 'buffer-auto-revert-by-notification' to a non-nil
 value.  Auto Revert mode can use this information to avoid polling the
 buffer periodically when 'auto-revert-avoid-polling' is non-nil.
 
+** Bookmarks
+
++++
+*** 'bookmark-file' is now an obsolete alias of
+'bookmark-default-file'.
+
+** Bookmarks
+
+---
+*** 'bookmark-old-default-file' is now an obsolete alias of
+'bookmark-default-file'.
+
 
 * New Modes and Packages in Emacs 27.1
 
@@ -1674,6 +1691,10 @@ valid event type.
 
 
 * Lisp Changes in Emacs 27.1
+
++++
+** The new macro `with-suppressed-warnings' can be used to suppress
+specific byte-compile warnings.
 
 +++
 ** The 'append' arg of 'add-hook' is generalized to a finer notion of 'depth'

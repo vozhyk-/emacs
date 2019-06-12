@@ -559,19 +559,25 @@ bytecompiled code, and their results compared.")
   "Check that byte compiling warns about unescaped character
 literals (Bug#20852)."
   (should (boundp 'lread--unescaped-character-literals))
-  (bytecomp-tests--with-temp-file source
-    (write-region "(list ?) ?( ?; ?\" ?[ ?])" nil source)
-    (bytecomp-tests--with-temp-file destination
-      (let* ((byte-compile-dest-file-function (lambda (_) destination))
-            (byte-compile-error-on-warn t)
-            (byte-compile-debug t)
-            (err (should-error (byte-compile-file source))))
-        (should (equal (cdr err)
-                       (list (concat "unescaped character literals "
-                                     "`?\"', `?(', `?)', `?;', `?[', `?]' "
-                                     "detected, "
-                                     "`?\\\"', `?\\(', `?\\)', `?\\;', `?\\[', "
-                                     "`?\\]' expected!"))))))))
+  (let ((byte-compile-error-on-warn t)
+        (byte-compile-debug t))
+    (bytecomp-tests--with-temp-file source
+      (write-region "(list ?) ?( ?; ?\" ?[ ?])" nil source)
+      (bytecomp-tests--with-temp-file destination
+        (let* ((byte-compile-dest-file-function (lambda (_) destination))
+               (err (should-error (byte-compile-file source))))
+          (should (equal (cdr err)
+                         `(,(concat "unescaped character literals "
+                                    "`?\"', `?(', `?)', `?;', `?[', `?]' "
+                                    "detected, "
+                                    "`?\\\"', `?\\(', `?\\)', `?\\;', `?\\[', "
+                                    "`?\\]' expected!")))))))
+    ;; But don't warn in subsequent compilations (Bug#36068).
+    (bytecomp-tests--with-temp-file source
+      (write-region "(list 1 2 3)" nil source)
+      (bytecomp-tests--with-temp-file destination
+        (let ((byte-compile-dest-file-function (lambda (_) destination)))
+          (should (byte-compile-file source)))))))
 
 (ert-deftest bytecomp-tests--old-style-backquotes ()
   "Check that byte compiling warns about old-style backquotes."
@@ -679,6 +685,96 @@ literals (Bug#20852)."
       (should (member '(byte-constant 222) lap))
       (should-not (member '(byte-constant 333) lap))
       (should (member '(byte-constant 444) lap)))))
+
+(defun test-suppression (form suppress match)
+  (let ((lexical-binding t)
+        (byte-compile-log-buffer (generate-new-buffer " *Compile-Log*")))
+    ;; Check that we get a warning without suppression.
+    (with-current-buffer byte-compile-log-buffer
+      (let ((inhibit-read-only t))
+        (erase-buffer)))
+    (test-byte-comp-compile-and-load t form)
+    (with-current-buffer byte-compile-log-buffer
+      (unless match
+        (error "%s" (buffer-string)))
+      (goto-char (point-min))
+      (should (re-search-forward match nil t)))
+    ;; And that it's gone now.
+    (with-current-buffer byte-compile-log-buffer
+      (let ((inhibit-read-only t))
+        (erase-buffer)))
+    (test-byte-comp-compile-and-load t
+     `(with-suppressed-warnings ,suppress
+        ,form))
+    (with-current-buffer byte-compile-log-buffer
+      (goto-char (point-min))
+      (should-not (re-search-forward match nil t)))
+    ;; Also check that byte compiled forms are identical.
+    (should (equal (byte-compile form)
+                   (byte-compile
+                    `(with-suppressed-warnings ,suppress ,form))))))
+
+(ert-deftest bytecomp-test--with-suppressed-warnings ()
+  (test-suppression
+   '(defvar prefixless)
+   '((lexical prefixless))
+   "global/dynamic var .prefixless. lacks")
+
+  (test-suppression
+   '(defun foo()
+      (let ((nil t))
+        (message-mail)))
+   '((constants nil))
+   "Warning: attempt to let-bind constant .nil.")
+
+  (test-suppression
+   '(progn
+      (defun obsolete ()
+        (declare (obsolete foo "22.1")))
+      (defun zot ()
+        (obsolete)))
+   '((obsolete obsolete))
+   "Warning: .obsolete. is an obsolete function")
+
+  (test-suppression
+   '(progn
+      (defun wrong-params (foo &optional unused)
+        (ignore unused)
+        foo)
+      (defun zot ()
+        (wrong-params 1 2 3)))
+   '((callargs wrong-params))
+   "Warning: wrong-params called with")
+
+  (test-byte-comp-compile-and-load nil
+    (defvar obsolete-variable nil)
+    (make-obsolete-variable 'obsolete-variable nil "24.1"))
+  (test-suppression
+   '(defun zot ()
+      obsolete-variable)
+   '((obsolete obsolete-variable))
+   "obsolete")
+
+  (test-suppression
+   '(defun zot ()
+      (mapcar #'list '(1 2 3))
+      nil)
+   '((mapcar mapcar))
+   "Warning: .mapcar. called for effect")
+
+  (test-suppression
+   '(defun zot ()
+      free-variable)
+   '((free-vars free-variable))
+   "Warning: reference to free variable")
+
+  (test-suppression
+   '(defun zot ()
+      (save-excursion
+        (set-buffer (get-buffer-create "foo"))
+        nil))
+   '((suspicious set-buffer))
+   "Warning: Use .with-current-buffer. rather than"))
 
 ;; Local Variables:
 ;; no-byte-compile: t
