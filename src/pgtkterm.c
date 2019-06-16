@@ -175,7 +175,6 @@ x_free_frame_resources (struct frame *f)
 
   block_input ();
 
-  free_frame_menubar (f);
   free_frame_faces (f);
 
 #define CLEAR_IF_EQ(FIELD)	\
