@@ -57,14 +57,11 @@ Note: Segmentation fault may occur on multiple display environment.
 
 Known problems:
 - Segmentation fault while multiple-display.
-- Can't send selection data sometimes.
 - Only small area is drawn when a X11 frame opens. (In the case, you can resize it to be correctly drawn.)
-- Tooltips are stressful.
 - Exits when a connection to display server is closed by peer. (However I may not be able to resolve.)
 
 Not implemented:
 - Toolbar.
-- Menubar.
 - Many other features.
 
 Those may not be developed because I don't use them.
@@ -104,14 +101,14 @@ You may need build and install cairo from git repo. 1.15.12 is insufficient.
 
 - archlinux
 - gtk+ 3.24.8
-- glib2 2.60.2
+- glib2 2.60.4
 - gnome-shell 3.32.2
 - gcc 8.3.0
 - wayland 1.17.0
 - wayland-protocols 1.17
 - cairo 1.16.0
 - freetype2 2.10.0
-- imagemagick 7.0.8.45
+- imagemagick 7.0.8.49
 
 ## Notice
 
