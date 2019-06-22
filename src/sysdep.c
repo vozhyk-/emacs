@@ -242,6 +242,12 @@ init_standard_fds (void)
   force_open (STDIN_FILENO, O_WRONLY);
   force_open (STDOUT_FILENO, O_RDONLY);
   force_open (STDERR_FILENO, O_RDONLY);
+
+  /* Line-buffer stderr.  However, leave stderr unbuffered on
+     MS-Windows, where setvbuf treats _IOLBF like _IOFBF.  */
+#ifndef DOS_NT
+  setvbuf (stderr, NULL, _IOLBF, 0);
+#endif
 }
 
 /* Return the current working directory.  The result should be freed
@@ -1067,16 +1073,6 @@ emacs_set_tty (int fd, struct emacs_tty *settings, bool flushp)
 static int old_fcntl_owner[FD_SETSIZE];
 #endif /* F_SETOWN */
 
-/* This may also be defined in stdio,
-   but if so, this does no harm,
-   and using the same name avoids wasting the other one's space.  */
-
-#if defined (USG)
-unsigned char _sobuf[BUFSIZ+8];
-#else
-char _sobuf[BUFSIZ];
-#endif
-
 /* Initialize the terminal mode on all tty devices that are currently
    open. */
 
@@ -1296,14 +1292,7 @@ init_sys_modes (struct tty_display_info *tty_out)
     }
 #endif /* F_GETOWN */
 
-#ifdef _IOFBF
-  /* This symbol is defined on recent USG systems.
-     Someone says without this call USG won't really buffer the file
-     even with a call to setbuf. */
-  setvbuf (tty_out->output, (char *) _sobuf, _IOFBF, sizeof _sobuf);
-#else
-  setbuf (tty_out->output, (char *) _sobuf);
-#endif
+  setvbuf (tty_out->output, NULL, _IOFBF, BUFSIZ);
 
   if (tty_out->terminal->set_terminal_modes_hook)
     tty_out->terminal->set_terminal_modes_hook (tty_out->terminal);

@@ -4696,7 +4696,9 @@ sxhash (Lisp_Object obj, int depth)
 
 DEFUN ("sxhash-eq", Fsxhash_eq, Ssxhash_eq, 1, 1, 0,
        doc: /* Return an integer hash code for OBJ suitable for `eq'.
-If (eq A B), then (= (sxhash-eq A) (sxhash-eq B)).  */)
+If (eq A B), then (= (sxhash-eq A) (sxhash-eq B)).
+
+Hash codes are not guaranteed to be preserved across Emacs sessions.  */)
   (Lisp_Object obj)
 {
   return make_fixnum (hashfn_eq (NULL, obj));
@@ -4704,7 +4706,9 @@ If (eq A B), then (= (sxhash-eq A) (sxhash-eq B)).  */)
 
 DEFUN ("sxhash-eql", Fsxhash_eql, Ssxhash_eql, 1, 1, 0,
        doc: /* Return an integer hash code for OBJ suitable for `eql'.
-If (eql A B), then (= (sxhash-eql A) (sxhash-eql B)).  */)
+If (eql A B), then (= (sxhash-eql A) (sxhash-eql B)).
+
+Hash codes are not guaranteed to be preserved across Emacs sessions.  */)
   (Lisp_Object obj)
 {
   return make_fixnum (hashfn_eql (NULL, obj));
@@ -4712,7 +4716,9 @@ If (eql A B), then (= (sxhash-eql A) (sxhash-eql B)).  */)
 
 DEFUN ("sxhash-equal", Fsxhash_equal, Ssxhash_equal, 1, 1, 0,
        doc: /* Return an integer hash code for OBJ suitable for `equal'.
-If (equal A B), then (= (sxhash-equal A) (sxhash-equal B)).  */)
+If (equal A B), then (= (sxhash-equal A) (sxhash-equal B)).
+
+Hash codes are not guaranteed to be preserved across Emacs sessions.  */)
   (Lisp_Object obj)
 {
   return make_fixnum (hashfn_equal (NULL, obj));

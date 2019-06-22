@@ -29,6 +29,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include "pgtkterm.h"
 #endif
 #include "blockinput.h"
+#include "charset.h"
 #include "composite.h"
 #include "font.h"
 #include "ftfont.h"
@@ -191,7 +192,6 @@ ftcrfont_open (struct frame *f, Lisp_Object entity, int pixel_size)
 
   block_input ();
   cairo_glyph_t stack_glyph;
-  int n = 0;
   font->min_width = font->average_width = font->space_width = 0;
   for (char c = 32; c < 127; c++)
     {
@@ -202,28 +202,25 @@ ftcrfont_open (struct frame *f, Lisp_Object entity, int pixel_size)
 					  0, 0, &c, 1, &glyphs, &num_glyphs,
 					  NULL, NULL, NULL);
 
-      if (status == CAIRO_STATUS_SUCCESS)
+      /* In order to simulate the Xft behavior, we use metrics of
+	 glyph ID 0 if there is no glyph for an ASCII printable.  */
+      if (status != CAIRO_STATUS_SUCCESS)
+	stack_glyph.index = 0;
+      else if (glyphs != &stack_glyph)
 	{
-	  if (glyphs != &stack_glyph)
-	    cairo_glyph_free (glyphs);
-	  else if (stack_glyph.index)
-	    {
-	      int this_width = ftcrfont_glyph_extents (font, stack_glyph.index,
-						       NULL);
-
-	      if (this_width > 0
-		  && (! font->min_width
-		      || font->min_width > this_width))
-		font->min_width = this_width;
-	      if (c == 32)
-		font->space_width = this_width;
-	      font->average_width += this_width;
-	      n++;
-	    }
+	  cairo_glyph_free (glyphs);
+	  stack_glyph.index = 0;
 	}
+      int this_width = ftcrfont_glyph_extents (font, stack_glyph.index, NULL);
+      if (this_width > 0
+	  && (! font->min_width
+	      || font->min_width > this_width))
+	font->min_width = this_width;
+      if (c == 32)
+	font->space_width = this_width;
+      font->average_width += this_width;
     }
-  if (n > 0)
-    font->average_width /= n;
+  font->average_width /= 95;
 
   cairo_scaled_font_extents (ftcrfont_info->cr_scaled_font, &extents);
   font->ascent = lround (extents.ascent);
@@ -315,6 +312,17 @@ ftcrfont_has_char (Lisp_Object font, int c)
 {
   if (FONT_ENTITY_P (font))
     return ftfont_has_char (font, c);
+
+  struct charset *cs = NULL;
+
+  if (EQ (AREF (font, FONT_ADSTYLE_INDEX), Qja)
+      && charset_jisx0208 >= 0)
+    cs = CHARSET_FROM_ID (charset_jisx0208);
+  else if (EQ (AREF (font, FONT_ADSTYLE_INDEX), Qko)
+      && charset_ksc5601 >= 0)
+    cs = CHARSET_FROM_ID (charset_ksc5601);
+  if (cs)
+    return (ENCODE_CHAR (cs, c) != CHARSET_INVALID_CODE (cs));
 
   return -1;
 }
@@ -619,6 +627,7 @@ syms_of_ftcrfont (void)
   DEFSYM (Qftcr, "ftcr");
 #ifdef HAVE_HARFBUZZ
   DEFSYM (Qftcrhb, "ftcrhb");
+  Fput (Qftcr, Qfont_driver_superseded_by, Qftcrhb);
 #endif	/* HAVE_HARFBUZZ */
   pdumper_do_now_and_after_load (syms_of_ftcrfont_for_pdumper);
 }

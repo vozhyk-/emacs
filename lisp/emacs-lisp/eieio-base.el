@@ -71,7 +71,7 @@ All slots are unbound, except those initialized with PARAMS."
   (let ((nobj  (if (stringp (car params))
                    (cl-call-next-method obj (pop params))
                  (cl-call-next-method obj))))
-    (dolist (descriptor (eieio-class-slots (class-of nobj)))
+    (dolist (descriptor (eieio-class-slots (eieio-object-class nobj)))
       (let ((slot (eieio-slot-descriptor-name descriptor)))
         (slot-makeunbound nobj slot)))
     (when params
@@ -508,10 +508,19 @@ instance."
   (or (slot-value obj 'object-name)
       (cl-call-next-method)))
 
-(cl-defmethod eieio-object-set-name-string ((obj eieio-named) name)
+(cl-defgeneric eieio-object-set-name-string (obj name)
   "Set the string which is OBJ's NAME."
+  (declare (obsolete "inherit from `eieio-named' and use (setf (slot-value OBJ \\='object-name) NAME) instead" "25.1"))
   (cl-check-type name string)
-  (eieio-oset obj 'object-name name))
+  (setf (gethash obj eieio--object-names) name))
+(define-obsolete-function-alias
+  'object-set-name-string 'eieio-object-set-name-string "24.4")
+
+(with-suppressed-warnings ((obsolete eieio-object-set-name-string))
+  (cl-defmethod eieio-object-set-name-string ((obj eieio-named) name)
+    "Set the string which is OBJ's NAME."
+    (cl-check-type name string)
+    (eieio-oset obj 'object-name name)))
 
 (cl-defmethod clone ((obj eieio-named) &rest params)
   "Clone OBJ, initializing `:parent' to OBJ.

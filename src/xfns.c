@@ -6225,8 +6225,8 @@ x_create_tip_frame (struct x_display_info *dpyinfo, Lisp_Object parms)
   register_font_driver (&ftxfont_driver, f);
 #endif	/* not HAVE_XFT */
 #endif	/* HAVE_FREETYPE */
-  register_font_driver (&xfont_driver, f);
 #endif	/* not USE_CAIRO */
+  register_font_driver (&xfont_driver, f);
 
   image_cache_refcount =
     FRAME_IMAGE_CACHE (f) ? FRAME_IMAGE_CACHE (f)->refcount : 0;
@@ -6955,6 +6955,10 @@ Text larger than the specified size is clipped.  */)
 		     root_x, root_y, width, height);
   XMapRaised (FRAME_X_DISPLAY (tip_f), FRAME_X_WINDOW (tip_f));
   unblock_input ();
+
+#ifdef USE_CAIRO
+  x_cr_update_surface_desired_size (tip_f, width, height);
+#endif	/* USE_CAIRO */
 
   w->must_be_updated_p = true;
   update_single_window (w);

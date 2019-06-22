@@ -311,7 +311,43 @@
     (let ((x "a")) (cond ((equal x "a") 'correct)
                          ((equal x "b") 'incorrect)
                          ((equal x "a") 'incorrect)
-                         ((equal x "c") 'incorrect))))
+                         ((equal x "c") 'incorrect)))
+    ;; Multi-value clauses
+    (mapcar (lambda (x) (cond ((eq x 'a) 11)
+                              ((memq x '(b a c d)) 22)
+                              ((eq x 'c) 33)
+                              ((eq x 'e) 44)
+                              ((memq x '(d f g)) 55)
+                              (t 99)))
+            '(a b c d e f g h))
+    (mapcar (lambda (x) (cond ((eql x 1) 11)
+                              ((memq x '(a b c)) 22)
+                              ((memql x '(2 1 4 1e-3)) 33)
+                              ((eq x 'd) 44)
+                              ((eql x #x10000000000000000))))
+            '(1 2 4 1e-3 a b c d 1.0 #x10000000000000000))
+    (mapcar (lambda (x) (cond ((eq x 'a) 11)
+                              ((memq x '(b d)) 22)
+                              ((equal x '(a . b)) 33)
+                              ((member x '(b c 1.5 2.5 "X" (d))) 44)
+                              ((eql x 3.14) 55)
+                              ((memql x '(9 0.5 1.5 q)) 66)
+                              (t 99)))
+            '(a b c d (d) (a . b) "X" 0.5 1.5 3.14 9 9.0))
+    ;; Multi-switch cond form
+    (mapcar (lambda (p) (let ((x (car p)) (y (cadr p)))
+                          (cond ((consp x) 11)
+                                ((eq x 'a) 22)
+                                ((memql x '(b 7 a -3)) 33)
+                                ((equal y "a") 44)
+                                ((memq y '(c d e)) 55)
+                                ((booleanp x) 66)
+                                ((eq x 'q) 77)
+                                ((memq x '(r s)) 88)
+                                ((eq x 't) 99)
+                                (t 999))))
+            '((a c) (b c) (7 c) (-3 c) (nil nil) (t c) (q c) (r c) (s c)
+              (t c) (x "a") (x "c") (x c) (x d) (x e))))
   "List of expression for test.
 Each element will be executed by interpreter and with
 bytecompiled code, and their results compared.")
@@ -691,6 +727,8 @@ literals (Bug#20852)."
         (byte-compile-log-buffer (generate-new-buffer " *Compile-Log*")))
     ;; Check that we get a warning without suppression.
     (with-current-buffer byte-compile-log-buffer
+      (setq-local fill-column 9999)
+      (setq-local warning-fill-column fill-column)
       (let ((inhibit-read-only t))
         (erase-buffer)))
     (test-byte-comp-compile-and-load t form)
@@ -698,7 +736,7 @@ literals (Bug#20852)."
       (unless match
         (error "%s" (buffer-string)))
       (goto-char (point-min))
-      (should (re-search-forward match nil t)))
+      (should (string-match match (buffer-string))))
     ;; And that it's gone now.
     (with-current-buffer byte-compile-log-buffer
       (let ((inhibit-read-only t))
@@ -708,7 +746,7 @@ literals (Bug#20852)."
         ,form))
     (with-current-buffer byte-compile-log-buffer
       (goto-char (point-min))
-      (should-not (re-search-forward match nil t)))
+      (should-not (string-match match (buffer-string))))
     ;; Also check that byte compiled forms are identical.
     (should (equal (byte-compile form)
                    (byte-compile

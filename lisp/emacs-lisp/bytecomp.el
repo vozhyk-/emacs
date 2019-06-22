@@ -142,7 +142,6 @@ If you change this, you might want to set `byte-compile-dest-file-function'.
 \(Note that the assumption of a \".elc\" suffix for compiled files
 is hard-coded in various places in Emacs.)"
   ;; Eg is_elc in Fload.
-  :group 'bytecomp
   :type 'regexp)
 
 (defcustom byte-compile-dest-file-function nil
@@ -152,7 +151,6 @@ file name, and return the name of the compiled file.
 \(Note that the assumption that the source and compiled files
 are found in the same directory is hard-coded in various places in Emacs.)"
   ;; Eg load-prefer-newer, documentation lookup IIRC.
-  :group 'bytecomp
   :type '(choice (const nil) function)
   :version "23.2")
 
@@ -206,7 +204,6 @@ otherwise adds \".elc\"."
 (defcustom byte-compile-verbose
   (and (not noninteractive) (> baud-rate search-slow-speed))
   "Non-nil means print messages describing progress of byte-compiler."
-  :group 'bytecomp
   :type 'boolean)
 
 (defcustom byte-optimize t
@@ -216,7 +213,6 @@ Possible values are:
   t        - all optimizations
   `source' - source-level optimizations only
   `byte'   - code-level optimizations only"
-  :group 'bytecomp
   :type '(choice (const :tag "none" nil)
 		 (const :tag "all" t)
 		 (const :tag "source-level" source)
@@ -225,13 +221,11 @@ Possible values are:
 (defcustom byte-compile-delete-errors nil
   "If non-nil, the optimizer may delete forms that may signal an error.
 This includes variable references and calls to functions such as `car'."
-  :group 'bytecomp
   :type 'boolean)
 
 (defcustom byte-compile-cond-use-jump-table t
   "Compile `cond' clauses to a jump table implementation (using a hash-table)."
   :version "26.1"
-  :group 'bytecomp
   :type 'boolean)
 
 (defvar byte-compile-dynamic nil
@@ -246,6 +240,7 @@ For example, add  -*-byte-compile-dynamic: t;-*- on the first line.
 
 When this option is true, if you load the compiled file and then move it,
 the functions you loaded will not be able to run.")
+(make-obsolete-variable 'byte-compile-dynamic "not worthwhile any more." "27.1")
 ;;;###autoload(put 'byte-compile-dynamic 'safe-local-variable 'booleanp)
 
 (defvar byte-compile-disable-print-circle nil
@@ -267,7 +262,6 @@ in the source file.  For example, add this to the first line:
 You can also set the variable globally.
 
 This option is enabled by default because it reduces Emacs memory usage."
-  :group 'bytecomp
   :type 'boolean)
 ;;;###autoload(put 'byte-compile-dynamic-docstrings 'safe-local-variable 'booleanp)
 
@@ -279,7 +273,6 @@ This option is enabled by default because it reduces Emacs memory usage."
 If this is `source', then only source-level optimizations will be logged.
 If it is `byte', then only byte-level optimizations will be logged.
 The information is logged to `byte-compile-log-buffer'."
-  :group 'bytecomp
   :type '(choice (const :tag "none" nil)
 		 (const :tag "all" t)
 		 (const :tag "source-level" source)
@@ -287,7 +280,6 @@ The information is logged to `byte-compile-log-buffer'."
 
 (defcustom byte-compile-error-on-warn nil
   "If true, the byte-compiler reports warnings with `error'."
-  :group 'bytecomp
   :type 'boolean)
 ;; This needs to be autoloaded because it needs to be available to
 ;; Emacs before the byte compiler is loaded, otherwise Emacs will not
@@ -325,7 +317,6 @@ Elements of the list may be:
 
 If the list begins with `not', then the remaining elements specify warnings to
 suppress.  For example, (not mapcar) will suppress warnings about mapcar."
-  :group 'bytecomp
   :type `(choice (const :tag "All" t)
 		 (set :menu-tag "Some"
                       ,@(mapcar (lambda (x) `(const ,x))
@@ -414,7 +405,6 @@ not reported.
 The call tree also lists those functions which are not known to be called
 \(that is, to which no calls have been compiled).  Functions which can be
 invoked interactively are excluded from this list."
-  :group 'bytecomp
   :type '(choice (const :tag "Yes" t) (const :tag "No" nil)
 		 (other :tag "Ask" lambda)))
 
@@ -432,7 +422,6 @@ FUNCTION.")
   "If non-nil, sort the call tree.
 The values `name', `callers', `calls', `calls+callers'
 specify different fields to sort on."
-  :group 'bytecomp
   :type '(choice (const name) (const callers) (const calls)
 		 (const calls+callers) (const nil)))
 
@@ -514,13 +503,20 @@ Return the compile-time value of FORM."
                                 expanded)))))
     (with-suppressed-warnings
         . ,(lambda (warnings &rest body)
-             ;; This function doesn't exist, but is just a placeholder
-             ;; symbol to hook up with the
-             ;; `byte-hunk-handler'/`byte-defop-compiler-1' machinery.
-             `(internal--with-suppressed-warnings
-               ',warnings
-               ,(macroexpand-all `(progn ,@body)
-                                 macroexpand-all-environment)))))
+             ;; We let-bind `byte-compile--suppressed-warnings' here in order
+             ;; to affect warnings emitted during macroexpansion.
+             ;; Later `internal--with-suppressed-warnings' binds it again, this
+             ;; time in order to affect warnings emitted during the
+             ;; compilation itself.
+             (let ((byte-compile--suppressed-warnings
+                    (append warnings byte-compile--suppressed-warnings)))
+               ;; This function doesn't exist, but is just a placeholder
+               ;; symbol to hook up with the
+               ;; `byte-hunk-handler'/`byte-defop-compiler-1' machinery.
+               `(internal--with-suppressed-warnings
+                 ',warnings
+                 ,(macroexpand-all `(progn ,@body)
+                                   macroexpand-all-environment))))))
   "The default macro-environment passed to macroexpand by the compiler.
 Placing a macro here will cause a macro to have different semantics when
 expanded by the compiler as when expanded by the interpreter.")
@@ -1036,7 +1032,7 @@ If STR is something like \"Buffer foo.el\", return #<buffer foo.el>
     str))
 
 (defconst emacs-lisp-compilation-parse-errors-filename-function
-  'emacs-lisp-compilation-file-name-or-buffer
+  #'emacs-lisp-compilation-file-name-or-buffer
   "The value for `compilation-parse-errors-filename-function' for when
 we go into emacs-lisp-compilation-mode.")
 
@@ -1044,13 +1040,12 @@ we go into emacs-lisp-compilation-mode.")
   "Search path for byte-compile error messages.
 Elements should be directory names, not file names of directories.
 The value nil as an element means to try the default directory."
-  :group 'bytecomp
   :version "27.1"
   :type '(repeat (choice (const :tag "Default" nil)
 			 (string :tag "Directory"))))
 
 (define-compilation-mode emacs-lisp-compilation-mode "elisp-compile"
-  "The variant of `compilation-mode' used for emacs-lisp error buffers")
+  "The variant of `compilation-mode' used for emacs-lisp compilation buffers.")
 
 (defvar byte-compile-current-form nil)
 (defvar byte-compile-dest-file nil)
@@ -1397,7 +1392,8 @@ when printing the error message."
 
 (defun byte-compile-function-warn (f nargs def)
   (byte-compile-set-symbol-position f)
-  (when (get f 'byte-obsolete-info)
+  (when (and (get f 'byte-obsolete-info)
+             (byte-compile-warning-enabled-p 'obsolete f))
     (byte-compile-warn-obsolete f))
 
   ;; Check to see if the function will be available at runtime
@@ -1601,7 +1597,10 @@ extra args."
 	   (while syms
 	     (setq s (symbol-name (pop syms))
 		   L (+ L (length s) 2))
-	     (if (< L (1- fill-column))
+	     (if (< L (1- (buffer-local-value 'fill-column
+                                              (or (get-buffer
+                                                   byte-compile-log-buffer)
+                                                  (current-buffer)))))
 		 (setq str (concat str " " s (and syms ",")))
 	       (setq str (concat str "\n    " s (and syms ","))
 		     L (+ (length s) 4))))
@@ -1746,8 +1745,8 @@ that already has a `.elc' file."
   (with-current-buffer (get-buffer-create byte-compile-log-buffer)
     (setq default-directory (expand-file-name directory))
     ;; compilation-mode copies value of default-directory.
-    (unless (eq major-mode 'compilation-mode)
-      (compilation-mode))
+    (unless (derived-mode-p 'compilation-mode)
+      (emacs-lisp-compilation-mode))
     (let ((directories (list default-directory))
 	  (default-directory default-directory)
 	  (skip-count 0)
@@ -4118,7 +4117,7 @@ that suppresses all warnings during execution of BODY."
 	(byte-compile-out-tag donetag))))
   (setq byte-compile--for-effect nil))
 
-(defun byte-compile-cond-vars (obj1 obj2)
+(defun byte-compile--cond-vars (obj1 obj2)
   ;; We make sure that of OBJ1 and OBJ2, one of them is a symbol,
   ;; and the other is a constant expression whose value can be
   ;; compared with `eq' (with `macroexp-const-p').
@@ -4126,161 +4125,175 @@ that suppresses all warnings during execution of BODY."
    (and (symbolp obj1) (macroexp-const-p obj2) (cons obj1 (eval obj2)))
    (and (symbolp obj2) (macroexp-const-p obj1) (cons obj2 (eval obj1)))))
 
-(defconst byte-compile--default-val (cons nil nil) "A unique object.")
+(defun byte-compile--common-test (test-1 test-2)
+  "Most specific common test of `eq', `eql' and `equal'"
+  (cond ((or (eq test-1 'equal) (eq test-2 'equal)) 'equal)
+        ((or (eq test-1 'eql)   (eq test-2 'eql))   'eql)
+        (t                                          'eq)))
 
-(defun byte-compile-cond-jump-table-info (clauses)
-  "If CLAUSES is a `cond' form where:
-The condition for each clause is of the form (TEST VAR VALUE).
-VAR is a variable.
-TEST and VAR are the same throughout all conditions.
-VALUE satisfies `macroexp-const-p'.
+(defun byte-compile--cond-switch-prefix (clauses)
+  "Find a switch corresponding to a prefix of CLAUSES, or nil if none.
+Return (TAIL VAR TEST CASES), where:
+  TAIL is the remaining part of CLAUSES after the switch, including
+  any default clause,
+  VAR is the variable being switched on,
+  TEST is the equality test (`eq', `eql' or `equal'),
+  CASES is a list of (VALUES . BODY) where VALUES is a list of values
+    corresponding to BODY (always non-empty)."
+  (let ((cases nil)                 ; Reversed list of (VALUES BODY).
+        (keys nil)                  ; Switch keys seen so far.
+        (switch-var nil)
+        (switch-test 'eq))
+    (while (pcase (car clauses)
+             (`((,fn ,expr1 ,expr2) . ,body)
+              (let* ((vars (byte-compile--cond-vars expr1 expr2))
+                     (var (car vars))
+                     (value (cdr vars)))
+                (and var (or (eq var switch-var) (not switch-var))
+                     (cond
+                      ((memq fn '(eq eql equal))
+                       (setq switch-var var)
+                       (setq switch-test
+                             (byte-compile--common-test switch-test fn))
+                       (unless (member value keys)
+                         (push value keys)
+                         (push (cons (list value) (or body '(t))) cases))
+                       t)
+                      ((and (memq fn '(memq memql member))
+                            (listp value)
+                            ;; Require a non-empty body, since the member
+                            ;; function value depends on the switch
+                            ;; argument.
+                            body)
+                       (setq switch-var var)
+                       (setq switch-test
+                             (byte-compile--common-test
+                              switch-test (cdr (assq fn '((memq   . eq)
+                                                          (memql  . eql)
+                                                          (member . equal))))))
+                       (let ((vals nil))
+                         (dolist (elem value)
+                           (unless (funcall fn elem keys)
+                             (push elem vals)))
+                         (when vals
+                           (setq keys (append vals keys))
+                           (push (cons (nreverse vals) body) cases)))
+                       t))))))
+      (setq clauses (cdr clauses)))
+    ;; Assume that a single switch is cheaper than two or more discrete
+    ;; compare clauses.  This could be tuned, possibly taking into
+    ;; account the total number of values involved.
+    (and (> (length cases) 1)
+         (list clauses switch-var switch-test (nreverse cases)))))
 
-Return a list of the form ((TEST . VAR)  ((VALUE BODY) ...))"
-  (let ((cases '())
-        (ok t)
-        prev-var prev-test)
-    (and (catch 'break
-           (dolist (clause (cdr clauses) ok)
-             (let* ((condition (car clause))
-                    (test (car-safe condition))
-                    (vars (when (consp condition)
-                            (byte-compile-cond-vars (cadr condition) (cl-caddr condition))))
-                    (obj1 (car-safe vars))
-                    (obj2 (cdr-safe vars))
-                    (body (cdr-safe clause)))
-               (unless prev-var
-                 (setq prev-var obj1))
-               (unless prev-test
-                 (setq prev-test test))
-               (if (and obj1 (memq test '(eq eql equal))
-                        (eq test prev-test)
-                        (eq obj1 prev-var))
-                   ;; discard duplicate clauses
-                   (unless (assoc obj2 cases test)
-                     (push (list obj2 body) cases))
-                 (if (and (macroexp-const-p condition) condition)
-		     (progn (push (list byte-compile--default-val
-					(or body `(,condition)))
-				  cases)
-                            (throw 'break t))
-                   (setq ok nil)
-                   (throw 'break nil))))))
-         (list (cons prev-test prev-var) (nreverse cases)))))
-
-(defun byte-compile-cond-jump-table (clauses)
-  (let* ((table-info (byte-compile-cond-jump-table-info clauses))
-         (test (caar table-info))
-         (var (cdar table-info))
-         (cases (cadr table-info))
-         jump-table test-obj body tag donetag default-tag default-case)
-    (when (and cases (not (= (length cases) 1)))
-      ;; TODO: Once :linear-search is implemented for `make-hash-table'
-      ;; set it to `t' for cond forms with a small number of cases.
+(defun byte-compile-cond-jump-table (switch donetag)
+  "Generate code for SWITCH, ending at DONETAG."
+  (let* ((var (car switch))
+         (test (nth 1 switch))
+         (cases (nth 2 switch))
+         jump-table test-objects body tag default-tag)
+    ;; TODO: Once :linear-search is implemented for `make-hash-table'
+    ;; set it to `t' for cond forms with a small number of cases.
+    (let ((nvalues (apply #'+ (mapcar (lambda (case) (length (car case)))
+                                      cases))))
       (setq jump-table (make-hash-table
 			:test test
 			:purecopy t
-			:size (if (assq byte-compile--default-val cases)
-				  (1- (length cases))
-				(length cases)))
-            default-tag (byte-compile-make-tag)
-            donetag (byte-compile-make-tag))
-      ;; The structure of byte-switch code:
-      ;;
-      ;; varref var
-      ;; constant #s(hash-table purecopy t data (val1 (TAG1) val2 (TAG2)))
-      ;; switch
-      ;; goto DEFAULT-TAG
-      ;; TAG1
-      ;; <clause body>
-      ;; goto DONETAG
-      ;; TAG2
-      ;; <clause body>
-      ;; goto DONETAG
-      ;; DEFAULT-TAG
-      ;; <body for `t' clause, if any (else `constant nil')>
-      ;; DONETAG
+			:size nvalues)))
+    (setq default-tag (byte-compile-make-tag))
+    ;; The structure of byte-switch code:
+    ;;
+    ;; varref var
+    ;; constant #s(hash-table purecopy t data (val1 (TAG1) val2 (TAG2)))
+    ;; switch
+    ;; goto DEFAULT-TAG
+    ;; TAG1
+    ;; <clause body>
+    ;; goto DONETAG
+    ;; TAG2
+    ;; <clause body>
+    ;; goto DONETAG
+    ;; DEFAULT-TAG
+    ;; <body for remaining (non-switch) clauses>
+    ;; DONETAG
 
-      (byte-compile-variable-ref var)
-      (byte-compile-push-constant jump-table)
-      (byte-compile-out 'byte-switch)
+    (byte-compile-variable-ref var)
+    (byte-compile-push-constant jump-table)
+    (byte-compile-out 'byte-switch)
 
-      ;; When the opcode argument is `byte-goto', `byte-compile-goto' sets
-      ;; `byte-compile-depth' to `nil'. However, we need `byte-compile-depth'
-      ;; to be non-nil for generating tags for all cases. Since
-      ;; `byte-compile-depth' will increase by at most 1 after compiling
-      ;; all of the clause (which is further enforced by cl-assert below)
-      ;; it should be safe to preserve its value.
-      (let ((byte-compile-depth byte-compile-depth))
-        (byte-compile-goto 'byte-goto default-tag))
+    ;; When the opcode argument is `byte-goto', `byte-compile-goto' sets
+    ;; `byte-compile-depth' to `nil'. However, we need `byte-compile-depth'
+    ;; to be non-nil for generating tags for all cases. Since
+    ;; `byte-compile-depth' will increase by at most 1 after compiling
+    ;; all of the clause (which is further enforced by cl-assert below)
+    ;; it should be safe to preserve its value.
+    (let ((byte-compile-depth byte-compile-depth))
+      (byte-compile-goto 'byte-goto default-tag))
 
-      (let ((default-match (assq byte-compile--default-val cases)))
-        (when default-match
-	  (setq default-case (cadr default-match)
-                cases (butlast cases))))
+    (dolist (case cases)
+      (setq tag (byte-compile-make-tag)
+            test-objects (car case)
+            body (cdr case))
+      (byte-compile-out-tag tag)
+      (dolist (value test-objects)
+        (puthash value tag jump-table))
 
-      (dolist (case cases)
-        (setq tag (byte-compile-make-tag)
-              test-obj (nth 0 case)
-              body (nth 1 case))
-        (byte-compile-out-tag tag)
-        (puthash test-obj tag jump-table)
+      (let ((byte-compile-depth byte-compile-depth)
+            (init-depth byte-compile-depth))
+        ;; Since `byte-compile-body' might increase `byte-compile-depth'
+        ;; by 1, not preserving its value will cause it to potentially
+        ;; increase by one for every clause body compiled, causing
+        ;; depth/tag conflicts or violating asserts down the road.
+        ;; To make sure `byte-compile-body' itself doesn't violate this,
+        ;; we use `cl-assert'.
+        (byte-compile-body body byte-compile--for-effect)
+        (cl-assert (or (= byte-compile-depth init-depth)
+                       (= byte-compile-depth (1+ init-depth))))
+        (byte-compile-goto 'byte-goto donetag)
+        (setcdr (cdr donetag) nil)))
 
-        (let ((byte-compile-depth byte-compile-depth)
-              (init-depth byte-compile-depth))
-          ;; Since `byte-compile-body' might increase `byte-compile-depth'
-          ;; by 1, not preserving its value will cause it to potentially
-          ;; increase by one for every clause body compiled, causing
-          ;; depth/tag conflicts or violating asserts down the road.
-          ;; To make sure `byte-compile-body' itself doesn't violate this,
-          ;; we use `cl-assert'.
-          (if (null body)
-              (byte-compile-form t byte-compile--for-effect)
-            (byte-compile-body body byte-compile--for-effect))
-          (cl-assert (or (= byte-compile-depth init-depth)
-                         (= byte-compile-depth (1+ init-depth))))
-          (byte-compile-goto 'byte-goto donetag)
-          (setcdr (cdr donetag) nil)))
-
-      (byte-compile-out-tag default-tag)
-      (if default-case
-          (byte-compile-body-do-effect default-case)
-        (byte-compile-constant nil))
-      (byte-compile-out-tag donetag)
-      (push jump-table byte-compile-jump-tables))))
+    (byte-compile-out-tag default-tag)
+    (push jump-table byte-compile-jump-tables)))
 
 (defun byte-compile-cond (clauses)
-  (or (and byte-compile-cond-use-jump-table
-           (byte-compile-cond-jump-table clauses))
-    (let ((donetag (byte-compile-make-tag))
-          nexttag clause)
-      (while (setq clauses (cdr clauses))
-        (setq clause (car clauses))
-        (cond ((or (eq (car clause) t)
-                   (and (eq (car-safe (car clause)) 'quote)
-                        (car-safe (cdr-safe (car clause)))))
-               ;; Unconditional clause
-               (setq clause (cons t clause)
-                     clauses nil))
-              ((cdr clauses)
-               (byte-compile-form (car clause))
-               (if (null (cdr clause))
-                   ;; First clause is a singleton.
-                   (byte-compile-goto-if t byte-compile--for-effect donetag)
-                 (setq nexttag (byte-compile-make-tag))
-                 (byte-compile-goto 'byte-goto-if-nil nexttag)
-                 (byte-compile-maybe-guarded (car clause)
-                   (byte-compile-body (cdr clause) byte-compile--for-effect))
-                 (byte-compile-goto 'byte-goto donetag)
-                 (byte-compile-out-tag nexttag)))))
-      ;; Last clause
-      (let ((guard (car clause)))
-        (and (cdr clause) (not (eq guard t))
-             (progn (byte-compile-form guard)
-                    (byte-compile-goto-if nil byte-compile--for-effect donetag)
-                    (setq clause (cdr clause))))
-        (byte-compile-maybe-guarded guard
-          (byte-compile-body-do-effect clause)))
-      (byte-compile-out-tag donetag))))
+  (let ((donetag (byte-compile-make-tag))
+        nexttag clause)
+    (setq clauses (cdr clauses))
+    (while clauses
+      (let ((switch-prefix (and byte-compile-cond-use-jump-table
+                                (byte-compile--cond-switch-prefix clauses))))
+        (if switch-prefix
+            (progn
+              (byte-compile-cond-jump-table (cdr switch-prefix) donetag)
+              (setq clauses (car switch-prefix)))
+          (setq clause (car clauses))
+          (cond ((or (eq (car clause) t)
+                     (and (eq (car-safe (car clause)) 'quote)
+                          (car-safe (cdr-safe (car clause)))))
+                 ;; Unconditional clause
+                 (setq clause (cons t clause)
+                       clauses nil))
+                ((cdr clauses)
+                 (byte-compile-form (car clause))
+                 (if (null (cdr clause))
+                     ;; First clause is a singleton.
+                     (byte-compile-goto-if t byte-compile--for-effect donetag)
+                   (setq nexttag (byte-compile-make-tag))
+                   (byte-compile-goto 'byte-goto-if-nil nexttag)
+                   (byte-compile-maybe-guarded (car clause)
+                     (byte-compile-body (cdr clause) byte-compile--for-effect))
+                   (byte-compile-goto 'byte-goto donetag)
+                   (byte-compile-out-tag nexttag))))
+          (setq clauses (cdr clauses)))))
+    ;; Last clause
+    (let ((guard (car clause)))
+      (and (cdr clause) (not (eq guard t))
+           (progn (byte-compile-form guard)
+                  (byte-compile-goto-if nil byte-compile--for-effect donetag)
+                  (setq clause (cdr clause))))
+      (byte-compile-maybe-guarded guard
+        (byte-compile-body-do-effect clause)))
+    (byte-compile-out-tag donetag)))
 
 (defun byte-compile-and (form)
   (let ((failtag (byte-compile-make-tag))

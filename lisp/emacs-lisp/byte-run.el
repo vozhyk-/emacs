@@ -45,7 +45,10 @@ So far, FUNCTION can only be a symbol, not a lambda expression."
 ;; `macro-declaration-function' are both obsolete (as marked at the end of this
 ;; file) but used in many .elc files.
 
-(defvar macro-declaration-function #'macro-declaration-function
+;; We don't use #' here, because it's an obsolete function, and we
+;; can't use `with-suppressed-errors' here due to how this file is
+;; used in the bootstrapping process.
+(defvar macro-declaration-function 'macro-declaration-function
   "Function to process declarations in a macro definition.
 The function will be called with two args MACRO and DECL.
 MACRO is the name of the macro being defined.
@@ -536,6 +539,14 @@ Otherwise, return nil.  For internal use only."
                                    sorted ", ")
                         (mapconcat (lambda (char) (format "`?\\%c'" char))
                                    sorted ", ")))))
+
+(defun byte-compile-info-string (&rest args)
+  "Format ARGS in a way that looks pleasing in the compilation output."
+  (format "  %-9s%s" "INFO" (apply #'format args)))
+
+(defun byte-compile-info-message (&rest args)
+  "Message format ARGS in a way that looks pleasing in the compilation output."
+  (message "%s" (apply #'byte-compile-info-string args)))
 
 
 ;; I nuked this because it's not a good idea for users to think of using it.

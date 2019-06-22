@@ -635,18 +635,16 @@ static void
 apply_xft_settings (Display_Info *dpyinfo,
                     struct xsettings *settings)
 {
-#if defined USE_CAIRO || defined HAVE_XFT
+#ifdef HAVE_XFT
   FcPattern *pat;
   struct xsettings oldsettings;
   bool changed = false;
 
   memset (&oldsettings, 0, sizeof (oldsettings));
   pat = FcPatternCreate ();
-#ifdef HAVE_XFT
   XftDefaultSubstitute (dpyinfo->display,
                         XScreenNumberOfScreen (dpyinfo->screen),
                         pat);
-#endif
   FcPatternGetBool (pat, FC_ANTIALIAS, 0, &oldsettings.aa);
   FcPatternGetBool (pat, FC_HINTING, 0, &oldsettings.hinting);
 #ifdef FC_HINT_STYLE
@@ -746,9 +744,7 @@ apply_xft_settings (Display_Info *dpyinfo,
       };
       char buf[sizeof format + d_formats * d_growth + lf_formats * lf_growth];
 
-#ifdef HAVE_XFT
       XftDefaultSet (dpyinfo->display, pat);
-#endif
       store_config_changed_event (Qfont_render,
 				  XCAR (dpyinfo->name_list_element));
       Vxft_settings
@@ -760,7 +756,7 @@ apply_xft_settings (Display_Info *dpyinfo,
     }
   else
     FcPatternDestroy (pat);
-#endif /* USE_CAIRO || HAVE_XFT */
+#endif /* HAVE_XFT */
 }
 #endif
 

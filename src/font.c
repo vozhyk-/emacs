@@ -710,7 +710,9 @@ font_prop_validate (int idx, Lisp_Object prop, Lisp_Object val)
 
 
 /* Store VAL as a value of extra font property PROP in FONT while
-   keeping the sorting order.  Don't check the validity of VAL.  */
+   keeping the sorting order.  Don't check the validity of VAL.  If
+   VAL is Qunbound, delete the slot for PROP from the list of extra
+   properties.  */
 
 Lisp_Object
 font_put_extra (Lisp_Object font, Lisp_Object prop, Lisp_Object val)
@@ -722,6 +724,8 @@ font_put_extra (Lisp_Object font, Lisp_Object prop, Lisp_Object val)
     {
       Lisp_Object prev = Qnil;
 
+      if (EQ (val, Qunbound))
+	return val;
       while (CONSP (extra)
 	     && NILP (Fstring_lessp (prop, XCAR (XCAR (extra)))))
 	prev = extra, extra = XCDR (extra);
@@ -734,7 +738,7 @@ font_put_extra (Lisp_Object font, Lisp_Object prop, Lisp_Object val)
       return val;
     }
   XSETCDR (slot, val);
-  if (NILP (val))
+  if (EQ (val, Qunbound))
     ASET (font, FONT_EXTRA_INDEX, Fdelq (slot, extra));
   return val;
 }
@@ -3055,7 +3059,7 @@ font_clear_prop (Lisp_Object *attrs, enum font_property_index prop)
   if (! NILP (Ffont_get (font, QCname)))
     {
       font = copy_font_spec (font);
-      font_put_extra (font, QCname, Qnil);
+      font_put_extra (font, QCname, Qunbound);
     }
 
   if (NILP (AREF (font, prop))
@@ -3518,7 +3522,10 @@ free_font_driver_list (struct frame *f)
 
 /* Make the frame F use font backends listed in NEW_DRIVERS (list of
    symbols, e.g. xft, x).  If NEW_DRIVERS is t, make F use all
-   available font drivers.  If NEW_DRIVERS is nil, finalize all drivers.
+   available font drivers that are not superseded by another driver.
+   (A font driver SYMBOL is superseded by the driver specified by
+   SYMBOL's 'font-driver-superseded-by property if it is a non-nil
+   symbol.)  If NEW_DRIVERS is nil, finalize all drivers.
 
    A caller must free all realized faces if any in advance.  The
    return value is a list of font backends actually made used on
@@ -3527,16 +3534,33 @@ free_font_driver_list (struct frame *f)
 Lisp_Object
 font_update_drivers (struct frame *f, Lisp_Object new_drivers)
 {
-  Lisp_Object active_drivers = Qnil;
+  Lisp_Object active_drivers = Qnil, default_drivers = Qnil;
   struct font_driver_list *list;
+
+  /* Collect all unsuperseded driver symbols into
+     `default_drivers'.  */
+  Lisp_Object all_drivers = Qnil;
+  for (list = f->font_driver_list; list; list = list->next)
+    all_drivers = Fcons (list->driver->type, all_drivers);
+  for (Lisp_Object rest = all_drivers; CONSP (rest); rest = XCDR (rest))
+    {
+      Lisp_Object superseded_by
+	= Fget (XCAR (rest), Qfont_driver_superseded_by);
+
+      if (NILP (superseded_by)
+	  || NILP (Fmemq (superseded_by, all_drivers)))
+	default_drivers = Fcons (XCAR (rest), default_drivers);
+    }
+
+  if (EQ (new_drivers, Qt))
+    new_drivers = default_drivers;
 
   /* At first, turn off non-requested drivers, and turn on requested
      drivers.  */
   for (list = f->font_driver_list; list; list = list->next)
     {
       struct font_driver const *driver = list->driver;
-      if ((EQ (new_drivers, Qt) || ! NILP (Fmemq (driver->type, new_drivers)))
-	  != list->on)
+      if ((! NILP (Fmemq (driver->type, new_drivers))) != list->on)
 	{
 	  if (list->on)
 	    {
@@ -3559,8 +3583,7 @@ font_update_drivers (struct frame *f, Lisp_Object new_drivers)
 
   if (NILP (new_drivers))
     return Qnil;
-
-  if (! EQ (new_drivers, Qt))
+  else
     {
       /* Re-order the driver list according to new_drivers.  */
       struct font_driver_list **list_table, **next;
@@ -3599,6 +3622,8 @@ font_update_drivers (struct frame *f, Lisp_Object new_drivers)
 	    {
 	      struct font_driver const *driver = list->driver;
 	      eassert (! list->on);
+	      if (NILP (Fmemq (driver->type, default_drivers)))
+		continue;
 	      if (! driver->start_for_frame
 		  || driver->start_for_frame (f) == 0)
 		{
@@ -4335,7 +4360,7 @@ the consecutive wildcards are folded into one.  */)
 
       while ((p1 = strstr (p0, "-*-*")))
 	{
-	  strcpy (p1, p1 + 2);
+	  memmove (p1, p1 + 2, (name + namelen + 1) - (p1 + 2));
 	  namelen -= 2;
 	  p0 = p1;
 	}
@@ -5358,6 +5383,8 @@ syms_of_font (void)
   /* For shapers that need to know text directionality.  */
   DEFSYM (QL2R, "L2R");
   DEFSYM (QR2L, "R2L");
+
+  DEFSYM (Qfont_driver_superseded_by, "font-driver-superseded-by");
 
   scratch_font_spec = Ffont_spec (0, NULL);
   staticpro (&scratch_font_spec);

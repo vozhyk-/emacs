@@ -3031,6 +3031,7 @@ syms_of_ftfont (void)
   DEFSYM (Qfreetype, "freetype");
 #ifdef HAVE_HARFBUZZ
   DEFSYM (Qfreetypehb, "freetypehb");
+  Fput (Qfreetype, Qfont_driver_superseded_by, Qfreetypehb);
 #endif	/* HAVE_HARFBUZZ */
 
   /* Fontconfig's generic families and their aliases.  */
