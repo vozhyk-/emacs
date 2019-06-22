@@ -4693,7 +4693,7 @@ pgtk_create_terminal (struct pgtk_display_info *dpyinfo)
   terminal->set_window_size_hook = pgtk_set_window_size;
   terminal->query_colors = pgtk_query_colors;
   terminal->get_focus_frame = x_get_focus_frame;
-  // terminal->focus_frame_hook = x_focus_frame;
+  terminal->focus_frame_hook = x_focus_frame;
   // terminal->set_frame_offset_hook = x_set_offset;
   terminal->free_pixmap = pgtk_free_pixmap;
 
@@ -6888,6 +6888,8 @@ gtk_window_move to set or store frame positions and disables some time
 consuming frame position adjustments.  In newer versions of GTK, Emacs
 always uses gtk_window_move and ignores the value of this variable.  */);
   x_gtk_use_window_move = true;
+
+  DEFSYM (Qx_gtk_map_stock, "x-gtk-map-stock");
 
   window_being_scrolled = Qnil;
   staticpro(&window_being_scrolled);

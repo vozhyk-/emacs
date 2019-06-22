@@ -422,7 +422,6 @@ file_for_image (Lisp_Object image)
   return specified_file;
 }
 
-#ifndef HAVE_PGTK
 /* For the image defined in IMG, make and return a GtkImage.  For displays with
    8 planes or less we must make a GdkPixbuf and apply the mask manually.
    Otherwise the highlighting and dimming the tool bar code in GTK does
@@ -524,7 +523,6 @@ xg_get_image_for_pixmap (struct frame *f,
 
   return GTK_WIDGET (old_widget);
 }
-#endif
 
 
 /* Set CURSOR on W and all widgets W contain.  We must do like this
@@ -4590,7 +4588,6 @@ xg_tool_bar_button_cb (GtkWidget *widget,
 }
 
 
-#ifndef HAVE_PGTK
 /* Callback function invoked when a tool bar item is pressed.
    W is the button widget in the tool bar that got pressed,
    CLIENT_DATA is an integer that is the index of the button in the
@@ -4629,14 +4626,17 @@ xg_tool_bar_callback (GtkWidget *w, gpointer client_data)
   /* Convert between the modifier bits GDK uses and the modifier bits
      Emacs uses.  This assumes GDK and X masks are the same, which they are when
      this is written.  */
+#ifndef HAVE_PGTK
   event.modifiers = x_x_to_emacs_modifiers (FRAME_DISPLAY_INFO (f), mod);
+#else
+  event.modifiers = pgtk_gtk_to_emacs_modifiers (mod);
+#endif
   kbd_buffer_store_event (&event);
 
   /* Return focus to the frame after we have clicked on a detached
      tool bar button. */
   FRAME_TERMINAL (f)->focus_frame_hook (f, false);
 }
-#endif
 
 static GtkWidget *
 xg_get_tool_bar_widgets (GtkWidget *vb, GtkWidget **wimage)
@@ -4700,7 +4700,6 @@ xg_tool_bar_help_callback (GtkWidget *w,
 
    Returns FALSE to tell GTK to keep processing this event.  */
 
-#ifndef HAVE_GTK3
 static gboolean
 xg_tool_bar_item_expose_callback (GtkWidget *w,
                                   GdkEventExpose *event,
@@ -4720,7 +4719,6 @@ xg_tool_bar_item_expose_callback (GtkWidget *w,
 
   return FALSE;
 }
-#endif
 
 /* Attach a tool bar to frame F.  */
 
@@ -4853,7 +4851,6 @@ find_rtl_image (struct frame *f, Lisp_Object image, Lisp_Object rtl)
   return image;
 }
 
-#ifndef HAVE_PGTK
 static GtkToolItem *
 xg_make_tool_item (struct frame *f,
                    GtkWidget *wimage,
@@ -4953,7 +4950,6 @@ xg_make_tool_item (struct frame *f,
 
   return ti;
 }
-#endif
 
 static bool
 is_box_type (GtkWidget *vb, bool is_horizontal)
@@ -4973,7 +4969,6 @@ is_box_type (GtkWidget *vb, bool is_horizontal)
 }
 
 
-#ifndef HAVE_PGTK
 static bool
 xg_tool_item_stale_p (GtkWidget *wbutton, const char *stock_name,
 		      const char *icon_name, const struct image *img,
@@ -5024,7 +5019,6 @@ xg_tool_item_stale_p (GtkWidget *wbutton, const char *stock_name,
     gtk_label_set_text (GTK_LABEL (wlbl), label);
   return 0;
 }
-#endif
 
 static bool
 xg_update_tool_bar_sizes (struct frame *f)
@@ -5114,9 +5108,12 @@ find_icon_from_name (char *name,
 void
 update_frame_tool_bar (struct frame *f)
 {
-#ifndef HAVE_PGTK
   int i, j;
+#ifndef HAVE_PGTK
   struct x_output *x = f->output_data.xp;
+#else
+  struct pgtk_output *x = f->output_data.pgtk;
+#endif
   int hmargin = 0, vmargin = 0;
   GtkToolbar *wtoolbar;
   GtkToolItem *ti;
@@ -5425,7 +5422,6 @@ update_frame_tool_bar (struct frame *f)
     }
 
   unblock_input ();
-#endif
 }
 
 /* Deallocate all resources for the tool bar on frame F.

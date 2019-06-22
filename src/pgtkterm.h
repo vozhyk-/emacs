@@ -425,18 +425,6 @@ enum
                        styleMask:[[FRAME_PGTK_VIEW (f) window] styleMask]])))
 #endif
 
-/* Compute pixel height of the toolbar. */
-#define FRAME_TOOLBAR_HEIGHT(f)                                         0
-#if 0
-  (([[FRAME_PGTK_VIEW (f) window] toolbar] == nil                         \
-    || ! [[FRAME_PGTK_VIEW (f) window] toolbar].isVisible) ?		\
-   0                                                                    \
-   : (int)(PGTKHeight([PGTKWindow contentRectForFrameRect:                  \
-                     [[FRAME_PGTK_VIEW (f) window] frame]                 \
-                     styleMask:[[FRAME_PGTK_VIEW (f) window] styleMask]]) \
-           - PGTKHeight([[[FRAME_PGTK_VIEW (f) window] contentView] frame])))
-#endif
-
 /* Compute pixel size for vertical scroll bars */
 #define PGTK_SCROLL_BAR_WIDTH(f)					\
   (FRAME_HAS_VERTICAL_SCROLL_BARS (f)					\
@@ -483,11 +471,13 @@ enum
 
 #define FRAME_PGTK_FONT_TABLE(f) (FRAME_DISPLAY_INFO (f)->font_table)
 
-#define FRAME_TOOLBAR_TOP_HEIGHT(f) (FRAME_X_OUTPUT(f)->toolbar_top_height)
+#define FRAME_TOOLBAR_TOP_HEIGHT(f) ((f)->output_data.pgtk->toolbar_top_height)
 #define FRAME_TOOLBAR_BOTTOM_HEIGHT(f) \
-  (FRAME_X_OUTPUT(f)->toolbar_bottom_height)
-#define FRAME_TOOLBAR_LEFT_WIDTH(f) (FRAME_X_OUTPUT(f)->toolbar_left_width)
-#define FRAME_TOOLBAR_RIGHT_WIDTH(f) (FRAME_X_OUTPUT(f)->toolbar_right_width)
+  ((f)->output_data.pgtk->toolbar_bottom_height)
+#define FRAME_TOOLBAR_HEIGHT(f) \
+  (FRAME_TOOLBAR_TOP_HEIGHT (f) + FRAME_TOOLBAR_BOTTOM_HEIGHT (f))
+#define FRAME_TOOLBAR_LEFT_WIDTH(f) ((f)->output_data.pgtk->toolbar_left_width)
+#define FRAME_TOOLBAR_RIGHT_WIDTH(f) ((f)->output_data.pgtk->toolbar_right_width)
 #define FRAME_TOOLBAR_WIDTH(f) \
   (FRAME_TOOLBAR_LEFT_WIDTH (f) + FRAME_TOOLBAR_RIGHT_WIDTH (f))
 
