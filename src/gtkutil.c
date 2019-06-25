@@ -1285,6 +1285,7 @@ style_changed_cb (GObject *go,
 
 /* Called when a delete-event occurs on WIDGET.  */
 
+#ifndef HAVE_PGTK
 static gboolean
 delete_cb (GtkWidget *widget,
            GdkEvent  *event,
@@ -1292,6 +1293,7 @@ delete_cb (GtkWidget *widget,
 {
   return TRUE;
 }
+#endif
 
 /* Create and set up the GTK widgets for frame F.
    Return true if creation succeeded.  */
@@ -4707,7 +4709,12 @@ xg_tool_bar_item_expose_callback (GtkWidget *w,
 {
   gint width, height;
 
+#ifndef HAVE_PGTK
   gdk_drawable_get_size (event->window, &width, &height);
+#else
+  gint x, y;
+  gdk_window_get_geometry (event->window, &x, &y, &width, &height);
+#endif
   event->area.x -= width > event->area.width ? width-event->area.width : 0;
   event->area.y -= height > event->area.height ? height-event->area.height : 0;
 

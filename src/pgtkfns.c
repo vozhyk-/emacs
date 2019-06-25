@@ -183,7 +183,7 @@ x_set_background_color (struct frame *f, Lisp_Object arg, Lisp_Object oldval)
   PGTK_TRACE("x_set_background_color: col.pixel=%08lx.", col.pixel);
   FRAME_X_OUTPUT(f)->background_color = col.pixel;
   FRAME_BACKGROUND_PIXEL (f) =
-    ARGB_TO_ULONG ((int)(0xff), (int)(col.red>>8), (int)(col.green>>8), (int)(col.blue>>8));
+    ARGB_TO_ULONG ((unsigned int)(0xff), (unsigned int)(col.red>>8), (unsigned int)(col.green>>8), (unsigned int)(col.blue>>8));
 
   xg_set_background_color(f, col.pixel);
   update_face_from_frame_parameter (f, Qbackground_color, arg);
@@ -506,7 +506,7 @@ x_set_menu_bar_lines (struct frame *f, Lisp_Object value, Lisp_Object oldval)
 }
 
 /* Set the pixel height of the tool bar of frame F to HEIGHT.  */
-void
+static void
 x_change_tool_bar_height (struct frame *f, int height)
 {
   FRAME_TOOL_BAR_LINES (f) = 0;
@@ -2756,11 +2756,6 @@ visible.  */)
   unblock_input ();
 
   return Qnil;
-}
-
-static void read_file_name_closed_cb(void)
-{
-  gtk_main_quit();
 }
 
 DEFUN ("pgtk-read-file-name", Fpgtk_read_file_name, Spgtk_read_file_name, 2, 5, 0,

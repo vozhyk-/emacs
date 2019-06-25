@@ -396,7 +396,7 @@ x_set_offset (struct frame *f, int xoff, int yoff, int change_gravity)
   unblock_input ();
 }
 
-void
+static void
 pgtk_set_window_size (struct frame *f,
                    bool change_gravity,
                    int width,
@@ -649,7 +649,7 @@ pgtk_make_frame_invisible (struct frame *f)
 #endif
 }
 
-Lisp_Object
+static Lisp_Object
 pgtk_new_font (struct frame *f, Lisp_Object font_object, int fontset)
 {
   PGTK_TRACE("pgtk_new_font");
