@@ -475,6 +475,9 @@ current and the previous or the next line, as before.
 
 * Changes in Specialized Modes and Packages in Emacs 27.1
 
+** tex-mode
+*** 'latex-noindent-commands' stops indenting arguments of \emph and friends
+
 ** byte compiler
 *** byte-compile-dynamic is now obsolete
 This is because on the one hand it suffers from various misbehaviors in corner
@@ -584,6 +587,9 @@ The mode is automatically enabled in files that start with the
 use the new 'fileloop-initialize' and 'fileloop-continue' functions
 instead.
 
++++
+*** etags is now able to read Zstandard-compressed files.
+
 ** bibtex
 
 ---
@@ -602,6 +608,10 @@ remapped to these, respectively.
 The default value is 'find-dired-sort-by-filename'.
 
 *** New sorting options for the variable 'find-ls-option'.
+
+---
+*** Zstandard compression is now supported for 'dired-do-compress' and
+'dired-do-compress-to'.
 
 ** Change Logs and VC
 
@@ -802,6 +812,9 @@ early init file.
 
 *** New function 'package-activate-all'.
 
+---
+*** Imenu support has been added to `package-menu-mode'.
+
 ** Info
 
 ---
@@ -889,6 +902,11 @@ See the concept index in the Gnus manual for the 'match-list' entry.
 article(s) to a pre-existing Message buffer, or create a new Message
 buffer with the article(s) attached.
 
++++
+*** A new Gnus summary mode command, 'w'
+('gnus-summary-browse-url') scans the article buffer for URLs, and
+offers them to the user to open with 'browse-url'.
+
 ---
 *** New option 'nnir-notmuch-filter-group-names-function'.
 This option controls whether and how to use Gnus search groups as
@@ -933,6 +951,9 @@ This attribute is meant to tell screen readers to ignore a tag.
 
 ---
 *** 'shr-tag-ol' now respects the ordered list 'start' attribute.
+
+---
+*** The <code ...> tag is now handled.
 
 ** Htmlfontify
 
@@ -1433,6 +1454,11 @@ near the current column in Tabulated Lists (see variables
 'tabulated-list-tty-sort-indicator-asc', and
 'tabulated-list-tty-sort-indicator-desc').
 
++++
+*** Two new commands and keystrokes have been added to the tabulated
+list mode: `w' (which widens the current column) and `c' which makes
+the current column contract.
+
 ** Text mode
 
 +++
@@ -1536,6 +1562,25 @@ directory is sufficient to know when updates are required, by setting
 the new variable 'buffer-auto-revert-by-notification' to a non-nil
 value.  Auto Revert mode can use this information to avoid polling the
 buffer periodically when 'auto-revert-avoid-polling' is non-nil.
+
+** auth-source-pass
+
++++
+*** New customizable variable 'auth-source-pass-filename'.
+Allows setting the path to the password-store, defaults to
+~/.password-store.
+
++++
+*** New customizable variable 'auth-source-pass-port-separator'.
+Specifies separator between host and port, defaults to colon ":".
+
+---
+*** Minimize the number of decryptions during password lookup.
+This makes the package usable with physical tokens requiring touching
+a sensor for every decryption.
+
+---
+*** 'auth-source-pass-get' is now autoloaded.
 
 ** Bookmarks
 
@@ -2154,6 +2199,15 @@ implement the url-variant of base-64 encoding as defined in RFC4648.
 The functions 'base64-decode-string' and 'base64-decode-region' now
 accept an optional argument to decode the URL variant of base-64
 encoding.
+
++++
+** The function 'file-size-human-readable' accepts more optional arguments.
+The new third argument is a string put between the number and unit; it
+defaults to the empty string.  The new fourth argument is a string
+representing the unit to use; it defaults to "B" when the second
+argument is 'iec' and the empty string otherwise.  We recomment a
+space or non-breaking space as third argument, and "B" as fourth
+argument, circumstances allowing.
 
 
 * Changes in Emacs 27.1 on Non-Free Operating Systems
