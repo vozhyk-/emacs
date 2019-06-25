@@ -451,7 +451,9 @@ pgtk_set_window_size (struct frame *f,
 #else
   // gtk_widget_set_size_request(FRAME_GTK_OUTER_WIDGET(f), pixelwidth, pixelheight);
   PGTK_TRACE("pgtk_set_window_size: %p: %dx%d.", f, width, height);
-  gtk_window_resize(GTK_WINDOW(FRAME_GTK_OUTER_WIDGET(f)), pixelwidth, pixelheight);
+  f->output_data.pgtk->preferred_width = pixelwidth;
+  f->output_data.pgtk->preferred_height = pixelheight;
+  // gtk_window_resize(GTK_WINDOW(FRAME_GTK_OUTER_WIDGET(f)), pixelwidth, pixelheight);
   x_wm_set_size_hint(f, 0, 0);
 #endif
 
