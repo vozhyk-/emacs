@@ -925,7 +925,7 @@ x_set_cursor_gc (struct glyph_string *s)
   else
     {
       /* Cursor on non-default face: must merge.  */
-      XGCValues xgcv;
+      Emacs_GC xgcv;
 
       PGTK_TRACE("x_set_cursor_gc: 2.");
       xgcv.background = FRAME_X_OUTPUT(s->f)->cursor_color;
@@ -986,7 +986,7 @@ x_set_mouse_face_gc (struct glyph_string *s)
     {
       /* Otherwise construct scratch_cursor_gc with values from FACE
 	 except for FONT.  */
-      XGCValues xgcv;
+      Emacs_GC xgcv;
 
       xgcv.background = s->face->background;
       xgcv.foreground = s->face->foreground;
@@ -1604,7 +1604,7 @@ static void
 x_setup_relief_color (struct frame *f, struct relief *relief, double factor,
 		      int delta, unsigned long default_pixel)
 {
-  XGCValues xgcv;
+  Emacs_GC xgcv;
   struct pgtk_output *di = FRAME_X_OUTPUT(f);
   unsigned long pixel;
   unsigned long background = di->relief_background;
@@ -1954,7 +1954,7 @@ x_draw_image_foreground_1 (struct glyph_string *s, cairo_surface_t *surface)
 	     manually.  */
 	  unsigned long mask = (GCClipMask | GCClipXOrigin | GCClipYOrigin
 				| GCFunction);
-	  XGCValues xgcv;
+	  Emacs_GC xgcv;
 
 	  xgcv.clip_mask = s->img->mask;
 	  xgcv.clip_x_origin = x - s->slice.x;
@@ -2120,7 +2120,7 @@ x_draw_image_foreground (struct glyph_string *s)
 	     manually.  */
 	  unsigned long mask = (GCClipMask | GCClipXOrigin | GCClipYOrigin
 				| GCFunction);
-	  XGCValues xgcv;
+	  Emacs_GC xgcv;
 	  XRectangle clip_rect, image_rect, r;
 
 	  xgcv.clip_mask = s->img->mask;
@@ -2780,7 +2780,7 @@ x_draw_hollow_cursor (struct window *w, struct glyph_row *row)
   struct frame *f = XFRAME (WINDOW_FRAME (w));
   struct pgtk_display_info *dpyinfo = FRAME_DISPLAY_INFO (f);
   int x, y, wd, h;
-  XGCValues xgcv;
+  Emacs_GC xgcv;
   struct glyph *cursor_glyph;
 
   /* Get the glyph the cursor is on.  If we can't tell because
@@ -3442,7 +3442,7 @@ pgtk_clip_to_row (struct window *w, struct glyph_row *row,
 }
 
 static void
-pgtk_cr_draw_image (struct frame *f, GC gc, cairo_pattern_t *image,
+pgtk_cr_draw_image (struct frame *f, Emacs_GC *gc, cairo_pattern_t *image,
 		 int src_x, int src_y, int width, int height,
 		 int dest_x, int dest_y, bool overlay_p)
 {
@@ -3533,7 +3533,7 @@ pgtk_draw_fringe_bitmap (struct window *w, struct glyph_row *row, struct draw_fr
   PGTK_TRACE("which: %d, max_fringe_bmp: %d.", p->which, max_fringe_bmp);
   if (p->which && p->which < max_fringe_bmp)
     {
-      XGCValues gcv;
+      Emacs_GC gcv;
 
       PGTK_TRACE("cursor_p=%d.", p->cursor_p);
       PGTK_TRACE("overlay_p_p=%d.", p->overlay_p);
@@ -6900,7 +6900,7 @@ always uses gtk_window_move and ignores the value of this variable.  */);
 }
 
 cairo_t *
-pgtk_begin_cr_clip (struct frame *f, XGCValues *gc)
+pgtk_begin_cr_clip (struct frame *f, Emacs_GC *gc)
 {
   cairo_t *cr = FRAME_CR_CONTEXT (f);
 
@@ -6954,14 +6954,14 @@ pgtk_end_cr_clip (struct frame *f)
 }
 
 void
-pgtk_set_cr_source_with_gc_foreground (struct frame *f, XGCValues *gc)
+pgtk_set_cr_source_with_gc_foreground (struct frame *f, Emacs_GC *gc)
 {
   PGTK_TRACE("pgtk_set_cr_source_with_gc_foreground: %08lx", gc->foreground);
   pgtk_set_cr_source_with_color(f, gc->foreground);
 }
 
 void
-pgtk_set_cr_source_with_gc_background (struct frame *f, XGCValues *gc)
+pgtk_set_cr_source_with_gc_background (struct frame *f, Emacs_GC *gc)
 {
   PGTK_TRACE("pgtk_set_cr_source_with_gc_background: %08lx", gc->background);
   pgtk_set_cr_source_with_color(f, gc->background);
