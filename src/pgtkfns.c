@@ -2518,11 +2518,7 @@ frame_geometry (Lisp_Object frame, Lisp_Object attribute)
   int native_right = f->left_pos + outer_width - border;
   int native_bottom = f->top_pos + outer_height - border;
   int internal_border_width = FRAME_INTERNAL_BORDER_WIDTH (f);
-#if 0
   int tool_bar_height = FRAME_TOOLBAR_HEIGHT (f);
-#else
-  int tool_bar_height = 0;
-#endif
   int tool_bar_width = (tool_bar_height
 			? outer_width - 2 * internal_border_width
 			: 0);
