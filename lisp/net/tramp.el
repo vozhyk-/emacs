@@ -1860,7 +1860,7 @@ an input event arrives.  The other arguments are passed to `tramp-error'."
 
 ;; We must make it a defun, because it is used earlier already.
 (defun tramp-user-error (vec-or-proc fmt-string &rest arguments)
-  "Signal a pilot error."
+  "Signal a user error (or \"pilot error\")."
   (unwind-protect
       (apply
        #'tramp-error vec-or-proc
@@ -2317,10 +2317,14 @@ Falls back to normal file name handler if no Tramp file name handler exists."
 		        ;; in recursive loading.  Therefore, we load
 		        ;; the Tramp packages locally.
 		        (when (autoloadp sf)
+                          ;; FIXME: Not clear why we need these bindings here.
+                          ;; The explanation above is not convincing and
+                          ;; the bug#9114 for which it was added doesn't
+                          ;; clarify the core of the problem.
 			  (let ((default-directory
 				  (tramp-compat-temporary-file-directory))
 			        file-name-handler-alist)
-			    (load (cadr sf) 'noerror 'nomessage)))
+			    (autoload-do-load sf foreign)))
                         ;; (tramp-message
                         ;;  v 4 "Running `%s'..." (cons operation args))
                         ;; If `non-essential' is non-nil, Tramp shall

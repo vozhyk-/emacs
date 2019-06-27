@@ -154,6 +154,7 @@ AC_DEFUN([gl_EARLY],
   # Code from module stdlib:
   # Code from module stpcpy:
   # Code from module string:
+  # Code from module strnlen:
   # Code from module strtoimax:
   # Code from module strtoll:
   # Code from module symlink:
@@ -346,6 +347,7 @@ AC_DEFUN([gl_INIT],
   gl_TIME_MODULE_INDICATOR([mktime])
   gl_MULTIARCH
   gl_FUNC_GNU_STRFTIME
+  gl_PATHMAX
   gl_FUNC_PIPE2
   gl_UNISTD_MODULE_INDICATOR([pipe2])
   gl_FUNC_PSELECT
@@ -403,6 +405,12 @@ AC_DEFUN([gl_INIT],
   fi
   gl_STRING_MODULE_INDICATOR([stpcpy])
   gl_HEADER_STRING_H
+  gl_FUNC_STRNLEN
+  if test $HAVE_DECL_STRNLEN = 0 || test $REPLACE_STRNLEN = 1; then
+    AC_LIBOBJ([strnlen])
+    gl_PREREQ_STRNLEN
+  fi
+  gl_STRING_MODULE_INDICATOR([strnlen])
   gl_FUNC_STRTOIMAX
   if test $HAVE_DECL_STRTOIMAX = 0 || test $REPLACE_STRTOIMAX = 1; then
     AC_LIBOBJ([strtoimax])
@@ -461,7 +469,6 @@ AC_DEFUN([gl_INIT],
   gl_gnulib_enabled_5264294aa0a5557541b53c8c741f7f31=false
   gl_gnulib_enabled_open=false
   gl_gnulib_enabled_03e0aaad4cb89ca757653bd367a6ccb7=false
-  gl_gnulib_enabled_pathmax=false
   gl_gnulib_enabled_6099e9737f757db36c47fa9d9f02e88c=false
   gl_gnulib_enabled_strtoll=false
   gl_gnulib_enabled_682e609604ccaac6be382e4ee3a4eaec=false
@@ -613,13 +620,6 @@ AC_DEFUN([gl_INIT],
       gl_gnulib_enabled_03e0aaad4cb89ca757653bd367a6ccb7=true
     fi
   }
-  func_gl_gnulib_m4code_pathmax ()
-  {
-    if ! $gl_gnulib_enabled_pathmax; then
-      gl_PATHMAX
-      gl_gnulib_enabled_pathmax=true
-    fi
-  }
   func_gl_gnulib_m4code_6099e9737f757db36c47fa9d9f02e88c ()
   {
     if ! $gl_gnulib_enabled_6099e9737f757db36c47fa9d9f02e88c; then
@@ -646,9 +646,6 @@ AC_DEFUN([gl_INIT],
   }
   if test $HAVE_CANONICALIZE_FILE_NAME = 0 || test $REPLACE_CANONICALIZE_FILE_NAME = 1; then
     func_gl_gnulib_m4code_malloca
-  fi
-  if test $HAVE_CANONICALIZE_FILE_NAME = 0 || test $REPLACE_CANONICALIZE_FILE_NAME = 1; then
-    func_gl_gnulib_m4code_pathmax
   fi
   if test $HAVE_FACCESSAT = 0 || test $REPLACE_FACCESSAT = 1; then
     func_gl_gnulib_m4code_260941c0e5dc67ec9e87d1fb321c300b
@@ -713,7 +710,6 @@ AC_DEFUN([gl_INIT],
   AM_CONDITIONAL([gl_GNULIB_ENABLED_5264294aa0a5557541b53c8c741f7f31], [$gl_gnulib_enabled_5264294aa0a5557541b53c8c741f7f31])
   AM_CONDITIONAL([gl_GNULIB_ENABLED_open], [$gl_gnulib_enabled_open])
   AM_CONDITIONAL([gl_GNULIB_ENABLED_03e0aaad4cb89ca757653bd367a6ccb7], [$gl_gnulib_enabled_03e0aaad4cb89ca757653bd367a6ccb7])
-  AM_CONDITIONAL([gl_GNULIB_ENABLED_pathmax], [$gl_gnulib_enabled_pathmax])
   AM_CONDITIONAL([gl_GNULIB_ENABLED_6099e9737f757db36c47fa9d9f02e88c], [$gl_gnulib_enabled_6099e9737f757db36c47fa9d9f02e88c])
   AM_CONDITIONAL([gl_GNULIB_ENABLED_strtoll], [$gl_gnulib_enabled_strtoll])
   AM_CONDITIONAL([gl_GNULIB_ENABLED_682e609604ccaac6be382e4ee3a4eaec], [$gl_gnulib_enabled_682e609604ccaac6be382e4ee3a4eaec])
@@ -1003,6 +999,7 @@ AC_DEFUN([gl_FILE_LIST], [
   lib/str-two-way.h
   lib/strftime.h
   lib/string.in.h
+  lib/strnlen.c
   lib/strtoimax.c
   lib/strtol.c
   lib/strtoll.c
@@ -1131,6 +1128,7 @@ AC_DEFUN([gl_FILE_LIST], [
   m4/stdlib_h.m4
   m4/stpcpy.m4
   m4/string_h.m4
+  m4/strnlen.m4
   m4/strtoimax.m4
   m4/strtoll.m4
   m4/symlink.m4
