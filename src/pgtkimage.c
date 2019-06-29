@@ -100,7 +100,7 @@ Emacs_Pixmap pgtk_image_create_from_xbm(char *bits, unsigned int width, unsigned
   return img;
 }
 
-#if 0
+
 Emacs_Pixmap pgtk_image_convert_from_xbm(char *bits, unsigned int width, unsigned int height)
 {
   struct pgtk_image_t *img = pgtk_image_create(width, height, 1);
@@ -123,7 +123,6 @@ Emacs_Pixmap pgtk_image_convert_from_xbm(char *bits, unsigned int width, unsigne
   }
   return img;
 }
-#endif
 
 void pgtk_image_set_alpha(Emacs_Pixmap pixmap, int x, int y, int alpha)
 {
