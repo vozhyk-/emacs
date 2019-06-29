@@ -1464,6 +1464,7 @@ xg_create_frame_widgets (struct frame *f)
 #ifndef HAVE_PGTK
   gtk_widget_realize (wfixed);
 #else
+  gtk_window_set_default_size(GTK_WINDOW(wtop), 640, 850);	// temporary solution...
   gtk_widget_show_all(wtop);
 #endif
 #ifndef HAVE_PGTK
