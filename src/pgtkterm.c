@@ -457,6 +457,8 @@ pgtk_set_window_size (struct frame *f,
   f->output_data.pgtk->preferred_height = pixelheight;
   // gtk_window_resize(GTK_WINDOW(FRAME_GTK_OUTER_WIDGET(f)), pixelwidth, pixelheight);
   x_wm_set_size_hint(f, 0, 0);
+  xg_frame_set_char_size (f, FRAME_PIXEL_TO_TEXT_WIDTH(f, pixelwidth), FRAME_PIXEL_TO_TEXT_HEIGHT(f, pixelheight));
+  gtk_widget_queue_resize (FRAME_GTK_OUTER_WIDGET (f));
 #endif
 
   unblock_input ();
@@ -5333,7 +5335,7 @@ static gboolean key_release_event(GtkWidget *widget, GdkEvent *event, gpointer *
 static gboolean configure_event(GtkWidget *widget, GdkEvent *event, gpointer *user_data)
 {
   struct frame *f = pgtk_any_window_to_frame (event->configure.window);
-  if (f) {
+  if (f && widget == FRAME_GTK_OUTER_WIDGET (f)) {
     PGTK_TRACE("%dx%d", event->configure.width, event->configure.height);
     xg_frame_resized(f, event->configure.width, event->configure.height);
   }
