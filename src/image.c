@@ -913,7 +913,7 @@ struct image_keyword
   bool mandatory_p;
 
   /* Used to recognize duplicate keywords in a property list.  */
-  int count;
+  bool count;
 
   /* The value that was found.  */
   Lisp_Object value;
@@ -934,7 +934,7 @@ parse_image_spec (Lisp_Object spec, struct image_keyword *keywords,
   Lisp_Object plist;
 
   if (!IMAGEP (spec))
-    return 0;
+    return false;
 
   plist = XCDR (spec);
   while (CONSP (plist))
@@ -945,11 +945,11 @@ parse_image_spec (Lisp_Object spec, struct image_keyword *keywords,
       key = XCAR (plist);
       plist = XCDR (plist);
       if (!SYMBOLP (key))
-	return 0;
+	return false;
 
       /* There must follow a value.  */
       if (!CONSP (plist))
-	return 0;
+	return false;
       value = XCAR (plist);
       plist = XCDR (plist);
 
@@ -961,34 +961,34 @@ parse_image_spec (Lisp_Object spec, struct image_keyword *keywords,
       if (i == nkeywords)
 	continue;
 
-      /* Record that we recognized the keyword.  If a keywords
+      /* Record that we recognized the keyword.  If a keyword
 	 was found more than once, it's an error.  */
       keywords[i].value = value;
-      if (keywords[i].count > 1)
-	return 0;
-      ++keywords[i].count;
+      if (keywords[i].count)
+	return false;
+      keywords[i].count = true;
 
       /* Check type of value against allowed type.  */
       switch (keywords[i].type)
 	{
 	case IMAGE_STRING_VALUE:
 	  if (!STRINGP (value))
-	    return 0;
+	    return false;
 	  break;
 
 	case IMAGE_STRING_OR_NIL_VALUE:
 	  if (!STRINGP (value) && !NILP (value))
-	    return 0;
+	    return false;
 	  break;
 
 	case IMAGE_SYMBOL_VALUE:
 	  if (!SYMBOLP (value))
-	    return 0;
+	    return false;
 	  break;
 
 	case IMAGE_POSITIVE_INTEGER_VALUE:
 	  if (! RANGED_FIXNUMP (1, value, INT_MAX))
-	    return 0;
+	    return false;
 	  break;
 
 	case IMAGE_NON_NEGATIVE_INTEGER_VALUE_OR_PAIR:
@@ -998,21 +998,21 @@ parse_image_spec (Lisp_Object spec, struct image_keyword *keywords,
 	      && RANGED_FIXNUMP (0, XCAR (value), INT_MAX)
 	      && RANGED_FIXNUMP (0, XCDR (value), INT_MAX))
 	    break;
-	  return 0;
+	  return false;
 
 	case IMAGE_ASCENT_VALUE:
 	  if (SYMBOLP (value) && EQ (value, Qcenter))
 	    break;
 	  else if (RANGED_FIXNUMP (0, value, 100))
 	    break;
-	  return 0;
+	  return false;
 
 	case IMAGE_NON_NEGATIVE_INTEGER_VALUE:
 	  /* Unlike the other integer-related cases, this one does not
 	     verify that VALUE fits in 'int'.  This is because callers
 	     want EMACS_INT.  */
 	  if (!FIXNUMP (value) || XFIXNUM (value) < 0)
-	    return 0;
+	    return false;
 	  break;
 
 	case IMAGE_DONT_CHECK_VALUE_TYPE:
@@ -1022,21 +1022,21 @@ parse_image_spec (Lisp_Object spec, struct image_keyword *keywords,
 	  value = indirect_function (value);
 	  if (FUNCTIONP (value))
 	    break;
-	  return 0;
+	  return false;
 
 	case IMAGE_NUMBER_VALUE:
 	  if (! NUMBERP (value))
-	    return 0;
+	    return false;
 	  break;
 
 	case IMAGE_INTEGER_VALUE:
 	  if (! TYPE_RANGED_FIXNUMP (int, value))
-	    return 0;
+	    return false;
 	  break;
 
 	case IMAGE_BOOL_VALUE:
 	  if (!NILP (value) && !EQ (value, Qt))
-	    return 0;
+	    return false;
 	  break;
 
 	default:
@@ -1045,13 +1045,13 @@ parse_image_spec (Lisp_Object spec, struct image_keyword *keywords,
 	}
 
       if (EQ (key, QCtype) && !EQ (type, value))
-	return 0;
+	return false;
     }
 
   /* Check that all mandatory fields are present.  */
   for (i = 0; i < nkeywords; ++i)
-    if (keywords[i].mandatory_p && keywords[i].count == 0)
-      return 0;
+    if (keywords[i].count < keywords[i].mandatory_p)
+      return false;
 
   return NILP (plist);
 }
@@ -2005,12 +2005,10 @@ compute_image_size (size_t width, size_t height,
   *d_width = desired_width;
   *d_height = desired_height;
 }
-#endif /* HAVE_IMAGEMAGICK || HAVE_NATIVE_TRANSFORMS */
 
-/* image_set_rotation, image_set_crop, image_set_size and
-   image_set_transform use affine transformation matrices to perform
-   various transforms on the image.  The matrix is a 2D array of
-   doubles.  It is laid out like this:
+/* image_set_rotation and image_set_transform use affine
+   transformation matrices to perform various transforms on the image.
+   The matrix is a 2D array of doubles.  It is laid out like this:
 
    m[0][0] = m11 | m[1][0] = m12 | m[2][0] = tx
    --------------+---------------+-------------
@@ -2079,22 +2077,17 @@ compute_image_size (size_t width, size_t height,
    finally move the origin back to the top left of the image, which
    may now be a different corner.
 
-   Cropping is easier as we just move the origin to the top left of
-   where we want to crop and set the width and height accordingly.
-   The matrices don't know anything about width and height.
+   Note that different GUI backends (X, Cairo, w32, NS) want the
+   transform matrix defined as transform from the original image to
+   the transformed image, while others want the matrix to describe the
+   transform of the space, which boils down to inverting the matrix.
 
    It's possible to pre-calculate the matrix multiplications and just
    generate one transform matrix that will do everything we need in a
    single step, but the maths for each element is much more complex
-   and I thought it was better to perform the steps separately.  */
+   and performing the steps separately makes for more readable code.  */
 
 typedef double matrix3x3[3][3];
-
-static void
-matrix3x3_copy (matrix3x3 a, matrix3x3 b)
-{
-  memcpy (b, a, sizeof (matrix3x3));
-}
 
 static void
 matrix3x3_mult (matrix3x3 a, matrix3x3 b, matrix3x3 result)
@@ -2110,102 +2103,27 @@ matrix3x3_mult (matrix3x3 a, matrix3x3 b, matrix3x3 result)
 }
 
 static void
-image_set_rotation (struct image *img, matrix3x3 tm)
+compute_image_rotation (struct image *img, double *rotation)
 {
-#ifdef HAVE_NATIVE_TRANSFORMS
-# ifdef HAVE_IMAGEMAGICK
-  /* ImageMagick images are already rotated.  */
-  if (EQ (image_spec_value (img->spec, QCtype, NULL), Qimagemagick))
-    return;
-# endif
-
-# if !defined USE_CAIRO && defined HAVE_XRENDER
-  if (!img->picture)
-    return;
-# endif
-
-  int rotation, cos_r, sin_r, width, height;
-
   Lisp_Object value = image_spec_value (img->spec, QCrotation, NULL);
   if (! NUMBERP (value))
-    return;
-
-  Lisp_Object reduced_angle = Fmod (value, make_fixnum (360));
-  if (! FLOATP (reduced_angle))
-    rotation = XFIXNUM (reduced_angle);
-  else
     {
-      rotation = XFLOAT_DATA (reduced_angle);
-      if (rotation != XFLOAT_DATA (reduced_angle))
-	goto not_a_multiple_of_90;
-    }
-
-  if (rotation == 0)
-    return;
-
-  if (rotation == 90)
-    {
-      width = img->height;
-      height = img->width;
-
-      cos_r = 0;
-      sin_r = 1;
-    }
-  else if (rotation == 180)
-    {
-      width = img->width;
-      height = img->height;
-
-      cos_r = -1;
-      sin_r = 0;
-    }
-  else if (rotation == 270)
-    {
-      width = img->height;
-      height = img->width;
-
-      cos_r = 0;
-      sin_r = -1;
-    }
-  else
-    {
-    not_a_multiple_of_90:
-      image_error ("Native image rotation supports "
-		   "only multiples of 90 degrees");
+      image_error ("Invalid image `:rotation' parameter");
       return;
     }
 
-  /* Translate so (0, 0) is in the center of the image.  */
-  matrix3x3 t
-    = { [0][0] = 1,
-				  [1][1] = 1,
-	[2][0] = img->width * .5, [2][1] = img->height * .5, [2][2] = 1 };
-  matrix3x3 tmp;
-  matrix3x3_mult (t, tm, tmp);
-
-  /* Rotate.  */
-  matrix3x3 rot = { [0][0] = cos_r, [0][1] = -sin_r,
-		    [1][0] = sin_r, [1][1] = cos_r,
-						     [2][2] = 1 };
-  matrix3x3 tmp2;
-  matrix3x3_mult (rot, tmp, tmp2);
-
-  /* Translate back.  */
-  t[2][0] = width * -.5;
-  t[2][1] = height * -.5;
-  matrix3x3_mult (t, tmp2, tm);
-
-  img->width = width;
-  img->height = height;
-#endif
+  Lisp_Object reduced_angle = Fmod (value, make_fixnum (360));
+  if (FLOATP (reduced_angle))
+    *rotation = XFLOAT_DATA (reduced_angle);
+  else
+    *rotation = XFIXNUM (reduced_angle);
 }
 
 static void
-image_set_crop (struct image *img, matrix3x3 tm)
+image_set_transform (struct frame *f, struct image *img)
 {
-#ifdef HAVE_NATIVE_TRANSFORMS
 # ifdef HAVE_IMAGEMAGICK
-  /* ImageMagick images are already cropped.  */
+  /* ImageMagick images already have the correct transform.  */
   if (EQ (image_spec_value (img->spec, QCtype, NULL), Qimagemagick))
     return;
 # endif
@@ -2215,119 +2133,121 @@ image_set_crop (struct image *img, matrix3x3 tm)
     return;
 # endif
 
-  Lisp_Object crop = image_spec_value (img->spec, QCcrop, NULL);
-
-  if (!CONSP (crop))
-    return;
-
-  Lisp_Object w = XCAR (crop), h = Qnil, x = Qnil, y = Qnil;
-  crop = XCDR (crop);
-  if (CONSP (crop))
-    {
-      h = XCAR (crop);
-      crop = XCDR (crop);
-      if (CONSP (crop))
-	{
-	  x = XCAR (crop);
-	  crop = XCDR (crop);
-	  if (CONSP (crop))
-	    y = XCAR (crop);
-	}
-    }
-
-  int width = img->width;
-  if (FIXNATP (w) && XFIXNAT (w) < img->width)
-    width = XFIXNAT (w);
-  int left;
-  if (TYPE_RANGED_FIXNUMP (int, x))
-    {
-      left = XFIXNUM (x);
-      if (left < 0)
-	left = img->width - width + left;
-    }
-  else
-    left = (img->width - width) >> 1;
-
-  int height = img->height;
-  if (FIXNATP (h) && XFIXNAT (h) < img->height)
-    height = XFIXNAT (h);
-  int top;
-  if (TYPE_RANGED_FIXNUMP (int, y))
-    {
-      top = XFIXNUM (y);
-      if (top < 0)
-	top = img->height - height + top;
-    }
-  else
-    top = (img->height - height) >> 1;
-
-  /* Negative values operate from the right and bottom of the image
-     instead of the left and top.  */
-  if (left < 0)
-    {
-      width = img->width + left;
-      left = 0;
-    }
-
-  if (width + left > img->width)
-    width = img->width - left;
-
-  if (top < 0)
-    {
-      height = img->height + top;
-      top = 0;
-    }
-
-  if (height + top > img->height)
-    height = img->height - top;
-
-  matrix3x3 tmp, m = { [0][0] = 1,
-				      [1][1] = 1,
-		       [2][0] = left, [2][1] = top, [2][2] = 1 };
-  matrix3x3_mult (m, tm, tmp);
-  matrix3x3_copy (tmp, tm);
-
-  img->width = width;
-  img->height = height;
-#endif
-}
-
-static void
-image_set_size (struct image *img, matrix3x3 tm)
-{
-#ifdef HAVE_NATIVE_TRANSFORMS
-# ifdef HAVE_IMAGEMAGICK
-  /* ImageMagick images are already the correct size.  */
-  if (EQ (image_spec_value (img->spec, QCtype, NULL), Qimagemagick))
-    return;
-# endif
-
-# if !defined USE_CAIRO && defined HAVE_XRENDER
-  if (!img->picture)
-    return;
-# endif
-
+  /* Determine size.  */
   int width, height;
-
   compute_image_size (img->width, img->height, img->spec, &width, &height);
 
-  double xscale = img->width / (double) width;
-  double yscale = img->height / (double) height;
+  /* Determine rotation.  */
+  double rotation = 0.0;
+  compute_image_rotation (img, &rotation);
 
-  matrix3x3 tmp, rm = { [0][0] = xscale, [1][1] = yscale, [2][2] = 1 };
-  matrix3x3_mult (rm, tm, tmp);
-  matrix3x3_copy (tmp, tm);
+  /* Perform scale transformation.  */
 
+  matrix3x3 matrix
+    = {
+# if defined USE_CAIRO || defined HAVE_XRENDER
+	[0][0] = (!IEEE_FLOATING_POINT && width == 0 ? DBL_MAX
+		  : img->width / (double) width),
+	[1][1] = (!IEEE_FLOATING_POINT && height == 0 ? DBL_MAX
+		  : img->height / (double) height),
+# elif defined HAVE_NTGUI || defined HAVE_NS
+	[0][0] = (!IEEE_FLOATING_POINT && img->width == 0 ? DBL_MAX
+		  : width / (double) img->width),
+	[1][1] = (!IEEE_FLOATING_POINT && img->height == 0 ? DBL_MAX
+		  : height / (double) img->height),
+# else
+	[0][0] = 1, [1][1] = 1,
+# endif
+	[2][2] = 1 };
   img->width = width;
   img->height = height;
-#endif
-}
 
-static void
-image_set_transform (struct frame *f, struct image *img, matrix3x3 matrix)
-{
-  /* TODO: Add MS Windows support.  */
-#ifdef HAVE_NATIVE_TRANSFORMS
+  /* Perform rotation transformation.  */
+
+  int rotate_flag = -1;
+  if (rotation == 0)
+    rotate_flag = 0;
+  else
+    {
+# if (defined USE_CAIRO || defined HAVE_XRENDER \
+      || defined HAVE_NTGUI || defined HAVE_NS)
+      int cos_r, sin_r;
+      if (rotation == 90)
+	{
+	  width = img->height;
+	  height = img->width;
+	  cos_r = 0;
+	  sin_r = 1;
+	  rotate_flag = 1;
+	}
+      else if (rotation == 180)
+	{
+	  cos_r = -1;
+	  sin_r = 0;
+	  rotate_flag = 1;
+	}
+      else if (rotation == 270)
+	{
+	  width = img->height;
+	  height = img->width;
+	  cos_r = 0;
+	  sin_r = -1;
+	  rotate_flag = 1;
+	}
+
+      if (0 < rotate_flag)
+	{
+#  if defined USE_CAIRO || defined HAVE_XRENDER
+	  /* 1. Translate so (0, 0) is in the center of the image.  */
+	  matrix3x3 t
+	    = { [0][0] = 1,
+					[1][1] = 1,
+		[2][0] = img->width*.5, [2][1] = img->height*.5, [2][2] = 1 };
+	  matrix3x3 u;
+	  matrix3x3_mult (t, matrix, u);
+
+	  /* 2. Rotate.  */
+	  matrix3x3 rot = { [0][0] = cos_r, [0][1] = -sin_r,
+			    [1][0] = sin_r, [1][1] = cos_r,
+							     [2][2] = 1 };
+	  matrix3x3 v;
+	  matrix3x3_mult (rot, u, v);
+
+	  /* 3. Translate back.  */
+	  t[2][0] = width * -.5;
+	  t[2][1] = height * -.5;
+	  matrix3x3_mult (t, v, matrix);
+#  else
+	  /* 1. Translate so (0, 0) is in the center of the image.  */
+	  matrix3x3 t
+	    = { [0][0] = 1,
+					 [1][1] = 1,
+		[2][0] = img->width*-.5, [2][1] = img->height*-.5, [2][2] = 1 };
+	  matrix3x3 u;
+	  matrix3x3_mult (matrix, t, u);
+
+	  /* 2. Rotate.  */
+	  matrix3x3 rot = { [0][0] = cos_r,  [0][1] = sin_r,
+			    [1][0] = -sin_r, [1][1] = cos_r,
+							     [2][2] = 1 };
+	  matrix3x3 v;
+	  matrix3x3_mult (u, rot, v);
+
+	  /* 3. Translate back.  */
+	  t[2][0] = width * .5;
+	  t[2][1] = height * .5;
+	  matrix3x3_mult (v, t, matrix);
+#  endif
+	  img->width = width;
+	  img->height = height;
+	}
+# endif
+    }
+
+  if (rotate_flag < 0)
+    image_error ("No native support for rotation by %g degrees",
+		 make_float (rotation));
+
 # if defined (HAVE_NS)
   /* Under NS the transform is applied to the drawing surface at
      drawing time, so store it for later.  */
@@ -2357,9 +2277,18 @@ image_set_transform (struct frame *f, struct image *img, matrix3x3 matrix)
 			       0, 0);
       XRenderSetPictureTransform (FRAME_X_DISPLAY (f), img->picture, &tmat);
     }
+# elif defined HAVE_NTGUI
+  /* Store the transform matrix for application at draw time.  */
+  img->xform.eM11 = matrix[0][0];
+  img->xform.eM12 = matrix[0][1];
+  img->xform.eM21 = matrix[1][0];
+  img->xform.eM22 = matrix[1][1];
+  img->xform.eDx  = matrix[2][0];
+  img->xform.eDy  = matrix[2][1];
 # endif
-#endif
 }
+
+#endif /* HAVE_IMAGEMAGICK || HAVE_NATIVE_TRANSFORMS */
 
 /* Return the id of image with Lisp specification SPEC on frame F.
    SPEC must be a valid Lisp image specification (see valid_image_p).  */
@@ -2417,26 +2346,22 @@ lookup_image (struct frame *f, Lisp_Object spec)
 	  int relief_bound;
 
 #ifdef HAVE_NATIVE_TRANSFORMS
-	  matrix3x3 transform_matrix = { [0][0] = 1, [1][1] = 1, [2][2] = 1 };
-	  image_set_size (img, transform_matrix);
-	  image_set_crop (img, transform_matrix);
-	  image_set_rotation (img, transform_matrix);
-	  image_set_transform (f, img, transform_matrix);
+          image_set_transform (f, img);
 #endif
 
 	  ascent = image_spec_value (spec, QCascent, NULL);
 	  if (FIXNUMP (ascent))
-	    img->ascent = XFIXNAT (ascent);
+	    img->ascent = XFIXNUM (ascent);
 	  else if (EQ (ascent, Qcenter))
 	    img->ascent = CENTERED_IMAGE_ASCENT;
 
 	  margin = image_spec_value (spec, QCmargin, NULL);
 	  if (FIXNUMP (margin))
-	    img->vmargin = img->hmargin = XFIXNAT (margin);
+	    img->vmargin = img->hmargin = XFIXNUM (margin);
 	  else if (CONSP (margin))
 	    {
-	      img->hmargin = XFIXNAT (XCAR (margin));
-	      img->vmargin = XFIXNAT (XCDR (margin));
+	      img->hmargin = XFIXNUM (XCAR (margin));
+	      img->vmargin = XFIXNUM (XCDR (margin));
 	    }
 
 	  relief = image_spec_value (spec, QCrelief, NULL);
@@ -2789,10 +2714,10 @@ image_create_x_image_and_pixmap_1 (struct frame *f, int width, int height, int d
 
   /* Create a DIBSection and raster array for the bitmap,
      and store its handle in *pixmap.  */
-  *pixmap = CreateDIBSection (hdc, &((*pimg)->info),
+  *pixmap = CreateDIBSection (hdc, &(*pimg)->info,
 			      (depth < 16) ? DIB_PAL_COLORS : DIB_RGB_COLORS,
 			      /* casting avoids a GCC warning */
-			      (void **)&((*pimg)->data), NULL, 0);
+			      (void **) &(*pimg)->data, NULL, 0);
 
   /* Realize display palette and garbage all frames. */
   release_frame_dc (f, hdc);
@@ -4222,7 +4147,7 @@ xpm_image_p (Lisp_Object object)
 	  && fmt[XPM_FILE].count + fmt[XPM_DATA].count == 1
 	  /* Either no `:color-symbols' or it's a list of conses
 	     whose car and cdr are strings.  */
-	  && (fmt[XPM_COLOR_SYMBOLS].count == 0
+	  && (! fmt[XPM_COLOR_SYMBOLS].count
 	      || xpm_valid_color_symbols_p (fmt[XPM_COLOR_SYMBOLS].value)));
 }
 
@@ -10061,19 +9986,34 @@ DEFUN ("lookup-image", Flookup_image, Slookup_image, 1, 1, 0,
 
 DEFUN ("image-transforms-p", Fimage_transforms_p, Simage_transforms_p, 0, 1, 0,
        doc: /* Test whether FRAME supports image transformation.
-Return t if FRAME supports native transforms, nil otherwise.  */)
+Return list of capabilities if FRAME supports native transforms, nil otherwise.
+FRAME defaults to the selected frame.
+The list of capabilities can include one or more of the following:
+
+ - the symbol `scale' if FRAME supports image scaling
+ - the symbol `rotate90' if FRAME supports image rotation only by angles
+    that are integral multiples of 90 degrees.  */)
      (Lisp_Object frame)
 {
-#if defined (USE_CAIRO) || defined (HAVE_NS) || defined (HAVE_NTGUI)
-  return Qt;
-#elif defined (HAVE_X_WINDOWS) && defined (HAVE_XRENDER)
-  int event_basep, error_basep;
+  struct frame *f = decode_live_frame (frame);
+  if (FRAME_WINDOW_P (f))
+    {
+#ifdef HAVE_NATIVE_TRANSFORMS
+# if defined HAVE_IMAGEMAGICK || defined (USE_CAIRO) || defined (HAVE_NS)
+      return list2 (Qscale, Qrotate90);
+# elif defined (HAVE_X_WINDOWS) && defined (HAVE_XRENDER)
+      int event_basep, error_basep;
 
-  if (XRenderQueryExtension
-      (FRAME_X_DISPLAY (decode_window_system_frame (frame)),
-       &event_basep, &error_basep))
-    return Qt;
+      if (XRenderQueryExtension (FRAME_X_DISPLAY (f),
+				 &event_basep, &error_basep))
+	return list2 (Qscale, Qrotate90);
+# elif defined (HAVE_NTGUI)
+      return (w32_image_rotations_p ()
+	      ? list2 (Qscale, Qrotate90)
+	      : list1 (Qscale));
+# endif
 #endif
+    }
 
   return Qnil;
 }
@@ -10219,6 +10159,14 @@ non-numeric, there is no explicit limit on the size of images.  */);
   DEFSYM (Qpostscript, "postscript");
   DEFSYM (QCmax_width, ":max-width");
   DEFSYM (QCmax_height, ":max-height");
+
+#ifdef HAVE_NATIVE_TRANSFORMS
+  DEFSYM (Qscale, "scale");
+  DEFSYM (Qrotate, "rotate");
+  DEFSYM (Qrotate90, "rotate90");
+  DEFSYM (Qcrop, "crop");
+#endif
+
 #ifdef HAVE_GHOSTSCRIPT
   add_image_type (Qpostscript);
   DEFSYM (QCloader, ":loader");

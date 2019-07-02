@@ -441,13 +441,25 @@ extract_number_and_incr (re_char **source)
 static int regex_emacs_debug = -100000;
 
 # define DEBUG_STATEMENT(e) e
-# define DEBUG_PRINT(...) if (regex_emacs_debug > 0) printf (__VA_ARGS__)
+# define DEBUG_PRINT(...)                                       \
+  if (regex_emacs_debug > 0) fprintf (stderr, __VA_ARGS__)
 # define DEBUG_COMPILES_ARGUMENTS
 # define DEBUG_PRINT_COMPILED_PATTERN(p, s, e)				\
   if (regex_emacs_debug > 0) print_partial_compiled_pattern (s, e)
 # define DEBUG_PRINT_DOUBLE_STRING(w, s1, sz1, s2, sz2)			\
   if (regex_emacs_debug > 0) print_double_string (w, s1, sz1, s2, sz2)
 
+static void
+debug_putchar (int c)
+{
+  if (c >= 32 && c <= 126)
+    fputc (c, stderr);
+  else
+    {
+      unsigned int uc = c;
+      fprintf (stderr, "{%02x}", uc);
+    }
+}
 
 /* Print the fastmap in human-readable form.  */
 
@@ -462,7 +474,7 @@ print_fastmap (char *fastmap)
       if (fastmap[i++])
 	{
 	  was_a_range = false;
-	  putchar (i - 1);
+	  debug_putchar (i - 1);
 	  while (i < (1 << BYTEWIDTH)  &&  fastmap[i])
 	    {
 	      was_a_range = true;
@@ -470,12 +482,12 @@ print_fastmap (char *fastmap)
 	    }
 	  if (was_a_range)
 	    {
-	      printf ("-");
-	      putchar (i - 1);
+	      fprintf (stderr, "-");
+	      debug_putchar (i - 1);
 	    }
 	}
     }
-  putchar ('\n');
+  fputc ('\n', stderr);
 }
 
 
@@ -515,7 +527,8 @@ print_partial_compiled_pattern (re_char *start, re_char *end)
 	  fprintf (stderr, "/exactn/%d", mcnt);
 	  do
 	    {
-	      fprintf (stderr, "/%c", *p++);
+	      fprintf (stderr, "/");
+	      debug_putchar (*p++);
 	    }
 	  while (--mcnt);
 	  break;
@@ -563,18 +576,18 @@ print_partial_compiled_pattern (re_char *start, re_char *end)
 		  /* Have we broken a range?  */
 		  else if (last + 1 != c && in_range)
 		    {
-		      fprintf (stderr, "%c", last);
+		      debug_putchar (last);
 		      in_range = false;
 		    }
 
 		  if (! in_range)
-		    fprintf (stderr, "%c", c);
+		    debug_putchar (c);
 
 		  last = c;
 	      }
 
 	    if (in_range)
-	      fprintf (stderr, "%c", last);
+	      debug_putchar (last);
 
 	    fprintf (stderr, "]");
 
@@ -733,19 +746,19 @@ print_compiled_pattern (struct re_pattern_buffer *bufp)
   re_char *buffer = bufp->buffer;
 
   print_partial_compiled_pattern (buffer, buffer + bufp->used);
-  printf ("%tu bytes used/%tu bytes allocated.\n",
-	  bufp->used, bufp->allocated);
+  fprintf (stderr, "%td bytes used/%td bytes allocated.\n",
+           bufp->used, bufp->allocated);
 
   if (bufp->fastmap_accurate && bufp->fastmap)
     {
-      printf ("fastmap: ");
+      fprintf (stderr, "fastmap: ");
       print_fastmap (bufp->fastmap);
     }
 
-  printf ("re_nsub: %tu\t", bufp->re_nsub);
-  printf ("regs_alloc: %d\t", bufp->regs_allocated);
-  printf ("can_be_null: %d\t", bufp->can_be_null);
-  fflush (stdout);
+  fprintf (stderr, "re_nsub: %td\t", bufp->re_nsub);
+  fprintf (stderr, "regs_alloc: %d\t", bufp->regs_allocated);
+  fprintf (stderr, "can_be_null: %d\n", bufp->can_be_null);
+  fflush (stderr);
   /* Perhaps we should print the translate table?  */
 }
 
@@ -755,16 +768,19 @@ print_double_string (re_char *where, re_char *string1, ptrdiff_t size1,
 		     re_char *string2, ptrdiff_t size2)
 {
   if (where == NULL)
-    printf ("(null)");
+    fprintf (stderr, "(null)");
   else
     {
+      int i;
       if (FIRST_STRING_P (where))
 	{
-	  fwrite_unlocked (where, 1, string1 + size1 - where, stdout);
+	  for (i = 0; i < string1 + size1 - where; i++)
+	    debug_putchar (where[i]);
 	  where = string2;
 	}
 
-      fwrite_unlocked (where, 1, string2 + size2 - where, stdout);
+      for (i = 0; i < string2 + size2 - where; i++)
+        debug_putchar (where[i]);
     }
 }
 
@@ -955,8 +971,8 @@ typedef struct
 while (REMAINING_AVAIL_SLOTS <= space) {				\
   if (!GROW_FAIL_STACK (fail_stack))					\
     return -2;								\
-  DEBUG_PRINT ("\n  Doubled stack; size now: %tu\n", fail_stack.size);	\
-  DEBUG_PRINT ("	 slots available: %tu\n", REMAINING_AVAIL_SLOTS);\
+  DEBUG_PRINT ("\n  Doubled stack; size now: %td\n", fail_stack.size);	\
+  DEBUG_PRINT ("	 slots available: %td\n", REMAINING_AVAIL_SLOTS);\
 }
 
 /* Push register NUM onto the stack.  */
@@ -1045,14 +1061,14 @@ do {									\
   char *destination;							\
   DEBUG_STATEMENT (nfailure_points_pushed++);				\
   DEBUG_PRINT ("\nPUSH_FAILURE_POINT:\n");				\
-  DEBUG_PRINT ("  Before push, next avail: %tu\n", fail_stack.avail);	\
-  DEBUG_PRINT ("			size: %tu\n", fail_stack.size);	\
+  DEBUG_PRINT ("  Before push, next avail: %td\n", fail_stack.avail);	\
+  DEBUG_PRINT ("			size: %td\n", fail_stack.size);	\
 									\
   ENSURE_FAIL_STACK (NUM_NONREG_ITEMS);					\
 									\
   DEBUG_PRINT ("\n");							\
 									\
-  DEBUG_PRINT ("  Push frame index: %tu\n", fail_stack.frame);		\
+  DEBUG_PRINT ("  Push frame index: %td\n", fail_stack.frame);		\
   PUSH_FAILURE_INT (fail_stack.frame);					\
 									\
   DEBUG_PRINT ("  Push string %p: \"", string_place);			\
@@ -1094,8 +1110,8 @@ do {									\
 									\
   /* Remove failure points and point to how many regs pushed.  */	\
   DEBUG_PRINT ("POP_FAILURE_POINT:\n");					\
-  DEBUG_PRINT ("  Before pop, next avail: %tu\n", fail_stack.avail);	\
-  DEBUG_PRINT ("		     size: %tu\n", fail_stack.size);	\
+  DEBUG_PRINT ("  Before pop, next avail: %td\n", fail_stack.avail);	\
+  DEBUG_PRINT ("		     size: %td\n", fail_stack.size);	\
 									\
   /* Pop the saved registers.  */					\
   while (fail_stack.frame < fail_stack.avail)				\
@@ -1114,7 +1130,7 @@ do {									\
   DEBUG_PRINT ("\"\n");							\
 									\
   fail_stack.frame = POP_FAILURE_INT ();				\
-  DEBUG_PRINT ("  Popping  frame index: %zu\n", fail_stack.frame);	\
+  DEBUG_PRINT ("  Popping  frame index: %td\n", fail_stack.frame);	\
 									\
   eassert (fail_stack.avail >= 0);					\
   eassert (fail_stack.frame <= fail_stack.avail);			\
@@ -1734,8 +1750,8 @@ regex_compile (re_char *pattern, ptrdiff_t size,
   if (regex_emacs_debug > 0)
     {
       for (ptrdiff_t debug_count = 0; debug_count < size; debug_count++)
-	putchar (pattern[debug_count]);
-      putchar ('\n');
+	debug_putchar (pattern[debug_count]);
+      fputc ('\n', stderr);
     }
 #endif
 
@@ -2637,7 +2653,7 @@ regex_compile (re_char *pattern, ptrdiff_t size,
   if (regex_emacs_debug > 0)
     {
       re_compile_fastmap (bufp);
-      DEBUG_PRINT ("\nCompiled pattern: \n");
+      DEBUG_PRINT ("\nCompiled pattern:\n");
       print_compiled_pattern (bufp);
     }
   regex_emacs_debug--;
@@ -2781,6 +2797,7 @@ static int
 analyze_first (re_char *p, re_char *pend, char *fastmap, bool multibyte)
 {
   int j, k;
+  int nbits;
   bool not;
 
   /* If all elements for base leading-codes in fastmap is set, this
@@ -2841,7 +2858,14 @@ analyze_first (re_char *p, re_char *pend, char *fastmap, bool multibyte)
 		 each byte is a character.  Thus, this works in both
 		 cases. */
 	      fastmap[p[1]] = 1;
-	      if (! multibyte)
+	      if (multibyte)
+		{
+		  /* Cover the case of matching a raw char in a
+		     multibyte regexp against unibyte.	*/
+		  if (CHAR_BYTE8_HEAD_P (p[1]))
+		    fastmap[CHAR_TO_BYTE8 (STRING_CHAR (p + 1))] = 1;
+		}
+	      else
 		{
 		  /* For the case of matching this unibyte regex
 		     against multibyte, we must set a leading code of
@@ -2873,10 +2897,17 @@ analyze_first (re_char *p, re_char *pend, char *fastmap, bool multibyte)
 	case charset:
 	  if (!fastmap) break;
 	  not = (re_opcode_t) *(p - 1) == charset_not;
-	  for (j = CHARSET_BITMAP_SIZE (&p[-1]) * BYTEWIDTH - 1, p++;
-	       j >= 0; j--)
+	  nbits = CHARSET_BITMAP_SIZE (&p[-1]) * BYTEWIDTH;
+	  p++;
+	  for (j = 0; j < nbits; j++)
 	    if (!!(p[j / BYTEWIDTH] & (1 << (j % BYTEWIDTH))) ^ not)
 	      fastmap[j] = 1;
+
+	  /* To match raw bytes (in the 80..ff range) against multibyte
+	     strings, add their leading bytes to the fastmap.  */
+	  for (j = 0x80; j < nbits; j++)
+	    if (!!(p[j / BYTEWIDTH] & (1 << (j % BYTEWIDTH))) ^ not)
+	      fastmap[CHAR_LEADING_CODE (BYTE8_TO_CHAR (j))] = 1;
 
 	  if (/* Any leading code can possibly start a character
 		 which doesn't match the specified set of characters.  */
@@ -3913,7 +3944,7 @@ re_match_2_internal (struct re_pattern_buffer *bufp,
   ptrdiff_t num_regs_pushed = 0;
 #endif
 
-  DEBUG_PRINT ("\n\nEntering re_match_2.\n");
+  DEBUG_PRINT ("\nEntering re_match_2.\n");
 
   REGEX_USE_SAFE_ALLOCA;
 
@@ -3996,7 +4027,7 @@ re_match_2_internal (struct re_pattern_buffer *bufp,
       dend = end_match_1;
     }
 
-  DEBUG_PRINT ("The compiled pattern is: ");
+  DEBUG_PRINT ("The compiled pattern is:\n");
   DEBUG_PRINT_COMPILED_PATTERN (bufp, p, pend);
   DEBUG_PRINT ("The string to match is: \"");
   DEBUG_PRINT_DOUBLE_STRING (d, string1, size1, string2, size2);
@@ -4238,8 +4269,9 @@ re_match_2_internal (struct re_pattern_buffer *bufp,
 		  }
 		p += pat_charlen;
 		d++;
+		mcnt -= pat_charlen;
 	      }
-	    while (--mcnt);
+	    while (mcnt > 0);
 
 	  break;
 

@@ -613,7 +613,7 @@ ftfont_get_open_type_spec (Lisp_Object otf_spec)
 	      unsigned int tag;
 
 	      OTF_SYM_TAG (XCAR (val), tag);
-	      spec->features[i][j++] = negative ? tag & 0x80000000 : tag;
+	      spec->features[i][j++] = negative ? tag | 0x80000000 : tag;
 	    }
 	}
       spec->nfeatures[i] = j;
@@ -3073,6 +3073,7 @@ syms_of_ftfont_for_pdumper (void)
 #ifdef HAVE_HARFBUZZ
   fthbfont_driver = ftfont_driver;
   fthbfont_driver.type = Qfreetypehb;
+  fthbfont_driver.otf_capability = hbfont_otf_capability,
   fthbfont_driver.shape = hbfont_shape;
   fthbfont_driver.combining_capability = hbfont_combining_capability;
   fthbfont_driver.begin_hb_font = fthbfont_begin_hb_font;

@@ -2530,7 +2530,7 @@ as an argument limits undo to changes within the current region."
     ;; so, ask the user whether she wants to skip the redo/undo pair.
     (let ((equiv (gethash pending-undo-list undo-equiv-table)))
       (or (eq (selected-window) (minibuffer-window))
-	  (setq message (format "%s%s!"
+	  (setq message (format "%s%s"
                                 (if (or undo-no-redo (not equiv))
                                     "Undo" "Redo")
                                 (if undo-in-region " in region" ""))))
@@ -7318,7 +7318,7 @@ indicating whether it should use soft newlines.")
 
 (defun default-indent-new-line (&optional soft)
   "Break line at point and indent.
-If a comment syntax is defined, call `comment-indent-new-line'.
+If a comment syntax is defined, call `comment-line-break-function'.
 
 The inserted newline is marked hard if variable `use-hard-newlines' is true,
 unless optional argument SOFT is non-nil."
