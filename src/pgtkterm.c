@@ -774,14 +774,13 @@ x_set_no_focus_on_map (struct frame *f, Lisp_Object new_value, Lisp_Object old_v
  * Some window managers may not honor this parameter. */
 {
   PGTK_TRACE("x_set_no_accept_focus_on_map");
-#if 0
-  NSTRACE ("x_set_no_focus_on_map");
+  /* doesn't work on wayland. */
 
   if (!EQ (new_value, old_value))
     {
+      xg_set_no_focus_on_map (f, new_value);
       FRAME_NO_FOCUS_ON_MAP (f) = !NILP (new_value);
     }
-#endif
 }
 
 void
