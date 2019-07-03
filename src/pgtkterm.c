@@ -814,37 +814,34 @@ x_set_z_group (struct frame *f, Lisp_Object new_value, Lisp_Object old_value)
 
    Some window managers may not honor this parameter. */
 {
+  /* doesn't work on wayland. */
   PGTK_TRACE("x_set_z_group");
-#if 0
-  EmacsView *view = (EmacsView *)FRAME_NS_VIEW (f);
-  NSWindow *window = [view window];
-
-  NSTRACE ("x_set_z_group");
 
   if (NILP (new_value))
     {
-      window.level = NSNormalWindowLevel;
+      gtk_window_set_keep_above (FRAME_GTK_OUTER_WIDGET (f), FALSE);
+      gtk_window_set_keep_below (FRAME_GTK_OUTER_WIDGET (f), FALSE);
       FRAME_Z_GROUP (f) = z_group_none;
     }
   else if (EQ (new_value, Qabove))
     {
-      window.level = NSNormalWindowLevel + 1;
+      gtk_window_set_keep_above (FRAME_GTK_OUTER_WIDGET (f), TRUE);
+      gtk_window_set_keep_below (FRAME_GTK_OUTER_WIDGET (f), FALSE);
       FRAME_Z_GROUP (f) = z_group_above;
     }
   else if (EQ (new_value, Qabove_suspended))
     {
-      /* Not sure what level this should be. */
-      window.level = NSNormalWindowLevel + 1;
+      gtk_window_set_keep_above (FRAME_GTK_OUTER_WIDGET (f), FALSE);
       FRAME_Z_GROUP (f) = z_group_above_suspended;
     }
   else if (EQ (new_value, Qbelow))
     {
-      window.level = NSNormalWindowLevel - 1;
+      gtk_window_set_keep_above (FRAME_GTK_OUTER_WIDGET (f), FALSE);
+      gtk_window_set_keep_below (FRAME_GTK_OUTER_WIDGET (f), TRUE);
       FRAME_Z_GROUP (f) = z_group_below;
     }
   else
     error ("Invalid z-group specification");
-#endif
 }
 
 static void

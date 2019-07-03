@@ -844,7 +844,7 @@ frame_parm_handler pgtk_frame_parm_handlers[] =
   x_set_skip_taskbar,
   x_set_no_focus_on_map,
   x_set_no_accept_focus,
-  x_set_z_group, /* x_set_z_group */
+  x_set_z_group,
   x_set_override_redirect,
   gui_set_no_special_glyphs,
 };
