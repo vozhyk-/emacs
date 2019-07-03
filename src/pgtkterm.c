@@ -794,13 +794,11 @@ x_set_no_accept_focus (struct frame *f, Lisp_Object new_value, Lisp_Object old_v
  *
  * Some window managers may not honor this parameter. */
 {
+  /* doesn't work on wayland. */
   PGTK_TRACE("x_set_no_accept_focus");
-#if 0
-  NSTRACE ("x_set_no_accept_focus");
 
-  if (!EQ (new_value, old_value))
-    FRAME_NO_ACCEPT_FOCUS (f) = !NILP (new_value);
-#endif
+  xg_set_no_accept_focus (f, new_value);
+  FRAME_NO_ACCEPT_FOCUS (f) = !NILP (new_value);
 }
 
 void
