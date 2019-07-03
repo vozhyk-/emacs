@@ -316,8 +316,6 @@ x_set_offset (struct frame *f, int xoff, int yoff, int change_gravity)
 {
   /* not working on wayland. */
 
-  int modified_top, modified_left;
-
   PGTK_TRACE("x_set_offset: %d,%d,%d.", xoff, yoff, change_gravity);
 
   if (change_gravity > 0)
@@ -338,62 +336,14 @@ x_set_offset (struct frame *f, int xoff, int yoff, int change_gravity)
   block_input ();
   x_wm_set_size_hint (f, 0, false);
 
-  if (x_gtk_use_window_move)
-    {
-      PGTK_TRACE("x_set_offset: x_gtk_use_window_move");
-      /* When a position change was requested and the outer GTK widget
-	 has been realized already, leave it to gtk_window_move to DTRT
-	 and return.  Used for Bug#25851 and Bug#25943.  */
-      if (change_gravity != 0 && FRAME_GTK_OUTER_WIDGET (f)) {
-	PGTK_TRACE("x_set_offset: move to %d,%d.", f->left_pos, f->top_pos);
-	gtk_window_move (GTK_WINDOW (FRAME_GTK_OUTER_WIDGET (f)),
-			 f->left_pos, f->top_pos);
-      }
-      unblock_input ();
-      return;
-    }
-
-  modified_left = f->left_pos;
-  modified_top = f->top_pos;
-
-#if 0
-  if (change_gravity != 0 && FRAME_DISPLAY_INFO (f)->wm_type == X_WMTYPE_A)
-    {
-      /* Some WMs (twm, wmaker at least) has an offset that is smaller
-	 than the WM decorations.  So we use the calculated offset instead
-	 of the WM decoration sizes here (x/y_pixels_outer_diff).  */
-      modified_left += FRAME_X_OUTPUT (f)->move_offset_left;
-      modified_top += FRAME_X_OUTPUT (f)->move_offset_top;
-    }
-#endif
-
-  gtk_window_move (GTK_WINDOW (FRAME_GTK_OUTER_WIDGET (f)),
-		   modified_left, modified_top);
-
-#if 0
-  x_sync_with_move (f, f->left_pos, f->top_pos,
-		    FRAME_DISPLAY_INFO (f)->wm_type == X_WMTYPE_UNKNOWN);
-#endif
-
-  /* change_gravity is non-zero when this function is called from Lisp to
-     programmatically move a frame.  In that case, we call
-     x_check_expected_move to discover if we have a "Type A" or "Type B"
-     window manager, and, for a "Type A" window manager, adjust the position
-     of the frame.
-
-     We call x_check_expected_move if a programmatic move occurred, and
-     either the window manager type (A/B) is unknown or it is Type A but we
-     need to compute the top/left offset adjustment for this frame.  */
-
-#if 0  /* Don't fight with window managers. */
-  if (change_gravity != 0
-      && !FRAME_PARENT_FRAME (f)
-      && (FRAME_DISPLAY_INFO (f)->wm_type == X_WMTYPE_UNKNOWN
-	  || (FRAME_DISPLAY_INFO (f)->wm_type == X_WMTYPE_A
-	      && (FRAME_X_OUTPUT (f)->move_offset_left == 0
-		  && FRAME_X_OUTPUT (f)->move_offset_top == 0))))
-    x_check_expected_move (f, modified_left, modified_top);
-#endif
+  /* When a position change was requested and the outer GTK widget
+     has been realized already, leave it to gtk_window_move to DTRT
+     and return.  Used for Bug#25851 and Bug#25943.  */
+  if (change_gravity != 0 && FRAME_GTK_OUTER_WIDGET (f)) {
+    PGTK_TRACE("x_set_offset: move to %d,%d.", f->left_pos, f->top_pos);
+    gtk_window_move (GTK_WINDOW (FRAME_GTK_OUTER_WIDGET (f)),
+		     f->left_pos, f->top_pos);
+  }
 
   unblock_input ();
 }
@@ -4703,7 +4653,7 @@ pgtk_create_terminal (struct pgtk_display_info *dpyinfo)
   terminal->query_colors = pgtk_query_colors;
   terminal->get_focus_frame = x_get_focus_frame;
   terminal->focus_frame_hook = pgtk_focus_frame;
-  // terminal->set_frame_offset_hook = x_set_offset;
+  terminal->set_frame_offset_hook = x_set_offset;
   terminal->free_pixmap = pgtk_free_pixmap;
 
   /* Other hooks are NULL by default.  */
