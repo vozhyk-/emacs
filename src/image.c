@@ -504,12 +504,14 @@ image_create_bitmap_from_file (struct frame *f, Lisp_Object file)
 #endif
 
 #ifdef HAVE_PGTK
-  GError *err;
+  GError *err = NULL;
   ptrdiff_t id;
   void * bitmap = gdk_pixbuf_new_from_file(SSDATA(file), &err);
 
-  if (!bitmap)
+  if (!bitmap) {
+    g_error_free(err);
     return -1;
+  }
 
   id = image_allocate_bitmap_record(f);
 
