@@ -934,7 +934,8 @@ Note that the style variables are always made local to the buffer."
       (goto-char (match-beginning 1))
       (setq m-beg (point))
       (c-end-of-macro)
-      (save-excursion (c-depropertize-raw-strings-in-region m-beg (point)))
+      (when (c-major-mode-is 'c++-mode)
+	(save-excursion (c-depropertize-raw-strings-in-region m-beg (point))))
       (c-clear-char-property-with-value m-beg (point) 'syntax-table '(1)))
 
     (while (and (< (point) end)
@@ -944,7 +945,8 @@ Note that the style variables are always made local to the buffer."
       (setq m-beg (point))
       (c-end-of-macro))
     (when (and ss-found (> (point) end))
-      (save-excursion (c-depropertize-raw-strings-in-region m-beg (point)))
+      (when (c-major-mode-is 'c++-mode)
+	(save-excursion (c-depropertize-raw-strings-in-region m-beg (point))))
       (c-clear-char-property-with-value m-beg (point) 'syntax-table '(1)))
 
     (while (and (< (point) c-new-END)
@@ -952,7 +954,8 @@ Note that the style variables are always made local to the buffer."
       (goto-char (match-beginning 1))
       (setq m-beg (point))
       (c-end-of-macro)
-      (save-excursion (c-depropertize-raw-strings-in-region m-beg (point)))
+      (when (c-major-mode-is 'c++-mode)
+	(save-excursion (c-depropertize-raw-strings-in-region m-beg (point))))
       (c-clear-char-property-with-value
        m-beg (point) 'syntax-table '(1)))))
 
@@ -1510,7 +1513,7 @@ Note that the style variables are always made local to the buffer."
 (defconst c-maybe-quoted-number-head
   (concat
    "\\(0\\("
-       "\\([Xx]\\([0-9a-fA-F]\\('[0-9a-fA-F]\\|[0-9a-fA-F]\\)*'?\\)?\\)"
+       "\\([Xx]\\([[:xdigit:]]\\('[[:xdigit:]]\\|[[:xdigit:]]\\)*'?\\)?\\)"
        "\\|"
        "\\([Bb]\\([01]\\('[01]\\|[01]\\)*'?\\)?\\)"
        "\\|"
@@ -1530,7 +1533,7 @@ Note that the style variables are always made local to the buffer."
     (save-excursion
       (let ((here (point))
 	    found)
-	(skip-chars-backward "0-9a-fA-F'")
+	(skip-chars-backward "[:xdigit:]'")
 	(if (and (memq (char-before) '(?x ?X))
 		 (eq (char-before (1- (point))) ?0))
 	    (backward-char 2))
@@ -1544,7 +1547,7 @@ Note that the style variables are always made local to the buffer."
 (defconst c-maybe-quoted-number-tail
   (concat
    "\\("
-       "\\([xX']?[0-9a-fA-F]\\('[0-9a-fA-F]\\|[0-9a-fA-F]\\)*\\)"
+       "\\([xX']?[[:xdigit:]]\\('[[:xdigit:]]\\|[[:xdigit:]]\\)*\\)"
    "\\|"
        "\\([bB']?[01]\\('[01]\\|[01]\\)*\\)"
    "\\|"
@@ -1564,7 +1567,7 @@ Note that this is a strict tail, so won't match, e.g. \"0x....\".")
 (defconst c-maybe-quoted-number
   (concat
    "\\(0\\("
-       "\\([Xx][0-9a-fA-F]\\('[0-9a-fA-F]\\|[0-9a-fA-F]\\)*\\)"
+       "\\([Xx][[:xdigit:]]\\('[[:xdigit:]]\\|[[:xdigit:]]\\)*\\)"
        "\\|"
        "\\([Bb][01]\\('[01]\\|[01]\\)*\\)"
        "\\|"
@@ -1582,9 +1585,9 @@ Note that this is a strict tail, so won't match, e.g. \"0x....\".")
   (when c-has-quoted-numbers
     (save-excursion
       (let ((here (point))
-	    (bound (progn (skip-chars-forward "0-9a-fA-F'") (point))))
+	    (bound (progn (skip-chars-forward "[:xdigit:]'") (point))))
 	(goto-char here)
-	(when (< (skip-chars-backward "0-9a-fA-F'") 0)
+	(when (< (skip-chars-backward "[:xdigit:]'") 0)
 	  (if (and (memq (char-before) '(?x ?X))
 		   (eq (char-before (1- (point))) ?0))
 	      (backward-char 2))
@@ -1625,7 +1628,7 @@ Note that this is a strict tail, so won't match, e.g. \"0x....\".")
 	(if (>= (point) c-new-BEG)
 	    (setq c-new-BEG (match-beginning 0))))
        ((looking-at
-	 "\\([^'\\]\\|\\\\\\([0-7]\\{1,3\\}\\|[xuU][0-9a-fA-F]+\\|.\\)\\)'")
+	 "\\([^'\\]\\|\\\\\\([0-7]\\{1,3\\}\\|[xuU][[:xdigit:]]+\\|.\\)\\)'")
 	(goto-char (match-end 0))
 	(if (> (match-end 0) c-new-BEG)
 	    (setq c-new-BEG (1- (match-beginning 0)))))
@@ -1654,7 +1657,7 @@ Note that this is a strict tail, so won't match, e.g. \"0x....\".")
 	(if (> (match-end 0) c-new-END)
 	    (setq c-new-END (match-end 0))))
        ((looking-at
-	 "\\([^'\\]\\|\\\\\\([0-7]\\{1,3\\}\\|[xuU][0-9a-fA-F]+\\|.\\)\\)'")
+	 "\\([^'\\]\\|\\\\\\([0-7]\\{1,3\\}\\|[xuU][[:xdigit:]]+\\|.\\)\\)'")
 	(goto-char (match-end 0))
 	(if (> (match-end 0) c-new-END)
 	    (setq c-new-END (match-end 0))))
@@ -1674,8 +1677,8 @@ Note that this is a strict tail, so won't match, e.g. \"0x....\".")
      ((c-quoted-number-tail-after-point)
       (setq c-new-END (match-end 0)))
      ((looking-at
-       "\\(\\\\\\([0-7]\\{1,3\\}\\|[xuU][0-9a-fA-F]+\\|.\\)\\|.\\)?\
-\\('\\([^'\\]\\|\\\\\\([0-7]\\{1,3\\}\\|[xuU][0-9a-fA-F]+\\|.\\)\\)\\)*'")
+       "\\(\\\\\\([0-7]\\{1,3\\}\\|[xuU][[:xdigit:]]+\\|.\\)\\|.\\)?\
+\\('\\([^'\\]\\|\\\\\\([0-7]\\{1,3\\}\\|[xuU][[:xdigit:]]+\\|.\\)\\)\\)*'")
       (setq c-new-END (match-end 0))))
 
     ;; Remove the '(1) syntax-table property from any "'"s within (c-new-BEG
@@ -1727,7 +1730,7 @@ Note that this is a strict tail, so won't match, e.g. \"0x....\".")
 					      'c-digit-separator t ?')
 	       (goto-char num-end))
 	      ((looking-at
-		"\\([^\\']\\|\\\\\\([0-7]\\{1,3\\}\\|[xuU][0-9a-fA-F]+\\|.\\)\
+		"\\([^\\']\\|\\\\\\([0-7]\\{1,3\\}\\|[xuU][[:xdigit:]]+\\|.\\)\
 \\)'") ; balanced quoted expression.
 	       (goto-char (match-end 0)))
 	      ((looking-at "\\\\'")	; Anomalous construct.
