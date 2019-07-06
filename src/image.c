@@ -10215,7 +10215,7 @@ non-numeric, there is no explicit limit on the size of images.  */);
   DEFSYM (Qxbm, "xbm");
   add_image_type (Qxbm);
 
-#if defined (HAVE_XPM) || defined (HAVE_NS)
+#if defined (HAVE_XPM) || defined (HAVE_NS) || defined (USE_CAIRO)
   DEFSYM (Qxpm, "xpm");
   add_image_type (Qxpm);
 #endif
