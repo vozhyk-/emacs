@@ -5140,21 +5140,19 @@ static gboolean key_press_event(GtkWidget *widget, GdkEvent *event, gpointer *us
 	  goto done;
 	}
 
-#if 0
       /* Now non-ASCII.  */
-      if (HASH_TABLE_P (Vx_keysym_table)
+      if (HASH_TABLE_P (Vpgtk_keysym_table)
 	  && (c = Fgethash (make_fixnum (keysym),
-			    Vx_keysym_table,
+			    Vpgtk_keysym_table,
 			    Qnil),
-	      NATNUMP (c)))
+	      FIXNATP (c)))
 	{
-	  inev.ie.kind = (SINGLE_BYTE_CHAR_P (XFASTINT (c))
+	  inev.ie.kind = (SINGLE_BYTE_CHAR_P (XFIXNAT (c))
 			  ? ASCII_KEYSTROKE_EVENT
 			  : MULTIBYTE_CHAR_KEYSTROKE_EVENT);
-	  inev.ie.code = XFASTINT (c);
+	  inev.ie.code = XFIXNAT (c);
 	  goto done;
 	}
-#endif
 
       /* Random non-modifier sorts of keysyms.  */
       if (((keysym >= GDK_KEY_BackSpace && keysym <= GDK_KEY_Escape)
@@ -6923,6 +6921,13 @@ so it is important to limit the wait.
 
 If set to a non-float value, there will be no wait at all.  */);
   Vpgtk_wait_for_event_timeout = make_float (0.1);
+
+  DEFVAR_LISP ("pgtk-keysym-table", Vpgtk_keysym_table,
+    doc: /* Hash table of character codes indexed by X keysym codes.  */);
+  Vpgtk_keysym_table = make_hash_table (hashtest_eql, 900,
+					DEFAULT_REHASH_SIZE,
+					DEFAULT_REHASH_THRESHOLD,
+					Qnil, false);
 
   window_being_scrolled = Qnil;
   staticpro(&window_being_scrolled);
