@@ -817,25 +817,25 @@ x_set_z_group (struct frame *f, Lisp_Object new_value, Lisp_Object old_value)
 
   if (NILP (new_value))
     {
-      gtk_window_set_keep_above (FRAME_GTK_OUTER_WIDGET (f), FALSE);
-      gtk_window_set_keep_below (FRAME_GTK_OUTER_WIDGET (f), FALSE);
+      gtk_window_set_keep_above (GTK_WINDOW (FRAME_GTK_OUTER_WIDGET (f)), FALSE);
+      gtk_window_set_keep_below (GTK_WINDOW (FRAME_GTK_OUTER_WIDGET (f)), FALSE);
       FRAME_Z_GROUP (f) = z_group_none;
     }
   else if (EQ (new_value, Qabove))
     {
-      gtk_window_set_keep_above (FRAME_GTK_OUTER_WIDGET (f), TRUE);
-      gtk_window_set_keep_below (FRAME_GTK_OUTER_WIDGET (f), FALSE);
+      gtk_window_set_keep_above (GTK_WINDOW (FRAME_GTK_OUTER_WIDGET (f)), TRUE);
+      gtk_window_set_keep_below (GTK_WINDOW (FRAME_GTK_OUTER_WIDGET (f)), FALSE);
       FRAME_Z_GROUP (f) = z_group_above;
     }
   else if (EQ (new_value, Qabove_suspended))
     {
-      gtk_window_set_keep_above (FRAME_GTK_OUTER_WIDGET (f), FALSE);
+      gtk_window_set_keep_above (GTK_WINDOW (FRAME_GTK_OUTER_WIDGET (f)), FALSE);
       FRAME_Z_GROUP (f) = z_group_above_suspended;
     }
   else if (EQ (new_value, Qbelow))
     {
-      gtk_window_set_keep_above (FRAME_GTK_OUTER_WIDGET (f), FALSE);
-      gtk_window_set_keep_below (FRAME_GTK_OUTER_WIDGET (f), TRUE);
+      gtk_window_set_keep_above (GTK_WINDOW (FRAME_GTK_OUTER_WIDGET (f)), FALSE);
+      gtk_window_set_keep_below (GTK_WINDOW (FRAME_GTK_OUTER_WIDGET (f)), TRUE);
       FRAME_Z_GROUP (f) = z_group_below;
     }
   else
@@ -5440,7 +5440,7 @@ pgtk_focus_frame (struct frame *f, bool noactivate)
   if (dpyinfo->x_focus_frame != f)
     {
       block_input ();
-      gtk_window_present(wid);
+      gtk_window_present (GTK_WINDOW (wid));
       unblock_input ();
     }
 }
