@@ -3100,6 +3100,8 @@ pgtk_update_begin (struct frame *f)
 	  unblock_input();
 	}
     }
+
+  pgtk_clear_under_internal_border (f);
 }
 
 /* Start update of window W.  */
