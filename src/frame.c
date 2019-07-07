@@ -4586,10 +4586,17 @@ gui_set_border_width (struct frame *f, Lisp_Object arg, Lisp_Object oldval)
   if (XFIXNUM (arg) == f->border_width)
     return;
 
+#ifndef HAVE_PGTK
   if (FRAME_NATIVE_WINDOW (f) != 0)
     error ("Cannot change the border width of a frame");
+#endif
 
   f->border_width = XFIXNUM (arg);
+
+#ifdef HAVE_PGTK
+  if (FRAME_TERMINAL (f)->frame_rehighlight_hook)
+    (*FRAME_TERMINAL (f)->frame_rehighlight_hook) (f);
+#endif
 }
 
 void
