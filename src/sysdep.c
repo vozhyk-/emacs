@@ -30,6 +30,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include <unistd.h>
 
 #include <c-ctype.h>
+#include <close-stream.h>
 #include <pathmax.h>
 #include <utimens.h>
 
@@ -2768,6 +2769,25 @@ safe_strsignal (int code)
   return signame;
 }
 
+/* Close standard output and standard error, reporting any write
+   errors as best we can.  This is intended for use with atexit.  */
+void
+close_output_streams (void)
+{
+  if (close_stream (stdout) != 0)
+    {
+      emacs_perror ("Write error to standard output");
+      _exit (EXIT_FAILURE);
+    }
+
+  /* Do not close stderr if addresses are being sanitized, as the
+     sanitizer might report to stderr after this function is invoked.  */
+  if (ADDRESS_SANITIZER
+      ? fflush_unlocked (stderr) != 0 || ferror (stderr)
+      : close_stream (stderr) != 0)
+    _exit (EXIT_FAILURE);
+}
+
 #ifndef DOS_NT
 /* For make-serial-process  */
 int
@@ -3249,7 +3269,7 @@ system_process_attributes (Lisp_Object pid)
   char *cmdline = NULL;
   ptrdiff_t cmdline_size;
   char c;
-  printmax_t proc_id;
+  intmax_t proc_id;
   int ppid, pgrp, sess, tty, tpgid, thcount;
   uid_t uid;
   gid_t gid;
@@ -3264,7 +3284,7 @@ system_process_attributes (Lisp_Object pid)
 
   CHECK_NUMBER (pid);
   CONS_TO_INTEGER (pid, pid_t, proc_id);
-  sprintf (procfn, "/proc/%"pMd, proc_id);
+  sprintf (procfn, "/proc/%"PRIdMAX, proc_id);
   if (stat (procfn, &st) < 0)
     return attrs;
 
@@ -3485,7 +3505,7 @@ system_process_attributes (Lisp_Object pid)
   struct psinfo pinfo;
   int fd;
   ssize_t nread;
-  printmax_t proc_id;
+  intmax_t proc_id;
   uid_t uid;
   gid_t gid;
   Lisp_Object attrs = Qnil;
@@ -3494,7 +3514,7 @@ system_process_attributes (Lisp_Object pid)
 
   CHECK_NUMBER (pid);
   CONS_TO_INTEGER (pid, pid_t, proc_id);
-  sprintf (procfn, "/proc/%"pMd, proc_id);
+  sprintf (procfn, "/proc/%"PRIdMAX, proc_id);
   if (stat (procfn, &st) < 0)
     return attrs;
 

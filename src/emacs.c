@@ -29,8 +29,6 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include <sys/stat.h>
 #include <unistd.h>
 
-#include <close-stream.h>
-
 #define MAIN_PROGRAM
 #include "lisp.h"
 #include "sysstdio.h"
@@ -152,7 +150,7 @@ bool display_arg;
 
 #if defined GNU_LINUX && defined HAVE_UNEXEC
 /* The gap between BSS end and heap start as far as we can tell.  */
-static uprintmax_t heap_bss_diff;
+static uintmax_t heap_bss_diff;
 #endif
 
 /* To run as a background daemon under Cocoa or Windows,
@@ -659,24 +657,6 @@ argmatch (char **argv, int argc, const char *sstr, const char *lstr,
     {
       return 0;
     }
-}
-
-/* Close standard output and standard error, reporting any write
-   errors as best we can.  This is intended for use with atexit.  */
-static void
-close_output_streams (void)
-{
-  if (close_stream (stdout) != 0)
-    {
-      emacs_perror ("Write error to standard output");
-      _exit (EXIT_FAILURE);
-    }
-
-  /* Do not close stderr if addresses are being sanitized, as the
-     sanitizer might report to stderr after this function is
-     invoked.  */
-  if (!ADDRESS_SANITIZER && close_stream (stderr) != 0)
-    _exit (EXIT_FAILURE);
 }
 
 #ifdef HAVE_PDUMPER
@@ -2582,7 +2562,8 @@ You must run Emacs in batch mode in order to dump it.  */)
     {
       fprintf (stderr, "**************************************************\n");
       fprintf (stderr, "Warning: Your system has a gap between BSS and the\n");
-      fprintf (stderr, "heap (%"pMu" bytes).  This usually means that exec-shield\n",
+      fprintf (stderr, ("heap (%"PRIuMAX" bytes).  "
+			"This usually means that exec-shield\n"),
                heap_bss_diff);
       fprintf (stderr, "or something similar is in effect.  The dump may\n");
       fprintf (stderr, "fail because of this.  See the section about\n");
