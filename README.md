@@ -57,19 +57,17 @@ Note: Segmentation fault may occur on multiple display environment.
 
 Known problems:
 - Segmentation fault while multiple-display.
-- Only small area is drawn when a X11 frame opens. (In the case, you can resize it to be correctly drawn.)
 - Exits when a connection to display server is closed by peer. (I may not be able to resolve.)
 
 Not implemented:
-- GTK does not implement these features:
+- GTK on wayland does not implement functions for these features:
   - x_set_offset
   - x_set_no_focus_on_map
-  - x x_set_no_accept_focus
+  - x_set_no_accept_focus
   - x_set_z_group
+  - auto-raise/lower
 - Some other features. Keywords:
   - popup_activated
-  - x_new_focus_frame
-  - x_focus_changed
   - vendor_specific_keysyms
   - x_find_modifier_meanings
   - x_load_resources
