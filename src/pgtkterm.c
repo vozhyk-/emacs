@@ -4866,6 +4866,7 @@ static void
 x_new_focus_frame (struct pgtk_display_info *dpyinfo, struct frame *frame)
 {
   struct frame *old_focus = dpyinfo->x_focus_frame;
+  /* doesn't work on wayland */
 
   if (frame != dpyinfo->x_focus_frame)
     {
@@ -4873,17 +4874,11 @@ x_new_focus_frame (struct pgtk_display_info *dpyinfo, struct frame *frame)
 	 the correct value of x_focus_frame.  */
       dpyinfo->x_focus_frame = frame;
 
-#if 0
       if (old_focus && old_focus->auto_lower)
-	x_lower_frame (old_focus);
-#endif
+	gdk_window_lower (gtk_widget_get_window (FRAME_GTK_OUTER_WIDGET (old_focus)));
 
-#if 0
       if (dpyinfo->x_focus_frame && dpyinfo->x_focus_frame->auto_raise)
-	dpyinfo->x_pending_autoraise_frame = dpyinfo->x_focus_frame;
-      else
-	dpyinfo->x_pending_autoraise_frame = NULL;
-#endif
+	gdk_window_raise (gtk_widget_get_window (FRAME_GTK_OUTER_WIDGET (dpyinfo->x_focus_frame)));
     }
 
   pgtk_frame_rehighlight (dpyinfo);
@@ -5734,10 +5729,8 @@ x_focus_changed (gboolean is_enter, int state, struct pgtk_display_info *dpyinfo
 	  XSETFRAME (bufp->ie.frame_or_window, frame);
 	}
 
-#if 0
       if (frame->pointer_invisible)
 	XTtoggle_invisible_pointer (frame, false);
-#endif
     }
 }
 
