@@ -3082,22 +3082,8 @@ pgtk_update_begin (struct frame *f)
 
   if (! FRAME_CR_SURFACE (f))
     {
-      int width, height;
-      if (FRAME_GTK_WIDGET (f))
-	{
-	  GdkWindow *w = gtk_widget_get_window (FRAME_GTK_WIDGET (f));
-	  width = gdk_window_get_width (w);
-	  height = gdk_window_get_height (w);
-	}
-      else
-	{
-	  width = FRAME_PIXEL_WIDTH (f);
-	  height = FRAME_PIXEL_HEIGHT (f);
-	  if (! FRAME_EXTERNAL_TOOL_BAR (f))
-	    height += FRAME_TOOL_BAR_HEIGHT (f);
-	  if (! FRAME_EXTERNAL_MENU_BAR (f))
-	    height += FRAME_MENU_BAR_HEIGHT (f);
-	}
+      int width = FRAME_PIXEL_WIDTH (f);
+      int height = FRAME_PIXEL_HEIGHT (f);
 
       if (width > 0 && height > 0)
 	{
