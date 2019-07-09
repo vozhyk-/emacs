@@ -804,7 +804,22 @@ the root directory.  */)
 
   /* Use the buffer's default-directory if DEFAULT_DIRECTORY is omitted.  */
   if (NILP (default_directory))
-    default_directory = BVAR (current_buffer, directory);
+    {
+      Lisp_Object dir = BVAR (current_buffer, directory);
+      /* The buffer's default-directory should be absolute.  If it
+	 isn't, try to expand it relative to invocation-directory.
+	 But we have to be careful to avoid an infinite loop, because
+	 the code in emacs.c that sets Vinvocation_directory might
+	 call Fexpand_file_name.  */
+      if (STRINGP (dir))
+	{
+	  if (!NILP (Ffile_name_absolute_p (dir)))
+	    default_directory = dir;
+	  else if (STRINGP (Vinvocation_directory)
+		   && !NILP (Ffile_name_absolute_p (Vinvocation_directory)))
+	    default_directory = Fexpand_file_name (dir, Vinvocation_directory);
+	}
+    }
   if (! STRINGP (default_directory))
     {
 #ifdef DOS_NT
@@ -5772,12 +5787,12 @@ A non-nil CURRENT-ONLY argument means save only current buffer.  */)
 	  {
 	    block_input ();
 	    if (!NILP (BVAR (b, filename)))
-	      fwrite_unlocked (SDATA (BVAR (b, filename)), 1,
-			       SBYTES (BVAR (b, filename)), stream);
-	    putc_unlocked ('\n', stream);
-	    fwrite_unlocked (SDATA (BVAR (b, auto_save_file_name)), 1,
-			     SBYTES (BVAR (b, auto_save_file_name)), stream);
-	    putc_unlocked ('\n', stream);
+	      fwrite (SDATA (BVAR (b, filename)), 1,
+		      SBYTES (BVAR (b, filename)), stream);
+	    putc ('\n', stream);
+	    fwrite (SDATA (BVAR (b, auto_save_file_name)), 1,
+		    SBYTES (BVAR (b, auto_save_file_name)), stream);
+	    putc ('\n', stream);
 	    unblock_input ();
 	  }
 
@@ -5972,7 +5987,7 @@ effect except for flushing STREAM's data.  */)
 
   binmode = NILP (mode) ? O_TEXT : O_BINARY;
   if (fp != stdin)
-    fflush_unlocked (fp);
+    fflush (fp);
 
   return (set_binary_mode (fileno (fp), binmode) == O_BINARY) ? Qt : Qnil;
 }
