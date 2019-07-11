@@ -2985,8 +2985,9 @@ suppressed.  */)
       Vautoload_queue = Qt;
 
       /* Load the file.  */
-      tem = Fload (NILP (filename) ? Fsymbol_name (feature) : filename,
-		   noerror, Qt, Qnil, (NILP (filename) ? Qt : Qnil));
+      tem = save_match_data_load
+	(NILP (filename) ? Fsymbol_name (feature) : filename,
+	 noerror, Qt, Qnil, (NILP (filename) ? Qt : Qnil));
 
       /* If load failed entirely, return nil.  */
       if (NILP (tem))
@@ -4223,6 +4224,12 @@ void
 hash_table_rehash (struct Lisp_Hash_Table *h)
 {
   ptrdiff_t size = HASH_TABLE_SIZE (h);
+
+  /* These structures may have been purecopied and shared
+     (bug#36447).  */
+  h->next = Fcopy_sequence (h->next);
+  h->index = Fcopy_sequence (h->index);
+  h->hash = Fcopy_sequence (h->hash);
 
   /* Recompute the actual hash codes for each entry in the table.
      Order is still invalid.  */
