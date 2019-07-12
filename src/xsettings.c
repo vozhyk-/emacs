@@ -136,7 +136,6 @@ store_font_name_changed (const char *newfont)
 }
 #endif /* USE_CAIRO || HAVE_XFT */
 
-#ifndef HAVE_PGTK
 /* Map TOOL_BAR_STYLE from a string to its corresponding Lisp value.
    Return Qnil if TOOL_BAR_STYLE is not known.  */
 
@@ -158,9 +157,7 @@ map_tool_bar_style (const char *tool_bar_style)
 
   return style;
 }
-#endif
 
-#ifndef HAVE_PGTK
 /* Store a tool bar style change event if the tool bar style changed.  */
 
 static void
@@ -176,7 +173,6 @@ store_tool_bar_style_changed (const char *newstyle,
     store_config_changed_event (Qtool_bar_style,
                                 XCAR (dpyinfo->name_list_element));
 }
-#endif
 
 #if defined USE_CAIRO || defined HAVE_XFT
 #define XSETTINGS_FONT_NAME       "Gtk/FontName"
@@ -239,10 +235,8 @@ something_changed_gsettingsCB (GSettings *settings,
           g_variant_ref_sink (val);
           if (g_variant_is_of_type (val, G_VARIANT_TYPE_STRING))
             {
-#ifndef HAVE_PGTK
               const gchar *newstyle = g_variant_get_string (val, NULL);
               store_tool_bar_style_changed (newstyle, first_dpyinfo);
-#endif
             }
           g_variant_unref (val);
         }
@@ -876,7 +870,6 @@ init_gsettings (void)
   g_signal_connect (G_OBJECT (gsettings_client), "changed",
                     G_CALLBACK (something_changed_gsettingsCB), NULL);
 
-#ifndef HAVE_PGTK
   val = g_settings_get_value (gsettings_client, GSETTINGS_TOOL_BAR_STYLE);
   if (val)
     {
@@ -886,7 +879,6 @@ init_gsettings (void)
           = map_tool_bar_style (g_variant_get_string (val, NULL));
       g_variant_unref (val);
     }
-#endif
 
 #if defined USE_CAIRO || defined HAVE_XFT
   val = g_settings_get_value (gsettings_client, GSETTINGS_MONO_FONT);
@@ -934,14 +926,12 @@ init_gconf (void)
                            something_changed_gconfCB,
                            NULL, NULL, NULL);
 
-#ifndef HAVE_PGTK
   s = gconf_client_get_string (gconf_client, GCONF_TOOL_BAR_STYLE, NULL);
   if (s)
     {
       current_tool_bar_style = map_tool_bar_style (s);
       g_free (s);
     }
-#endif
 
 #if defined USE_CAIRO || defined HAVE_XFT
   s = gconf_client_get_string (gconf_client, GCONF_MONO_FONT, NULL);
