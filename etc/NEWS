@@ -754,6 +754,10 @@ better emulate 'M-.' in both Bash and zsh, since the former counts
 from the beginning of the arguments, while the latter counts from the
 end.
 
++++
+*** 'comint-run' can now accept a list of switches to pass to the program.
+'C-u M-x comint-run' will prompt for the switches interactively.
+
 ** SQL
 
 *** SQL Indent Minor Mode
@@ -1809,6 +1813,9 @@ never worked reliably, and now causes an error.
 ** 'eventp' no longer returns non-nil for lists whose car is nil.
 This is consistent with the fact that nil, though a symbol, is not a
 valid event type.
+
+---
+** The obsolete package xesam.el (since Emacs 24) has been removed.
 
 
 * Lisp Changes in Emacs 27.1

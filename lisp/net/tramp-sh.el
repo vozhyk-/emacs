@@ -37,14 +37,18 @@
 (defvar vc-git-program)
 (defvar vc-hg-program)
 
-(defcustom tramp-inline-compress-start-size 4096
+;;;###tramp-autoload
+(defcustom tramp-inline-compress-start-size
+  (unless (memq system-type '(windows-nt)) 4096)
   "The minimum size of compressing where inline transfer.
 When inline transfer, compress transferred data of file
 whose size is this value or above (up to `tramp-copy-size-limit').
 If it is nil, no compression at all will be applied."
   :group 'tramp
+  :version "26.3"
   :type '(choice (const nil) integer))
 
+;;;###tramp-autoload
 (defcustom tramp-copy-size-limit 10240
   "The maximum file size where inline copying is preferred over an \
 out-of-the-band copy.
@@ -61,6 +65,7 @@ files conditionalize this setup based on the TERM environment variable."
   :group 'tramp
   :type 'string)
 
+;;;###tramp-autoload
 (defcustom tramp-histfile-override "~/.tramp_history"
   "When invoking a shell, override the HISTFILE with this value.
 When setting to a string, it redirects the shell history to that
@@ -103,6 +108,7 @@ detected as prompt when being sent on echoing hosts, therefore.")
 (defconst tramp-end-of-heredoc (md5 tramp-end-of-output)
   "String used to recognize end of heredoc strings.")
 
+;;;###tramp-autoload
 (defcustom tramp-use-ssh-controlmaster-options t
   "Whether to use `tramp-ssh-controlmaster-options'."
   :group 'tramp
@@ -1991,6 +1997,8 @@ file names."
       (with-parsed-tramp-file-name (if t1 filename newname) nil
 	(when (and (not ok-if-already-exists) (file-exists-p newname))
 	  (tramp-error v 'file-already-exists newname))
+	(when (and (file-directory-p newname) (not (directory-name-p newname)))
+	  (tramp-error v 'file-error "File is a directory %s" newname))
 
 	(with-tramp-progress-reporter
 	    v 0 (format "%s %s to %s"
