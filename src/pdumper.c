@@ -324,12 +324,13 @@ dump_reloc_set_offset (struct dump_reloc *reloc, dump_off offset)
 }
 
 static void
-dump_fingerprint (const char *label, unsigned char const *xfingerprint)
+dump_fingerprint (char const *label,
+		  unsigned char const xfingerprint[sizeof fingerprint])
 {
-  fprintf (stderr, "%s: ", label);
-  for (int i = 0; i < 32; ++i)
-    fprintf (stderr, "%02x", (unsigned) xfingerprint[i]);
-  putc ('\n', stderr);
+  enum { hexbuf_size = 2 * sizeof fingerprint };
+  char hexbuf[hexbuf_size];
+  hexbuf_digest (hexbuf, xfingerprint, sizeof fingerprint);
+  fprintf (stderr, "%s: %.*s\n", label, hexbuf_size, hexbuf);
 }
 
 /* Format of an Emacs portable dump file.  All offsets are relative to
@@ -355,7 +356,7 @@ struct dump_header
   char magic[sizeof (dump_magic)];
 
   /* Associated Emacs binary.  */
-  unsigned char fingerprint[32];
+  unsigned char fingerprint[sizeof fingerprint];
 
   /* Relocation table for the dump file; each entry is a
      struct dump_reloc.  */
@@ -3061,10 +3062,7 @@ dump_object (struct dump_context *ctx, Lisp_Object object)
 #if CHECK_STRUCTS && !defined (HASH_Lisp_Type_E2AD97D3F7)
 # error "Lisp_Type changed. See CHECK_STRUCTS comment in config.h."
 #endif
-#ifdef ENABLE_CHECKING
-  /* Vdead is extern only when ENABLE_CHECKING.  */
-  eassert (!EQ (object, Vdead));
-#endif
+  eassert (!EQ (object, dead_object ()));
 
   dump_off offset = dump_recall_object (ctx, object);
   if (offset > 0)

@@ -1247,6 +1247,15 @@ make_lisp_ptr (void *ptr, enum Lisp_Type type)
 #define XSETSYMBOL(a, b) ((a) = make_lisp_symbol (b))
 #define XSETFLOAT(a, b) ((a) = make_lisp_ptr (b, Lisp_Float))
 
+/* Return a Lisp_Object value that does not correspond to any object.
+   This can make some Lisp objects on free lists recognizable in O(1).  */
+
+INLINE Lisp_Object
+dead_object (void)
+{
+  return make_lisp_ptr (NULL, Lisp_String);
+}
+
 /* Pseudovector types.  */
 
 #define XSETPVECTYPE(v, code)						\
@@ -2269,7 +2278,8 @@ struct Lisp_Hash_Table
      'index' are special and are either ignored by the GC or traced in
      a special way (e.g. because of weakness).  */
 
-  /* Number of key/value entries in the table.  */
+  /* Number of key/value entries in the table.  This number is
+     negated if the table needs rehashing.  */
   ptrdiff_t count;
 
   /* Index of first free entry in free list, or -1 if none.  */
@@ -3577,6 +3587,7 @@ extern ptrdiff_t list_length (Lisp_Object);
 extern EMACS_INT next_almost_prime (EMACS_INT) ATTRIBUTE_CONST;
 extern Lisp_Object larger_vector (Lisp_Object, ptrdiff_t, ptrdiff_t);
 extern bool sweep_weak_table (struct Lisp_Hash_Table *, bool);
+extern void hexbuf_digest (char *, void const *, int);
 extern char *extract_data_from_object (Lisp_Object, ptrdiff_t *, ptrdiff_t *);
 EMACS_UINT hash_string (char const *, ptrdiff_t);
 EMACS_UINT sxhash (Lisp_Object, int);
@@ -3758,9 +3769,6 @@ extern byte_ct gc_relative_threshold;
 extern byte_ct const memory_full_cons_threshold;
 #ifdef HAVE_PDUMPER
 extern int number_finalizers_run;
-#endif
-#ifdef ENABLE_CHECKING
-extern Lisp_Object Vdead;
 #endif
 extern Lisp_Object list1 (Lisp_Object);
 extern Lisp_Object list2 (Lisp_Object, Lisp_Object);

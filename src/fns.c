@@ -2162,9 +2162,13 @@ merge (Lisp_Object org_l1, Lisp_Object org_l2, Lisp_Object pred)
 DEFUN ("plist-get", Fplist_get, Splist_get, 2, 2, 0,
        doc: /* Extract a value from a property list.
 PLIST is a property list, which is a list of the form
-\(PROP1 VALUE1 PROP2 VALUE2...).  This function returns the value
-corresponding to the given PROP, or nil if PROP is not one of the
-properties on the list.  This function never signals an error.  */)
+\(PROP1 VALUE1 PROP2 VALUE2...).
+
+This function returns the value corresponding to the given PROP, or
+nil if PROP is not one of the properties on the list.  The comparison
+with PROP is done using `eq'.
+
+This function never signals an error.  */)
   (Lisp_Object plist, Lisp_Object prop)
 {
   Lisp_Object tail = plist;
@@ -2240,10 +2244,8 @@ It can be retrieved with `(get SYMBOL PROPNAME)'.  */)
 
 DEFUN ("lax-plist-get", Flax_plist_get, Slax_plist_get, 2, 2, 0,
        doc: /* Extract a value from a property list, comparing with `equal'.
-PLIST is a property list, which is a list of the form
-\(PROP1 VALUE1 PROP2 VALUE2...).  This function returns the value
-corresponding to the given PROP, or nil if PROP is not
-one of the properties on the list.  */)
+This function is otherwise like `plist-get', but may signal an error
+if PLIST isn't a valid plist.  */)
   (Lisp_Object plist, Lisp_Object prop)
 {
   Lisp_Object tail = plist;
@@ -4230,6 +4232,11 @@ maybe_resize_hash_table (struct Lisp_Hash_Table *h)
     }
 }
 
+/* Recompute the hashes (and hence also the "next" pointers).
+   Normally there's never a need to recompute hashes.
+   This is done only on first-access to a hash-table loaded from
+   the "pdump", because the object's addresses may have changed, thus
+   affecting their hash.  */
 void
 hash_table_rehash (struct Lisp_Hash_Table *h)
 {
@@ -4874,7 +4881,9 @@ DEFUN ("hash-table-count", Fhash_table_count, Shash_table_count, 1, 1, 0,
        doc: /* Return the number of elements in TABLE.  */)
   (Lisp_Object table)
 {
-  return make_fixnum (check_hash_table (table)->count);
+  struct Lisp_Hash_Table *h = check_hash_table (table);
+  hash_rehash_if_needed (h);
+  return make_fixnum (h->count);
 }
 
 
@@ -5039,18 +5048,27 @@ returns nil, then (funcall TEST x1 x2) also returns nil.  */)
 #include "sha256.h"
 #include "sha512.h"
 
-static Lisp_Object
-make_digest_string (Lisp_Object digest, int digest_size)
+/* Store into HEXBUF an unterminated hexadecimal character string
+   representing DIGEST, which is binary data of size DIGEST_SIZE bytes.
+   HEXBUF might equal DIGEST.  */
+void
+hexbuf_digest (char *hexbuf, void const *digest, int digest_size)
 {
-  unsigned char *p = SDATA (digest);
+  unsigned char const *p = digest;
 
   for (int i = digest_size - 1; i >= 0; i--)
     {
       static char const hexdigit[16] = "0123456789abcdef";
       int p_i = p[i];
-      p[2 * i] = hexdigit[p_i >> 4];
-      p[2 * i + 1] = hexdigit[p_i & 0xf];
+      hexbuf[2 * i] = hexdigit[p_i >> 4];
+      hexbuf[2 * i + 1] = hexdigit[p_i & 0xf];
     }
+}
+
+static Lisp_Object
+make_digest_string (Lisp_Object digest, int digest_size)
+{
+  hexbuf_digest (SSDATA (digest), SDATA (digest), digest_size);
   return digest;
 }
 
