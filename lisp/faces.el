@@ -25,8 +25,6 @@
 
 ;;; Code:
 
-(require 'subr-x)
-
 (defcustom term-file-prefix (purecopy "term/")
   "If non-nil, Emacs startup performs terminal-specific initialization.
 It does this by: (load (concat term-file-prefix (getenv \"TERM\")))
@@ -1531,10 +1529,11 @@ If FRAME is omitted or nil, use the selected frame."
 			  (help-xref-button 1 'help-face attr)))
 		    (insert "\n")))))
 	    (terpri)
-            (when-let ((version-info (describe-variable-custom-version-info
-                                      f 'face)))
-              (insert version-info))
-            (terpri)))))))
+            (let ((version-info (describe-variable-custom-version-info
+                                 f 'face)))
+              (when version-info
+                (insert version-info)
+                (terpri)))))))))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
