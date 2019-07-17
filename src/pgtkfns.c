@@ -1742,18 +1742,15 @@ parse_resource_key (const char *res_key, char *setting_key)
   /* check existence of setting_key */
   GSettingsSchemaSource *ssrc = g_settings_schema_source_get_default ();
   GSettingsSchema *scm = g_settings_schema_source_lookup (ssrc, SCHEMA_ID, FALSE);
-  printf("setting_key=%s\n", setting_key);
   if (!g_settings_schema_has_key (scm, setting_key)) {
     g_settings_schema_unref (scm);
     return NULL;
   }
 
   /* create GSettings, and return it */
-  printf("path=%s\n", path);
   GSettings *gs = g_settings_new_full (scm, NULL, path);
 
   g_settings_schema_unref (scm);
-  printf("%p\n", gs);
   return gs;
 }
 
@@ -1767,13 +1764,10 @@ pgtk_get_defaults_value (const char *key)
 
   GSettings *gs = parse_resource_key(key, skey);
   if (gs == NULL) {
-    printf("bad: %s\n", key);
     return NULL;
   }
 
   gchar *str = g_settings_get_string (gs, skey);
-  printf ("str=%p\n", str);
-  printf ("str=%s\n", str ? str : "(null)");
 
   /* There is no timing to free str.
    * So, copy it here and free it.
@@ -1799,15 +1793,12 @@ pgtk_set_defaults_value (const char *key, const char *value)
 
   GSettings *gs = parse_resource_key(key, skey);
   if (gs == NULL) {
-    printf("bad: %s\n", key);
     return NULL;
   }
 
   if (value != NULL) {
-    printf ("value=%s\n", value);
     g_settings_set_string (gs, skey, value);
   } else {
-    printf ("value=(reset)\n");
     g_settings_reset (gs, skey);
   }
 
