@@ -1643,17 +1643,25 @@ Some window managers may refuse to restack windows.  */)
 
 #define RESOURCE_KEY_MAX_LEN 128
 #define SCHEMA_ID "org.gnu.emacs.defaults"
+#define PATH_FOR_CLASS_TYPE "/org/gnu/emacs/defaults-by-class/"
+#define PATH_PREFIX_FOR_NAME_TYPE "/org/gnu/emacs/defaults-by-name/"
 
 static inline int
-is_valid_key_char(int c)
+pgtk_is_lower_char (int c)
 {
-  if (c >= 'a' && c <= 'z')
-    return 1;
-  if (c >= 'A' && c <= 'Z')
-    return 1;
-  if (c >= '0' && c <= '9')
-    return 1;
-  return 0;
+  return c >= 'a' && c <= 'z';
+}
+
+static inline int
+pgtk_is_upper_char (int c)
+{
+  return c >= 'A' && c <= 'Z';
+}
+
+static inline int
+pgtk_is_numeric_char (int c)
+{
+  return c >= '0' && c <= '9';
 }
 
 static GSettings *
@@ -1672,55 +1680,66 @@ parse_resource_key (const char *res_key, char *setting_key)
    *   -> path="/org/gnu/emacs/defaults-by-class/"
    *      setting_key="cursor-blink"
    *
-   * Returns gsettings if setting_key exists in schema.
+   * Returns GSettings* if setting_key exists in schema, otherwise NULL.
    */
 
-  printf("res_key=%s\n", res_key);
-  if (*sp >= 'A' && *sp <= 'Z') {
-    strcpy (path, "/org/gnu/emacs/defaults-by-class/");
+  /* generate path */
+  if (pgtk_is_upper_char(*sp)) {
+    /* First letter is upper case. It should be "Emacs",
+     * but don't care.
+     */
+    strcpy (path, PATH_FOR_CLASS_TYPE);
     while (*sp != '\0') {
       if (*sp == '.')
 	break;
       sp++;
     }
   } else {
-    strcpy (path, "/org/gnu/emacs/defaults-by-name/");
+    strcpy (path, PATH_PREFIX_FOR_NAME_TYPE);
     dp = path + strlen (path);
     while (*sp != '\0') {
       int c = *sp;
       if (c == '.')
 	break;
-      if (!is_valid_key_char (c))
-	return NULL;
-      if (c >= 'A' && c <= 'Z')
-	c = c - 'A' + 'a';
+      if (pgtk_is_lower_char (c))
+	(void) 0;		/* lower -> NOP */
+      else if (pgtk_is_upper_char (c))
+	c = c - 'A' + 'a';	/* upper -> lower */
+      else if (pgtk_is_numeric_char (c))
+	(void) 0;		/* numeric -> NOP */
+      else
+	return NULL;		/* invalid */
       *dp++ = c;
       sp++;
     }
-    *dp++ = '/';
+    *dp++ = '/';	/* must ends with '/' */
     *dp = '\0';
   }
 
-  if (*sp != '.')
+  if (*sp++ != '.')
     return NULL;
-  sp++;
 
+  /* generate setting_key */
   dp = setting_key;
-
   while (*sp != '\0') {
     int c = *sp;
-    if (!is_valid_key_char (c))
-      return NULL;
-    if (c >= 'A' && c <= 'Z') {
-      c = c - 'A' + 'a';
+    if (pgtk_is_lower_char (c))
+      (void) 0;			/* lower -> NOP */
+    else if (pgtk_is_upper_char (c)) {
+      c = c - 'A' + 'a';	/* upper -> lower */
       if (dp != setting_key)
-	*dp++ = '-';
-    }
+	*dp++ = '-';		/* store '-' unless first char */
+    } else if (pgtk_is_numeric_char (c))
+      (void) 0;			/* numeric -> NOP */
+    else
+      return NULL;		/* invalid */
+
     *dp++ = c;
     sp++;
   }
   *dp = '\0';
 
+  /* check existence of setting_key */
   GSettingsSchemaSource *ssrc = g_settings_schema_source_get_default ();
   GSettingsSchema *scm = g_settings_schema_source_lookup (ssrc, SCHEMA_ID, FALSE);
   printf("setting_key=%s\n", setting_key);
@@ -1729,6 +1748,7 @@ parse_resource_key (const char *res_key, char *setting_key)
     return NULL;
   }
 
+  /* create GSettings, and return it */
   printf("path=%s\n", path);
   GSettings *gs = g_settings_new_full (scm, NULL, path);
 
@@ -1755,8 +1775,14 @@ pgtk_get_defaults_value (const char *key)
   printf ("str=%p\n", str);
   printf ("str=%s\n", str ? str : "(null)");
 
+  /* There is no timing to free str.
+   * So, copy it here and free it.
+   *
+   * MEMO: Resource values for emacs shouldn't need such a long string value.
+   */
   static char holder[128];
-  strcpy (holder, str);		// fixme: when too long.
+  strncpy (holder, str, 128);
+  holder[127] = '\0';
 
   g_object_unref (gs);
   g_free (str);
@@ -1788,6 +1814,10 @@ pgtk_set_defaults_value (const char *key, const char *value)
   g_object_unref (gs);
 }
 
+#undef RESOURCE_KEY_MAX_LEN
+#undef SCHEMA_ID
+#undef PATH_FOR_CLASS_TYPE
+#undef PATH_PREFIX_FOR_NAME_TYPE
 
 DEFUN ("pgtk-get-resource", Fpgtk_get_resource, Spgtk_get_resource, 2, 2, 0,
        doc: /* Return the value of the property NAME of OWNER from the defaults database.
