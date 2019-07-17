@@ -1640,9 +1640,148 @@ Some window managers may refuse to restack windows.  */)
     }
 }
 
+
+static void resource_name_to_schema_key(const char *name, char *key)
+{
+  int first_char = true;
+  while (*name != '\0') {
+    int c = *name++;
+    if (c >= 'A' && c <= 'Z') {
+      c += 'a' - 'A';
+      if (!first_char)
+	*key++ = '-';
+    }
+    *key++ = c;
+    first_char = false;
+  }
+  *key++ = '\0';
+}
+
+static void
+get_schema_path(const char *name, char *schema, char *path)
+{
+  if (*name >= 'A' && *name <= 'Z') {
+    strcpy (schema, "org.gnu.emacs.defaults");
+    strcpy (path, "/org/gnu/emacs/defaults-by-class/");
+  } else {
+    strcpy (schema, "org.gnu.emacs.defaults");
+    strcpy (path, "/org/gnu/emacs/defaults-by-name/");
+    strcat (path, name);
+    strcat (path, "/");
+  }
+  /* path:
+   *   /org/gnu/emacs/defaults-by-class/
+   *   /org/gnu/emacs/defaults-by-name/emacs/
+   */
+}
+
 const char *
 pgtk_get_defaults_value (const char *key)
 {
+  char *key_copy = g_strdup (key);
+  char *name, *skey;
+  char schema[64], path[256];
+
+  printf("%s\n", key);
+  name = strchr (key_copy, '.');
+  if (name == NULL) {
+    g_free (key_copy);
+    return NULL;
+  }
+  *name++ = '\0';
+  printf("%s\n", name);
+
+  printf ("%d\n", (strlen (name) + 1) * 2);
+  skey = g_new0(char, (strlen (name) + 1) * 2);
+  resource_name_to_schema_key (name, skey);
+
+  printf ("key_copy=%s\n", key_copy);
+  printf ("skey=%s\n", skey);
+
+  get_schema_path (key_copy, schema, path);
+
+  printf ("schema=%s\n", schema);
+  printf ("path=%s\n", path);
+
+  GSettingsSchemaSource *ssrc = g_settings_schema_source_get_default ();
+  GSettingsSchema *scm = g_settings_schema_source_lookup (ssrc, schema, FALSE);
+  if (!g_settings_schema_has_key (scm, skey)) {
+    g_settings_schema_unref (scm);
+    g_free (skey);
+    g_free (key_copy);
+    return NULL;
+  }
+
+  GSettings *gs = g_settings_new_full (scm, NULL, path);
+  printf("%p\n", gs);
+
+  gchar *str = g_settings_get_string (gs, skey);
+  printf ("str=%p\n", str);
+  printf ("str=%s\n", str ? str : "(null)");
+
+  static char hold[128];
+  strcpy (hold, str);
+  g_free (str);
+
+  g_object_unref (gs);
+  g_settings_schema_unref (scm);
+  g_free (skey);
+  g_free (key_copy);
+  return hold;
+}
+
+void
+pgtk_set_defaults_value (const char *key, const char *value)
+{
+  char *key_copy = g_strdup (key);
+  char *name, *skey;
+  char schema[64], path[256];
+
+  printf("%s\n", key);
+  name = strchr (key_copy, '.');
+  if (name == NULL) {
+    g_free (key_copy);
+    return NULL;
+  }
+  *name++ = '\0';
+  printf("%s\n", name);
+
+  printf ("%d\n", (strlen (name) + 1) * 2);
+  skey = g_new0(char, (strlen (name) + 1) * 2);
+  resource_name_to_schema_key (name, skey);
+
+  printf ("key_copy=%s\n", key_copy);
+  printf ("skey=%s\n", skey);
+
+  get_schema_path (key_copy, schema, path);
+
+  printf ("schema=%s\n", schema);
+  printf ("path=%s\n", path);
+
+  GSettingsSchemaSource *ssrc = g_settings_schema_source_get_default ();
+  GSettingsSchema *scm = g_settings_schema_source_lookup (ssrc, schema, FALSE);
+  if (!g_settings_schema_has_key (scm, skey)) {
+    g_settings_schema_unref (scm);
+    g_free (skey);
+    g_free (key_copy);
+    return NULL;
+  }
+
+  GSettings *gs = g_settings_new_full (scm, NULL, path);
+  printf("%p\n", gs);
+
+  if (value != NULL) {
+    printf("%s = %s\n", skey, value);
+    g_settings_set_string (gs, skey, value);
+  } else {
+    printf("%s = (reset)\n", skey);
+    g_settings_reset (gs, skey);
+  }
+
+  g_object_unref (gs);
+  g_settings_schema_unref (scm);
+  g_free (skey);
+  g_free (key_copy);
   return NULL;
 }
 
@@ -1667,16 +1806,24 @@ If OWNER is nil, Emacs is assumed.  */)
 }
 
 
-DEFUN ("pgtk-set-resource", Fpgtk_set_resource, Spgtk_set_resource, 3, 3, 0,
-       doc: /* Set property NAME of OWNER to VALUE, from the defaults database.
-If OWNER is nil, Emacs is assumed.
-If VALUE is nil, the default is removed.  */)
-     (Lisp_Object owner, Lisp_Object name, Lisp_Object value)
+DEFUN ("pgtk-set-resource", Fpgtk_set_resource, Spgtk_set_resource, 2, 2, 0,
+       doc: /* Set the value of ATTRIBUTE, of class CLASS, as VALUE, into defaults database. */)
+     (Lisp_Object attribute, Lisp_Object value)
 {
   check_window_system (NULL);
-  if (NILP (owner))
-    owner = build_string (pgtk_app_name);
-  CHECK_STRING (name);
+
+  CHECK_STRING (attribute);
+  if (!NILP (value))
+    CHECK_STRING (value);
+
+  char *res = SSDATA (Vx_resource_name);
+  char *attr = SSDATA (attribute);
+  if (attr[0] >= 'A' && attr[0] <= 'Z')
+    res = SSDATA (Vx_resource_class);
+
+  char *key = g_strdup_printf("%s.%s", res, attr);
+
+  pgtk_set_defaults_value(key, NILP (value) ? NULL : SSDATA (value));
 
   return Qnil;
 }
@@ -1973,20 +2120,26 @@ pgtk_set_scroll_bar_default_height (struct frame *f)
 const char *
 pgtk_get_string_resource (XrmDatabase rdb, const char *name, const char *class)
 {
-  /* remove appname prefix; TODO: allow for !="Emacs" */
-  const char *res, *toCheck = class + (!strncmp (class, "Emacs.", 6) ? 6 : 0);
-
   check_window_system (NULL);
 
   if (inhibit_x_resources)
     /* --quick was passed, so this is a no-op.  */
     return NULL;
 
-  res = pgtk_get_defaults_value (toCheck);
-  return (char *) (!res ? NULL
-		   : !c_strncasecmp (res, "YES", 3) ? "true"
-		   : !c_strncasecmp (res, "NO", 2) ? "false"
-		   : res);
+  const char *res = pgtk_get_defaults_value (name);
+  if (res == NULL)
+    res = pgtk_get_defaults_value (class);
+
+  if (res == NULL)
+    return NULL;
+
+  if (c_strncasecmp (res, "YES", 3) == 0)
+    return "true";
+
+  if (c_strncasecmp (res, "NO", 2) == 0)
+    return "false";
+
+  return res;
 }
 
 
