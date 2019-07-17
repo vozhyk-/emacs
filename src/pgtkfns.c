@@ -1641,148 +1641,151 @@ Some window managers may refuse to restack windows.  */)
 }
 
 
-static void resource_name_to_schema_key(const char *name, char *key)
+#define RESOURCE_KEY_MAX_LEN 128
+#define SCHEMA_ID "org.gnu.emacs.defaults"
+
+static inline int
+is_valid_key_char(int c)
 {
-  int first_char = true;
-  while (*name != '\0') {
-    int c = *name++;
-    if (c >= 'A' && c <= 'Z') {
-      c += 'a' - 'A';
-      if (!first_char)
-	*key++ = '-';
-    }
-    *key++ = c;
-    first_char = false;
-  }
-  *key++ = '\0';
+  if (c >= 'a' && c <= 'z')
+    return 1;
+  if (c >= 'A' && c <= 'Z')
+    return 1;
+  if (c >= '0' && c <= '9')
+    return 1;
+  return 0;
 }
 
-static void
-get_schema_path(const char *name, char *schema, char *path)
+static GSettings *
+parse_resource_key (const char *res_key, char *setting_key)
 {
-  if (*name >= 'A' && *name <= 'Z') {
-    strcpy (schema, "org.gnu.emacs.defaults");
-    strcpy (path, "/org/gnu/emacs/defaults-by-class/");
-  } else {
-    strcpy (schema, "org.gnu.emacs.defaults");
-    strcpy (path, "/org/gnu/emacs/defaults-by-name/");
-    strcat (path, name);
-    strcat (path, "/");
-  }
-  /* path:
-   *   /org/gnu/emacs/defaults-by-class/
-   *   /org/gnu/emacs/defaults-by-name/emacs/
+  char path[32 + RESOURCE_KEY_MAX_LEN];
+  const char *sp = res_key;
+  char *dp;
+
+  /*
+   * res_key="emacs.cursorBlink"
+   *   -> path="/org/gnu/emacs/defaults-by-name/emacs/"
+   *      setting_key="cursor-blink"
+   *
+   * res_key="Emacs.CursorBlink"
+   *   -> path="/org/gnu/emacs/defaults-by-class/"
+   *      setting_key="cursor-blink"
+   *
+   * Returns gsettings if setting_key exists in schema.
    */
+
+  printf("res_key=%s\n", res_key);
+  if (*sp >= 'A' && *sp <= 'Z') {
+    strcpy (path, "/org/gnu/emacs/defaults-by-class/");
+    while (*sp != '\0') {
+      if (*sp == '.')
+	break;
+      sp++;
+    }
+  } else {
+    strcpy (path, "/org/gnu/emacs/defaults-by-name/");
+    dp = path + strlen (path);
+    while (*sp != '\0') {
+      int c = *sp;
+      if (c == '.')
+	break;
+      if (!is_valid_key_char (c))
+	return NULL;
+      if (c >= 'A' && c <= 'Z')
+	c = c - 'A' + 'a';
+      *dp++ = c;
+      sp++;
+    }
+    *dp++ = '/';
+    *dp = '\0';
+  }
+
+  if (*sp != '.')
+    return NULL;
+  sp++;
+
+  dp = setting_key;
+
+  while (*sp != '\0') {
+    int c = *sp;
+    if (!is_valid_key_char (c))
+      return NULL;
+    if (c >= 'A' && c <= 'Z') {
+      c = c - 'A' + 'a';
+      if (dp != setting_key)
+	*dp++ = '-';
+    }
+    *dp++ = c;
+    sp++;
+  }
+  *dp = '\0';
+
+  GSettingsSchemaSource *ssrc = g_settings_schema_source_get_default ();
+  GSettingsSchema *scm = g_settings_schema_source_lookup (ssrc, SCHEMA_ID, FALSE);
+  printf("setting_key=%s\n", setting_key);
+  if (!g_settings_schema_has_key (scm, setting_key)) {
+    g_settings_schema_unref (scm);
+    return NULL;
+  }
+
+  printf("path=%s\n", path);
+  GSettings *gs = g_settings_new_full (scm, NULL, path);
+
+  g_settings_schema_unref (scm);
+  printf("%p\n", gs);
+  return gs;
 }
 
 const char *
 pgtk_get_defaults_value (const char *key)
 {
-  char *key_copy = g_strdup (key);
-  char *name, *skey;
-  char schema[64], path[256];
+  char skey[(RESOURCE_KEY_MAX_LEN + 1) * 2];
 
-  printf("%s\n", key);
-  name = strchr (key_copy, '.');
-  if (name == NULL) {
-    g_free (key_copy);
+  if (strlen (key) >= RESOURCE_KEY_MAX_LEN)
+    error ("resource key too long.");
+
+  GSettings *gs = parse_resource_key(key, skey);
+  if (gs == NULL) {
+    printf("bad: %s\n", key);
     return NULL;
   }
-  *name++ = '\0';
-  printf("%s\n", name);
-
-  printf ("%d\n", (strlen (name) + 1) * 2);
-  skey = g_new0(char, (strlen (name) + 1) * 2);
-  resource_name_to_schema_key (name, skey);
-
-  printf ("key_copy=%s\n", key_copy);
-  printf ("skey=%s\n", skey);
-
-  get_schema_path (key_copy, schema, path);
-
-  printf ("schema=%s\n", schema);
-  printf ("path=%s\n", path);
-
-  GSettingsSchemaSource *ssrc = g_settings_schema_source_get_default ();
-  GSettingsSchema *scm = g_settings_schema_source_lookup (ssrc, schema, FALSE);
-  if (!g_settings_schema_has_key (scm, skey)) {
-    g_settings_schema_unref (scm);
-    g_free (skey);
-    g_free (key_copy);
-    return NULL;
-  }
-
-  GSettings *gs = g_settings_new_full (scm, NULL, path);
-  printf("%p\n", gs);
 
   gchar *str = g_settings_get_string (gs, skey);
   printf ("str=%p\n", str);
   printf ("str=%s\n", str ? str : "(null)");
 
-  static char hold[128];
-  strcpy (hold, str);
-  g_free (str);
+  static char holder[128];
+  strcpy (holder, str);		// fixme: when too long.
 
   g_object_unref (gs);
-  g_settings_schema_unref (scm);
-  g_free (skey);
-  g_free (key_copy);
-  return hold;
+  g_free (str);
+  return holder[0] != '\0' ? holder : NULL;
 }
 
 void
 pgtk_set_defaults_value (const char *key, const char *value)
 {
-  char *key_copy = g_strdup (key);
-  char *name, *skey;
-  char schema[64], path[256];
+  char skey[(RESOURCE_KEY_MAX_LEN + 1) * 2];
 
-  printf("%s\n", key);
-  name = strchr (key_copy, '.');
-  if (name == NULL) {
-    g_free (key_copy);
+  if (strlen (key) >= RESOURCE_KEY_MAX_LEN)
+    error ("resource key too long.");
+
+  GSettings *gs = parse_resource_key(key, skey);
+  if (gs == NULL) {
+    printf("bad: %s\n", key);
     return NULL;
   }
-  *name++ = '\0';
-  printf("%s\n", name);
-
-  printf ("%d\n", (strlen (name) + 1) * 2);
-  skey = g_new0(char, (strlen (name) + 1) * 2);
-  resource_name_to_schema_key (name, skey);
-
-  printf ("key_copy=%s\n", key_copy);
-  printf ("skey=%s\n", skey);
-
-  get_schema_path (key_copy, schema, path);
-
-  printf ("schema=%s\n", schema);
-  printf ("path=%s\n", path);
-
-  GSettingsSchemaSource *ssrc = g_settings_schema_source_get_default ();
-  GSettingsSchema *scm = g_settings_schema_source_lookup (ssrc, schema, FALSE);
-  if (!g_settings_schema_has_key (scm, skey)) {
-    g_settings_schema_unref (scm);
-    g_free (skey);
-    g_free (key_copy);
-    return NULL;
-  }
-
-  GSettings *gs = g_settings_new_full (scm, NULL, path);
-  printf("%p\n", gs);
 
   if (value != NULL) {
-    printf("%s = %s\n", skey, value);
+    printf ("value=%s\n", value);
     g_settings_set_string (gs, skey, value);
   } else {
-    printf("%s = (reset)\n", skey);
+    printf ("value=(reset)\n");
     g_settings_reset (gs, skey);
   }
 
   g_object_unref (gs);
-  g_settings_schema_unref (scm);
-  g_free (skey);
-  g_free (key_copy);
-  return NULL;
 }
 
 
