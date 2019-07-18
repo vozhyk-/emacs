@@ -45,7 +45,6 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include "fontset.h"
 #include "composite.h"
 #include "ccl.h"
-#include "dynlib.h"
 
 #include "termhooks.h"
 #include "termopts.h"
@@ -6140,68 +6139,6 @@ same_x_server (const char *name1, const char *name2)
   return (seen_colon
 	  && (*name1 == '.' || *name1 == '\0')
 	  && (*name2 == '.' || *name2 == '\0'));
-}
-
-/***
-    Detect socket to display server.
-    Don't assume existence of X11 or Wayland specific functions.
-***/
-
-static int pgtk_detect_wayland_connection(dynlib_handle_ptr h, GdkDisplay *gdpy)
-{
-  GType wldpy_type;
-  void *(*fn1)(void *);
-  int (*fn2)(void *);
-  /* Check gdpy is an instance of GdkWaylandDisplay. */
-  if ((wldpy_type = g_type_from_name("GdkWaylandDisplay")) == G_TYPE_INVALID)
-    return -1;
-  if (!g_type_check_instance_is_a((void *) gdpy, wldpy_type))
-    return -1;
-  /* Obtain Wayland Display from GdkWaylandDisplay,
-     and get file descriptor from it. */
-  fn1 = dynlib_sym(h, "gdk_wayland_display_get_wl_display");
-  fn2 = dynlib_sym(h, "wl_display_get_fd");
-  if (!fn1 || !fn2)
-    return -1;
-  return fn2(fn1(gdpy));
-}
-
-static int pgtk_detect_x11_connection(dynlib_handle_ptr h, GdkDisplay *gdpy)
-{
-  GType xdpy_type;
-  void *(*fn1)(void *);
-  int (*fn2)(void *);
-  /* Check gdpy is an instance of GdkX11Display. */
-  if ((xdpy_type = g_type_from_name("GdkX11Display")) == G_TYPE_INVALID)
-    return -1;
-  if (!g_type_check_instance_is_a((void *) gdpy, xdpy_type))
-    return -1;
-  /* Obtain X Display from GdkX11Display, and get file descriptor from it. */
-  fn1 = dynlib_sym(h, "gdk_x11_display_get_xdisplay");
-  fn2 = dynlib_sym(h, "XConnectionNumber");
-  if (!fn1 || !fn2)
-    return -1;
-  return fn2(fn1(gdpy));
-}
-
-static int pgtk_detect_connection(GdkDisplay *gdpy)
-{
-  static dynlib_handle_ptr h = NULL;
-  int fd;
-  if (h == NULL) {
-    if ((h = dynlib_open(NULL)) == NULL) {
-      error("dynlib_open failed.");
-      return -1;
-    }
-  }
-  if ((fd = pgtk_detect_x11_connection(h, gdpy)) != -1)
-    return fd;
-  if ((fd = pgtk_detect_wayland_connection(h, gdpy)) != -1)
-    return fd;
-  /* I don't know how to detect fd if other backend. */
-
-  error("socket detection failed.");
-  return -1;
 }
 
 /* Open a connection to X display DISPLAY_NAME, and return
