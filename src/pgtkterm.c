@@ -6550,20 +6550,10 @@ pgtk_term_init (Lisp_Object display_name, char *resource_name)
 	argv[argc++] = name_opt;
 	argv[argc++] = resource_name;
 
-#if 0
-	XSetLocaleModifiers ("");
-#endif
-
 	/* Work around GLib bug that outputs a faulty warning. See
 	   https://bugzilla.gnome.org/show_bug.cgi?id=563627.  */
 	id = g_log_set_handler ("GLib", G_LOG_LEVEL_WARNING | G_LOG_FLAG_FATAL
 				  | G_LOG_FLAG_RECURSION, my_log_handler, NULL);
-
-#if 0
-	/* NULL window -> events for all windows go to our function.
-	   Call before gtk_init so Gtk+ event filters comes after our.  */
-	gdk_window_add_filter (NULL, event_handler_gdk, NULL);
-#endif
 
 	/* gtk_init does set_locale.  Fix locale before and after.  */
 	fixup_locale ();
@@ -6695,61 +6685,7 @@ pgtk_term_init (Lisp_Object display_name, char *resource_name)
   dpyinfo->horizontal_scroll_bar_cursor
     = gdk_cursor_new_for_display(dpyinfo->gdpy, GDK_SB_H_DOUBLE_ARROW);
 
-#if 0
-  xrdb = x_load_resources (dpyinfo->display, xrm_option,
-			   resource_name, EMACS_CLASS);
-  dpyinfo->display->db = xrdb;
-  /* Put the rdb where we can find it in a way that works on
-     all versions.  */
-  dpyinfo->xrdb = xrdb;
-#endif
-
-#if 0
-  dpyinfo->screen = ScreenOfDisplay (dpyinfo->display,
-				     DefaultScreen (dpyinfo->display));
-  select_visual (dpyinfo);
-  dpyinfo->cmap = DefaultColormapOfScreen (dpyinfo->screen);
-  dpyinfo->root_window = RootWindowOfScreen (dpyinfo->screen);
-  dpyinfo->icon_bitmap_id = -1;
-  dpyinfo->wm_type = X_WMTYPE_UNKNOWN;
-#endif
-
   reset_mouse_highlight (&dpyinfo->mouse_highlight);
-
-#if 0
-  /* See if we can construct pixel values from RGB values.  */
-  if (dpyinfo->visual->class == TrueColor)
-    {
-      get_bits_and_offset (dpyinfo->visual->red_mask,
-			   &dpyinfo->red_bits, &dpyinfo->red_offset);
-      get_bits_and_offset (dpyinfo->visual->blue_mask,
-			   &dpyinfo->blue_bits, &dpyinfo->blue_offset);
-      get_bits_and_offset (dpyinfo->visual->green_mask,
-			   &dpyinfo->green_bits, &dpyinfo->green_offset);
-    }
-#endif
-
-#if 0
-  /* See if a private colormap is requested.  */
-  if (dpyinfo->visual == DefaultVisualOfScreen (dpyinfo->screen))
-    {
-      if (dpyinfo->visual->class == PseudoColor)
-	{
-	  AUTO_STRING (privateColormap, "privateColormap");
-	  AUTO_STRING (PrivateColormap, "PrivateColormap");
-	  Lisp_Object value
-	    = display_x_get_resource (dpyinfo, privateColormap,
-				      PrivateColormap, Qnil, Qnil);
-	  if (STRINGP (value)
-	      && (!strcmp (SSDATA (value), "true")
-		  || !strcmp (SSDATA (value), "on")))
-	    dpyinfo->cmap = XCopyColormapAndFree (dpyinfo->display, dpyinfo->cmap);
-	}
-    }
-  else
-    dpyinfo->cmap = XCreateColormap (dpyinfo->display, dpyinfo->root_window,
-				     dpyinfo->visual, AllocNone);
-#endif
 
   {
     GdkScreen *gscr = gdk_display_get_default_screen(dpyinfo->gdpy);
@@ -6762,12 +6698,6 @@ pgtk_term_init (Lisp_Object display_name, char *resource_name)
   dpyinfo->x_dnd_atoms_size = 8;
   dpyinfo->x_dnd_atoms = xmalloc (sizeof *dpyinfo->x_dnd_atoms
 				  * dpyinfo->x_dnd_atoms_size);
-#endif
-#if 0
-  dpyinfo->gray
-    = XCreatePixmapFromBitmapData (dpyinfo->display, dpyinfo->root_window,
-				   gray_bits, gray_width, gray_height,
-				   1, 0, 1);
 #endif
 
   x_setup_pointer_blanking (dpyinfo);
@@ -7110,25 +7040,6 @@ pgtk_begin_cr_clip (struct frame *f, Emacs_GC *gc)
     }
 
   cairo_save (cr);
-
-#if 0
-  if (gc)
-    {
-      struct x_gc_ext_data *gc_ext = x_gc_get_ext_data (f, gc, 0);
-
-      if (gc_ext && gc_ext->n_clip_rects)
-	{
-	  int i;
-
-	  for (i = 0; i < gc_ext->n_clip_rects; i++)
-	    cairo_rectangle (cr, gc_ext->clip_rects[i].x,
-			     gc_ext->clip_rects[i].y,
-			     gc_ext->clip_rects[i].width,
-			     gc_ext->clip_rects[i].height);
-	  cairo_clip (cr);
-	}
-    }
-#endif
 
   return cr;
 }
