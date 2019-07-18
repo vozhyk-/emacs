@@ -405,77 +405,14 @@ pgtk_set_window_size (struct frame *f,
     PGTK_TRACE(" %dx%d+%d+%d", alloc.width, alloc.height, alloc.x, alloc.y);
   }
 
-#if 0
-  gtk_widget_set_size_request(FRAME_GTK_WIDGET(f), pixelwidth, pixelheight);
-#else
-  // gtk_widget_set_size_request(FRAME_GTK_OUTER_WIDGET(f), pixelwidth, pixelheight);
   PGTK_TRACE("pgtk_set_window_size: %p: %dx%d.", f, width, height);
   f->output_data.pgtk->preferred_width = pixelwidth;
   f->output_data.pgtk->preferred_height = pixelheight;
-  // gtk_window_resize(GTK_WINDOW(FRAME_GTK_OUTER_WIDGET(f)), pixelwidth, pixelheight);
   x_wm_set_size_hint(f, 0, 0);
   xg_frame_set_char_size (f, FRAME_PIXEL_TO_TEXT_WIDTH(f, pixelwidth), FRAME_PIXEL_TO_TEXT_HEIGHT(f, pixelheight));
   gtk_widget_queue_resize (FRAME_GTK_OUTER_WIDGET (f));
-#endif
 
   unblock_input ();
-
-#if 0
-  EmacsView *view = FRAME_NS_VIEW (f);
-  NSWindow *window = [view window];
-  NSRect wr = [window frame];
-  int pixelwidth, pixelheight;
-  int orig_height = wr.size.height;
-
-  NSTRACE ("x_set_window_size");
-
-  if (view == nil)
-    return;
-
-  NSTRACE_RECT ("current", wr);
-  NSTRACE_MSG ("Width:%d Height:%d Pixelwise:%d", width, height, pixelwise);
-  NSTRACE_MSG ("Font %d x %d", FRAME_COLUMN_WIDTH (f), FRAME_LINE_HEIGHT (f));
-
-  block_input ();
-
-  if (pixelwise)
-    {
-      pixelwidth = FRAME_TEXT_TO_PIXEL_WIDTH (f, width);
-      pixelheight = FRAME_TEXT_TO_PIXEL_HEIGHT (f, height);
-    }
-  else
-    {
-      pixelwidth =  FRAME_TEXT_COLS_TO_PIXEL_WIDTH   (f, width);
-      pixelheight = FRAME_TEXT_LINES_TO_PIXEL_HEIGHT (f, height);
-    }
-
-  wr.size.width = pixelwidth + f->border_width;
-  wr.size.height = pixelheight;
-  if (! [view isFullscreen])
-    wr.size.height += FRAME_NS_TITLEBAR_HEIGHT (f)
-      + FRAME_TOOLBAR_HEIGHT (f);
-
-  /* Do not try to constrain to this screen.  We may have multiple
-     screens, and want Emacs to span those.  Constraining to screen
-     prevents that, and that is not nice to the user.  */
- if (f->output_data.ns->zooming)
-   f->output_data.ns->zooming = 0;
- else
-   wr.origin.y += orig_height - wr.size.height;
-
- frame_size_history_add
-   (f, Qx_set_window_size_1, width, height,
-    list5 (Fcons (make_fixnum (pixelwidth), make_fixnum (pixelheight)),
-	   Fcons (make_fixnum (wr.size.width), make_fixnum (wr.size.height)),
-	   make_fixnum (f->border_width),
-	   make_fixnum (FRAME_NS_TITLEBAR_HEIGHT (f)),
-	   make_fixnum (FRAME_TOOLBAR_HEIGHT (f))));
-
-  [window setFrame: wr display: YES];
-
-  [view updateFrameSize: NO];
-  unblock_input ();
-#endif
 }
 
 void
@@ -532,11 +469,7 @@ pgtk_iconify_frame (struct frame *f)
   SET_FRAME_ICONIFIED (f, true);
   SET_FRAME_VISIBLE (f, 0);
 
-#if 0
-  XFlush (FRAME_X_DISPLAY (f));
-#else
   gdk_flush();
-#endif
   unblock_input ();
 }
 
@@ -1947,81 +1880,6 @@ x_draw_underwave (struct glyph_string *s, unsigned long color)
 			  s->width, wave_height, wave_length);
 }
 
-/* Draw the foreground of image glyph string S to PIXMAP.  */
-
-static void
-x_draw_image_foreground_1 (struct glyph_string *s, cairo_surface_t *surface)
-{
-  int x = 0;
-  int y = s->ybase - s->y - image_ascent (s->img, s->face, &s->slice);
-
-  /* If first glyph of S has a left box line, start drawing it to the
-     right of that line.  */
-  if (s->face->box != FACE_NO_BOX
-      && s->first_glyph->left_box_line_p
-      && s->slice.x == 0)
-    x += eabs (s->face->box_line_width);
-
-  /* If there is a margin around the image, adjust x- and y-position
-     by that margin.  */
-  if (s->slice.x == 0)
-    x += s->img->hmargin;
-  if (s->slice.y == 0)
-    y += s->img->vmargin;
-
-#if 0
-  if (s->img->pixmap)
-    {
-      if (s->img->mask)
-	{
-	  /* We can't set both a clip mask and use XSetClipRectangles
-	     because the latter also sets a clip mask.  We also can't
-	     trust on the shape extension to be available
-	     (XShapeCombineRegion).  So, compute the rectangle to draw
-	     manually.  */
-	  unsigned long mask = (GCClipMask | GCClipXOrigin | GCClipYOrigin
-				| GCFunction);
-	  Emacs_GC xgcv;
-
-	  xgcv.clip_mask = s->img->mask;
-	  xgcv.clip_x_origin = x - s->slice.x;
-	  xgcv.clip_y_origin = y - s->slice.y;
-	  xgcv.function = GXcopy;
-	  XChangeGC (s->display, s->gc, mask, &xgcv);
-
-	  XCopyArea (s->display, s->img->pixmap, pixmap, s->gc,
-		     s->slice.x, s->slice.y,
-		     s->slice.width, s->slice.height, x, y);
-	  XSetClipMask (s->display, s->gc, None);
-	}
-      else
-	{
-	  XCopyArea (s->display, s->img->pixmap, pixmap, s->gc,
-		     s->slice.x, s->slice.y,
-		     s->slice.width, s->slice.height, x, y);
-
-	  /* When the image has a mask, we can expect that at
-	     least part of a mouse highlight or a block cursor will
-	     be visible.  If the image doesn't have a mask, make
-	     a block cursor visible by drawing a rectangle around
-	     the image.  I believe it's looking better if we do
-	     nothing here for mouse-face.  */
-	  if (s->hl == DRAW_CURSOR)
-	    {
-	      int r = eabs (s->img->relief);
-	      x_draw_rectangle (s->f, s->gc, x - r, y - r,
-			      s->slice.width + r*2 - 1,
-			      s->slice.height + r*2 - 1);
-	    }
-	}
-    }
-  else
-#endif
-    /* Draw a rectangle if image could not be loaded.  */
-    pgtk_draw_rectangle (s->f, s->xgcv.foreground, x, y,
-			   s->slice.width - 1, s->slice.height - 1);
-}
-
 /* Draw a relief around the image glyph string S.  */
 
 static void
@@ -2140,74 +1998,9 @@ x_draw_image_foreground (struct glyph_string *s)
   if (s->slice.y == 0)
     y += s->img->vmargin;
 
-#if 0
-  if (s->img->pixmap)
-    {
-      if (s->img->mask)
-	{
-	  /* We can't set both a clip mask and use XSetClipRectangles
-	     because the latter also sets a clip mask.  We also can't
-	     trust on the shape extension to be available
-	     (XShapeCombineRegion).  So, compute the rectangle to draw
-	     manually.  */
-	  unsigned long mask = (GCClipMask | GCClipXOrigin | GCClipYOrigin
-				| GCFunction);
-	  Emacs_GC xgcv;
-	  XRectangle clip_rect, image_rect, r;
-
-	  xgcv.clip_mask = s->img->mask;
-	  xgcv.clip_x_origin = x;
-	  xgcv.clip_y_origin = y;
-	  xgcv.function = GXcopy;
-	  XChangeGC (s->display, s->gc, mask, &xgcv);
-
-	  get_glyph_string_clip_rect (s, &clip_rect);
-	  image_rect.x = x;
-	  image_rect.y = y;
-	  image_rect.width = s->slice.width;
-	  image_rect.height = s->slice.height;
-	  if (x_intersect_rectangles (&clip_rect, &image_rect, &r))
-	    XCopyArea (s->display, s->img->pixmap,
-		       FRAME_X_DRAWABLE (s->f), s->gc,
-		       s->slice.x + r.x - x, s->slice.y + r.y - y,
-		       r.width, r.height, r.x, r.y);
-	}
-      else
-	{
-	  XRectangle clip_rect, image_rect, r;
-
-	  get_glyph_string_clip_rect (s, &clip_rect);
-	  image_rect.x = x;
-	  image_rect.y = y;
-	  image_rect.width = s->slice.width;
-	  image_rect.height = s->slice.height;
-	  if (x_intersect_rectangles (&clip_rect, &image_rect, &r))
-	    XCopyArea (s->display, s->img->pixmap,
-		       FRAME_X_DRAWABLE (s->f), s->gc,
-		       s->slice.x + r.x - x, s->slice.y + r.y - y,
-		       r.width, r.height, r.x, r.y);
-
-	  /* When the image has a mask, we can expect that at
-	     least part of a mouse highlight or a block cursor will
-	     be visible.  If the image doesn't have a mask, make
-	     a block cursor visible by drawing a rectangle around
-	     the image.  I believe it's looking better if we do
-	     nothing here for mouse-face.  */
-	  if (s->hl == DRAW_CURSOR)
-	    {
-	      int relief = eabs (s->img->relief);
-	      x_draw_rectangle (s->f, s->gc,
-			      x - relief, y - relief,
-			      s->slice.width + relief*2 - 1,
-			      s->slice.height + relief*2 - 1);
-	    }
-	}
-    }
-  else
-#endif
-    /* Draw a rectangle if image could not be loaded.  */
-    pgtk_draw_rectangle (s->f, s->xgcv.foreground, x, y,
-			   s->slice.width - 1, s->slice.height - 1);
+  /* Draw a rectangle if image could not be loaded.  */
+  pgtk_draw_rectangle (s->f, s->xgcv.foreground, x, y,
+		       s->slice.width - 1, s->slice.height - 1);
 }
 
 /* Draw image glyph string S.
@@ -2246,9 +2039,7 @@ x_draw_image_glyph_string (struct glyph_string *s)
       || s->img->vmargin
       || s->img->mask
       || s->img->pixmap == 0
-#ifdef HAVE_PGTK
       || s->stippled_p
-#endif
       || s->width != s->background_width)
     {
       if (s->img->mask)
@@ -4976,30 +4767,8 @@ pgtk_any_window_to_frame (GdkWindow *window)
       f = XFRAME (frame);
       if (FRAME_PGTK_P (f))
 	{
-#if 1
 	  if (pgtk_window_is_of_frame(f, window))
 	    found = f;
-#elif 1
-	  if (FRAME_GTK_OUTER_WIDGET(f) && gtk_widget_get_window(FRAME_GTK_OUTER_WIDGET(f)) == window)
-	    found = f;
-	  if (FRAME_GTK_WIDGET(f) && gtk_widget_get_window(FRAME_GTK_WIDGET(f)) == window)
-	    found = f;
-#else
-	  /* This frame matches if the window is any of its widgets.  */
-	  x = FRAME_X_OUTPUT(f);
-	  if (x->hourglass_window == wdesc)
-	    found = f;
-	  else if (x->widget)
-	    {
-	      GtkWidget *gwdesc = xg_win_to_widget (dpyinfo->display, wdesc);
-	      if (gwdesc != 0
-		  && gtk_widget_get_toplevel (gwdesc) == x->widget)
-		found = f;
-	    }
-	  else if (FRAME_GTK_WIDGET (f) == widget)
-	    /* A tooltip frame.  */
-	    found = f;
-#endif
 	}
     }
 
@@ -6073,9 +5842,6 @@ button_event(GtkWidget *widget, GdkEvent *event, gpointer *user_data)
   frame = pgtk_any_window_to_frame(gtk_widget_get_window(widget));
   dpyinfo = FRAME_DISPLAY_INFO (frame);
 
-#if 0
-  memset (&compose_status, 0, sizeof (compose_status));
-#endif
   dpyinfo->last_mouse_glyph_frame = NULL;
 #if 0
   x_display_set_last_user_time (dpyinfo, event->button.time);
@@ -6090,10 +5856,6 @@ button_event(GtkWidget *widget, GdkEvent *event, gpointer *user_data)
       if (f && event->button.type == GDK_BUTTON_PRESS
 #if 0
 	  && !popup_activated ()
-#endif
-#if 0
-	  && !x_window_to_scroll_bar (event->button.display,
-				      event->button.window, 2)
 #endif
 	  && !FRAME_NO_ACCEPT_FOCUS (f))
 	{
@@ -6146,17 +5908,6 @@ button_event(GtkWidget *widget, GdkEvent *event, gpointer *user_data)
 			     XEMBED_REQUEST_FOCUS, 0, 0, 0);
 #endif
     }
-  else
-    {
-#if 0
-      struct scroll_bar *bar
-	= x_window_to_scroll_bar (event->button.display,
-				  event->button.window, 2);
-
-      if (bar)
-	x_scroll_bar_handle_click (bar, event, &inev.ie);
-#endif
-    }
 
   if (event->type == GDK_BUTTON_PRESS)
     {
@@ -6171,34 +5922,6 @@ button_event(GtkWidget *widget, GdkEvent *event, gpointer *user_data)
      only motion after the ButtonPress/Release.  */
   if (f != 0)
     f->mouse_moved = false;
-
-#if 0
-  f = x_menubar_window_to_frame (dpyinfo, event);
-  /* For a down-event in the menu bar,
-     don't pass it to Xt right now.
-     Instead, save it away
-     and we will pass it to Xt from kbd_buffer_get_event.
-     That way, we can run some Lisp code first.  */
-  if (! popup_activated ()
-      /* Gtk+ menus only react to the first three buttons. */
-      && event->button.button < 3
-      && f && event->type == GDK_BUTTON_PRESS
-      /* Verify the event is really within the menu bar
-	 and not just sent to it due to grabbing.  */
-      && event->button.x >= 0
-      && event->button.x < FRAME_PIXEL_WIDTH (f)
-      && event->button.y >= 0
-      && event->button.y < FRAME_MENUBAR_HEIGHT (f)
-      && event->button.same_screen)
-    {
-      if (!FRAME_X_OUTPUT(f)->saved_menu_event)
-	FRAME_X_OUTPUT(f)->saved_menu_event = xmalloc (sizeof *event);
-      *FRAME_X_OUTPUT(f)->saved_menu_event = *event;
-      inev.ie.kind = MENU_BAR_ACTIVATE_EVENT;
-      XSETFRAME (inev.ie.frame_or_window, f);
-      *finish = X_EVENT_DROP;
-    }
-#endif
 
   if (inev.ie.kind != NO_EVENT)
     evq_enqueue (&inev);
