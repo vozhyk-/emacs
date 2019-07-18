@@ -66,11 +66,9 @@ Not implemented:
   - x_set_no_accept_focus
   - x_set_z_group
   - auto-raise/lower
+  - vendor_specific_keysyms
 - Some other features. Keywords:
   - popup_activated
-  - vendor_specific_keysyms
-  - x_find_modifier_meanings
-  - x_load_resources
   - dnd
   - gtk_plug (not exists on wayland)
   - x_set_parent_frame
@@ -107,7 +105,7 @@ To use them, you can write this code in `~/.emacs`:
 
 Changing this variable on the fly may not work.
 
-You may need build and install cairo from git repo. 1.15.12 is insufficient.
+You need cairo 1.16.0.
 
 ## My Environment
 
