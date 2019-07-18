@@ -570,6 +570,9 @@ have_buggy_timerfd (void)
 # ifdef CYGWIN
   struct utsname name;
   return uname (&name) < 0 || strverscmp (name.release, "3.0.2") < 0;
+# elif defined HAVE_PGTK
+  /* pgtk emacs does not want timerfd. */
+  return true;
 # else
   return false;
 # endif
@@ -582,7 +585,7 @@ init_atimer (void)
 #ifdef HAVE_ITIMERSPEC
 # ifdef HAVE_TIMERFD
   /* Until this feature is considered stable, you can ask to not use it.  */
-  timerfd = (getenv ("EMACS_IGNORE_TIMERFD") || have_buggy_timerfd () ? -1 :    /* process-environment is not setup yet, so egetenv() is not available. */
+  timerfd = (egetenv ("EMACS_IGNORE_TIMERFD") || have_buggy_timerfd () ? -1 :
 	     timerfd_create (CLOCK_REALTIME, TFD_NONBLOCK | TFD_CLOEXEC));
 # endif
   if (timerfd < 0)

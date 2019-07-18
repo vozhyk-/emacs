@@ -6828,5 +6828,4 @@ pgtk_cr_destroy_surface(struct frame *f)
 void
 init_pgtkterm (void)
 {
-  xputenv ("EMACS_IGNORE_TIMERFD=1");
 }
