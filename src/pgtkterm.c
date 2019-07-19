@@ -6354,12 +6354,6 @@ pgtk_term_init (Lisp_Object display_name, char *resource_name)
     dpyinfo->resy = dpi;
   }
 
-#if 0
-  dpyinfo->x_dnd_atoms_size = 8;
-  dpyinfo->x_dnd_atoms = xmalloc (sizeof *dpyinfo->x_dnd_atoms
-				  * dpyinfo->x_dnd_atoms_size);
-#endif
-
   x_setup_pointer_blanking (dpyinfo);
 
   xsettings_initialize (dpyinfo);

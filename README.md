@@ -69,7 +69,6 @@ Not implemented:
   - vendor_specific_keysyms
 - Some other features. Keywords:
   - popup_activated
-  - dnd
   - gtk_plug (not exists on wayland)
   - x_set_parent_frame
   - frame_x_embedded_p
