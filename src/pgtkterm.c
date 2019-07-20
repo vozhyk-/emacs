@@ -649,60 +649,6 @@ x_display_pixel_width (struct pgtk_display_info *dpyinfo)
 }
 
 void
-x_set_parent_frame (struct frame *f, Lisp_Object new_value, Lisp_Object old_value)
-/* --------------------------------------------------------------------------
-     Set frame F's `parent-frame' parameter.  If non-nil, make F a child
-     frame of the frame specified by that parameter.  Technically, this
-     makes F's window-system window a child window of the parent frame's
-     window-system window.  If nil, make F's window-system window a
-     top-level window--a child of its display's root window.
-
-     A child frame's `left' and `top' parameters specify positions
-     relative to the top-left corner of its parent frame's native
-     rectangle.  On macOS moving a parent frame moves all its child
-     frames too, keeping their position relative to the parent
-     unaltered.  When a parent frame is iconified or made invisible, its
-     child frames are made invisible.  When a parent frame is deleted,
-     its child frames are deleted too.
-
-     Whether a child frame has a tool bar may be window-system or window
-     manager dependent.  It's advisable to disable it via the frame
-     parameter settings.
-
-     Some window managers may not honor this parameter.
-   -------------------------------------------------------------------------- */
-{
-  PGTK_TRACE("x_set_parent_frame");
-#if 0
-  struct frame *p = NULL;
-  GtkWindow *parent, child;
-
-  if (!NILP (new_value)
-      && (!FRAMEP (new_value)
-	  || !FRAME_LIVE_P (p = XFRAME (new_value))
-	  || !FRAME_X_P (p)))
-    {
-      store_frame_param (f, Qparent_frame, old_value);
-      error ("Invalid specification of `parent-frame'");
-    }
-
-  if (p != FRAME_PARENT_FRAME (f))
-    {
-      /* parent = FRAME_NS_VIEW (p); */
-      /* child = FRAME_NS_VIEW (f); */
-
-
-
-      block_input ();
-      gtk_widget_set_parent(p, f->widget);
-      unblock_input ();
-
-      fset_parent_frame (f, new_value);
-    }
-#endif
-}
-
-void
 x_set_no_focus_on_map (struct frame *f, Lisp_Object new_value, Lisp_Object old_value)
 /* Set frame F's `no-focus-on-map' parameter which, if non-nil, means
  * that F's window-system window does not want to receive input focus

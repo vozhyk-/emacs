@@ -849,7 +849,7 @@ frame_parm_handler pgtk_frame_parm_handlers[] =
   0, /* x_set_tool_bar_position */
   0, /* x_set_inhibit_double_buffering */
   x_set_undecorated,
-  x_set_parent_frame,
+  0, /* x_set_parent_frame, */
   x_set_skip_taskbar,
   x_set_no_focus_on_map,
   x_set_no_accept_focus,
