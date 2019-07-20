@@ -400,6 +400,7 @@ mode they are described in the manual "(emacs) Display".
 ---
 ** New variable 'xref-file-name-display' controls the display of file
 names in xref buffers.
+** New variable `file-size-function' controls how file sizes are displayed
 
 
 * Editing Changes in Emacs 27.1
@@ -921,6 +922,11 @@ This can be controlled by the new 'ecomplete-sort-predicate' variable.
 Of course it will still find it if you have it in '~/.ecompleterc'.
 
 ** Gnus
+
++++
+*** There's a new value for `gnus-article-date-headers',
+`combined-local-lapsed', which will show both the time (in the local
+timezone) and the lapsed time.
 
 ---
 *** Gnus now maps imaps to 993 only on old MS-Windows versions.
@@ -1701,6 +1707,13 @@ needing to advice 'ispell-change-dictionary'.
 This command is bound to 'S-down' and scrolls the buffer up in
 particular when the end of the buffer is visible in the window.
 
+** mwheel.el
+
+---
+*** 'mwheel-install' is now obsolete.
+Use 'mouse-wheel-mode' instead.  Note that 'mouse-wheel-mode' is
+already enabled by default on most graphical displays.
+
 
 * New Modes and Packages in Emacs 27.1
 
@@ -1738,6 +1751,10 @@ prevent delays of several minutes, and make Emacs responsive almost
 immediately.  Type 'M-x so-long-commentary' for full documentation.
 
 * Incompatible Lisp Changes in Emacs 27.1
+
+---
+** The REGEXP in 'magic-mode-alist' is now matched case-sensitively.
+Likewise for 'magic-fallback-mode-alist'.
 
 +++
 ** add-hook does not always add to the front or the end any more.
@@ -2239,6 +2256,11 @@ The image parameters 'image-transform-rotation',
 'image-transform-scale' and 'image-transform-resize' are now declared
 buffer-local, so each buffer could have its own values for these
 parameters.
+
++++
+*** The command 'image-rotate' now accepts a prefix argument.
+With a prefix argument, 'image-rotate' now rotates the image at point
+90 degrees counter-clockwise, instead of the default clockwise.
 
 ** Modules
 
