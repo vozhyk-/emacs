@@ -5086,12 +5086,6 @@ static gboolean key_press_event(GtkWidget *widget, GdkEvent *event, gpointer *us
   inev.ie.kind = NO_EVENT;
   inev.ie.arg = Qnil;
 
-#if 0
-  /* Dispatch KeyPress events when in menu.  */
-  if (popup_activated ())
-    goto done;
-#endif
-
   struct frame *f = pgtk_any_window_to_frame(gtk_widget_get_window(widget));
   hlinfo = MOUSE_HL_INFO(f);
 
@@ -5124,12 +5118,6 @@ static gboolean key_press_event(GtkWidget *widget, GdkEvent *event, gpointer *us
       Lisp_Object coding_system = Qlatin_1;
       Lisp_Object c;
       guint state = event->key.state;
-
-      /* Don't pass keys to GTK.  A Tab will shift focus to the
-	 tool bar in GTK 2.4.  Keys will still go to menus and
-	 dialogs because in that case popup_activated is nonzero
-	 (see above).  */
-      // *finish = X_EVENT_DROP;
 
       state |= pgtk_emacs_to_gtk_modifiers (FRAME_DISPLAY_INFO (f), extra_keyboard_modifiers);
       modifiers = state;
@@ -5692,9 +5680,6 @@ motion_notify_event(GtkWidget *widget, GdkEvent *event, gpointer *user_data)
 	 `mouse-autoselect-window' but don't let popup menus
 	 interfere with this (Bug#1261).  */
       if (!NILP (Vmouse_autoselect_window)
-#if 0
-	  && !popup_activated ()
-#endif
 	  /* Don't switch if we're currently in the minibuffer.
 	     This tries to work around problems where the
 	     minibuffer gets unselected unexpectedly, and where
@@ -5853,9 +5838,6 @@ button_event(GtkWidget *widget, GdkEvent *event, gpointer *user_data)
       f = pgtk_any_window_to_frame(gtk_widget_get_window(widget));
 
       if (f && event->button.type == GDK_BUTTON_PRESS
-#if 0
-	  && !popup_activated ()
-#endif
 	  && !FRAME_NO_ACCEPT_FOCUS (f))
 	{
 	  /* When clicking into a child frame or when clicking
@@ -5883,24 +5865,21 @@ button_event(GtkWidget *widget, GdkEvent *event, gpointer *user_data)
   if (f)
     {
       if (!tool_bar_p)
-#if 0
-	if (! popup_activated ())
-#endif
-	  {
-	    if (ignore_next_mouse_click_timeout)
-	      {
-		if (event->type == GDK_BUTTON_PRESS
-		    && event->button.time > ignore_next_mouse_click_timeout)
-		  {
-		    ignore_next_mouse_click_timeout = 0;
-		    construct_mouse_click (&inev.ie, &event->button, f);
-		  }
-		if (event->type == GDK_BUTTON_RELEASE)
+	{
+	  if (ignore_next_mouse_click_timeout)
+	    {
+	      if (event->type == GDK_BUTTON_PRESS
+		  && event->button.time > ignore_next_mouse_click_timeout)
+		{
 		  ignore_next_mouse_click_timeout = 0;
-	      }
-	    else
-	      construct_mouse_click (&inev.ie, &event->button, f);
-	  }
+		  construct_mouse_click (&inev.ie, &event->button, f);
+		}
+	      if (event->type == GDK_BUTTON_RELEASE)
+		ignore_next_mouse_click_timeout = 0;
+	    }
+	  else
+	    construct_mouse_click (&inev.ie, &event->button, f);
+	}
 #if 0
       if (FRAME_X_EMBEDDED_P (f))
 	xembed_send_message (f, event->button.time,

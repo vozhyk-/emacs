@@ -2954,13 +2954,6 @@ value of DIR as in previous invocations; this is standard MS Windows behavior.  
 
   check_window_system (f);
 
-#if 0
-  if (popup_activated ())
-    error ("Trying to use a menu from within a menu-entry");
-  else
-    x_menu_set_in_use (true);
-#endif
-
   CHECK_STRING (prompt);
   CHECK_STRING (dir);
 

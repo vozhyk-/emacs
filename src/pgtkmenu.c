@@ -41,10 +41,6 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include "gtkutil.h"
 #include <gtk/gtk.h>
 
-/* Flag which when set indicates a dialog or menu has been posted by
-   Xt on behalf of one of the widget sets.  */
-static int popup_activated_flag;
-
 
 Lisp_Object
 pgtk_popup_dialog (struct frame *f, Lisp_Object header, Lisp_Object contents)
@@ -111,15 +107,6 @@ menu_highlight_callback (GtkWidget *widget, gpointer call_data)
   if (! cb_data) return;
 
   help = call_data ? cb_data->help : Qnil;
-
-  /* If popup_activated_flag is greater than 1 we are in a popup menu.
-     Don't pass the frame to show_help_event for those.
-     Passing frame creates an Emacs event.  As we are looping in
-     popup_widget_loop, it won't be handled.  Passing NULL shows the tip
-     directly without using an Emacs event.  This is what the Lucid code
-     does below.  */
-  /* show_help_event (popup_activated_flag <= 1 ? cb_data->cl_data->f : NULL, */
-  /*                  widget, help); */
 }
 
 
@@ -129,7 +116,6 @@ menu_highlight_callback (GtkWidget *widget, gpointer call_data)
 static void
 popup_deactivate_callback (GtkWidget *widget, gpointer client_data)
 {
-  popup_activated_flag = 0;
 }
 
 
@@ -445,29 +431,12 @@ If FRAME is nil or not given, use the selected frame.  */)
       if (children)
         {
           g_signal_emit_by_name (children->data, "activate_item");
-          popup_activated_flag = 1;
           g_list_free (children);
         }
     }
   unblock_input ();
 
   return Qnil;
-}
-
-/* Loop util popup_activated_flag is set to zero in a callback.
-   Used for popup menus and dialogs. */
-
-static void
-popup_widget_loop (bool do_timers, GtkWidget *widget)
-{
-  ++popup_activated_flag;
-
-  /* Process events in the Gtk event loop until done.  */
-  while (popup_activated_flag)
-    {
-      if (do_timers) x_menu_wait_for_event (0);
-      gtk_main_iteration ();
-    }
 }
 
 
