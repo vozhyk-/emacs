@@ -202,6 +202,18 @@ x_free_frame_resources (struct frame *f)
     FRAME_X_OUTPUT(f)->border_color_css_provider = NULL;
   }
 
+  if (FRAME_X_OUTPUT(f)->scrollbar_foreground_css_provider != NULL) {
+    GtkCssProvider *old = FRAME_X_OUTPUT(f)->scrollbar_foreground_css_provider;
+    g_object_unref (old);
+    FRAME_X_OUTPUT(f)->scrollbar_foreground_css_provider = NULL;
+  }
+
+  if (FRAME_X_OUTPUT(f)->scrollbar_background_css_provider != NULL) {
+    GtkCssProvider *old = FRAME_X_OUTPUT(f)->scrollbar_background_css_provider;
+    g_object_unref (old);
+    FRAME_X_OUTPUT(f)->scrollbar_background_css_provider = NULL;
+  }
+
   if (FRAME_X_OUTPUT(f)->cr_surface_visible_bell != NULL) {
     cairo_surface_destroy(FRAME_X_OUTPUT(f)->cr_surface_visible_bell);
     FRAME_X_OUTPUT(f)->cr_surface_visible_bell = NULL;
