@@ -1372,14 +1372,10 @@ This function is an internal primitive--use `make-frame' instead.  */)
   gui_default_parameter (f, parms, Qno_special_glyphs, Qnil,
 		       NULL, NULL, RES_TYPE_BOOLEAN);
 
-#if 0
-  x_default_scroll_bar_color_parameter (f, parms, Qscroll_bar_foreground,
-					"scrollBarForeground",
-					"ScrollBarForeground", true);
-  x_default_scroll_bar_color_parameter (f, parms, Qscroll_bar_background,
-					"scrollBarBackground",
-					"ScrollBarBackground", false);
-#endif
+  gui_default_parameter (f, parms, Qscroll_bar_foreground, Qnil,
+			 "scrollBarForeground", "ScrollBarForeground", RES_TYPE_STRING);
+  gui_default_parameter (f, parms, Qscroll_bar_background, Qnil,
+			 "scrollBarBackground", "ScrollBarBackground", RES_TYPE_STRING);
 
   /* Init faces before gui_default_parameter is called for the
      scroll-bar-width parameter because otherwise we end up in
@@ -1862,6 +1858,7 @@ pgtk_set_defaults_value (const char *key, const char *value)
 
   GSettings *gs = parse_resource_key(key, skey);
   if (gs == NULL) {
+    error ("unknown resource key.");
     return NULL;
   }
 

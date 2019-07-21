@@ -193,8 +193,6 @@ x_free_frame_resources (struct frame *f)
   if (f == hlinfo->mouse_face_mouse_frame)
     reset_mouse_highlight (hlinfo);
 
-  gtk_widget_destroy(FRAME_GTK_OUTER_WIDGET(f));
-
   if (FRAME_X_OUTPUT(f)->border_color_css_provider != NULL) {
     GtkStyleContext *ctxt = gtk_widget_get_style_context(FRAME_GTK_OUTER_WIDGET(f));
     GtkCssProvider *old = FRAME_X_OUTPUT(f)->border_color_css_provider;
@@ -213,6 +211,8 @@ x_free_frame_resources (struct frame *f)
     g_object_unref (old);
     FRAME_X_OUTPUT(f)->scrollbar_background_css_provider = NULL;
   }
+
+  gtk_widget_destroy(FRAME_GTK_OUTER_WIDGET(f));
 
   if (FRAME_X_OUTPUT(f)->cr_surface_visible_bell != NULL) {
     cairo_surface_destroy(FRAME_X_OUTPUT(f)->cr_surface_visible_bell);
