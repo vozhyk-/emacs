@@ -48,6 +48,7 @@ static void sort_vector_copy (Lisp_Object, ptrdiff_t,
 enum equal_kind { EQUAL_NO_QUIT, EQUAL_PLAIN, EQUAL_INCLUDING_PROPERTIES };
 static bool internal_equal (Lisp_Object, Lisp_Object,
 			    enum equal_kind, int, Lisp_Object);
+static EMACS_UINT sxhash_bignum (struct Lisp_Bignum *);
 
 DEFUN ("identity", Fidentity, Sidentity, 1, 1, 0,
        doc: /* Return the argument unchanged.  */
@@ -4018,11 +4019,12 @@ hashfn_eql (Lisp_Object key, struct Lisp_Hash_Table *h)
 /* Given HT, return a hash code for KEY which uses a user-defined
    function to compare keys.  */
 
-static Lisp_Object
+Lisp_Object
 hashfn_user_defined (Lisp_Object key, struct Lisp_Hash_Table *h)
 {
   Lisp_Object args[] = { h->test.user_hash_function, key };
-  return hash_table_user_defined_call (ARRAYELTS (args), args, h);
+  Lisp_Object hash = hash_table_user_defined_call (ARRAYELTS (args), args, h);
+  return FIXNUMP (hash) ? hash : make_fixnum (sxhash (hash, 0));
 }
 
 struct hash_table_test const
@@ -4708,7 +4710,7 @@ sxhash (Lisp_Object obj, int depth)
  ***********************************************************************/
 
 DEFUN ("sxhash-eq", Fsxhash_eq, Ssxhash_eq, 1, 1, 0,
-       doc: /* Return a fixnum hash code for OBJ suitable for `eq'.
+       doc: /* Return an integer hash code for OBJ suitable for `eq'.
 If (eq A B), then (= (sxhash-eq A) (sxhash-eq B)).
 
 Hash codes are not guaranteed to be preserved across Emacs sessions.  */)
@@ -4718,7 +4720,7 @@ Hash codes are not guaranteed to be preserved across Emacs sessions.  */)
 }
 
 DEFUN ("sxhash-eql", Fsxhash_eql, Ssxhash_eql, 1, 1, 0,
-       doc: /* Return a fixnum hash code for OBJ suitable for `eql'.
+       doc: /* Return an integer hash code for OBJ suitable for `eql'.
 If (eql A B), then (= (sxhash-eql A) (sxhash-eql B)).
 
 Hash codes are not guaranteed to be preserved across Emacs sessions.  */)
@@ -4728,7 +4730,7 @@ Hash codes are not guaranteed to be preserved across Emacs sessions.  */)
 }
 
 DEFUN ("sxhash-equal", Fsxhash_equal, Ssxhash_equal, 1, 1, 0,
-       doc: /* Return a fixnum hash code for OBJ suitable for `equal'.
+       doc: /* Return an integer hash code for OBJ suitable for `equal'.
 If (equal A B), then (= (sxhash-equal A) (sxhash-equal B)).
 
 Hash codes are not guaranteed to be preserved across Emacs sessions.  */)
@@ -4752,7 +4754,7 @@ keys.  Default is `eql'.  Predefined are the tests `eq', `eql', and
 Default is 65.
 
 :rehash-size REHASH-SIZE - Indicates how to expand the table when it
-fills up.  If REHASH-SIZE is a fixnum, increase the size by that
+fills up.  If REHASH-SIZE is an integer, increase the size by that
 amount.  If it is a float, it must be > 1.0, and the new size is the
 old size multiplied by that factor.  Default is 1.5.
 

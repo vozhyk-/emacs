@@ -270,7 +270,7 @@ textual parts.")
 		  (forward-line)
 		  (null (looking-at-p
 			 ;; We're expecting a mail header.
-			 "^[!-9;-~]+: "))))
+			 "^[!-9;-~]+:[[:space:]]"))))
 	    (delete-region (line-beginning-position)
 			   (1+ (line-end-position)))
 	  (setq lines nil)
@@ -1340,7 +1340,7 @@ If LIMIT, first try to limit the search to the N last articles."
 		    (progn (end-of-line)
 			   (skip-chars-backward " \r\"")
 			   (point)))))
-	(unless (member '%NoSelect flags)
+	(unless (member '%Noselect flags)
           (let* ((group (utf7-decode (if (stringp group) group
                                        (format "%s" group)) t))
                  (group (cond ((or (not prefix)
