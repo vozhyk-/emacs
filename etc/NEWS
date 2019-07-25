@@ -92,17 +92,21 @@ and in particular better supports the Address Space Layout
 Randomization (ASLR) feature, a security technique used by most modern
 operating systems.
 
-Portable dumping can be disabled at configure time via the configure
-option '--with-dumping=unexec' (but we don't recommend that, unless
-the portable dumping doesn't work on your system for some
-reason---please report such systems to the Emacs developers as bugs).
-
 When built with the portable dumping support (which is the default),
 Emacs looks for the 'emacs.pdmp' file, generated during the build, in
 its data directory at startup, and loads the dumped state from there.
 The new command-line argument '--dump-file=FILE' allows to specify a
 non-default '.pdmp' file to load the state from; see the node "Initial
 Options" in the Emacs manual for more information.
+
+An Emacs started via a dump file can create a new dump file only if it
+was invoked with the -batch option.
+
+Although the portable dumper has been tested, it may have a bug on
+unusual platforms.  If you require traditional unexec dumping you can
+use the configure-time option '--with-dumping=unexec'; however, please
+file a bug report describing the situation, as unexec dumping is
+deprecated.
 
 +++
 ** The new configure option '--enable-checking=structs' attempts to
@@ -699,8 +703,8 @@ buffers will delete the marked files (or if no files are marked, the
 file under point).  This command does not notify the VC backend, and
 is mostly useful for unregistered files.
 
-*** New command 'vc-log-search' asks for a pattern string, searches
-it in the revision log, and displays matched log entries in the
+*** New command 'vc-log-search' asks for a pattern, searches it
+in the revision log, and displays matched log entries in the
 log buffer.  For example, 'M-x vc-log-search RET bug#36644 RET'
 displays all entries whose log messages match the bug number.
 With a prefix argument asks for a command, so for example,
@@ -1162,6 +1166,23 @@ and case-sensitivity together with search strings in the search ring.
 
 +++
 *** 'flush-lines' prints and returns the number of deleted matching lines.
+
+---
+*** 'char-fold-to-regexp' now matches more variants of a base character.
+The table used to check for equivalence of characters is now built
+using the complete chain of unicode decompositions of a character,
+rather than stopping after one level, such that searching for
+e.g. GREEK SMALL LETTER IOTA will now also find GREEK SMALL LETTER
+IOTA WITH OXIA.
+
++++
+*** New char-folding options: 'char-fold-include' lets you add ad hoc
+foldings, 'char-fold-exclude' to remove foldings from default decomposition,
+and 'char-fold-symmetric' to search for any of an equivalence class of
+characters.  For example, with a 'nil' value of 'char-fold-symmetric'
+you can search for "e" to find "é", but not vice versa.  With a non-nil
+value you can search for either, for example, you can search for "é"
+to find "e".
 
 ** Debugger
 
@@ -1793,6 +1814,9 @@ interprets it relative to the directory where Emacs was started, not
 relative to the 'default-directory' of the current buffer.  We recommend
 always setting "$HOME" to an absolute file name, so that its meaning is
 independent of where Emacs was started.
+
+** file-name-absolute-p no longer considers "~foo" to be an absolute
+file name if there is no user named "foo".
 
 ** The FILENAME argument to 'file-name-base' is now mandatory and no
 longer defaults to 'buffer-file-name'.

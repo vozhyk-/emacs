@@ -333,8 +333,8 @@ dump_fingerprint (char const *label,
   fprintf (stderr, "%s: %.*s\n", label, hexbuf_size, hexbuf);
 }
 
-/* Format of an Emacs portable dump file.  All offsets are relative to
-   the beginning of the file.  An Emacs portable dump file is coupled
+/* Format of an Emacs dump file.  All offsets are relative to
+   the beginning of the file.  An Emacs dump file is coupled
    to exactly the Emacs binary that produced it, so details of
    alignment and endianness are unimportant.
 
@@ -719,12 +719,7 @@ emacs_offset (const void *emacs_ptr)
 static bool
 dump_builtin_symbol_p (Lisp_Object object)
 {
-  if (!SYMBOLP (object))
-    return false;
-  char *bp = (char *) lispsym;
-  struct Lisp_Symbol *s = XSYMBOL (object);
-  char *sp = (char *) s;
-  return bp <= sp && sp < bp + sizeof (lispsym);
+  return SYMBOLP (object) && c_symbol_p (XSYMBOL (object));
 }
 
 /* Return whether OBJECT has the same bit pattern in all Emacs
@@ -3990,7 +3985,7 @@ dump_drain_deferred_symbols (struct dump_context *ctx)
 DEFUN ("dump-emacs-portable",
        Fdump_emacs_portable, Sdump_emacs_portable,
        1, 2, 0,
-       doc: /* Dump current state of Emacs into portable dump file FILENAME.
+       doc: /* Dump current state of Emacs into dump file FILENAME.
 If TRACK-REFERRERS is non-nil, keep additional debugging information
 that can help track down the provenance of unsupported object
 types.  */)
@@ -5470,14 +5465,14 @@ pdumper_record_wd (const char *wd)
 
 DEFUN ("pdumper-stats", Fpdumper_stats, Spdumper_stats, 0, 0, 0,
        doc: /* Return statistics about portable dumping used by this session.
-If this Emacs sesion was started from a portable dump file,
+If this Emacs session was started from a dump file,
 the return value is an alist of the form:
 
   ((dumped-with-pdumper . t) (load-time . TIME) (dump-file-name . FILE))
 
 where TIME is the time in seconds it took to restore Emacs state
 from the dump file, and FILE is the name of the dump file.
-Value is nil if this session was not started using a portable dump file.*/)
+Value is nil if this session was not started using a dump file.*/)
      (void)
 {
   if (!dumped_with_pdumper_p ())
