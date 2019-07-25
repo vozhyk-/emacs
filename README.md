@@ -53,6 +53,27 @@ This returns `"GdkWaylandDisplay"` for Wayland, or `"GdkX11Display"` for X11.
 
 Note: Segmentation fault may occur on multiple display environment.
 
+## Instead of xrdb
+
+X has the resource database, and you could store initial default values into it.
+
+Gtk/Gdk can't handle it even if on X11, so I implemented similar feature using gsettings.
+
+Saving:
+```elisp
+(pgtk-set-resource "background" "gray")
+```
+
+Getting:
+```elisp
+(pgtk-get-resource "background" "Background")
+```
+
+If your emacs got failing to start, then edit your settings with `dconf-editor`.
+Your settings are saved under `/org/gnu/emacs/defaults-by-name/<instance-name>/` and
+`/org/gnu/emacs/defaults-by-class/`. All are of string type.
+Correct your mistakes.
+
 ## TODO
 
 Known problems:
