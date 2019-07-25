@@ -6202,38 +6202,6 @@ pgtk_term_init (Lisp_Object display_name, char *resource_name)
       {
 	terminal->kboard = allocate_kboard (Qpgtk);
 
-	if (!EQ (XSYMBOL (Qvendor_specific_keysyms)->u.s.function, Qunbound))
-	  {
-	    const gchar *vendor = NULL;
-	    GList *lp = gdk_display_list_seats (dpy);
-	    while (lp != NULL) {
-	      GdkSeat *seat = lp->data;
-	      lp = g_list_delete_link (lp, lp);
-
-	      GList *lp2 = gdk_seat_get_slaves (seat, GDK_SEAT_CAPABILITY_ALL);
-	      while (lp2 != NULL) {
-		GdkDevice *device = lp2->data;
-		lp2 = g_list_delete_link (lp2, lp2);
-
-		if (vendor == NULL)
-		  vendor = gdk_device_get_vendor_id (device);  /* gdkdevice does not provide vendor_name. */
-	      }
-	    }
-
-	    if (vendor != NULL) {  /* no vendor on wayland and x11... */
-	      /* Temporarily hide the partially initialized terminal.  */
-	      terminal_list = terminal->next_terminal;
-	      unblock_input ();
-	      kset_system_key_alist
-		(terminal->kboard,
-		 call1 (Qvendor_specific_keysyms,
-			vendor ? build_string (vendor) : empty_unibyte_string));
-	      block_input ();
-	      terminal->next_terminal = terminal_list;
-	      terminal_list = terminal;
-	    }
-	  }
-
 	/* Don't let the initial kboard remain current longer than necessary.
 	   That would cause problems if a file loaded on startup tries to
 	   prompt in the mini-buffer.  */
@@ -6485,8 +6453,6 @@ pgtk_clear_area (struct frame *f, int x, int y, int width, int height)
 void
 syms_of_pgtkterm (void)
 {
-  DEFSYM (Qvendor_specific_keysyms, "vendor-specific-keysyms");
-
   /* from 23+ we need to tell emacs what modifiers there are.. */
   DEFSYM (Qmodifier_value, "modifier-value");
   DEFSYM (Qalt, "alt");

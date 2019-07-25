@@ -66,6 +66,7 @@ Not implemented:
   - x_set_no_accept_focus
   - x_set_z_group
   - auto-raise/lower
+- GTK does not implement functions for these features:
   - vendor_specific_keysyms
 - Some other features. Keywords:
   - popup_activated
