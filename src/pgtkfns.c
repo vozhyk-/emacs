@@ -1570,28 +1570,6 @@ This function is an internal primitive--use `make-frame' instead.  */)
       store_frame_param (f, Qvisibility, visibility);
     }
 
-  block_input ();
-
-#if  0
-  /* Set machine name and pid for the purpose of window managers.  */
-  set_machine_and_pid_properties (f);
-#endif
-
-#if 0
-  /* Set the WM leader property.  GTK does this itself, so this is not
-     needed when using GTK.  */
-  if (dpyinfo->client_leader_window != 0)
-    {
-      XChangeProperty (FRAME_X_DISPLAY (f),
-		       FRAME_OUTER_WINDOW (f),
-		       dpyinfo->Xatom_wm_client_leader,
-		       XA_WINDOW, 32, PropModeReplace,
-		       (unsigned char *) &dpyinfo->client_leader_window, 1);
-    }
-#endif
-
-  unblock_input ();
-
   /* Works iff frame has been already mapped.  */
   gui_default_parameter (f, parms, Qskip_taskbar, Qnil,
 		       NULL, NULL, RES_TYPE_BOOLEAN);
