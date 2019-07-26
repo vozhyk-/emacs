@@ -883,46 +883,6 @@ do_unwind_create_frame (Lisp_Object frame)
   unwind_create_frame (frame);
 }
 
-/*
- * Read geometry related parameters from preferences if not in PARMS.
- * Returns the union of parms and any preferences read.
- */
-
-static Lisp_Object
-get_geometry_from_preferences (struct pgtk_display_info *dpyinfo,
-                               Lisp_Object parms)
-{
-#if 0
-  struct {
-    const char *val;
-    const char *cls;
-    Lisp_Object tem;
-  } r[] = {
-    { "width",  "Width", Qwidth },
-    { "height", "Height", Qheight },
-    { "left", "Left", Qleft },
-    { "top", "Top", Qtop },
-  };
-
-  int i;
-  for (i = 0; i < ARRAYELTS (r); ++i)
-    {
-      if (NILP (Fassq (r[i].tem, parms)))
-        {
-          Lisp_Object value
-            = gui_display_get_arg (dpyinfo, parms, r[i].tem, r[i].val, r[i].cls,
-                         RES_TYPE_NUMBER);
-          if (! EQ (value, Qunbound))
-            parms = Fcons (Fcons (r[i].tem, value), parms);
-        }
-    }
-
-  return parms;
-#else
-  return Qnil;
-#endif
-}
-
 /* Return the pixel color value for color COLOR_NAME on frame F.  If F
    is a monochrome frame, return MONO_COLOR regardless of what ARG says.
    Signal an error if color can't be allocated.  */
