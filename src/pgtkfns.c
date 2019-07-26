@@ -581,117 +581,28 @@ x_set_internal_border_width (struct frame *f, Lisp_Object arg, Lisp_Object oldva
 
 
 static void
-pgtk_implicitly_set_icon_type (struct frame *f)
-{
-#if 0
-  Lisp_Object tem;
-  EmacsView *view = FRAME_PGTK_VIEW (f);
-  id image = nil;
-  Lisp_Object chain, elt;
-  NSAutoreleasePool *pool;
-  BOOL setMini = YES;
-
-  NSTRACE ("pgtk_implicitly_set_icon_type");
-
-  block_input ();
-  pool = [[NSAutoreleasePool alloc] init];
-  if (FRAME_X_OUTPUT(f)->miniimage
-      && [[NSString stringWithUTF8String: SSDATA (f->name)]
-               isEqualToString: [(NSImage *)FRAME_X_OUTPUT(f)->miniimage name]])
-    {
-      [pool release];
-      unblock_input ();
-      return;
-    }
-
-  tem = assq_no_quit (Qicon_type, f->param_alist);
-  if (CONSP (tem) && ! NILP (XCDR (tem)))
-    {
-      [pool release];
-      unblock_input ();
-      return;
-    }
-
-  for (chain = Vpgtk_icon_type_alist;
-       image == nil && CONSP (chain);
-       chain = XCDR (chain))
-    {
-      elt = XCAR (chain);
-      /* special case: t means go by file type */
-      if (SYMBOLP (elt) && EQ (elt, Qt) && SSDATA (f->name)[0] == '/')
-        {
-          NSString *str
-	     = [NSString stringWithUTF8String: SSDATA (f->name)];
-          if ([[NSFileManager defaultManager] fileExistsAtPath: str])
-            image = [[[NSWorkspace sharedWorkspace] iconForFile: str] retain];
-        }
-      else if (CONSP (elt) &&
-               STRINGP (XCAR (elt)) &&
-               STRINGP (XCDR (elt)) &&
-               fast_string_match (XCAR (elt), f->name) >= 0)
-        {
-          image = [EmacsImage allocInitFromFile: XCDR (elt)];
-          if (image == nil)
-            image = [[NSImage imageNamed:
-                               [NSString stringWithUTF8String:
-					    SSDATA (XCDR (elt))]] retain];
-        }
-    }
-
-  if (image == nil)
-    {
-      image = [[[NSWorkspace sharedWorkspace] iconForFileType: @"text"] retain];
-      setMini = NO;
-    }
-
-  [FRAME_X_OUTPUT(f)->miniimage release];
-  FRAME_X_OUTPUT(f)->miniimage = image;
-  [view setMiniwindowImage: setMini];
-  [pool release];
-  unblock_input ();
-#endif
-}
-
-
-static void
 x_set_icon_type (struct frame *f, Lisp_Object arg, Lisp_Object oldval)
 {
-#if 0
-  EmacsView *view = FRAME_PGTK_VIEW (f);
-  id image = nil;
-  BOOL setMini = YES;
-
-  NSTRACE ("x_set_icon_type");
-
-  if (!NILP (arg) && SYMBOLP (arg))
-    {
-      arg =build_string (SSDATA (SYMBOL_NAME (arg)));
-      store_frame_param (f, Qicon_type, arg);
+  /* This does not work if on Wayland, or if icon is defined in emacs.desktop
+   * even if on X11.
+   */
+  GdkPixbuf *pixbuf;
+  if (NILP (arg) || EQ (arg, Qt))
+    pixbuf = NULL;
+  else {
+    GError *err = NULL;
+    CHECK_STRING (arg);
+    pixbuf = gdk_pixbuf_new_from_file (SSDATA (arg), &err);
+    if (pixbuf == NULL) {
+      Lisp_Object msg = build_string (err->message);
+      g_error_free (err);
+      error ("%s", SSDATA (msg));
     }
+  }
 
-  /* do it the implicit way */
-  if (NILP (arg))
-    {
-      pgtk_implicitly_set_icon_type (f);
-      return;
-    }
-
-  CHECK_STRING (arg);
-
-  image = [EmacsImage allocInitFromFile: arg];
-  if (image == nil)
-    image =[NSImage imageNamed: [NSString stringWithUTF8String:
-                                            SSDATA (arg)]];
-
-  if (image == nil)
-    {
-      image = [NSImage imageNamed: @"text"];
-      setMini = NO;
-    }
-
-  FRAME_X_OUTPUT(f)->miniimage = image;
-  [view setMiniwindowImage: setMini];
-#endif
+  gtk_window_set_icon (GTK_WINDOW (FRAME_GTK_OUTER_WIDGET (f)), pixbuf);
+  if (pixbuf != NULL)
+    g_object_unref (pixbuf);
 }
 
 /* This is the same as the xfns.c definition.  */
