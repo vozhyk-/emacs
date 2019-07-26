@@ -1684,10 +1684,8 @@ pgtk_set_defaults_value (const char *key, const char *value)
     error ("resource key too long.");
 
   GSettings *gs = parse_resource_key(key, skey);
-  if (gs == NULL) {
+  if (gs == NULL)
     error ("unknown resource key.");
-    return NULL;
-  }
 
   if (value != NULL) {
     g_settings_set_string (gs, skey, value);
