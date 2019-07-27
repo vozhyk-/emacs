@@ -1697,25 +1697,6 @@ pgtk_set_defaults_value (const char *key, const char *value)
 #undef PATH_FOR_CLASS_TYPE
 #undef PATH_PREFIX_FOR_NAME_TYPE
 
-DEFUN ("pgtk-get-resource", Fpgtk_get_resource, Spgtk_get_resource, 2, 2, 0,
-       doc: /* Return the value of the property NAME of OWNER from the defaults database.
-If OWNER is nil, Emacs is assumed.  */)
-     (Lisp_Object owner, Lisp_Object name)
-{
-  const char *value;
-
-  check_window_system (NULL);
-  if (NILP (owner))
-    owner = build_string(pgtk_app_name);
-  CHECK_STRING (name);
-
-  value = pgtk_get_defaults_value (SSDATA (name));
-
-  if (value)
-    return build_string (value);
-  return Qnil;
-}
-
 
 DEFUN ("pgtk-set-resource", Fpgtk_set_resource, Spgtk_set_resource, 2, 2, 0,
        doc: /* Set the value of ATTRIBUTE, of class CLASS, as VALUE, into defaults database. */)
@@ -2967,7 +2948,6 @@ be used as the image of the icon representing the frame.  */);
   }
 
 
-  defsubr (&Spgtk_get_resource);
   defsubr (&Spgtk_set_resource);
   defsubr (&Sxw_display_color_p); /* this and next called directly by C code */
   defsubr (&Sx_display_grayscale_p);
