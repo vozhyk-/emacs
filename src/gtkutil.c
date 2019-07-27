@@ -4711,6 +4711,7 @@ xg_tool_bar_help_callback (GtkWidget *w,
 }
 
 
+#ifndef HAVE_GTK3
 /* This callback is called when a tool bar item shall be redrawn.
    It modifies the expose event so that the GtkImage widget redraws the
    whole image.  This to overcome a bug that makes GtkImage draw the image
@@ -4728,12 +4729,7 @@ xg_tool_bar_item_expose_callback (GtkWidget *w,
 {
   gint width, height;
 
-#ifndef HAVE_PGTK
   gdk_drawable_get_size (event->window, &width, &height);
-#else
-  gint x, y;
-  gdk_window_get_geometry (event->window, &x, &y, &width, &height);
-#endif
   event->area.x -= width > event->area.width ? width-event->area.width : 0;
   event->area.y -= height > event->area.height ? height-event->area.height : 0;
 
@@ -4745,6 +4741,7 @@ xg_tool_bar_item_expose_callback (GtkWidget *w,
 
   return FALSE;
 }
+#endif
 
 /* Attach a tool bar to frame F.  */
 
