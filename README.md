@@ -66,7 +66,7 @@ Saving:
 
 Getting:
 ```elisp
-(pgtk-get-resource "background" "Background")
+(x-get-resource "background" "Background")
 ```
 
 If your emacs got failing to start, then edit your settings with `dconf-editor`.
