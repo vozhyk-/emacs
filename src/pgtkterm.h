@@ -562,7 +562,7 @@ extern int pgtk_select (int nfds, fd_set *readfds, fd_set *writefds,
 			sigset_t *sigmask);
 
 /* Cairo related functions implemented in pgtkterm.c */
-extern cairo_t *pgtk_begin_cr_clip (struct frame *f, Emacs_GC *gc);
+extern cairo_t *pgtk_begin_cr_clip (struct frame *f);
 extern void pgtk_end_cr_clip (struct frame *f);
 extern void pgtk_set_cr_source_with_gc_foreground (struct frame *f, Emacs_GC *gc);
 extern void pgtk_set_cr_source_with_gc_background (struct frame *f, Emacs_GC *gc);

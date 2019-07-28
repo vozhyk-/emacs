@@ -500,7 +500,7 @@ ftcrfont_draw (struct glyph_string *s,
 #ifndef HAVE_PGTK
   cr = x_begin_cr_clip (f, s->gc);
 #else
-  cr = pgtk_begin_cr_clip (f, NULL);
+  cr = pgtk_begin_cr_clip (f);
 #endif
 
   if (with_background)

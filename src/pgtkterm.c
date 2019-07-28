@@ -1099,7 +1099,7 @@ x_draw_glyph_string_background (struct glyph_string *s, bool force_p)
 							   s->x, s->y + box_line_width,
 							   s->background_width, s->height - 2 * box_line_width);
 
-	  cairo_t *cr = pgtk_begin_cr_clip (s->f, NULL);
+	  cairo_t *cr = pgtk_begin_cr_clip (s->f);
 	  cairo_set_source_surface (cr, bg, s->x, s->y + box_line_width);
 	  cairo_rectangle (cr,
 			   s->x, s->y + box_line_width,
@@ -1137,7 +1137,7 @@ pgtk_draw_rectangle (struct frame *f, unsigned long color, int x, int y, int wid
 {
   cairo_t *cr;
 
-  cr = pgtk_begin_cr_clip (f, NULL);
+  cr = pgtk_begin_cr_clip (f);
   pgtk_set_cr_source_with_color (f, color);
   cairo_rectangle (cr, x + 0.5, y + 0.5, width, height);
   cairo_set_line_width (cr, 1);
@@ -1458,7 +1458,7 @@ x_fill_trapezoid_for_relief (struct frame *f, unsigned long color, int x, int y,
 {
   cairo_t *cr;
 
-  cr = pgtk_begin_cr_clip (f, NULL);
+  cr = pgtk_begin_cr_clip (f);
   pgtk_set_cr_source_with_color (f, color);
   cairo_move_to (cr, top_p ? x : x + height, y);
   cairo_line_to (cr, x, y + height);
@@ -1485,7 +1485,7 @@ x_erase_corners_for_relief (struct frame *f, unsigned long color, int x, int y,
   cairo_t *cr;
   int i;
 
-  cr = pgtk_begin_cr_clip (f, NULL);
+  cr = pgtk_begin_cr_clip (f);
   pgtk_set_cr_source_with_color (f, color);
   for (i = 0; i < CORNER_LAST; i++)
     if (corners & (1 << i))
@@ -1602,7 +1602,7 @@ x_draw_relief_rect (struct frame *f,
   unsigned long top_left_color, bottom_right_color;
   int corners = 0;
 
-  cairo_t *cr = pgtk_begin_cr_clip(f, NULL);
+  cairo_t *cr = pgtk_begin_cr_clip(f);
 
   if (raised_p)
     {
@@ -1684,7 +1684,7 @@ x_draw_box_rect (struct glyph_string *s,
 {
   unsigned long foreground_backup;
 
-  cairo_t *cr = pgtk_begin_cr_clip(s->f, NULL);
+  cairo_t *cr = pgtk_begin_cr_clip(s->f);
 
   foreground_backup = s->xgcv.foreground;
   s->xgcv.foreground = s->face->box_color;
@@ -1780,7 +1780,7 @@ x_draw_horizontal_wave (struct frame *f, unsigned long color, int x, int y,
   double dx = wave_length, dy = height - 1;
   int xoffset, n;
 
-  cr = pgtk_begin_cr_clip (f, NULL);
+  cr = pgtk_begin_cr_clip (f);
   pgtk_set_cr_source_with_color (f, color);
   cairo_rectangle (cr, x, y, width, height);
   cairo_clip (cr);
@@ -1921,7 +1921,7 @@ x_draw_glyph_string_bg_rect (struct glyph_string *s, int x, int y, int w, int h)
 
       cairo_surface_t *bg = create_background_surface (s, x, y, w, h);
 
-      cairo_t *cr = pgtk_begin_cr_clip (s->f, NULL);
+      cairo_t *cr = pgtk_begin_cr_clip (s->f);
       cairo_set_source_surface (cr, bg, x, y);
       cairo_rectangle (cr, x, y, w, h);
       cairo_fill (cr);
@@ -2003,7 +2003,7 @@ x_draw_image_glyph_string (struct glyph_string *s)
 	{
 	  cairo_surface_t *bg = create_background_surface (s, s->x, s->y, s->background_width, s->height);
 
-	  cairo_t *cr = pgtk_begin_cr_clip (s->f, NULL);
+	  cairo_t *cr = pgtk_begin_cr_clip (s->f);
 	  cairo_set_source_surface (cr, bg, s->x, s->y);
 	  cairo_rectangle (cr, s->x, s->y, s->background_width, s->height);
 	  cairo_fill (cr);
@@ -2029,7 +2029,7 @@ x_draw_image_glyph_string (struct glyph_string *s)
 
 	  cairo_surface_t *bg = create_background_surface (s, x, y, width, height);
 
-	  cairo_t *cr = pgtk_begin_cr_clip (s->f, NULL);
+	  cairo_t *cr = pgtk_begin_cr_clip (s->f);
 	  cairo_set_source_surface (cr, bg, x, y);
 	  cairo_rectangle (cr, x, y, width, height);
 	  cairo_fill (cr);
@@ -2044,7 +2044,7 @@ x_draw_image_glyph_string (struct glyph_string *s)
   /* Draw the foreground.  */
   if (s->img->cr_data)
     {
-      cairo_t *cr = pgtk_begin_cr_clip (s->f, NULL);
+      cairo_t *cr = pgtk_begin_cr_clip (s->f);
 
       int x = s->x + s->img->hmargin;
       int y = s->y + s->img->vmargin;
@@ -2129,7 +2129,7 @@ x_draw_stretch_glyph_string (struct glyph_string *s)
 	  else
 	    color = s->face->foreground;
 
-	  cairo_t *cr = pgtk_begin_cr_clip(s->f, NULL);
+	  cairo_t *cr = pgtk_begin_cr_clip(s->f);
 
 	  get_glyph_string_clip_rect (s, &r);
 	  x_set_clip_rectangles (s->f, cr, &r, 1);
@@ -2138,7 +2138,7 @@ x_draw_stretch_glyph_string (struct glyph_string *s)
 	    {
 	      /* Fill background with a stipple pattern.  */
 	      cairo_surface_t *bg = create_background_surface (s, x, y, w, h);
-	      cairo_t *cr = pgtk_begin_cr_clip (s->f, NULL);
+	      cairo_t *cr = pgtk_begin_cr_clip (s->f);
 	      cairo_set_source_surface (cr, bg, x, y);
 	      cairo_rectangle (cr, x, y, w, h);
 	      cairo_fill (cr);
@@ -2193,7 +2193,7 @@ static void pgtk_draw_glyph_string(struct glyph_string *s)
 	   width += next->width, next = next->next)
 	if (next->first_glyph->type != IMAGE_GLYPH)
 	  {
-	    cairo_t *cr = pgtk_begin_cr_clip(next->f, NULL);
+	    cairo_t *cr = pgtk_begin_cr_clip(next->f);
 	    PGTK_TRACE("pgtk_draw_glyph_string: 1.");
 	    x_set_glyph_string_gc (next);
 	    x_set_glyph_string_clipping (next, cr);
@@ -2210,7 +2210,7 @@ static void pgtk_draw_glyph_string(struct glyph_string *s)
   PGTK_TRACE("pgtk_draw_glyph_string: 2.");
   x_set_glyph_string_gc (s);
 
-  cairo_t *cr = pgtk_begin_cr_clip(s->f, NULL);
+  cairo_t *cr = pgtk_begin_cr_clip(s->f);
 
   /* Draw relief (if any) in advance for char/composition so that the
      glyph string can be drawn over it.  */
@@ -2544,7 +2544,7 @@ x_draw_hollow_cursor (struct window *w, struct glyph_row *row)
 
   /* The foreground of cursor_gc is typically the same as the normal
      background color, which can cause the cursor box to be invisible.  */
-  cairo_t *cr = pgtk_begin_cr_clip(f, NULL);
+  cairo_t *cr = pgtk_begin_cr_clip(f);
   pgtk_set_cr_source_with_color(f, FRAME_X_OUTPUT(f)->cursor_color);
 
   /* When on R2L character, show cursor at the right edge of the
@@ -2601,7 +2601,7 @@ x_draw_bar_cursor (struct window *w, struct glyph_row *row, int width, enum text
       struct face *face = FACE_FROM_ID (f, cursor_glyph->face_id);
       unsigned long color;
 
-      cairo_t *cr = pgtk_begin_cr_clip(f, NULL);
+      cairo_t *cr = pgtk_begin_cr_clip(f);
 
       /* If the glyph's background equals the color we normally draw
 	 the bars cursor in, the bar cursor in its normal color is
@@ -2751,7 +2751,7 @@ pgtk_copy_bits (struct frame *f, cairo_rectangle_t *src_rect, cairo_rectangle_t 
   cairo_paint(cr);
   cairo_destroy(cr);
 
-  cr = pgtk_begin_cr_clip(f, NULL);
+  cr = pgtk_begin_cr_clip(f);
   cairo_set_source_surface(cr, surface, dst_rect->x, dst_rect->y);
   cairo_rectangle(cr, dst_rect->x, dst_rect->y, dst_rect->width, dst_rect->height);
   cairo_clip(cr);
@@ -2881,7 +2881,7 @@ pgtk_draw_vertical_window_border (struct window *w, int x, int y0, int y1)
   struct face *face;
   cairo_t *cr;
 
-  cr = pgtk_begin_cr_clip (f, NULL);
+  cr = pgtk_begin_cr_clip (f);
 
   face = FACE_FROM_ID_OR_NULL (f, VERTICAL_BORDER_FACE_ID);
   if (face)
@@ -2911,7 +2911,7 @@ pgtk_draw_window_divider (struct window *w, int x0, int x1, int y0, int y1)
   unsigned long color_last = (face_last
 			      ? face_last->foreground
 			      : FRAME_FOREGROUND_PIXEL (f));
-  cairo_t *cr = pgtk_begin_cr_clip (f, NULL);
+  cairo_t *cr = pgtk_begin_cr_clip (f);
 
   if (y1 - y0 > x1 - x0 && x1 - x0 > 2)
     /* Vertical.  */
@@ -3189,7 +3189,7 @@ pgtk_cr_draw_image (struct frame *f, Emacs_GC *gc, cairo_pattern_t *image,
   cairo_format_t format;
 
   PGTK_TRACE("pgtk_cr_draw_image: 0: %d,%d,%d,%d,%d,%d,%d.", src_x, src_y, width, height, dest_x, dest_y, overlay_p);
-  cr = pgtk_begin_cr_clip (f, gc);
+  cr = pgtk_begin_cr_clip (f);
   if (overlay_p)
     cairo_rectangle (cr, dest_x, dest_y, width, height);
   else
@@ -3244,7 +3244,7 @@ pgtk_draw_fringe_bitmap (struct window *w, struct glyph_row *row, struct draw_fr
   struct frame *f = XFRAME (WINDOW_FRAME (w));
   struct face *face = p->face;
 
-  cairo_t *cr = pgtk_begin_cr_clip(f, NULL);
+  cairo_t *cr = pgtk_begin_cr_clip(f);
   cairo_save(cr);
 
   /* Must clip because of partially visible lines.  */
@@ -3258,7 +3258,7 @@ pgtk_draw_fringe_bitmap (struct window *w, struct glyph_row *row, struct draw_fr
 	 FillSolid in x_draw_glyph_string_background.  */
       if (face->stipple) {
 	cairo_surface_t *bg = create_background_surface_by_face(f, face, p->bx, p->by, p->nx, p->ny);
-	cairo_t *cr = pgtk_begin_cr_clip (f, NULL);
+	cairo_t *cr = pgtk_begin_cr_clip (f);
 	cairo_set_source_surface (cr, bg, p->bx, p->by);
 	cairo_rectangle (cr, p->bx, p->by, p->nx, p->ny);
 	cairo_fill (cr);
@@ -4798,7 +4798,7 @@ pgtk_fill_rectangle(struct frame *f, unsigned long color, int x, int y, int widt
 {
   PGTK_TRACE("pgtk_fill_rectangle");
   cairo_t *cr;
-  cr = pgtk_begin_cr_clip (f, NULL);
+  cr = pgtk_begin_cr_clip (f);
   pgtk_set_cr_source_with_color (f, color);
   cairo_rectangle (cr, x, y, width, height);
   cairo_fill (cr);
@@ -4832,7 +4832,7 @@ pgtk_clear_under_internal_border (struct frame *f)
 	{
 	  unsigned long color = face->background;
 
-	  cairo_t *cr = pgtk_begin_cr_clip (f, NULL);
+	  cairo_t *cr = pgtk_begin_cr_clip (f);
 	  for (int i = 0; i < 4; i++) {
 	    int x = rects[i].x;
 	    int y = rects[i].y;
@@ -6441,7 +6441,7 @@ pgtk_clear_area (struct frame *f, int x, int y, int width, int height)
 
   eassert (width > 0 && height > 0);
 
-  cr = pgtk_begin_cr_clip (f, NULL);
+  cr = pgtk_begin_cr_clip (f);
   PGTK_TRACE("back color %08lx.", (unsigned long) FRAME_X_OUTPUT(f)->background_color);
   pgtk_set_cr_source_with_color (f, FRAME_X_OUTPUT(f)->background_color);
   cairo_rectangle (cr, x, y, width, height);
@@ -6577,7 +6577,7 @@ If set to a non-float value, there will be no wait at all.  */);
 }
 
 cairo_t *
-pgtk_begin_cr_clip (struct frame *f, Emacs_GC *gc)
+pgtk_begin_cr_clip (struct frame *f)
 {
   cairo_t *cr = FRAME_CR_CONTEXT (f);
 
