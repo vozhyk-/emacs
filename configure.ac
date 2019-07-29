@@ -1735,17 +1735,18 @@ if test "${with_sound}" != "no"; then
       SAVE_LIBS="$LIBS"
       CFLAGS="$ALSA_CFLAGS $CFLAGS"
       LIBS="$ALSA_LIBS $LIBS"
-      AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[#include <asoundlib.h>]], [[snd_lib_error_set_handler (0);]])],
-                      emacs_alsa_normal=yes,
-	            emacs_alsa_normal=no)
-      if test "$emacs_alsa_normal" != yes; then
-        AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[#include <alsa/asoundlib.h>]],
+      AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[#include <alsa/asoundlib.h>]], [[snd_lib_error_set_handler (0);]])],
+                      emacs_alsa_subdir=yes,
+	            emacs_alsa_subdir=no)
+      if test "$emacs_alsa_subdir" != yes; then
+        AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[#include <asoundlib.h>]],
                        [[snd_lib_error_set_handler (0);]])],
-                       emacs_alsa_subdir=yes,
-	             emacs_alsa_subdir=no)
-        if test "$emacs_alsa_subdir" != yes; then
+                       emacs_alsa_normal=yes,
+	             emacs_alsa_normal=no)
+        if test "$emacs_alsa_normal" != yes; then
           AC_MSG_ERROR([pkg-config found alsa, but it does not compile.  See config.log for error messages.])
         fi
+      else
         ALSA_CFLAGS="$ALSA_CFLAGS -DALSA_SUBDIR_INCLUDE"
       fi
 
