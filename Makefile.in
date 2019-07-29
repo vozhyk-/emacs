@@ -335,7 +335,7 @@ CONFIG_STATUS_FILES_IN = \
 COPYDIR = ${srcdir}/etc ${srcdir}/lisp
 COPYDESTS = "$(DESTDIR)${etcdir}" "$(DESTDIR)${lispdir}"
 
-gsettings_SCHEMAS = org.gnu.emacs.defaults.gschema.xml
+gsettings_SCHEMAS = etc/org.gnu.emacs.defaults.gschema.xml
 
 all: ${SUBDIR} info $(gsettings_SCHEMAS:.xml=.valid)
 

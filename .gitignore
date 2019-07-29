@@ -292,4 +292,4 @@ src/gdb.ini
 /var/
 
 # gsettings schema
-/*.gschema.valid
+/etc/*.gschema.valid
