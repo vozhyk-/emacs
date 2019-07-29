@@ -6184,7 +6184,7 @@ pgtk_term_init (Lisp_Object display_name, char *resource_name)
   if (interrupt_input)
     init_sigio (dpyinfo->connection);
 
-  pgtk_selection_init(dpyinfo);
+  pgtk_selection_init();
 
   unblock_input ();
 

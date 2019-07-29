@@ -177,7 +177,7 @@ clear_func(GtkClipboard *cb, gpointer user_data_or_owner)
 
    ========================================================================== */
 
-void pgtk_selection_init(struct pgtk_display_info *dpyinfo)
+void pgtk_selection_init(void)
 {
   if (quark_primary_data == 0) {
     quark_primary_data = g_quark_from_static_string("pgtk-primary-data");
@@ -223,7 +223,6 @@ nil, it defaults to the selected frame.*/)
   Lisp_Object successful_p = Qnil;
   Lisp_Object target_symbol, rest;
   GtkClipboard *cb;
-  struct pgtk_display_info *dpyinfo;
   struct frame *f;
   GQuark quark_data, quark_size;
 
@@ -234,22 +233,8 @@ nil, it defaults to the selected frame.*/)
     error ("pgtk selection unavailable for this frame");
   f = XFRAME(frame);
 
-  dpyinfo = FRAME_DISPLAY_INFO (f);
-
   cb = symbol_to_gtk_clipboard(FRAME_GTK_WIDGET(f), selection);
   selection_type_to_quarks(gtk_clipboard_get_selection(cb), &quark_data, &quark_size);
-
-#if 0
-  {
-    Lisp_Object old_value = assq_no_quit (selection, Vselection_alist);
-    Lisp_Object new_value = list2 (selection, value);
-
-    if (NILP (old_value))
-      Vselection_alist = Fcons (new_value, Vselection_alist);
-    else
-      Fsetcdr (old_value, Fcdr (new_value));
-  }
-#endif
 
   /* We only support copy of text.  */
   target_symbol = QTEXT;
@@ -321,13 +306,10 @@ On PGTK, the TIME-OBJECT is unused.  */)
   PGTK_TRACE("pgtk-disown-selection-internal.");
 
   struct frame *f = frame_for_pgtk_selection (terminal);
-  struct pgtk_display_info *dpyinfo;
   GtkClipboard *cb;
 
   if (!f)
     return Qnil;
-
-  dpyinfo = FRAME_DISPLAY_INFO (f);
 
   cb = symbol_to_gtk_clipboard(FRAME_GTK_WIDGET(f), selection);
 
@@ -353,13 +335,10 @@ On Nextstep, TERMINAL is unused.  */)
 {
   PGTK_TRACE("pgtk-selection-exists-p.");
   struct frame *f = frame_for_pgtk_selection (terminal);
-  struct pgtk_display_info *dpyinfo;
   GtkClipboard *cb;
 
   if (!f)
     return Qnil;
-
-  dpyinfo = FRAME_DISPLAY_INFO (f);
 
   cb = symbol_to_gtk_clipboard(FRAME_GTK_WIDGET(f), selection);
 
@@ -418,7 +397,6 @@ On PGTK, TIME-STAMP is unused.  */)
    Lisp_Object time_stamp, Lisp_Object terminal)
 {
   struct frame *f = frame_for_pgtk_selection (terminal);
-  struct pgtk_display_info *dpyinfo;
   GtkClipboard *cb;
 
   CHECK_SYMBOL (selection_symbol);
@@ -427,8 +405,6 @@ On PGTK, TIME-STAMP is unused.  */)
     error ("Retrieving MULTIPLE selections is currently unimplemented");
   if (!f)
     error ("PGTK selection unavailable for this frame");
-
-  dpyinfo = FRAME_DISPLAY_INFO (f);
 
   cb = symbol_to_gtk_clipboard(FRAME_GTK_WIDGET(f), selection_symbol);
 
