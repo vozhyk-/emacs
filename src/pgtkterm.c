@@ -57,6 +57,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include "font.h"
 #include "xsettings.h"
 #include "pgtkselect.h"
+#include "pgtkconn.h"
 
 #define STORE_KEYSYM_FOR_DEBUG(keysym) ((void)0)
 
@@ -326,7 +327,7 @@ x_calc_absolute_position (struct frame *f)
    position values).  It is -1 when calling from x_set_frame_parameters,
    which means, do adjust for borders but don't change the gravity.  */
 
-void
+static void
 x_set_offset (struct frame *f, int xoff, int yoff, int change_gravity)
 /* --------------------------------------------------------------------------
      External: Position the window
@@ -1032,14 +1033,12 @@ fill_background_by_face (struct frame *f, struct face *face, int x, int y, int w
   }
 
   pgtk_end_cr_clip (f);
-
-  return NULL;
 }
 
 static void
 fill_background (struct glyph_string *s, int x, int y, int width, int height)
 {
-  return fill_background_by_face (s->f, s->face, x, y, width, height);
+  fill_background_by_face (s->f, s->face, x, y, width, height);
 }
 
 /* Draw the background of glyph_string S.  If S->background_filled_p
@@ -1489,9 +1488,6 @@ x_setup_relief_color (struct frame *f, struct relief *relief, double factor,
   struct pgtk_output *di = FRAME_X_OUTPUT(f);
   unsigned long pixel;
   unsigned long background = di->relief_background;
-  struct pgtk_display_info *dpyinfo = FRAME_DISPLAY_INFO (f);
-
-  // xgcv.line_width = 1;
 
   /* Allocate new color.  */
   xgcv.foreground = default_pixel;
@@ -1795,7 +1791,7 @@ x_draw_underwave (struct glyph_string *s, unsigned long color)
 
   x_get_scale_factor (&scale_x, &scale_y);
 
-  int wave_height = 3 * scale_y, wave_length = 2 * scale_x, thickness = scale_y;
+  int wave_height = 3 * scale_y, wave_length = 2 * scale_x;
 
   x_draw_horizontal_wave (s->f, color, s->x, s->ybase - wave_height + 3,
 			  s->width, wave_height, wave_length);
@@ -2461,9 +2457,7 @@ static void
 x_draw_hollow_cursor (struct window *w, struct glyph_row *row)
 {
   struct frame *f = XFRAME (WINDOW_FRAME (w));
-  struct pgtk_display_info *dpyinfo = FRAME_DISPLAY_INFO (f);
   int x, y, wd, h;
-  Emacs_GC xgcv;
   struct glyph *cursor_glyph;
 
   /* Get the glyph the cursor is on.  If we can't tell because
@@ -3096,7 +3090,6 @@ static void
 pgtk_clip_to_row (struct window *w, struct glyph_row *row,
 		    enum glyph_row_area area, cairo_t *cr)
 {
-  struct frame *f = XFRAME (WINDOW_FRAME (w));
   int window_x, window_y, window_width;
   cairo_rectangle_int_t rect;
 
@@ -3463,7 +3456,6 @@ static int
 pgtk_read_socket (struct terminal *terminal, struct input_event *hold_quit)
 {
   PGTK_TRACE("pgtk_read_socket: enter.");
-  struct pgtk_display_info *dpyinfo = terminal->display_info.pgtk;
   GMainContext *context;
   bool context_acquired = false;
   int count;
@@ -3696,7 +3688,6 @@ xg_scroll_callback (GtkRange     *range,
   struct scroll_bar *bar = user_data;
   enum scroll_bar_part part = scroll_bar_nowhere;
   GtkAdjustment *adj = GTK_ADJUSTMENT (gtk_range_get_adjustment (range));
-  struct frame *f = g_object_get_data (G_OBJECT (range), XG_FRAME_DATA);
   PGTK_TRACE("xg_scroll_callback:");
 
   if (xg_ignore_gtk_scrollbar) return false;
@@ -4347,7 +4338,6 @@ x_set_frame_alpha (struct frame *f)
   struct pgtk_display_info *dpyinfo = FRAME_DISPLAY_INFO (f);
   double alpha = 1.0;
   double alpha_min = 1.0;
-  unsigned long opac;
 
   if (dpyinfo->highlight_frame == f)
     alpha = f->alpha[0];
@@ -4640,7 +4630,6 @@ pgtk_any_window_to_frame (GdkWindow *window)
 {
   Lisp_Object tail, frame;
   struct frame *f, *found = NULL;
-  struct pgtk_output *x;
 
   if (window == NULL)
     return NULL;
@@ -4758,9 +4747,6 @@ pgtk_clear_under_internal_border (struct frame *f)
 
       if (face)
 	{
-	  unsigned long color = face->background;
-
-	  cairo_t *cr = pgtk_begin_cr_clip (f);
 	  for (int i = 0; i < 4; i++) {
 	    int x = rects[i].x;
 	    int y = rects[i].y;
@@ -4768,7 +4754,6 @@ pgtk_clear_under_internal_border (struct frame *f)
 	    int h = rects[i].h;
 	    fill_background_by_face (f, face, x, y, w, h);
 	  }
-	  pgtk_end_cr_clip (f);
 	}
       else
 	{
