@@ -6000,8 +6000,8 @@ pgtk_term_init (Lisp_Object display_name, char *resource_name)
   struct pgtk_display_info *dpyinfo;
   static int x_initialized = 0;
   static unsigned x_display_id = 0;
-  static const char *initial_display = NULL;
-  const char *dpy_name;
+  static char *initial_display = NULL;
+  char *dpy_name;
   Lisp_Object lisp_dpy_name = Qnil;
   int conn_fd;
 
@@ -6075,7 +6075,7 @@ pgtk_term_init (Lisp_Object display_name, char *resource_name)
 
 	dpy = DEFAULT_GDK_DISPLAY ();
 
-	initial_display = gdk_display_get_name(dpy);
+	initial_display = g_strdup (gdk_display_get_name(dpy));
 	dpy_name = initial_display;
 	lisp_dpy_name = build_string(dpy_name);
       }
