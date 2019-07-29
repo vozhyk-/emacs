@@ -166,7 +166,6 @@ static void
 x_set_background_color (struct frame *f, Lisp_Object arg, Lisp_Object oldval)
 {
   Emacs_Color col;
-  struct face *face;
 
   block_input ();
   if (pgtk_lisp_to_color (arg, &col))
@@ -1671,7 +1670,7 @@ pgtk_get_defaults_value (const char *key)
   return holder[0] != '\0' ? holder : NULL;
 }
 
-void
+static void
 pgtk_set_defaults_value (const char *key, const char *value)
 {
   char skey[(RESOURCE_KEY_MAX_LEN + 1) * 2];
@@ -2468,13 +2467,9 @@ A tooltip's maximum size is specified by `x-max-tooltip-size'.
 Text larger than the specified size is clipped.  */)
   (Lisp_Object string, Lisp_Object frame, Lisp_Object parms, Lisp_Object timeout, Lisp_Object dx, Lisp_Object dy)
 {
-  struct frame *f, *tip_f;
-  struct window *w;
+  struct frame *f;
   int root_x, root_y;
-  struct buffer *old_buffer;
-  struct text_pos pos;
   int width, height;
-  int old_windows_or_buffers_changed = windows_or_buffers_changed;
   ptrdiff_t count = SPECPDL_INDEX ();
 
   specbind (Qinhibit_redisplay, Qt);
