@@ -306,7 +306,7 @@ pgtk_set_name_internal (struct frame *f, Lisp_Object name)
     encoded_icon_name = encoded_name;
   else
     encoded_icon_name = ENCODE_UTF_8 (f->icon_name);
-  gtk_window_set_icon_name(GTK_WINDOW(widget), SSDATA (encoded_name));
+  gtk_window_set_icon_name(GTK_WINDOW(widget), SSDATA (encoded_icon_name));
 }
 
 static void
