@@ -174,10 +174,12 @@ store_tool_bar_style_changed (const char *newstyle,
                                 XCAR (dpyinfo->name_list_element));
 }
 
+#ifndef HAVE_PGTK
 #if defined USE_CAIRO || defined HAVE_XFT
 #define XSETTINGS_FONT_NAME       "Gtk/FontName"
 #endif
 #define XSETTINGS_TOOL_BAR_STYLE  "Gtk/ToolbarStyle"
+#endif
 
 enum {
   SEEN_AA         = 0x01,
