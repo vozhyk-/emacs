@@ -2629,18 +2629,20 @@ dump_hash_table_stable_p (const struct Lisp_Hash_Table *hash)
   bool is_equal = hash->test.hashfn == hashfn_equal;
   ptrdiff_t size = HASH_TABLE_SIZE (hash);
   for (ptrdiff_t i = 0; i < size; ++i)
-    if (!NILP (HASH_HASH (hash, i)))
-      {
-        Lisp_Object key =  HASH_KEY (hash, i);
-	bool key_stable = (dump_builtin_symbol_p (key)
-			   || FIXNUMP (key)
-			   || (is_equal
-			       && (STRINGP (key) || BOOL_VECTOR_P (key)))
-			   || ((is_equal || is_eql)
-			       && (FLOATP (key) || BIGNUMP (key))));
-        if (!key_stable)
-          return false;
-      }
+    {
+      Lisp_Object key =  HASH_KEY (hash, i);
+      if (!EQ (key, Qunbound))
+        {
+	  bool key_stable = (dump_builtin_symbol_p (key)
+			     || FIXNUMP (key)
+			     || (is_equal
+			         && (STRINGP (key) || BOOL_VECTOR_P (key)))
+			     || ((is_equal || is_eql)
+			         && (FLOATP (key) || BIGNUMP (key))));
+          if (!key_stable)
+            return false;
+        }
+    }
 
   return true;
 }
@@ -2652,8 +2654,11 @@ hash_table_contents (Lisp_Object table)
   Lisp_Object contents = Qnil;
   struct Lisp_Hash_Table *h = XHASH_TABLE (table);
   for (ptrdiff_t i = 0; i < HASH_TABLE_SIZE (h); ++i)
-    if (!NILP (HASH_HASH (h, i)))
-      dump_push (&contents, Fcons (HASH_KEY (h, i), HASH_VALUE (h, i)));
+    {
+      Lisp_Object key =  HASH_KEY (h, i);
+      if (!EQ (key, Qunbound))
+        dump_push (&contents, Fcons (key, HASH_VALUE (h, i)));
+    }
   return Fnreverse (contents);
 }
 
@@ -2662,13 +2667,14 @@ hash_table_contents (Lisp_Object table)
 static void
 check_hash_table_rehash (Lisp_Object table_orig)
 {
+  ptrdiff_t count = XHASH_TABLE (table_orig)->count;
   hash_rehash_if_needed (XHASH_TABLE (table_orig));
   Lisp_Object table_rehashed = Fcopy_hash_table (table_orig);
-  eassert (XHASH_TABLE (table_rehashed)->count >= 0);
-  XHASH_TABLE (table_rehashed)->count *= -1;
-  eassert (XHASH_TABLE (table_rehashed)->count <= 0);
+  eassert (!hash_rehash_needed_p (XHASH_TABLE (table_rehashed)));
+  XHASH_TABLE (table_rehashed)->hash = Qnil;
+  eassert (count == 0 || hash_rehash_needed_p (XHASH_TABLE (table_rehashed)));
   hash_rehash_if_needed (XHASH_TABLE (table_rehashed));
-  eassert (XHASH_TABLE (table_rehashed)->count >= 0);
+  eassert (!hash_rehash_needed_p (XHASH_TABLE (table_rehashed)));
   Lisp_Object expected_contents = hash_table_contents (table_orig);
   while (!NILP (expected_contents))
     {
@@ -2732,7 +2738,13 @@ dump_hash_table (struct dump_context *ctx,
      the need to rehash-on-access if we can load the dump where we
      want.  */
   if (hash->count > 0 && !is_stable)
-    hash->count = -hash->count;
+    /* Hash codes will have to be recomputed anyway, so let's not dump them.
+       Also set `hash` to nil for hash_rehash_needed_p.
+       We could also refrain from dumping the `next' and `index' vectors,
+       except that `next' is currently used for HASH_TABLE_SIZE and
+       we'd have to rebuild the next_free list as well as adjust
+       sweep_weak_hash_table for the case where there's no `index'.  */
+    hash->hash = Qnil;
 
   START_DUMP_PVEC (ctx, &hash->header, struct Lisp_Hash_Table, out);
   dump_pseudovector_lisp_fields (ctx, &out->header, &hash->header);

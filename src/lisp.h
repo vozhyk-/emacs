@@ -2274,8 +2274,8 @@ struct Lisp_Hash_Table
      weakness of the table.  */
   Lisp_Object weak;
 
-  /* Vector of hash codes.  If hash[I] is nil, this means that the
-     I-th entry is unused.  */
+  /* Vector of hash codes.
+     If the I-th entry is unused, then hash[I] should be nil.  */
   Lisp_Object hash;
 
   /* Vector used to chain entries.  If entry I is free, next[I] is the
@@ -2323,6 +2323,7 @@ struct Lisp_Hash_Table
 
   /* Vector of keys and values.  The key of item I is found at index
      2 * I, the value is found at index 2 * I + 1.
+     If the key is equal to Qunbound, then this slot is unused.
      This is gc_marked specially if the table is weak.  */
   Lisp_Object key_and_value;
 
@@ -2387,7 +2388,7 @@ void hash_table_rehash (struct Lisp_Hash_Table *h);
 INLINE bool
 hash_rehash_needed_p (const struct Lisp_Hash_Table *h)
 {
-  return h->count < 0;
+  return NILP (h->hash);
 }
 
 INLINE void

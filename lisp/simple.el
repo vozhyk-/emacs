@@ -4972,10 +4972,11 @@ Normally set from the UNDO element of a yank-handler; see `insert-for-yank'.")
 
 (defun yank-pop (&optional arg)
   "Replace just-yanked stretch of killed text with a different stretch.
-This command is allowed only immediately after a `yank' or a `yank-pop'.
-At such a time, the region contains a stretch of reinserted
-previously-killed text.  `yank-pop' deletes that text and inserts in its
-place a different stretch of killed text.
+This command is allowed only immediately after a `yank' or a
+`yank-pop'.  At such a time, the region contains a stretch of
+reinserted previously-killed text.  `yank-pop' deletes that text
+and inserts in its place a different stretch of killed text by
+traversing the value of the `kill-ring' variable.
 
 With no argument, the previous kill is inserted.
 With argument N, insert the Nth previous kill.
@@ -5629,7 +5630,14 @@ separate contiguous regions for each line."
                    (eq (overlay-start rol) start)
                    (eq (overlay-end rol) end))
         (move-overlay rol start end (current-buffer)))
-      rol)))
+      rol))
+  "Function to move the region-highlight overlay.
+This function is called with four parameters, START, END, WINDOW
+and OVERLAY.  If OVERLAY is nil, a new overlay is created.  In
+any case, the overlay is adjusted to reflect the other three
+parameters.
+
+The overlay is returned by the function.")
 
 (defun redisplay--update-region-highlight (window)
   (let ((rol (window-parameter window 'internal-region-overlay)))
@@ -9054,6 +9062,82 @@ to capitalize ARG words."
   (if (use-region-p)
       (capitalize-region (region-beginning) (region-end))
     (capitalize-word arg)))
+
+;;; Accessors for `decode-time' values.
+
+(defsubst decoded-time-second (time)
+  "The seconds in TIME, which is a value returned by `decode-time'.
+This is an integer between 0 and 60 (inclusive).  (60 is a leap
+second, which only some operating systems support.)"
+  (nth 0 time))
+
+(defsubst decoded-time-minute (time)
+  "The minutes in TIME, which is a value returned by `decode-time'.
+This is an integer between 0 and 59 (inclusive)."
+  (nth 1 time))
+
+(defsubst decoded-time-hour (time)
+  "The hours in TIME, which is a value returned by `decode-time'.
+This is an integer between 0 and 23 (inclusive)."
+  (nth 2 time))
+
+(defsubst decoded-time-day (time)
+  "The day-of-the-month in TIME, which is a value returned by `decode-time'.
+This is an integer between 1 and 31 (inclusive)."
+  (nth 3 time))
+
+(defsubst decoded-time-month (time)
+  "The month in TIME, which is a value returned by `decode-time'.
+This is an integer between 1 and 12 (inclusive).  January is 1."
+  (nth 4 time))
+
+(defsubst decoded-time-year (time)
+  "The year in TIME, which is a value returned by `decode-time'.
+This is a four digit integer."
+  (nth 5 time))
+
+(defsubst decoded-time-weekday (time)
+  "The day-of-the-week in TIME, which is a value returned by `decode-time'.
+This is a number between 0 and 6, and 0 is Sunday."
+  (nth 6 time))
+
+(defsubst decoded-time-dst (time)
+  "The daylight saving time in TIME, which is a value returned by `decode-time'.
+This is t if daylight saving time is in effect, and nil if not."
+  (nth 7 time))
+
+(defsubst decoded-time-zone (time)
+  "The time zone in TIME, which is a value returned by `decode-time'.
+This is an integer indicating the UTC offset in seconds, i.e.,
+the number of seconds east of Greenwich."
+  (nth 8 time))
+
+(gv-define-setter decoded-time-second (second time)
+  `(setf (nth 0 ,time) ,second))
+
+(gv-define-setter decoded-time-minute (minute time)
+  `(setf (nth 1 ,time) ,minute))
+
+(gv-define-setter decoded-time-hour (hour time)
+  `(setf (nth 2 ,time) ,hour))
+
+(gv-define-setter decoded-time-day (day time)
+  `(setf (nth 3 ,time) ,day))
+
+(gv-define-setter decoded-time-month (month time)
+  `(setf (nth 4 ,time) ,month))
+
+(gv-define-setter decoded-time-year (year time)
+  `(setf (nth 5 ,time) ,year))
+
+;; No setter for weekday, which is the 6th element.
+
+(gv-define-setter decoded-time-dst (dst time)
+  `(setf (nth 7 ,time) ,dst))
+
+(gv-define-setter decoded-time-zone (zone time)
+  `(setf (nth 8 ,time) ,zone))
+
 
 
 
