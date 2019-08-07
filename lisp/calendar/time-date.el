@@ -171,14 +171,14 @@ If DATE lacks timezone information, GMT is assumed."
 (defalias 'time-to-seconds 'float-time)
 
 ;;;###autoload
-(defalias 'seconds-to-time 'encode-time)
+(defalias 'seconds-to-time 'time-convert)
 
 ;;;###autoload
 (defun days-to-time (days)
   "Convert DAYS into a time value."
-  (let ((time (encode-time (* 86400 days))))
+  (let ((time (time-convert (* 86400 days))))
     ;; Traditionally, this returned a two-element list if DAYS was an integer.
-    ;; Keep that tradition if encode-time outputs timestamps in list form.
+    ;; Keep that tradition if time-convert outputs timestamps in list form.
     (if (and (integerp days) (consp (cdr time)))
 	(setcdr (cdr time) nil))
     time))
@@ -216,9 +216,9 @@ DATE1 and DATE2 should be date-time strings."
 
 (defun time-date--day-in-year (tim)
   "Return the day number within the year corresponding to the decoded time TIM."
-  (let* ((month (nth 4 tim))
-	 (day (nth 3 tim))
-	 (year (nth 5 tim))
+  (let* ((month (decoded-time-month tim))
+         (day (decoded-time-day tim))
+         (year (decoded-time-year tim))
 	 (day-of-year (+ day (* 31 (1- month)))))
     (when (> month 2)
       (setq day-of-year (- day-of-year (/ (+ 23 (* 4 month)) 10)))
@@ -237,7 +237,7 @@ DATE1 and DATE2 should be date-time strings."
 TIME should be a time value.
 The Gregorian date Sunday, December 31, 1bce is imaginary."
   (let* ((tim (decode-time time))
-	 (year (nth 5 tim)))
+	 (year (decoded-time-year tim)))
     (+ (time-date--day-in-year tim)	;	Days this year
        (* 365 (1- year))		;	+ Days in prior years
        (/ (1- year) 4)			;	+ Julian leap years
@@ -374,8 +374,8 @@ January 1st being 1."
 
 (defun decoded-time-add (time delta)
   "Add DELTA to TIME, both of which are `decoded-time' structures.
-TIME should represent a time, while DELTA should only have
-non-nil integers for the values that should be altered.
+TIME should represent a time, while DELTA should have non-nil
+entries only for the values that should be altered.
 
 For instance, if you want to \"add two months\" to TIME, then
 leave all other fields but the month field in DELTA nil, and make
@@ -423,6 +423,13 @@ changes in daylight saving time are not taken into account."
     (setq seconds (+ (* (or (decoded-time-hour delta) 0) 3600)
                      (* (or (decoded-time-minute delta) 0) 60)
                      (or (decoded-time-second delta) 0)))
+    (when (decoded-time-subsec delta)
+      (let* ((subsec (time-convert (time-add (decoded-time-subsec time)
+					     (decoded-time-subsec delta))
+				   t))
+	     (s (time-convert subsec 'integer)))
+	(setq seconds (+ seconds s))
+	(setf (decoded-time-subsec time) (time-subtract subsec s))))
 
     ;; Time zone adjustments are basically the same as time adjustments.
     (setq seconds (+ seconds (or (decoded-time-zone delta) 0)))
@@ -494,9 +501,42 @@ changes in daylight saving time are not taken into account."
 
 (cl-defun make-decoded-time (&key second minute hour
                                   day month year
-                                  dst zone)
+                                  dst zone subsec)
   "Return a `decoded-time' structure with only the keywords given filled out."
-  (list second minute hour day month year nil dst zone))
+  (list second minute hour day month year nil dst zone subsec))
+
+(defun decoded-time-set-defaults (time &optional default-zone)
+  "Set any nil values in `decoded-time' TIME to default values.
+The default value is based on January 1st, 1970 at midnight.
+
+TIME is modified and returned."
+  (unless (decoded-time-second time)
+    (setf (decoded-time-second time) 0))
+  (unless (decoded-time-minute time)
+    (setf (decoded-time-minute time) 0))
+  (unless (decoded-time-hour time)
+    (setf (decoded-time-hour time) 0))
+
+  (unless (decoded-time-day time)
+    (setf (decoded-time-day time) 1))
+  (unless (decoded-time-month time)
+    (setf (decoded-time-month time) 1))
+  (unless (decoded-time-year time)
+    (setf (decoded-time-year time) 0))
+
+  ;; When we don't have a time zone and we don't have a DST, then mark
+  ;; it as unknown.
+  (when (and (not (decoded-time-zone time))
+             (not (decoded-time-dst time)))
+    (setf (decoded-time-dst time) -1))
+
+  (when (and (not (decoded-time-zone time))
+             default-zone)
+    (setf (decoded-time-zone time) 0))
+
+  (unless (decoded-time-subsec time)
+    (setf (decoded-time-subsec time) 0))
+  time)
 
 (provide 'time-date)
 

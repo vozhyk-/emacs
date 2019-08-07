@@ -3598,22 +3598,22 @@ possible values."
 	  (let ((dtime (decode-time time)))
 	    (concat
 	     "Date: the "
-	     (number-to-string (nth 3 dtime))
-	     (let ((digit (% (nth 3 dtime) 10)))
+	     (number-to-string (decoded-time-day dtime))
+	     (let ((digit (% (decoded-time-day dtime) 10)))
 	       (cond
-		((memq (nth 3 dtime) '(11 12 13)) "th")
+		((memq (decoded-time-day dtime) '(11 12 13)) "th")
 		((= digit 1) "st")
 		((= digit 2) "nd")
 		((= digit 3) "rd")
 		(t "th")))
 	     " of "
-	     (nth (1- (nth 4 dtime)) gnus-english-month-names)
+	     (nth (1- (decoded-time-month dtime)) gnus-english-month-names)
 	     " "
-	     (number-to-string (nth 5 dtime))
+	     (number-to-string (decoded-time-year dtime))
 	     " at "
-	     (format "%02d" (nth 2 dtime))
+	     (format "%02d" (decoded-time-hour dtime))
 	     ":"
-	     (format "%02d" (nth 1 dtime)))))))
+	     (format "%02d" (decoded-time-minute dtime)))))))
     (foo
      (format "Date: %s (from Gnus)" date))))
 
@@ -4381,7 +4381,7 @@ If variable `gnus-use-long-file-name' is non-nil, it is
 ;;; Gnus article mode
 ;;;
 
-(set-keymap-parent gnus-article-mode-map widget-keymap)
+(set-keymap-parent gnus-article-mode-map button-buffer-map)
 
 (gnus-define-keys gnus-article-mode-map
   " " gnus-article-goto-next-page
@@ -4506,9 +4506,7 @@ commands:
 (defun gnus-article-setup-buffer ()
   "Initialize the article buffer."
   (let* ((name (if gnus-single-article-buffer "*Article*"
-		 (concat "*Article "
-			 (gnus-group-decoded-name gnus-newsgroup-name)
-			 "*")))
+		 (concat "*Article " gnus-newsgroup-name "*")))
 	 (original
 	  (progn (string-match "\\*Article" name)
 		 (concat " *Original Article"
@@ -4874,6 +4872,7 @@ General format specifiers can also be used.  See Info node
 
 (defvar gnus-mime-button-map
   (let ((map (make-sparse-keymap)))
+    (define-key map "\r" 'gnus-article-push-button)
     (define-key map [mouse-2] 'gnus-article-push-button)
     (define-key map [down-mouse-3] 'gnus-mime-button-menu)
     (dolist (c gnus-mime-button-commands)
@@ -4888,7 +4887,9 @@ General format specifiers can also be used.  See Info node
 	      gnus-mime-button-commands)))
 
 (defvar gnus-url-button-commands
-  '((gnus-article-copy-string "u" "Copy URL to kill ring")))
+  '((gnus-article-copy-string "u" "Copy URL to kill ring")
+    (push-button "\r" "Push the button")
+    (push-button [mouse-2] "Push the button")))
 
 (defvar gnus-url-button-map
   (let ((map (make-sparse-keymap)))
@@ -5849,26 +5850,12 @@ all parts."
 		;; Exclude a newline.
 		(1- (point))
 	      (point)))
-    (when gnus-article-button-face
-      (overlay-put (make-overlay b e nil t)
-		   'face gnus-article-button-face))
-    (widget-convert-button
-     'link b e
-     :mime-handle handle
-     :action 'gnus-widget-press-button
-     :button-keymap gnus-mime-button-map
-     :help-echo
-     (lambda (widget)
-       (format
-	"%S: %s the MIME part; %S: more options"
-	'mouse-2
-	(if (mm-handle-displayed-p (widget-get widget :mime-handle))
-	    "hide" "show")
-	'down-mouse-3)))))
-
-(defun gnus-widget-press-button (elems _el)
-  (goto-char (widget-get elems :from))
-  (gnus-article-press-button))
+    (make-text-button
+     b e
+     'keymap gnus-mime-button-map
+     'face gnus-article-button-face
+     'help-echo
+     "mouse-2: toggle the MIME part; down-mouse-3: more options")))
 
 (defvar gnus-displaying-mime nil)
 
@@ -6151,10 +6138,9 @@ If nil, don't show those extra buttons."
 	     mouse-face ,gnus-article-mouse-face
 	     face ,gnus-article-button-face
 	     gnus-part ,id
+	     button t
 	     article-type multipart
 	     rear-nonsticky t))
-	  (widget-convert-button 'link from (point)
-				 :action 'gnus-widget-press-button)
 	  ;; Do the handles
 	  (while (setq handle (pop handles))
 	    (add-text-properties
@@ -6175,10 +6161,9 @@ If nil, don't show those extra buttons."
 	       mouse-face ,gnus-article-mouse-face
 	       face ,gnus-article-button-face
 	       gnus-part ,id
+	       button t
 	       gnus-data ,handle
 	       rear-nonsticky t))
-	    (widget-convert-button 'link from (point)
-				   :action 'gnus-widget-press-button)
 	    (insert "  "))
 	  (insert "\n\n"))
 	(when preferred
@@ -7752,7 +7737,7 @@ positives are possible."
      1 (>= gnus-button-browse-level 0) gnus-button-embedded-url 1)
     ;; Raw URLs.
     (gnus-button-url-regexp
-     0 (>= gnus-button-browse-level 0) browse-url 0)
+     0 (>= gnus-button-browse-level 0) browse-url-button-open-url 0)
     ;; man pages
     ("\\b\\([a-z][a-z]+([1-9])\\)\\W"
      0 (and (>= gnus-button-man-level 1) (< gnus-button-man-level 3))
@@ -8025,7 +8010,7 @@ url is put as the `gnus-button-url' overlay property on the button."
 					       (match-beginning 1))
 					   points)))))
 		     (match-beginning 2)))
-	  (let (gnus-article-mouse-face widget-mouse-face)
+	  (let (gnus-article-mouse-face)
 	    (while points
 	      (gnus-article-add-button (pop points) (pop points)
 				       'gnus-button-push
@@ -8074,18 +8059,19 @@ url is put as the `gnus-button-url' overlay property on the button."
 
 (defun gnus-article-add-button (from to fun &optional data text)
   "Create a button between FROM and TO with callback FUN and data DATA."
-  (when gnus-article-button-face
-    (overlay-put (make-overlay from to nil t)
-		 'face gnus-article-button-face))
   (add-text-properties
    from to
    (nconc (and gnus-article-mouse-face
 	       (list 'mouse-face gnus-article-mouse-face))
-	  (list 'gnus-callback fun)
+	  (list 'gnus-callback fun
+		'button-data data
+		'action fun
+		'keymap gnus-url-button-map
+		'category t
+		'button t)
 	  (and data (list 'gnus-data data))))
-  (widget-convert-button 'link from to :action 'gnus-widget-press-button
-			 :help-echo (or text "Follow the link")
-			 :keymap gnus-url-button-map))
+  (when gnus-article-button-face
+    (add-face-text-property from to gnus-article-button-face t)))
 
 (defun gnus-article-copy-string ()
   "Copy the string in the button to the kill ring."
@@ -8413,13 +8399,8 @@ url is put as the `gnus-button-url' overlay property on the button."
 		;; Exclude a newline.
 		(1- (point))
 	      (point)))
-    (when gnus-article-button-face
-      (overlay-put (make-overlay b e nil t)
-		   'face gnus-article-button-face))
-    (widget-convert-button
-     'link b e
-     :action 'gnus-button-prev-page
-     :button-keymap gnus-prev-page-map)))
+    (make-text-button b e 'keymap gnus-prev-page-map
+		      'face gnus-article-button-face)))
 
 (defun gnus-button-next-page (&optional _args _more-args)
   "Go to the next page."
@@ -8449,13 +8430,8 @@ url is put as the `gnus-button-url' overlay property on the button."
 		;; Exclude a newline.
 		(1- (point))
 	      (point)))
-    (when gnus-article-button-face
-      (overlay-put (make-overlay b e nil t)
-		   'face gnus-article-button-face))
-    (widget-convert-button
-     'link b e
-     :action 'gnus-button-next-page
-     :button-keymap gnus-next-page-map)))
+    (make-text-button b e 'keymap gnus-next-page-map
+		      'face gnus-article-button-face)))
 
 (defun gnus-article-button-next-page (_arg)
   "Go to the next page."
@@ -8708,6 +8684,7 @@ For example:
 
 (defvar gnus-mime-security-button-map
   (let ((map (make-sparse-keymap)))
+    (define-key map "\r" 'gnus-article-push-button)
     (define-key map [mouse-2] 'gnus-article-push-button)
     (define-key map [down-mouse-3] 'gnus-mime-security-button-menu)
     (dolist (c gnus-mime-security-button-commands)
@@ -8843,20 +8820,8 @@ For example:
 		;; Exclude a newline.
 		(1- (point))
 	      (point)))
-    (when gnus-article-button-face
-      (overlay-put (make-overlay b e nil t)
-		   'face gnus-article-button-face))
-    (widget-convert-button
-     'link b e
-     :mime-handle handle
-     :action 'gnus-widget-press-button
-     :button-keymap gnus-mime-security-button-map
-     :help-echo
-     (lambda (_widget)
-       (format
-	"%S: show detail; %S: more options"
-	'mouse-2
-	'down-mouse-3)))))
+    (make-text-button b e 'keymap gnus-mime-security-button-map
+		      'face gnus-article-button-face)))
 
 (defun gnus-mime-display-security (handle)
   (save-restriction

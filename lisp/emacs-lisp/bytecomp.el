@@ -1037,9 +1037,10 @@ If STR is something like \"Buffer foo.el\", return #<buffer foo.el>
 we go into emacs-lisp-compilation-mode.")
 
 (defcustom emacs-lisp-compilation-search-path '(nil)
-  "Search path for byte-compile error messages.
-Elements should be directory names, not file names of directories.
-The value nil as an element means to try the default directory."
+  "Directories to search for files named in byte-compile error messages.
+Value should be a list of directory names, not file names of
+directories.  The value nil as an element means the byte-compile
+message buffer `default-directory'."
   :version "27.1"
   :type '(repeat (choice (const :tag "Default" nil)
 			 (string :tag "Directory"))))
@@ -5090,8 +5091,15 @@ it won't work in an interactive Emacs."
   "Run `byte-compile-file' on the files remaining on the command line.
 Use this from the command line, with `-batch';
 it won't work in an interactive Emacs.
-Each file is processed even if an error occurred previously.
+
+Each file is processed even if an error occurred previously.  If
+a file name denotes a directory, all Emacs Lisp source files in
+that directory (that have previously been compiled) will be
+recompiled if newer than the compiled files.  In this case,
+NOFORCE is ignored.
+
 For example, invoke \"emacs -batch -f batch-byte-compile $emacs/ ~/*.el\".
+
 If NOFORCE is non-nil, don't recompile a file that seems to be
 already up-to-date."
   ;; command-line-args-left is what is left of the command line, from

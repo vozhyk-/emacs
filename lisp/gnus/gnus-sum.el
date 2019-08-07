@@ -3500,8 +3500,7 @@ value of GROUP, and puts the buffer in `gnus-summary-mode'.
 
 Returns non-nil if the setup was successful."
   (let ((buffer (gnus-summary-buffer-name group))
-	(dead-name (concat "*Dead Summary "
-			   (gnus-group-decoded-name group) "*")))
+	(dead-name (concat "*Dead Summary " group "*")))
     ;; If a dead summary buffer exists, we kill it.
     (gnus-kill-buffer dead-name)
     (if (get-buffer buffer)
@@ -3984,8 +3983,7 @@ If SELECT-ARTICLES, only select those articles from GROUP."
   ;;  (when (and (not (gnus-group-native-p group))
   ;;	     (not (gethash group gnus-newsrc-hashtb)))
   ;;    (error "Dead non-native groups can't be entered"))
-  (gnus-message 7 "Retrieving newsgroup: %s..."
-		(gnus-group-decoded-name group))
+  (gnus-message 7 "Retrieving newsgroup: %s..." group)
   (let* ((new-group (gnus-summary-setup-buffer group))
 	 (quit-config (gnus-group-quit-config group))
 	 (did-select (and new-group (gnus-select-newsgroup
@@ -4016,8 +4014,7 @@ If SELECT-ARTICLES, only select those articles from GROUP."
 	      (gnus-group-next-unread-group 1))
 	  (gnus-handle-ephemeral-exit quit-config)))
       (if (null (gnus-list-of-unread-articles group))
-	  (gnus-message 3 "Group %s contains no messages"
-			(gnus-group-decoded-name group))
+	  (gnus-message 3 "Group %s contains no messages" group)
 	(gnus-message 3 "Can't select group"))
       nil)
      ;; The user did a `C-g' while prompting for number of articles,
@@ -5618,25 +5615,24 @@ or a straight list of headers."
 
 (defun gnus-fetch-headers (articles &optional limit force-new dependencies)
   "Fetch headers of ARTICLES."
-  (let ((name (gnus-group-decoded-name gnus-newsgroup-name)))
-    (gnus-message 7 "Fetching headers for %s..." name)
-    (prog1
-	(if (eq 'nov
-		(setq gnus-headers-retrieved-by
-		      (gnus-retrieve-headers
-		       articles gnus-newsgroup-name
-		       (or limit
-			   ;; We might want to fetch old headers, but
-			   ;; not if there is only 1 article.
-			   (and (or (and
-				     (not (eq gnus-fetch-old-headers 'some))
-				     (not (numberp gnus-fetch-old-headers)))
-				    (> (length articles) 1))
-				gnus-fetch-old-headers)))))
-	    (gnus-get-newsgroup-headers-xover
-	     articles force-new dependencies gnus-newsgroup-name t)
-	  (gnus-get-newsgroup-headers dependencies force-new))
-      (gnus-message 7 "Fetching headers for %s...done" name))))
+  (gnus-message 7 "Fetching headers for %s..." gnus-newsgroup-name)
+  (prog1
+      (if (eq 'nov
+	      (setq gnus-headers-retrieved-by
+		    (gnus-retrieve-headers
+		     articles gnus-newsgroup-name
+		     (or limit
+			 ;; We might want to fetch old headers, but
+			 ;; not if there is only 1 article.
+			 (and (or (and
+				   (not (eq gnus-fetch-old-headers 'some))
+				   (not (numberp gnus-fetch-old-headers)))
+				  (> (length articles) 1))
+			      gnus-fetch-old-headers)))))
+	  (gnus-get-newsgroup-headers-xover
+	   articles force-new dependencies gnus-newsgroup-name t)
+	(gnus-get-newsgroup-headers dependencies force-new))
+    (gnus-message 7 "Fetching headers for %s...done" gnus-newsgroup-name)))
 
 (defun gnus-select-newsgroup (group &optional read-all select-articles)
   "Select newsgroup GROUP.
@@ -5649,13 +5645,12 @@ If SELECT-ARTICLES, only select those articles from GROUP."
 	      t
 	    gnus-summary-ignore-duplicates))
 	 (info (nth 1 entry))
-	 charset articles fetched-articles cached)
+	 articles fetched-articles cached)
 
     (unless (gnus-check-server
 	     (set (make-local-variable 'gnus-current-select-method)
 		  (gnus-find-method-for-group group)))
       (error "Couldn't open server"))
-    (setq charset (gnus-group-name-charset gnus-current-select-method group))
 
     (or (and entry (not (eq (car entry) t))) ; Either it's active...
 	(gnus-activate-group group)	; Or we can activate it...
@@ -5663,16 +5658,12 @@ If SELECT-ARTICLES, only select those articles from GROUP."
 	  (when (derived-mode-p 'gnus-summary-mode)
 	    (gnus-kill-buffer (current-buffer)))
 	  (error
-	   "Couldn't activate group %s: %s"
-	   (decode-coding-string group charset)
-	   (decode-coding-string (gnus-status-message group) charset))))
+	   "Couldn't activate group %s: %s" group (gnus-status-message group))))
 
     (unless (gnus-request-group group t nil info)
       (when (derived-mode-p 'gnus-summary-mode)
 	(gnus-kill-buffer (current-buffer)))
-      (error "Couldn't request group %s: %s"
-	     (decode-coding-string group charset)
-	     (decode-coding-string (gnus-status-message group) charset)))
+      (error "Couldn't request group %s: %s" group (gnus-status-message group)))
 
     (when (and gnus-agent
 	       (gnus-active group))
@@ -5938,13 +5929,11 @@ If SELECT-ARTICLES, only select those articles from GROUP."
 			   (if only-read-p
 			       (format
 				"How many articles from %s (available %d, default %d): "
-				(gnus-group-real-name
-				 (gnus-group-decoded-name gnus-newsgroup-name))
+				(gnus-group-real-name gnus-newsgroup-name)
 				number default)
 			     (format
 			      "How many articles from %s (%d default): "
-			      (gnus-group-real-name
-			       (gnus-group-decoded-name gnus-newsgroup-name))
+			      (gnus-group-real-name gnus-newsgroup-name)
 			      default))
 			   nil
 			   nil
@@ -5956,8 +5945,7 @@ If SELECT-ARTICLES, only select those articles from GROUP."
 			 (read-string
 			  (format "%s %s (%d scored, %d total): "
 				  "How many articles from"
-				  (gnus-group-decoded-name
-				   (gnus-group-real-name gnus-newsgroup-name))
+				  (gnus-group-real-name gnus-newsgroup-name)
 				  scored number))))
 		    (if (string-match "^[ \t]*$" input)
 			number input)))
@@ -6199,8 +6187,7 @@ If WHERE is `summary', the summary mode line format will be used."
 			 (intern
 			  (format "gnus-%s-mode-line-format-spec" where))))
 	       (gnus-tmp-group-name (gnus-mode-string-quote
-				     (gnus-group-decoded-name
-				      gnus-newsgroup-name)))
+				     gnus-newsgroup-name))
 	       (gnus-tmp-article-number (or gnus-current-article 0))
 	       (gnus-tmp-unread gnus-newsgroup-unreads)
 	       (gnus-tmp-unread-and-unticked (length gnus-newsgroup-unreads))
@@ -6276,7 +6263,7 @@ The resulting hash table is returned, or nil if no Xrefs were found."
 (defun gnus-mark-xrefs-as-read (from-newsgroup headers unreads)
   "Look through all the headers and mark the Xrefs as read."
   (let ((virtual (gnus-virtual-group-p from-newsgroup))
-	name info xref-hashtb method nth4)
+	info xref-hashtb method nth4)
     (with-current-buffer gnus-group-buffer
       (when (setq xref-hashtb
 		  (gnus-create-xref-hashtb from-newsgroup headers unreads))
@@ -6285,7 +6272,7 @@ The resulting hash table is returned, or nil if no Xrefs were found."
 	   (unless (string= from-newsgroup group)
 	     ;; Dead groups are not updated.
 	     (and (prog1
-		      (setq info (gnus-get-info name))
+		      (setq info (gnus-get-info group))
 		    (when (stringp (setq nth4 (gnus-info-method info)))
 		      (setq nth4 (gnus-server-to-method nth4))))
 		  ;; Only do the xrefs if the group has the same
@@ -6303,7 +6290,7 @@ The resulting hash table is returned, or nil if no Xrefs were found."
 		      ;; Only do cross-references on subscribed
 		      ;; groups, if that is what is wanted.
 		      (<= (gnus-info-level info) gnus-level-subscribed))
-		  (gnus-group-make-articles-read name idlist))))
+		  (gnus-group-make-articles-read group idlist))))
 	 xref-hashtb)))))
 
 (defun gnus-compute-read-articles (group articles)
@@ -7921,11 +7908,11 @@ If BACKWARD, the previous article is selected instead of the next."
 		      (not (gnus-ephemeral-group-p gnus-newsgroup-name)))
 		 (format " (Type %s for %s [%s])"
 			 (single-key-description cmd)
-			 (gnus-group-decoded-name group)
+			 group
 			 (gnus-group-unread group))
 	       (format " (Type %s to exit %s)"
 		       (single-key-description cmd)
-		       (gnus-group-decoded-name gnus-newsgroup-name)))))
+		       gnus-newsgroup-name))))
       ;; Confirm auto selection.
       (setq key (car (setq keve (gnus-read-event-char prompt)))
 	    ended t)
@@ -9410,7 +9397,9 @@ Obeys the standard process/prefix convention."
      (t
       (error "Couldn't select virtual nndoc group")))))
 
-(defun gnus-summary-widget-forward (arg)
+(define-obsolete-function-alias 'gnus-summary-widget-forward
+  #'gnus-summary-button-forward "27.1")
+(defun gnus-summary-button-forward (arg)
   "Move point to the next field or button in the article.
 With optional ARG, move across that many fields."
   (interactive "p")
@@ -9420,9 +9409,11 @@ With optional ARG, move across that many fields."
                  (error "No article window found"))))
     (select-window win)
     (select-frame-set-input-focus (window-frame win))
-    (widget-forward arg)))
+    (forward-button arg)))
 
-(defun gnus-summary-widget-backward (arg)
+(define-obsolete-function-alias 'gnus-summary-widget-backward
+  #'gnus-summary-button-backward "27.1")
+(defun gnus-summary-button-backward (arg)
   "Move point to the previous field or button in the article.
 With optional ARG, move across that many fields."
   (interactive "p")
@@ -9432,30 +9423,28 @@ With optional ARG, move across that many fields."
                  (error "No article window found"))))
     (select-window win)
     (select-frame-set-input-focus (window-frame win))
-    (unless (widget-at (point))
+    (unless (button-at (point))
       (goto-char (point-max)))
-    (widget-backward arg)))
+    (backward-button arg)))
 
 (defcustom gnus-collect-urls-primary-text "Link"
-  "The widget text for the default link in `gnus-summary-browse-url'."
+  "The button text for the default link in `gnus-summary-browse-url'."
   :version "27.1"
   :type 'string
   :group 'gnus-article-various)
 
 (defun gnus-collect-urls ()
   "Return the list of URLs in the buffer after (point).
-The 1st element is the widget named by `gnus-collect-urls-primary-text'."
+The 1st element is the button named by `gnus-collect-urls-primary-text'."
   (let ((pt (point)) urls primary)
-    (while (progn (widget-move 1 t) ; no echo
-		  ;; `widget-move' wraps around to top of buffer.
-		  (> (point) pt))
+    (while (forward-button 1 nil nil t)
       (setq pt (point))
-      (when-let ((w (widget-at pt))
-                 (u (or (widget-value w)
+      (when-let ((w (button-at pt))
+                 (u (or (button-get w 'shr-url)
                         (get-text-property pt 'gnus-string))))
 	(when (string-match-p "\\`[[:alpha:]]+://" u)
           (if (and gnus-collect-urls-primary-text (null primary)
-                   (string= gnus-collect-urls-primary-text (widget-text w)))
+                   (string= gnus-collect-urls-primary-text (button-label w)))
               (setq primary u)
 	    (push u urls)))))
     (setq urls (nreverse urls))
@@ -9489,7 +9478,7 @@ default."
     (gnus-summary-select-article)
     (gnus-with-article-buffer
       (article-goto-body)
-      ;; Back up a char, in case body starts with a widget.
+      ;; Back up a char, in case body starts with a button.
       (backward-char)
       (setq urls (gnus-collect-urls))
       (setq target
@@ -10108,7 +10097,7 @@ ACTION can be either `move' (the default), `crosspost' or `copy'."
 	(copy-buf (save-excursion
 		    (nnheader-set-temp-buffer " *copy article*")))
 	art-group to-method new-xref article to-groups
-	articles-to-update-marks encoded)
+	articles-to-update-marks)
     (unless (assq action names)
       (error "Unknown action %s" action))
     ;; Read the newsgroup name.
@@ -10130,22 +10119,12 @@ ACTION can be either `move' (the default), `crosspost' or `copy'."
 			  (symbol-value
 			   (intern (format "gnus-current-%s-group" action)))
 			  articles prefix)
-	    encoded to-newsgroup
 	    to-method (gnus-server-to-method (gnus-group-method to-newsgroup)))
-      (set (intern (format "gnus-current-%s-group" action))
-	   (decode-coding-string
-	    to-newsgroup
-	    (gnus-group-name-charset to-method to-newsgroup))))
+      (set (intern (format "gnus-current-%s-group" action)) to-newsgroup))
     (unless to-method
       (setq to-method (or select-method
 			  (gnus-server-to-method
 			   (gnus-group-method to-newsgroup)))))
-    (setq to-newsgroup
-	  (or encoded
-	      (and to-newsgroup
-		   (encode-coding-string
-		    to-newsgroup
-		    (gnus-group-name-charset to-method to-newsgroup)))))
     ;; Check the method we are to move this article to...
     (unless (gnus-check-backend-function
 	     'request-accept-article (car to-method))
@@ -10155,7 +10134,7 @@ ACTION can be either `move' (the default), `crosspost' or `copy'."
     (gnus-message 6 "%s to %s: %s..."
 		  (caddr (assq action names))
 		  (or (car select-method)
-		      (gnus-group-decoded-name to-newsgroup))
+		      to-newsgroup)
 		  articles)
     ;; This `while' is not equivalent to a `dolist' (bug#33653#134).
     (while articles
@@ -12467,27 +12446,23 @@ save those articles instead."
            (t
             (gnus-completing-read
              prom (nreverse split-name) nil nil 'gnus-group-history))))
-         (to-method (gnus-server-to-method (gnus-group-method to-newsgroup)))
-	 encoded)
+         (to-method (gnus-server-to-method (gnus-group-method to-newsgroup))))
     (when to-newsgroup
       (if (or (string= to-newsgroup "")
 	      (string= to-newsgroup prefix))
 	  (setq to-newsgroup default))
       (unless to-newsgroup
-	(user-error "No group name entered"))
-      (setq encoded (encode-coding-string
-		     to-newsgroup
-		     (gnus-group-name-charset to-method to-newsgroup)))
-      (or (gnus-active encoded)
-	  (gnus-activate-group encoded nil nil to-method)
+	(error "No group name entered"))
+      (or (gnus-active to-newsgroup)
+	  (gnus-activate-group to-newsgroup nil nil to-method)
 	  (if (gnus-y-or-n-p (format "No such group: %s.  Create it? "
 				     to-newsgroup))
-	      (or (and (gnus-request-create-group encoded to-method)
-		       (gnus-activate-group encoded nil nil to-method)
-		       (gnus-subscribe-group encoded))
+	      (or (and (gnus-request-create-group to-newsgroup to-method)
+		       (gnus-activate-group to-newsgroup nil nil to-method)
+		       (gnus-subscribe-group to-newsgroup))
 		  (error "Couldn't create group %s" to-newsgroup)))
-	  (user-error "No such group: %s" to-newsgroup))
-      encoded)))
+	  (error "No such group: %s" to-newsgroup))
+      to-newsgroup)))
 
 (defvar gnus-summary-save-parts-counter)
 (declare-function mm-uu-dissect "mm-uu" (&optional noheader mime-type))
@@ -13154,7 +13129,7 @@ If ALL is a number, fetch this number of articles."
 		      (read-string
 		       (format
 			"How many articles from %s (%s %d): "
-			(gnus-group-decoded-name gnus-newsgroup-name)
+			gnus-newsgroup-name
 			(if initial "max" "default")
 			len)
 		       nil nil

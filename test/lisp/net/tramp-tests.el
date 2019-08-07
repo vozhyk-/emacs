@@ -56,6 +56,7 @@
 (declare-function tramp-list-tramp-buffers "tramp-cmds")
 (declare-function tramp-method-out-of-band-p "tramp-sh")
 (declare-function tramp-smb-get-localname "tramp-smb")
+(declare-function tramp-time-diff "tramp")
 (defvar auto-save-file-name-transforms)
 (defvar tramp-connection-properties)
 (defvar tramp-copy-size-limit)
@@ -3084,9 +3085,23 @@ This tests also `access-file', `file-readable-p',
 
 (defsubst tramp--test-file-attributes-equal-p (attr1 attr2)
   "Check, whether file attributes ATTR1 and ATTR2 are equal.
-They might differ only in access time."
+They might differ only in time attributes."
+  ;; Access time.
   (setcar (nthcdr 4 attr1) tramp-time-dont-know)
   (setcar (nthcdr 4 attr2) tramp-time-dont-know)
+  ;; Modification time.
+  (when (or (tramp-compat-time-equal-p (nth 5 attr1) tramp-time-dont-know)
+	    (tramp-compat-time-equal-p (nth 5 attr2) tramp-time-dont-know)
+	    (< (abs (tramp-time-diff (nth 5 attr1) (nth 5 attr2))) 5))
+    (setcar (nthcdr 5 attr1) tramp-time-dont-know)
+    (setcar (nthcdr 5 attr2) tramp-time-dont-know))
+  ;; Status change time.
+  (when (or (tramp-compat-time-equal-p (nth 6 attr1) tramp-time-dont-know)
+	    (tramp-compat-time-equal-p (nth 6 attr2) tramp-time-dont-know)
+	    (< (abs (tramp-time-diff (nth 6 attr1) (nth 6 attr2))) 5))
+    (setcar (nthcdr 6 attr1) tramp-time-dont-know)
+    (setcar (nthcdr 6 attr2) tramp-time-dont-know))
+  (unless (equal attr1 attr2) (tramp--test-message "%S\n%S" attr1 attr2))
   (equal attr1 attr2))
 
 ;; This isn't 100% correct, but better than no explainer at all.
@@ -3112,27 +3127,22 @@ They might differ only in access time."
 	    (write-region "foo" nil (expand-file-name "foo" tmp-name2))
 	    (write-region "bar" nil (expand-file-name "bar" tmp-name2))
 	    (write-region "boz" nil (expand-file-name "boz" tmp-name2))
+
 	    (setq attr (directory-files-and-attributes tmp-name2))
 	    (should (consp attr))
-	    ;; Dumb remote shells without perl(1) or stat(1) are not
-	    ;; able to return the date correctly.  They say "don't know".
 	    (dolist (elt attr)
-	      (unless
-		  (tramp-compat-time-equal-p
-		   (nth
-		    5 (file-attributes (expand-file-name (car elt) tmp-name2)))
-		   tramp-time-dont-know)
-		(should
-		 (tramp--test-file-attributes-equal-p
-		  (file-attributes (expand-file-name (car elt) tmp-name2))
-		  (cdr elt)))))
+	      (should
+	       (tramp--test-file-attributes-equal-p
+		(file-attributes (expand-file-name (car elt) tmp-name2))
+		(cdr elt))))
+
 	    (setq attr (directory-files-and-attributes tmp-name2 'full))
+	    (should (consp attr))
 	    (dolist (elt attr)
-	      (unless (tramp-compat-time-equal-p
-		       (nth 5 (file-attributes (car elt))) tramp-time-dont-know)
-		(should
-		 (tramp--test-file-attributes-equal-p
-		  (file-attributes (car elt)) (cdr elt)))))
+	      (should
+	       (tramp--test-file-attributes-equal-p
+		(file-attributes (car elt)) (cdr elt))))
+
 	    (setq attr (directory-files-and-attributes tmp-name2 nil "^b"))
 	    (should (equal (mapcar #'car attr) '("bar" "boz"))))
 
@@ -3143,7 +3153,13 @@ They might differ only in access time."
   "Check `file-modes'.
 This tests also `file-executable-p', `file-writable-p' and `set-file-modes'."
   (skip-unless (tramp--test-enabled))
-  (skip-unless (or (tramp--test-sh-p) (tramp--test-sudoedit-p)))
+  (skip-unless
+   (or (tramp--test-sh-p) (tramp--test-sudoedit-p)
+       ;; Not all tramp-gvfs.el methods support changing the file mode.
+       (and
+	(tramp--test-gvfs-p)
+	(string-match-p
+	 "ftp" (file-remote-p tramp-test-temporary-file-directory 'method)))))
 
   (dolist (quoted (if (tramp--test-expensive-test) '(nil t) '(nil)))
     (let ((tmp-name (tramp--test-make-temp-name nil quoted)))
@@ -3443,7 +3459,8 @@ This tests also `make-symbolic-link', `file-truename' and `add-name-to-file'."
   "Check `set-file-times' and `file-newer-than-file-p'."
   (skip-unless (tramp--test-enabled))
   (skip-unless
-   (or (tramp--test-adb-p) (tramp--test-sh-p) (tramp--test-sudoedit-p)))
+   (or (tramp--test-adb-p) (tramp--test-gvfs-p)
+       (tramp--test-sh-p) (tramp--test-sudoedit-p)))
 
   (dolist (quoted (if (tramp--test-expensive-test) '(nil t) '(nil)))
     (let ((tmp-name1 (tramp--test-make-temp-name nil quoted))

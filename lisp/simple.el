@@ -1125,8 +1125,9 @@ delete the text in the region and deactivate the mark instead.
 To disable this, set option `delete-active-region' to nil.
 
 Optional second arg KILLFLAG, if non-nil, means to kill (save in
-kill ring) instead of delete.  Interactively, N is the prefix
-arg, and KILLFLAG is set if N is explicitly specified.
+kill ring) instead of delete.  If called interactively, a numeric
+prefix argument specifies N, and KILLFLAG is also set if a prefix
+argument is used.
 
 When killing, the killed text is filtered by
 `filter-buffer-substring' before it is saved in the kill ring, so
@@ -1166,8 +1167,9 @@ delete the text in the region and deactivate the mark instead.
 To disable this, set variable `delete-active-region' to nil.
 
 Optional second arg KILLFLAG non-nil means to kill (save in kill
-ring) instead of delete.  Interactively, N is the prefix arg, and
-KILLFLAG is set if N was explicitly specified.
+ring) instead of delete.  If called interactively, a numeric
+prefix argument specifies N, and KILLFLAG is also set if a prefix
+argument is used.
 
 When killing, the killed text is filtered by
 `filter-buffer-substring' before it is saved in the kill ring, so
@@ -5855,8 +5857,7 @@ mode temporarily."
     (goto-char omark)
     (cond (temp-highlight
 	   (setq-local transient-mark-mode (cons 'only transient-mark-mode)))
-	  ((or (and arg (region-active-p)) ; (xor arg (not (region-active-p)))
-	       (not (or arg (region-active-p))))
+	  ((xor arg (not (region-active-p)))
 	   (deactivate-mark))
 	  (t (activate-mark)))
     nil))
@@ -9065,79 +9066,32 @@ to capitalize ARG words."
 
 ;;; Accessors for `decode-time' values.
 
-(defsubst decoded-time-second (time)
-  "The seconds in TIME, which is a value returned by `decode-time'.
+(cl-defstruct (decoded-time
+               (:constructor nil)
+               (:copier nil)
+               (:type list))
+  (second nil :documentation "\
 This is an integer between 0 and 60 (inclusive).  (60 is a leap
-second, which only some operating systems support.)"
-  (nth 0 time))
-
-(defsubst decoded-time-minute (time)
-  "The minutes in TIME, which is a value returned by `decode-time'.
-This is an integer between 0 and 59 (inclusive)."
-  (nth 1 time))
-
-(defsubst decoded-time-hour (time)
-  "The hours in TIME, which is a value returned by `decode-time'.
-This is an integer between 0 and 23 (inclusive)."
-  (nth 2 time))
-
-(defsubst decoded-time-day (time)
-  "The day-of-the-month in TIME, which is a value returned by `decode-time'.
-This is an integer between 1 and 31 (inclusive)."
-  (nth 3 time))
-
-(defsubst decoded-time-month (time)
-  "The month in TIME, which is a value returned by `decode-time'.
-This is an integer between 1 and 12 (inclusive).  January is 1."
-  (nth 4 time))
-
-(defsubst decoded-time-year (time)
-  "The year in TIME, which is a value returned by `decode-time'.
-This is a four digit integer."
-  (nth 5 time))
-
-(defsubst decoded-time-weekday (time)
-  "The day-of-the-week in TIME, which is a value returned by `decode-time'.
-This is a number between 0 and 6, and 0 is Sunday."
-  (nth 6 time))
-
-(defsubst decoded-time-dst (time)
-  "The daylight saving time in TIME, which is a value returned by `decode-time'.
-This is t if daylight saving time is in effect, and nil if not."
-  (nth 7 time))
-
-(defsubst decoded-time-zone (time)
-  "The time zone in TIME, which is a value returned by `decode-time'.
+second, which only some operating systems support.)")
+  (minute nil :documentation "This is an integer between 0 and 59 (inclusive).")
+  (hour nil :documentation "This is an integer between 0 and 23 (inclusive).")
+  (day nil :documentation "This is an integer between 1 and 31 (inclusive).")
+  (month nil :documentation "\
+This is an integer between 1 and 12 (inclusive).  January is 1.")
+  (year nil :documentation "This is a four digit integer.")
+  (weekday nil :documentation "\
+This is a number between 0 and 6, and 0 is Sunday.")
+  (dst nil :documentation "\
+This is t if daylight saving time is in effect, nil if it is not
+in effect, and -1 if daylight saving information is not
+available.")
+  (zone nil :documentation "\
 This is an integer indicating the UTC offset in seconds, i.e.,
-the number of seconds east of Greenwich."
-  (nth 8 time))
-
-(gv-define-setter decoded-time-second (second time)
-  `(setf (nth 0 ,time) ,second))
-
-(gv-define-setter decoded-time-minute (minute time)
-  `(setf (nth 1 ,time) ,minute))
-
-(gv-define-setter decoded-time-hour (hour time)
-  `(setf (nth 2 ,time) ,hour))
-
-(gv-define-setter decoded-time-day (day time)
-  `(setf (nth 3 ,time) ,day))
-
-(gv-define-setter decoded-time-month (month time)
-  `(setf (nth 4 ,time) ,month))
-
-(gv-define-setter decoded-time-year (year time)
-  `(setf (nth 5 ,time) ,year))
-
-;; No setter for weekday, which is the 6th element.
-
-(gv-define-setter decoded-time-dst (dst time)
-  `(setf (nth 7 ,time) ,dst))
-
-(gv-define-setter decoded-time-zone (zone time)
-  `(setf (nth 8 ,time) ,zone))
-
+the number of seconds east of Greenwich.")
+  (subsec nil :documentation "\
+This is 0, or is an integer pair (TICKS . HZ) indicating TICKS/HZ seconds,
+where HZ is positive and TICKS is nonnegative and less than HZ.")
+  )
 
 
 
