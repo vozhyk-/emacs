@@ -4855,11 +4855,16 @@ x_find_modifier_meanings (struct pgtk_display_info *dpyinfo)
   gboolean r = gdk_keymap_map_virtual_modifiers (keymap, &state);
   if (r) {
     /* Meta key exists. */
-    dpyinfo->meta_mod_mask = state & ~GDK_META_MASK;
-    if (dpyinfo->meta_mod_mask == GDK_MOD1_MASK)
+    if (state == GDK_META_MASK) {
+      dpyinfo->meta_mod_mask = GDK_MOD1_MASK;	/* maybe this is meta. */
       dpyinfo->alt_mod_mask = 0;
-    else
-      dpyinfo->alt_mod_mask = GDK_MOD1_MASK;
+    } else {
+      dpyinfo->meta_mod_mask = state & ~GDK_META_MASK;
+      if (dpyinfo->meta_mod_mask == GDK_MOD1_MASK)
+	dpyinfo->alt_mod_mask = 0;
+      else
+	dpyinfo->alt_mod_mask = GDK_MOD1_MASK;
+    }
   } else {
     dpyinfo->meta_mod_mask = GDK_MOD1_MASK;
     dpyinfo->alt_mod_mask = 0;
