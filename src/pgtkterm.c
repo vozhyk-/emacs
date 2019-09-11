@@ -6018,8 +6018,11 @@ pgtk_term_init (Lisp_Object display_name, char *resource_name)
   if (!x_initialized)
     {
       Fset_input_interrupt_mode (Qt);
-      x_cr_init_fringe (&pgtk_redisplay_interface);
       baud_rate = 19200;
+
+#ifdef USE_CAIRO
+      gui_init_fringe (&pgtk_redisplay_interface);
+#endif
 
       ++x_initialized;
     }
