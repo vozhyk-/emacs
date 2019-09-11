@@ -477,18 +477,18 @@ END:VEVENT
 
           ;; testcase: no time zone in input -> keep time as is
           ;; 1 Jan 2013 10:00
-          (should (equal '(0 0 10 1 1 2013 2 nil 7200 0)
+          (should (equal '(0 0 10 1 1 2013 2 nil 7200)
                          (icalendar--decode-isodatetime "20130101T100000")))
           ;; 1 Aug 2013 10:00 (DST)
-          (should (equal '(0 0 10 1 8 2013 4 t 10800 0)
+          (should (equal '(0 0 10 1 8 2013 4 t 10800)
                          (icalendar--decode-isodatetime "20130801T100000")))
 
           ;; testcase: UTC time zone specifier in input -> convert to local time
           ;; 31 Dec 2013 23:00 UTC -> 1 Jan 2013 01:00 EET
-          (should (equal '(0 0 1 1 1 2014 3 nil 7200 0)
+          (should (equal '(0 0 1 1 1 2014 3 nil 7200)
                          (icalendar--decode-isodatetime "20131231T230000Z")))
           ;; 1 Aug 2013 10:00 UTC -> 1 Aug 2013 13:00 EEST
-          (should (equal '(0 0 13 1 8 2013 4 t 10800 0)
+          (should (equal '(0 0 13 1 8 2013 4 t 10800)
                          (icalendar--decode-isodatetime "20130801T100000Z")))
 
           )
@@ -1299,6 +1299,24 @@ UID:9188710a-08a7-4061-bae3-d4cf4972599a
  UID: 9188710a-08a7-4061-bae3-d4cf4972599a
 "
 ))
+
+(ert-deftest icalendar-import-bug-33277 ()
+  ;;bug#33277 -- start time equals end time
+  (icalendar-tests--test-import
+   "DTSTART:20181105T200000Z
+DTSTAMP:20181105T181652Z
+DESCRIPTION:
+LAST-MODIFIED:20181105T181646Z
+LOCATION:
+SEQUENCE:0
+SUMMARY:event with same start/end time
+TRANSP:OPAQUE
+"
+
+   "&2018/11/5 21:00 event with same start/end time\n"
+   "&5/11/2018 21:00 event with same start/end time\n"
+   "&11/5/2018 21:00 event with same start/end time\n"
+   ))
 
 (ert-deftest icalendar-import-multiple-vcalendars ()
   (icalendar-tests--test-import

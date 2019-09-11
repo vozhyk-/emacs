@@ -397,8 +397,16 @@ typedef EMACS_INT Lisp_Word;
    (eassert (CONSP (a)), XUNTAG (a, Lisp_Cons, struct Lisp_Cons))
 #define lisp_h_XHASH(a) XUFIXNUM_RAW (a)
 #if USE_LSB_TAG
-# define lisp_h_make_fixnum(n) \
+# define lisp_h_make_fixnum_wrap(n) \
     XIL ((EMACS_INT) (((EMACS_UINT) (n) << INTTYPEBITS) + Lisp_Int0))
+# if defined HAVE_STATEMENT_EXPRESSIONS && defined HAVE_TYPEOF
+#  define lisp_h_make_fixnum(n) \
+     ({ typeof (+(n)) lisp_h_make_fixnum_n = n; \
+	eassert (!FIXNUM_OVERFLOW_P (lisp_h_make_fixnum_n)); \
+	lisp_h_make_fixnum_wrap (lisp_h_make_fixnum_n); })
+# else
+#  define lisp_h_make_fixnum(n) lisp_h_make_fixnum_wrap (n)
+# endif
 # define lisp_h_XFIXNUM_RAW(a) (XLI (a) >> INTTYPEBITS)
 # define lisp_h_XTYPE(a) ((enum Lisp_Type) (XLI (a) & ~VALMASK))
 #endif
@@ -1125,18 +1133,31 @@ enum More_Lisp_Bits
 #define MOST_POSITIVE_FIXNUM (EMACS_INT_MAX >> INTTYPEBITS)
 #define MOST_NEGATIVE_FIXNUM (-1 - MOST_POSITIVE_FIXNUM)
 
+/* True if the possibly-unsigned integer I doesn't fit in a fixnum.  */
+
+#define FIXNUM_OVERFLOW_P(i) \
+  (! ((0 <= (i) || MOST_NEGATIVE_FIXNUM <= (i)) && (i) <= MOST_POSITIVE_FIXNUM))
+
 #if USE_LSB_TAG
 
 INLINE Lisp_Object
 (make_fixnum) (EMACS_INT n)
 {
-  return lisp_h_make_fixnum (n);
+  eassert (!FIXNUM_OVERFLOW_P (n));
+  return lisp_h_make_fixnum_wrap (n);
 }
 
 INLINE EMACS_INT
 (XFIXNUM_RAW) (Lisp_Object a)
 {
   return lisp_h_XFIXNUM_RAW (a);
+}
+
+INLINE Lisp_Object
+make_ufixnum (EMACS_INT n)
+{
+  eassert (0 <= n && n <= INTMASK);
+  return lisp_h_make_fixnum_wrap (n);
 }
 
 #else /* ! USE_LSB_TAG */
@@ -1149,6 +1170,7 @@ INLINE EMACS_INT
 INLINE Lisp_Object
 make_fixnum (EMACS_INT n)
 {
+  eassert (! FIXNUM_OVERFLOW_P (n));
   EMACS_INT int0 = Lisp_Int0;
   if (USE_LSB_TAG)
     {
@@ -1177,6 +1199,22 @@ XFIXNUM_RAW (Lisp_Object a)
       i = u << INTTYPEBITS;
     }
   return i >> INTTYPEBITS;
+}
+
+INLINE Lisp_Object
+make_ufixnum (EMACS_INT n)
+{
+  eassert (0 <= n && n <= INTMASK);
+  EMACS_INT int0 = Lisp_Int0;
+  if (USE_LSB_TAG)
+    {
+      EMACS_UINT u = n;
+      n = u << INTTYPEBITS;
+      n += int0;
+    }
+  else
+    n += int0 << VALBITS;
+  return XIL (n);
 }
 
 #endif /* ! USE_LSB_TAG */
@@ -1231,11 +1269,6 @@ INLINE bool
 {
   return lisp_h_EQ (x, y);
 }
-
-/* True if the possibly-unsigned integer I doesn't fit in a fixnum.  */
-
-#define FIXNUM_OVERFLOW_P(i) \
-  (! ((0 <= (i) || MOST_NEGATIVE_FIXNUM <= (i)) && (i) <= MOST_POSITIVE_FIXNUM))
 
 INLINE intmax_t
 clip_to_bounds (intmax_t lower, intmax_t num, intmax_t upper)
@@ -2274,7 +2307,7 @@ struct Lisp_Hash_Table
      weakness of the table.  */
   Lisp_Object weak;
 
-  /* Vector of hash codes.
+  /* Vector of hash codes, or nil if the table needs rehashing.
      If the I-th entry is unused, then hash[I] should be nil.  */
   Lisp_Object hash;
 
@@ -2294,8 +2327,7 @@ struct Lisp_Hash_Table
      'index' are special and are either ignored by the GC or traced in
      a special way (e.g. because of weakness).  */
 
-  /* Number of key/value entries in the table.  This number is
-     negated if the table needs rehashing.  */
+  /* Number of key/value entries in the table.  */
   ptrdiff_t count;
 
   /* Index of first free entry in free list, or -1 if none.  */
@@ -2380,7 +2412,9 @@ HASH_HASH (const struct Lisp_Hash_Table *h, ptrdiff_t idx)
 INLINE ptrdiff_t
 HASH_TABLE_SIZE (const struct Lisp_Hash_Table *h)
 {
-  return ASIZE (h->next);
+  ptrdiff_t size = ASIZE (h->next);
+  eassume (0 < size);
+  return size;
 }
 
 void hash_table_rehash (struct Lisp_Hash_Table *h);
@@ -3581,7 +3615,6 @@ extern void set_default_internal (Lisp_Object, Lisp_Object,
 extern Lisp_Object expt_integer (Lisp_Object, Lisp_Object);
 extern void syms_of_data (void);
 extern void swap_in_global_binding (struct Lisp_Symbol *);
-extern Lisp_Object integer_mod (Lisp_Object, Lisp_Object);
 
 /* Defined in cmds.c */
 extern void syms_of_cmds (void);
@@ -3793,9 +3826,7 @@ extern void flush_stack_call_func (void (*func) (void *arg), void *arg);
 extern void garbage_collect (void);
 extern const char *pending_malloc_warning;
 extern Lisp_Object zero_vector;
-typedef intptr_t object_ct; /* Signed type of object counts reported by GC.  */
-#define OBJECT_CT_MAX INTPTR_MAX
-extern object_ct consing_until_gc;
+extern intmax_t consing_until_gc;
 #ifdef HAVE_PDUMPER
 extern int number_finalizers_run;
 #endif

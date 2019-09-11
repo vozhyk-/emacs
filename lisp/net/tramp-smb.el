@@ -589,7 +589,7 @@ PRESERVE-UID-GID and PRESERVE-EXTENDED-ATTRIBUTES are completely ignored."
 	    (when (and (not ok-if-already-exists) (file-exists-p newname))
 	      (tramp-error v 'file-already-exists newname))
 	    (when (and (file-directory-p newname)
-		       (not (directory-name-p newname)))
+		       (not (tramp-compat-directory-name-p newname)))
 	      (tramp-error v 'file-error "File is a directory %s" newname))
 
 	    ;; We must also flush the cache of the directory, because
@@ -986,7 +986,7 @@ PRESERVE-UID-GID and PRESERVE-EXTENDED-ATTRIBUTES are completely ignored."
   (setq filename (expand-file-name filename))
   (unless switches (setq switches ""))
   ;; Mark trailing "/".
-  (when (and (zerop (length (file-name-nondirectory filename)))
+  (when (and (tramp-compat-directory-name-p filename)
 	     (not full-directory-p))
     (setq switches (concat switches "F")))
   (if full-directory-p
@@ -1175,8 +1175,7 @@ component is used as the target of the symlink."
 
       ;; If TARGET is still remote, quote it.
       (if (tramp-tramp-file-p target)
-	  (make-symbolic-link
-	   (let (file-name-handler-alist) (tramp-compat-file-name-quote target))
+	  (make-symbolic-link (tramp-compat-file-name-quote target 'top)
 	   linkname ok-if-already-exists)
 
 	;; Do the 'confirm if exists' thing.
@@ -1334,7 +1333,8 @@ component is used as the target of the symlink."
       (if (tramp-tramp-file-p filename) filename newname) nil
     (when (and (not ok-if-already-exists) (file-exists-p newname))
       (tramp-error v 'file-already-exists newname))
-    (when (and (file-directory-p newname) (not (directory-name-p newname)))
+    (when (and (file-directory-p newname)
+	       (not (tramp-compat-directory-name-p newname)))
       (tramp-error v 'file-error "File is a directory %s" newname))
 
     (with-tramp-progress-reporter

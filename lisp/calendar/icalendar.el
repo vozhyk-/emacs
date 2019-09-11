@@ -628,6 +628,7 @@ FIXME: multiple comma-separated values should be allowed!"
         (when (> (length isodatetimestring) 14)
           ;; seconds present
           (setq second (read (substring isodatetimestring 13 15))))
+	;; FIXME: Support subseconds.
         (when (and (> (length isodatetimestring) 15)
                    ;; UTC specifier present
                    (char-equal ?Z (aref isodatetimestring 15)))
@@ -644,7 +645,7 @@ FIXME: multiple comma-separated values should be allowed!"
         ;; create the decoded date-time
         ;; FIXME!?!
 	(let ((decoded-time (list second minute hour day month year
-				  nil -1 zone 0)))
+				  nil -1 zone)))
 	  (condition-case nil
 	      (decode-time (encode-time decoded-time))
 	    (error
@@ -703,6 +704,7 @@ FIXME: multiple comma-separated values should be allowed!"
                 (setq minutes (read (substring isodurationstring
                                                (match-beginning 10)
                                                (match-end 10)))))
+	    ;; FIXME: Support subseconds.
             (if (match-beginning 11)
                 (setq seconds (read (substring isodurationstring
                                                (match-beginning 12)
@@ -719,9 +721,12 @@ FIXME: multiple comma-separated values should be allowed!"
   "Add TIME1 to TIME2.
 Both times must be given in decoded form.  One of these times must be
 valid (year > 1900 or something)."
-  ;; FIXME: does this function exist already?
+  ;; FIXME: does this function exist already?  Can we use decoded-time-add?
   (decode-time (encode-time
-                (+ (decoded-time-second time1) (decoded-time-second time2))
+		;; FIXME: Support subseconds.
+		(time-convert (time-add (decoded-time-second time1)
+					(decoded-time-second time2))
+			      'integer)
                 (+ (decoded-time-minute time1) (decoded-time-minute time2))
                 (+ (decoded-time-hour time1) (decoded-time-hour time2))
                 (+ (decoded-time-day time1) (decoded-time-day time2))
@@ -2090,7 +2095,9 @@ written into the buffer `*icalendar-errors*'."
                                                              dtstart-zone))
                  (start-d (icalendar--datetime-to-diary-date
                            dtstart-dec))
-                 (start-t (icalendar--datetime-to-colontime dtstart-dec))
+                 (start-t (and dtstart
+                               (> (length dtstart) 8)
+                               (icalendar--datetime-to-colontime dtstart-dec)))
                  (dtend (icalendar--get-event-property e 'DTEND))
                  (dtend-zone (icalendar--find-time-zone
  			      (icalendar--get-event-property-attributes
@@ -2143,8 +2150,7 @@ written into the buffer `*icalendar-errors*'."
                                     (icalendar--get-event-property-attributes
                                      e 'DTEND))
                                    "DATE")))
-                            (icalendar--datetime-to-colontime dtend-dec)
-                          start-t))
+                            (icalendar--datetime-to-colontime dtend-dec)))
             (icalendar--dmsg "start-d: %s, end-d: %s" start-d end-d)
             (cond
              ;; recurring event

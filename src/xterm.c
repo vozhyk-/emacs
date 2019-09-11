@@ -10044,7 +10044,6 @@ For details, see etc/PROBLEMS.\n",
     {
       fprintf (stderr, "%s\n", error_msg);
       Fkill_emacs (make_fixnum (70));
-      /* NOTREACHED */
     }
 
   totally_unblock_input ();
@@ -13531,7 +13530,7 @@ x_initialize (void)
 #endif
 
 #ifdef USE_CAIRO
-  x_cr_init_fringe (&x_redisplay_interface);
+  gui_init_fringe (&x_redisplay_interface);
 #endif
 
   /* Note that there is no real way portable across R3/R4 to get the

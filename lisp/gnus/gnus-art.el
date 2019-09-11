@@ -3628,7 +3628,7 @@ possible values."
     (unless max-segments
       (setq max-segments (length article-time-units)))
     (cond
-     ((zerop sec)
+     ((< (abs sec) 1)
       "Now")
      (t
       (concat
@@ -5059,7 +5059,10 @@ and `gnus-mime-delete-part', and not provided at run-time normally."
    (list
     (read-file-name "Replace MIME part with file: "
                     (or mm-default-directory default-directory)
-                    nil nil)))
+                    nil t)))
+  (unless (file-regular-p (file-truename file))
+    (error "Can't replace part with %s, which isn't a regular file"
+	   file))
   (gnus-mime-save-part-and-strip file))
 
 (defun gnus-mime-save-part-and-strip (&optional file)
@@ -5375,9 +5378,9 @@ Compressed files like .gz and .bz2 are decompressed."
 				    'gnus-undeletable t))))
 	  ;; We're in the article header.
 	  (delete-char -1)
-	  (dolist (ovl (overlays-in btn (point)))
+	  (let ((ovl (make-overlay btn (point))))
 	    (overlay-put ovl 'gnus-button-attachment-extra t)
-	    (overlay-put ovl 'face nil))
+	    (overlay-put ovl 'evaporate t))
 	  (save-restriction
 	    (message-narrow-to-field)
 	    (let ((gnus-treatment-function-alist
@@ -5760,9 +5763,9 @@ all parts."
 				    'gnus-undeletable t))))
 	  ;; We're in the article header.
 	  (delete-char -1)
-	  (dolist (ovl (overlays-in point (point)))
+	  (let ((ovl (make-overlay point (point))))
 	    (overlay-put ovl 'gnus-button-attachment-extra t)
-	    (overlay-put ovl 'face nil))
+	    (overlay-put ovl 'evaporate t))
 	  (save-restriction
 	    (message-narrow-to-field)
 	    (let ((gnus-treatment-function-alist
@@ -6376,9 +6379,9 @@ in the body.  Use `gnus-header-face-alist' to highlight buttons."
 		  (insert "\n")
 		  (end-of-line)))
 	      (insert "\n")
-	      (dolist (ovl (overlays-in (point-min) (point)))
+	      (let ((ovl (make-overlay (point-min) (point))))
 		(overlay-put ovl 'gnus-button-attachment-extra t)
-		(overlay-put ovl 'face nil))
+		(overlay-put ovl 'evaporate t))
 	      (let ((gnus-treatment-function-alist
 		     '((gnus-treat-highlight-headers
 			gnus-article-highlight-headers))))
