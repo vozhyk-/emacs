@@ -4107,7 +4107,7 @@ Also, delete any process that is exited or signaled."
 		    (t "--")))
 		  (cmd
 		   (if (memq type '(network serial))
-		       (let ((contact (process-contact p t)))
+		       (let ((contact (process-contact p t t)))
 			 (if (eq type 'network)
 			     (format "(%s %s)"
 				     (if (plist-get contact :type)
@@ -9074,7 +9074,7 @@ Otherwise, it calls `capitalize-word', with prefix argument passed to it
 to capitalize ARG words."
   (interactive "*p")
   (if (use-region-p)
-      (capitalize-region (region-beginning) (region-end))
+      (capitalize-region (region-beginning) (region-end) (region-noncontiguous-p))
     (capitalize-word arg)))
 
 ;;; Accessors for `decode-time' values.

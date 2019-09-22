@@ -1748,16 +1748,20 @@ openp (Lisp_Object path, Lisp_Object str, Lisp_Object suffixes,
 		  {
 		    if (file_directory_p (encoded_fn))
 		      last_errno = EISDIR;
-		    else
+		    else if (errno == ENOENT || errno == ENOTDIR)
 		      fd = 1;
+		    else
+		      last_errno = errno;
 		  }
+		else if (! (errno == ENOENT || errno == ENOTDIR))
+		  last_errno = errno;
 	      }
 	    else
 	      {
 		fd = emacs_open (pfn, O_RDONLY, 0);
 		if (fd < 0)
 		  {
-		    if (errno != ENOENT)
+		    if (! (errno == ENOENT || errno == ENOTDIR))
 		      last_errno = errno;
 		  }
 		else
@@ -1987,11 +1991,10 @@ readevalloop (Lisp_Object readcharfun,
 	    (NILP (lex_bound) || EQ (lex_bound, Qunbound)
 	     ? Qnil : list1 (Qt)));
 
-  /* Try to ensure sourcename is a truename, except whilst preloading.  */
+  /* Ensure sourcename is absolute, except whilst preloading.  */
   if (!will_dump_p ()
-      && !NILP (sourcename) && !NILP (Ffile_name_absolute_p (sourcename))
-      && !NILP (Ffboundp (Qfile_truename)))
-    sourcename = call1 (Qfile_truename, sourcename) ;
+      && !NILP (sourcename) && !NILP (Ffile_name_absolute_p (sourcename)))
+    sourcename = Fexpand_file_name (sourcename, Qnil);
 
   LOADHIST_ATTACH (sourcename);
 
@@ -4666,9 +4669,6 @@ load_path_default (void)
 void
 init_lread (void)
 {
-  if (NILP (Vpurify_flag) && !NILP (Ffboundp (Qfile_truename)))
-    Vsource_directory = call1 (Qfile_truename, Vsource_directory);
-
   /* First, set Vload_path.  */
 
   /* Ignore EMACSLOADPATH when dumping.  */
@@ -5088,7 +5088,6 @@ this variable will become obsolete.  */);
   DEFSYM (Qload, "load");
   DEFSYM (Qload_file_name, "load-file-name");
   DEFSYM (Qeval_buffer_list, "eval-buffer-list");
-  DEFSYM (Qfile_truename, "file-truename");
   DEFSYM (Qdir_ok, "dir-ok");
   DEFSYM (Qdo_after_load_evaluation, "do-after-load-evaluation");
 

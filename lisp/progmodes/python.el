@@ -4084,6 +4084,12 @@ JUSTIFY should be used (if applicable) as in `fill-paragraph'."
       (goto-char (line-end-position))))
   t)
 
+(defun python-do-auto-fill ()
+  "Like `do-auto-fill', but bind `fill-indent-according-to-mode'."
+  ;; See Bug#36056.
+  (let ((fill-indent-according-to-mode t))
+    (do-auto-fill)))
+
 
 ;;; Skeletons
 
@@ -4409,7 +4415,7 @@ returns will be used.  If not FORCE-PROCESS is passed what
 
 (defvar-local python-eldoc-get-doc t
   "Non-nil means eldoc should fetch the documentation
-  automatically. Set to nil by `python-eldoc-function' if
+  automatically.  Set to nil by `python-eldoc-function' if
   `python-eldoc-function-timeout-permanent' is non-nil and
   `python-eldoc-function' times out.")
 
@@ -4421,7 +4427,7 @@ returns will be used.  If not FORCE-PROCESS is passed what
 
 (defcustom python-eldoc-function-timeout-permanent t
   "Non-nil means that when `python-eldoc-function' times out
-`python-eldoc-get-doc' will be set to nil"
+`python-eldoc-get-doc' will be set to nil."
   :group 'python
   :type 'boolean
   :version "25.1")
@@ -4439,7 +4445,7 @@ function returns then if
 longer return the documentation at the point automatically.
 
 Set `python-eldoc-get-doc' to t to reenable eldoc documentation
-fetching"
+fetching."
   (when python-eldoc-get-doc
     (with-timeout (python-eldoc-function-timeout
                    (if python-eldoc-function-timeout-permanent
@@ -5379,7 +5385,7 @@ REPORT-FN is Flymake's callback function."
   (set (make-local-variable 'paragraph-start) "\\s-*$")
   (set (make-local-variable 'fill-paragraph-function)
        #'python-fill-paragraph)
-  (set (make-local-variable 'fill-indent-according-to-mode) t) ; Bug#36056.
+  (set (make-local-variable 'normal-auto-fill-function) #'python-do-auto-fill)
 
   (set (make-local-variable 'beginning-of-defun-function)
        #'python-nav-beginning-of-defun)

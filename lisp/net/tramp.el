@@ -211,23 +211,41 @@ pair of the form (KEY VALUE).  The following KEYs are defined:
     or the name of telnet or a workalike, or the name of su or a workalike.
 
   * `tramp-login-args'
-    This specifies the list of arguments to pass to the above
-    mentioned program.  Please note that this is a list of list of arguments,
-    that is, normally you don't want to put \"-a -b\" or \"-f foo\"
-    here.  Instead, you want a list (\"-a\" \"-b\"), or (\"-f\" \"foo\").
-    There are some patterns: \"%h\" in this list is replaced by the host
-    name, \"%u\" is replaced by the user name, \"%p\" is replaced by the
-    port number, and \"%%\" can be used to obtain a literal percent character.
-    If a list containing \"%h\", \"%u\" or \"%p\" is unchanged during
-    expansion (i.e. no host or no user specified), this list is not used as
-    argument.  By this, arguments like (\"-l\" \"%u\") are optional.
-    \"%t\" is replaced by the temporary file name produced with
-    `tramp-make-tramp-temp-file'.  \"%k\" indicates the keep-date
-    parameter of a program, if exists.  \"%c\" adds additional
-    `tramp-ssh-controlmaster-options' options for the first hop.
-    The existence of `tramp-login-args', combined with the absence of
-    `tramp-copy-args', is an indication that the method is capable of
-     multi-hops.
+    This specifies a list of lists of arguments to pass to the
+    above mentioned program.  You normally want to put each
+    argument in an individual string, i.e.
+    (\"-a\" \"-b\") rather than (\"-a -b\").
+
+    \"%\" followed by a letter are expanded in the arguments as
+    follows:
+
+    - \"%h\" is replaced by the host name
+    - \"%u\" is replaced by the user name
+    - \"%p\" is replaced by the port number
+    - \"%%\" can be used to obtain a literal percent character.
+
+    If a sub-list containing \"%h\", \"%u\" or \"%p\" is
+    unchanged after expansion (i.e. no host, no user or no port
+    were specified), that sublist is not used.  For e.g.
+
+    '((\"-a\" \"-b\") (\"-l\" \"%u\"))
+
+    that means that (\"-l\" \"%u\") is used only if the user was
+    specified, and it is thus effectively optional.
+
+    Other expansions are:
+
+    - \"%l\" is replaced by the login shell `tramp-remote-shell'
+      and its parameters.
+    - \"%t\" is replaced by the temporary file name produced with
+      `tramp-make-tramp-temp-file'.
+    - \"%k\" indicates the keep-date parameter of a program, if exists.
+    - \"%c\" adds additional `tramp-ssh-controlmaster-options'
+      options for the first hop.
+
+    The existence of `tramp-login-args', combined with the
+    absence of `tramp-copy-args', is an indication that the
+    method is capable of multi-hops.
 
   * `tramp-login-env'
      A list of environment variables and their values, which will
@@ -326,6 +344,9 @@ must specify `tramp-copy-program' and `tramp-copy-args'.  If it is an
 inline method, then these two parameters should be nil.
 
 Notes:
+
+All these arguments can be overwritten by connection properties.
+See Info node `(tramp) Predefined connection information'.
 
 When using `su' or `sudo' the phrase \"open connection to a remote
 host\" sounds strange, but it is used nevertheless, for consistency.
@@ -1566,25 +1587,27 @@ necessary only.  This function will be used in file name completion."
 	     tramp-postfix-host-format))
 	  (when localname localname)))
 
-(defun tramp-get-buffer (vec)
+(defun tramp-get-buffer (vec &optional dont-create)
   "Get the connection buffer to be used for VEC."
   (or (get-buffer (tramp-buffer-name vec))
-      (with-current-buffer (get-buffer-create (tramp-buffer-name vec))
-	;; We use the existence of connection property "process-buffer"
-	;; as indication, whether a connection is active.
-	(tramp-set-connection-property
-	 vec "process-buffer"
-	 (tramp-get-connection-property vec "process-buffer" nil))
-	(setq buffer-undo-list t
-	      default-directory (tramp-make-tramp-file-name vec 'noloc 'nohop))
-	(current-buffer))))
+      (unless dont-create
+	(with-current-buffer (get-buffer-create (tramp-buffer-name vec))
+	  ;; We use the existence of connection property "process-buffer"
+	  ;; as indication, whether a connection is active.
+	  (tramp-set-connection-property
+	   vec "process-buffer"
+	   (tramp-get-connection-property vec "process-buffer" nil))
+	  (setq buffer-undo-list t
+		default-directory
+		(tramp-make-tramp-file-name vec 'noloc 'nohop))
+	  (current-buffer)))))
 
-(defun tramp-get-connection-buffer (vec)
+(defun tramp-get-connection-buffer (vec &optional dont-create)
   "Get the connection buffer to be used for VEC.
 In case a second asynchronous communication has been started, it is different
 from `tramp-get-buffer'."
   (or (tramp-get-connection-property vec "process-buffer" nil)
-      (tramp-get-buffer vec)))
+      (tramp-get-buffer vec dont-create)))
 
 (defun tramp-get-connection-name (vec)
   "Get the connection name to be used for VEC.
@@ -1770,14 +1793,15 @@ applicable)."
       ;; Log only when there is a minimum level.
       (when (>= tramp-verbose 4)
 	(let ((tramp-verbose 0))
-	  ;; Append connection buffer for error messages.
+	  ;; Append connection buffer for error messages, if exists.
 	  (when (= level 1)
-	    (with-current-buffer
-		(if (processp vec-or-proc)
-		    (process-buffer vec-or-proc)
-		  (tramp-get-connection-buffer vec-or-proc))
-	      (setq fmt-string (concat fmt-string "\n%s")
-		    arguments (append arguments (list (buffer-string))))))
+	    (ignore-errors
+	      (with-current-buffer
+		  (if (processp vec-or-proc)
+		      (process-buffer vec-or-proc)
+		    (tramp-get-connection-buffer vec-or-proc 'dont-create))
+		(setq fmt-string (concat fmt-string "\n%s")
+		      arguments (append arguments (list (buffer-string)))))))
 	  ;; Translate proc to vec.
 	  (when (processp vec-or-proc)
 	    (setq vec-or-proc (process-get vec-or-proc 'vector))))
@@ -2517,16 +2541,21 @@ Add operations defined in `HANDLER-alist' to `tramp-file-name-handler'."
    ;; This variable has been obsoleted in Emacs 26.
    tramp-completion-mode))
 
-(defun tramp-connectable-p (filename)
+(defun tramp-connectable-p (vec-or-filename)
   "Check, whether it is possible to connect the remote host w/o side-effects.
 This is true, if either the remote host is already connected, or if we are
 not in completion mode."
-  (let (tramp-verbose)
-    (and (tramp-tramp-file-p filename)
-	 (or (not (tramp-completion-mode-p))
-	     (process-live-p
-	      (tramp-get-connection-process
-	       (tramp-dissect-file-name filename)))))))
+  (let (tramp-verbose
+	(vec
+	 (cond
+	  ((tramp-file-name-p vec-or-filename) vec-or-filename)
+	  ((tramp-tramp-file-p vec-or-filename)
+	   (tramp-dissect-file-name vec-or-filename)))))
+    (or ;; We check this for the process related to
+	;; `tramp-buffer-name'; otherwise `start-file-process'
+	;; wouldn't run ever when `non-essential' is non-nil.
+        (and vec (process-live-p (get-process (tramp-buffer-name vec))))
+	(not (tramp-completion-mode-p)))))
 
 ;; Method, host name and user name completion.
 ;; `tramp-completion-dissect-file-name' returns a list of
@@ -2606,8 +2635,7 @@ not in completion mode."
   (try-completion
    filename
    (mapcar #'list (file-name-all-completions filename directory))
-   (when (and predicate
-	      (tramp-connectable-p (expand-file-name filename directory)))
+   (when (and predicate (tramp-connectable-p directory))
      (lambda (x) (funcall predicate (expand-file-name (car x) directory))))))
 
 ;; I misuse a little bit the `tramp-file-name' structure in order to
@@ -3096,7 +3124,11 @@ User is always nil."
 
 (defun tramp-handle-file-exists-p (filename)
   "Like `file-exists-p' for Tramp files."
-  (not (null (file-attributes filename))))
+  ;; `file-exists-p' is used as predicate in file name completion.
+  ;; We don't want to run it when `non-essential' is t, or there is
+  ;; no connection process yet.
+  (when (tramp-connectable-p filename)
+    (not (null (file-attributes filename)))))
 
 (defun tramp-handle-file-in-directory-p (filename directory)
   "Like `file-in-directory-p' for Tramp files."
@@ -3120,10 +3152,10 @@ User is always nil."
 
 (defun tramp-handle-file-modes (filename)
   "Like `file-modes' for Tramp files."
-  (let ((truename (or (file-truename filename) filename)))
-    (when (file-exists-p truename)
-      (tramp-mode-string-to-int
-       (tramp-compat-file-attribute-modes (file-attributes truename))))))
+  ;; Starting with Emacs 25.1, `when-let' can be used.
+  (let ((attrs (file-attributes (or (file-truename filename) filename))))
+    (when attrs
+      (tramp-mode-string-to-int (tramp-compat-file-attribute-modes attrs)))))
 
 ;; Localname manipulation functions that grok Tramp localnames...
 (defun tramp-handle-file-name-as-directory (file)

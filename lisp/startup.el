@@ -406,6 +406,7 @@ if you have not already set `auto-save-list-file-name' yourself.
 Directories in the prefix will be created if necessary.
 Set this to nil if you want to prevent `auto-save-list-file-name'
 from being initialized."
+  :initialize #'custom-initialize-delay
   :type '(choice (const :tag "Don't record a session's auto save list" nil)
 		 string)
   :group 'auto-save)
@@ -507,7 +508,14 @@ DIRS are relative."
 			       (if (eq system-type 'ms-dos)
 				   "/_emacs.d/"
 				 "/.emacs.d/"))))
-      (if (file-exists-p emacs-d-dir)
+      (if (or (file-exists-p emacs-d-dir)
+	      (if (eq system-type 'windows-nt)
+		  (directory-files (concat "~" user-name) nil
+				   "\\`[._]emacs\\(\\.elc?\\)?\\'")
+		(file-exists-p (concat "~" init-file-user
+				       (if (eq system-type 'ms-dos)
+					   "/_emacs"
+					 "/.emacs")))))
 	  emacs-d-dir
 	xdg-dir))))
 
