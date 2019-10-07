@@ -1843,24 +1843,42 @@ For non-interactive use, superceded by `fileloop-initialize-replace'."
    delimited)
   (fileloop-continue))
 
-(defun tags-complete-tags-table-file (string predicate what) ; Doc string?
+(defun tags-complete-tags-table-file (string predicate what)
+  "Complete STRING from file names in the current tags table.
+The meaning of the arguments are the same as the function form of
+COLLECTION as explained in Info node `(elisp) Programmed
+Completion', except that if WHAT does not equal t, it is treated
+as if it were nil."
   (save-excursion
     ;; If we need to ask for the tag table, allow that.
     (let ((enable-recursive-minibuffers t))
       (visit-tags-table-buffer))
     (if (eq what t)
-	(all-completions string (tags-table-files) predicate)
+        (all-completions string (tags-table-files) predicate)
       (try-completion string (tags-table-files) predicate))))
+
+(defun tags--get-current-buffer-name-in-tags-file ()
+  "Get the file name that the current buffer corresponds in the tags file."
+  (let ((tag-dir
+         (save-excursion
+           (visit-tags-table-buffer)
+           (file-name-directory (buffer-file-name)))))
+    (file-relative-name (buffer-file-name) tag-dir)))
 
 ;;;###autoload
 (defun list-tags (file &optional _next-match)
   "Display list of tags in file FILE.
-This searches only the first table in the list, and no included tables.
-FILE should be as it appeared in the `etags' command, usually without a
-directory specification."
-  (interactive (list (completing-read "List tags in file: "
-				      'tags-complete-tags-table-file
-				      nil t nil)))
+This searches only the first table in the list, and no included
+tables.  FILE should be as it appeared in the `etags' command,
+usually without a directory specification.  If called
+interactively, FILE defaults to the file name of the current
+buffer."
+  (interactive (list (completing-read
+                      "List tags in file: "
+                      'tags-complete-tags-table-file
+                      nil t
+                      ;; Default FILE to the current buffer.
+                      (tags--get-current-buffer-name-in-tags-file))))
   (with-output-to-temp-buffer "*Tags List*"
     (princ (substitute-command-keys "Tags in file `"))
     (tags-with-face 'highlight (princ file))

@@ -3248,7 +3248,7 @@ Return nil if file does not exist.  */)
   acl_t acl = acl_get_file (SSDATA (ENCODE_FILE (absname)), ACL_TYPE_EXTENDED);
   if (acl == NULL)
     {
-      if (errno == ENOENT || errno == ENOTDIR || errno == ENOTSUP)
+      if (errno == ENOENT || errno == ENOTDIR || !acl_errno_valid (errno))
 	return Qnil;
       report_file_error ("Getting ACLs", absname);
     }
@@ -6151,7 +6151,7 @@ init_fileio (void)
      For more on why fsync often fails to work on today's hardware, see:
      Zheng M et al. Understanding the robustness of SSDs under power fault.
      11th USENIX Conf. on File and Storage Technologies, 2013 (FAST '13), 271-84
-     http://www.usenix.org/system/files/conference/fast13/fast13-final80.pdf
+     https://www.usenix.org/system/files/conference/fast13/fast13-final80.pdf
 
      For more on why fsync does not suffice even if it works properly, see:
      Roche X. Necessary step(s) to synchronize filename operations on disk.

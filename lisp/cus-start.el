@@ -324,6 +324,9 @@ Leaving \"Default\" unchecked is equivalent with specifying a default of
 			    ;; FIXME?
                             ;; :initialize custom-initialize-default
 			    :set custom-set-minor-mode)
+	     (tab-bar-mode (frames mouse) boolean nil
+                           ;; :initialize custom-initialize-default
+			   :set custom-set-minor-mode)
 	     (tool-bar-mode (frames mouse) boolean nil
                             ;; :initialize custom-initialize-default
 			    :set custom-set-minor-mode)
@@ -652,6 +655,20 @@ since it could result in memory overflow and make Emacs crash."
                (const :tag "Count lines from beginning of narrowed region"
                       :value nil))
               "26.1")
+             (display-line-numbers-major-tick
+              display-line-numbers
+              (choice
+               (const :tag "No line" 0)
+               (integer :tag "Multiples of"
+                        :value 10))
+              "27.1")
+             (display-line-numbers-minor-tick
+              display-line-numbers
+              (choice
+               (const :tag "No line" 0)
+               (integer :tag "Multiples of"
+                        :value 5))
+              "27.1")
 
              (display-fill-column-indicator
               display-fill-column-indicator
@@ -725,6 +742,8 @@ since it could result in memory overflow and make Emacs crash."
 		      ;; Conditioned on x-create-frame, because that's
 		      ;; the condition for loadup.el to preload tool-bar.el.
 		      ((string-match "tool-bar-" (symbol-name symbol))
+		       (fboundp 'x-create-frame))
+		      ((string-match "tab-bar-" (symbol-name symbol))
 		       (fboundp 'x-create-frame))
 		      ((equal "vertical-centering-font-regexp"
 			      (symbol-name symbol))

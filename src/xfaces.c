@@ -4201,7 +4201,7 @@ color_distance (Emacs_Color *x, Emacs_Color *y)
 	 algorithm: it does not have a range of colors where it suddenly
 	 gives far from optimal results.
 
-     See <http://www.compuphase.com/cmetric.htm> for more info.  */
+     See <https://www.compuphase.com/cmetric.htm> for more info.  */
 
   long r = (x->red   - y->red)   >> 8;
   long g = (x->green - y->green) >> 8;
@@ -4610,6 +4610,8 @@ lookup_basic_face (struct window *w, struct frame *f, int face_id)
     case MODE_LINE_FACE_ID:		name = Qmode_line;		break;
     case MODE_LINE_INACTIVE_FACE_ID:	name = Qmode_line_inactive;	break;
     case HEADER_LINE_FACE_ID:		name = Qheader_line;		break;
+    case TAB_LINE_FACE_ID:		name = Qtab_line;		break;
+    case TAB_BAR_FACE_ID:		name = Qtab_bar;		break;
     case TOOL_BAR_FACE_ID:		name = Qtool_bar;		break;
     case FRINGE_FACE_ID:		name = Qfringe;			break;
     case SCROLL_BAR_FACE_ID:		name = Qscroll_bar;		break;
@@ -5317,6 +5319,8 @@ realize_basic_faces (struct frame *f)
       realize_named_face (f, Qwindow_divider_last_pixel,
 			  WINDOW_DIVIDER_LAST_PIXEL_FACE_ID);
       realize_named_face (f, Qinternal_border, INTERNAL_BORDER_FACE_ID);
+      realize_named_face (f, Qtab_bar, TAB_BAR_FACE_ID);
+      realize_named_face (f, Qtab_line, TAB_LINE_FACE_ID);
 
       /* Reflect changes in the `menu' face in menu bars.  */
       if (FRAME_FACE_CACHE (f)->menu_face_changed_p)
@@ -6603,7 +6607,9 @@ syms_of_xfaces (void)
   /* Names of basic faces.  */
   DEFSYM (Qdefault, "default");
   DEFSYM (Qtool_bar, "tool-bar");
+  DEFSYM (Qtab_bar, "tab-bar");
   DEFSYM (Qfringe, "fringe");
+  DEFSYM (Qtab_line, "tab-line");
   DEFSYM (Qheader_line, "header-line");
   DEFSYM (Qscroll_bar, "scroll-bar");
   DEFSYM (Qmenu, "menu");

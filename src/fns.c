@@ -3177,8 +3177,14 @@ The data read from the system are decoded using `locale-coding-system'.  */)
 # endif
 # ifdef HAVE_LANGINFO__NL_PAPER_WIDTH
   if (EQ (item, Qpaper))
-    return list2i ((intptr_t) nl_langinfo (_NL_PAPER_WIDTH),
-		   (intptr_t) nl_langinfo (_NL_PAPER_HEIGHT));
+    /* We have to cast twice here: first to a correctly-sized integer,
+       then to int, because that's what nl_langinfo is documented to
+       return for _NO_PAPER_{WIDTH,HEIGHT}.  The first cast doesn't
+       suffice because it could overflow an Emacs fixnum.  This can
+       happen when running under ASan, which fills allocated but
+       uninitialized memory with 0xBE bytes.  */
+    return list2i ((int) (intptr_t) nl_langinfo (_NL_PAPER_WIDTH),
+		   (int) (intptr_t) nl_langinfo (_NL_PAPER_HEIGHT));
 # endif
 #endif	/* HAVE_LANGINFO_CODESET*/
   return Qnil;
@@ -5082,7 +5088,7 @@ make_digest_string (Lisp_Object digest, int digest_size)
 
 DEFUN ("secure-hash-algorithms", Fsecure_hash_algorithms,
        Ssecure_hash_algorithms, 0, 0, 0,
-       doc: /* Return a list of all the supported `secure_hash' algorithms. */)
+       doc: /* Return a list of all the supported `secure-hash' algorithms. */)
   (void)
 {
   return list (Qmd5, Qsha1, Qsha224, Qsha256, Qsha384, Qsha512);
@@ -5389,7 +5395,12 @@ anything security-related.  See `secure-hash' for alternatives.  */)
 DEFUN ("secure-hash", Fsecure_hash, Ssecure_hash, 2, 5, 0,
        doc: /* Return the secure hash of OBJECT, a buffer or string.
 ALGORITHM is a symbol specifying the hash to use:
-md5, sha1, sha224, sha256, sha384 or sha512.
+- md5    corresponds to MD5
+- sha1   corresponds to SHA-1
+- sha224 corresponds to SHA-2 (SHA-224)
+- sha256 corresponds to SHA-2 (SHA-256)
+- sha384 corresponds to SHA-2 (SHA-384)
+- sha512 corresponds to SHA-2 (SHA-512)
 
 The two optional arguments START and END are positions specifying for
 which part of OBJECT to compute the hash.  If nil or omitted, uses the

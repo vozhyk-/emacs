@@ -274,6 +274,12 @@ of[ \t]+\"?\\([a-zA-Z]?:?[^\":\n]+\\)\"?:" 3 2 nil (1))
     (ruby-Test::Unit
      "^[\t ]*\\[\\([^(].*\\):\\([1-9][0-9]*\\)\\(\\]\\)?:in " 1 2)
 
+    (gmake
+     ;; Set GNU make error messages as INFO level.
+     ;; It starts with the name of the make program which is variable,
+     ;; so don't try to match it.
+     ": \\*\\*\\* \\[\\(\\(.+?\\):\\([0-9]+\\): .+\\)\\]" 2 3 nil 0 1)
+
     (gnu
      ;; The first line matches the program name for
 
@@ -327,7 +333,7 @@ of[ \t]+\"?\\([a-zA-Z]?:?[^\":\n]+\\)\"?:" 3 2 nil (1))
           (: (* " ")
              (group-n 7 (| (regexp "[Ii]nfo\\(?:\\>\\|rmationa?l?\\)")
                            "I:"
-                           (: "[ skipping " (+ ".") " ]")
+                           (: "[ skipping " (+ nonl) " ]")
                            "instantiated from"
                            "required from"
                            (regexp "[Nn]ote"))))
@@ -2625,7 +2631,10 @@ Actual value is never used, only the text property.")
 	(make-overlay overlay-arrow-position overlay-arrow-position))
   (overlay-put compilation-arrow-overlay
                'before-string compilation--dummy-string)
-  (set-window-margins (selected-window) (+ (or (car (window-margins)) 0) 2)))
+  (set-window-margins (selected-window) (+ (or (car (window-margins)) 0) 2))
+  ;; Take precautions against `compilation-mode' getting reinitialized.
+  (add-hook 'change-major-mode-hook
+            'compilation-tear-down-arrow-spec-in-margin nil t))
 
 (defun compilation-tear-down-arrow-spec-in-margin ()
   "Restore compilation-arrow-overlay to not using the margin, which is removed."

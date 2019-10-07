@@ -2650,6 +2650,9 @@ if test "${HAVE_X11}" = "yes" || test "${HAVE_NS}" = "yes" || test "${window_sys
     if test $HAVE_IMAGEMAGICK = yes; then
       AC_DEFINE([HAVE_IMAGEMAGICK], 1, [Define to 1 if using ImageMagick.])
     else
+      if test "${with_imagemagick}" != "no"; then
+        AC_MSG_ERROR([ImageMagick wanted, but it does not compile.  Maybe some library files are missing?]);
+      fi
       IMAGEMAGICK_CFLAGS=
       IMAGEMAGICK_LIBS=
     fi

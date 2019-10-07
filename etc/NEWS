@@ -276,6 +276,12 @@ used to remove comments before calling the libxml functions to parse
 the data.
 
 +++
+** A new DOM (the XML/HTML document structure returned by functions
+such as 'libxml-parse-html-region') traversal function has been added:
+'dom-search', which takes a DOM and a predicate and returns all nodes
+that match.
+
++++
 ** The Network Security Manager now allows more fine-grained control
 of what checks to run via the 'network-security-protocol-checks'
 variable.
@@ -439,6 +445,11 @@ RGB triplets with a single hexadecimal digit per component.
 ---
 ** The toolbar now shows the equivalent key binding in its tooltips.
 
+---
+** 'scroll-lock-mode' is now bound to the 'Scroll_Lock' key globally.
+Note that this key binding will not work on MS-Windows systems if
+'w32-scroll-lock-modifier' is non-nil.
+
 
 * Editing Changes in Emacs 27.1
 
@@ -488,7 +499,8 @@ interface that's more like functions like 'search-forward'.
 ---
 ** More commands support noncontiguous rectangular regions, namely
 'upcase-dwim', 'downcase-dwim', 'capitalize-dwim', 'capitalize-region',
-'replace-string', 'replace-regexp', and 'delimit-columns-region'.
+'upcase-initials-region', 'replace-string', 'replace-regexp', and
+'delimit-columns-region'.
 
 +++
 ** When asked to visit a large file, Emacs now offers visiting it literally.
@@ -541,6 +553,18 @@ network connection information (in addition to the host name).
 
 ** The 'cl' package is now officially deprecated in favor of 'cl-lib'.
 
+---
+** desktop
+*** When called interactively with a prefix arg 'C-u', 'desktop-read'
+now prompts the user for the directory containing the desktop file.
+
++++
+** display-line-numbers-mode
+*** New faces 'line-number-major-tick' and 'line-number-minor-tick',
+and customizable variables 'display-line-numbers-major-tick' and
+'display-line-numbers-minor-tick' can be used to highlight the line
+numbers of lines multiple of certain numbers.
+
 +++
 ** winner
 *** A new variable, 'winner-boring-buffers-regexp', has been added.
@@ -570,6 +594,11 @@ This is because on the one hand it suffers from various misbehaviors in corner
 cases that have plagued it for years, and on the other experiments indicated
 that it doesn't bring any measurable benefit.
 
+---
+*** The 'g' keystroke in *Compile-Log* buffers has been bound to a new
+command that will recompile the file previously compiled with 'M-x
+byte-compile-file' and the like.
+
 ** compile.el
 ---
 *** In 'compilation-error-regexp-alist', 'line' (and 'end-line') can
@@ -595,12 +624,21 @@ its functions.
 *** New commands 'doc-view-presentation' and 'doc-view-fit-window-to-page'.
 *** Added support for password-protected PDF files
 
+*** A new variable 'doc-view-pdftotext-program-args' has been added to
+allow controlling how the conversion to text is done.
+
 ** Ido
 *** New user option 'ido-big-directories' to mark directories whose
 names match certain regular expressions as big.  Ido won't attempt to
 list the contents of such directories when completing file names.
 
 ** Minibuffer
+
++++
+*** A new variable, 'minibuffer-beginning-of-buffer-movement', has
+been introduced to allow controlling how the 'M-<' command works in
+the minibuffer.  If non-nil, point will move to the end of the prompt
+(if point is after the end of the prompt).
 
 ---
 *** Minibuffer now uses 'minibuffer-message' to display error messages
@@ -971,6 +1009,9 @@ early init file.
 ---
 *** Imenu support has been added to 'package-menu-mode'.
 
+---
+*** The package list can now be sorted by version or description.
+
 ** Info
 
 +++
@@ -1030,6 +1071,23 @@ This can be controlled by the new 'ecomplete-sort-predicate' variable.
 Of course it will still find it if you have it in '~/.ecompleterc'.
 
 ** Gnus
+
++++
+*** Two new Gnus summary mode navigation commands have been added,
+bound to the '[' and ']' keys: `gnus-summary-prev-unseen-article' and
+`gnus-summary-next-unseen-article'.  These take you (respectively) to
+the previous unseen or next unseen article.  (These are the ones that
+are marked with "." in the summary mode lines.)
+
++++
+*** The Gnus user variable 'nnimap-expunge' supports three new values:
+'never' for never expunging messages, 'immediately' for immediately
+expunging deleted messages, and 'on-exit' to expunge deleted articles
+when exiting the group's summary buffer.  Setting 'nnimap-expunge' to
+'nil' or 't' is still supported but not recommended, since it may
+result in Gnus expunging all messages that have been flagged as
+deleted by any IMAP client (rather than just those that have been
+deleted by Gnus).
 
 +++
 *** New option 'gnus-use-atomic-windows' makes Gnus window layouts
@@ -1092,7 +1150,7 @@ This option controls whether and how to use Gnus search groups as
 'path:' search terms to 'notmuch'.
 
 ---
-+++ The buttons in the Gnus article buffer were formerly widgets
+*** The buttons in the Gnus article buffer were formerly widgets
 (i.e., buttons from widget.el).  This has now changed, and they are
 now buttons (from button.el), and commands like 'TAB' now search for
 buttons instead of widgets.  There should be no user-visible changes,
@@ -1117,9 +1175,19 @@ The variable to use instead to alter text to be sent is now
 ** eww/shr
 
 +++
+*** The new variable 'shr-cookie-policy' can be used to control when
+to use cookies when fetching embedded images.  The default is to use
+them when the images are from the same domain as the main HTML
+document.
+
++++
 *** The 'eww' command can now create a new EWW buffer.
 Invoking the command with a prefix argument will cause it to create a
 new EWW buffer for the URL instead of reusing the default one.
+
++++
+*** Clicking with the Ctrl key or 'C-u RET' on a link opens a new tab
+when tab-bar-mode is enabled.
 
 +++
 *** The 'd' ('eww-download') command now falls back to current page's URL.
@@ -1480,6 +1548,11 @@ available for output of asynchronous shell commands.
 
 ** Pcomplete
 
+*** The 'pcomplete' command is now obsolete
+The Pcomplete functionality can be obtained via completion-at-point
+instead, by adding pcomplete-completions-at-point to
+completion-at-point-functions.
+
 *** The function 'pcomplete-uniquify-list' has been renamed from
 'pcomplete-uniqify-list'.
 
@@ -1496,7 +1569,8 @@ To recover the previous behavior, set new user option
 *** .authinfo and .netrc files now use a new mode: 'authinfo-mode'.
 This is just like 'fundamental-mode', except that it hides passwords
 under a "****" display property.  When the cursor moves to this text,
-the real password is revealed (via 'reveal-mode').
+the real password is revealed (via 'reveal-mode').  The
+'authinfo-hidden' variable can be used to control what to hide.
 
 ** Tramp
 
@@ -1573,6 +1647,10 @@ Use of built-in libgnutls based functionality (described in the Emacs
 GnuTLS manual) is recommended instead.
 
 ** Message
+
+*** 'message-mode' now supports highlighting citations of different
+depths.  This can be customized via 'message-cite-level-function' and
+the new 'message-cited-text-*' faces.
 
 +++
 *** Messages can now be systematically encrypted
@@ -1713,6 +1791,10 @@ This also works for their aliases: '|' for 'or'; ':', 'and' and
 In this case, 'rx' will generate code which produces a regexp string
 at run time, instead of a constant string.
 
+---
+*** New rx extension mechanism: 'rx-define', 'rx-let', 'rx-let-eval'.
+These macros add new forms to the rx notation.
+
 ** Frames
 
 +++
@@ -1744,6 +1826,11 @@ near the current column in Tabulated Lists (see variables
 *** Two new commands and keystrokes have been added to the tabulated
 list mode: 'w' (which widens the current column) and 'c' which makes
 the current column contract.
+
++++
+*** New function 'tabulated-list-clear-all-tags'.
+This function clears all tags from the padding area in the current
+buffer.  Tags are typically added by calling 'tabulated-list-put-tag'.
 
 ** Text mode
 
@@ -1940,8 +2027,59 @@ and 'gravatar-force-default'.
 *** The built-in ada-mode is now deleted.  The GNU ELPA package is a
 good replacement, even in very large source files.
 
+** Some conversions recommended for 'time-stamp-format' have changed.
+The new documented/recommended %-conversions are closer to those
+used by 'format-time-string' and are compatible at least as far back
+as Emacs 22.1 (released in 2007).
+
+Uppercase abbreviated day name of week: was %3A, now %#a
+Full day name of week: was %:a, now %:A
+Uppercase abbreviated month name: was %3B, now %#b
+Full month name: was %:b, now %:B
+Four-digit year: was %:y, now %Y
+Lowercase timezone name: was %z, now %#Z
+Fully-qualified host name: was %s, now %Q
+Unqualified host name: (was none), now %q
+Login name: was %u, now %l
+User's full name: was %U, now %L
+
+Merely having (add-hook 'before-save-hook 'time-stamp) in your
+Emacs init file does not expose you to this change.  However,
+if you set 'time-stamp-format' or 'time-stamp-pattern' with a
+file-local variable, you may need to update the value.
+
 
 * New Modes and Packages in Emacs 27.1
+
+** Tab Bars
+
++++
+*** Tab-Bar mode
+The new command 'tab-bar-mode' enables the tab-bar at the top of each
+frame, where you can use tabs to switch between named persistent
+window configurations.
+
+The 'C-x 6' sequence is the new prefix key for tab-related commands:
+'C-x 6 2' creates a new tab; 'C-x 6 0' deletes the current tab;
+'C-x 6 b' switches to buffer in another tab; 'C-x 6 f' and 'C-x 6 C-f'
+edit file in another tab; and 'C-TAB' and 'S-C-TAB' switch to the next
+or previous tab.  You can also switch between tabs and create/delete
+tabs with a mouse.
+
+Tab-related commands are available even when the Tab-Bar mode is
+disabled: by default, they enable Tab-Bar mode in that case.
+
+Read the new Info node "(emacs) Tab Bars" for full description
+of all related features.
+
+*** Tab-Line mode
+The new command 'global-tab-line-mode' enables the tab-line above each
+window, which you can use to switch buffers in the window.  Selecting
+the previous window-local tab is the same as typing 'C-x <LEFT>'
+(previous-buffer), selecting the next tab is the same as 'C-x <RIGHT>'
+(next-buffer).  Clicking on the plus icon adds a new buffer to the
+window-local tab-line of buffers.  Using the mouse wheel on the
+tab-line scrolls tabs that display the window buffers.
 
 ** fileloop.el lets one setup multifile operations like search&replace.
 
@@ -1978,6 +2116,24 @@ immediately.  Type 'M-x so-long-commentary' for full documentation.
 
 
 * Incompatible Lisp Changes in Emacs 27.1
+
+---
+** Two-column mode provides its C-x 6 prefix map only after loading
+two-column.el.  Its prefix key F2 is still available globally
+along with C-x 6 used by the tab commands globally.
+
+---
+** Incomplete destructive splicing support has been removed.
+Support for Common Lisp style destructive splicing (",.") was
+incomplete and broken for a long time.  It has now been removed.
+
+This means that backquote substitution now works for identifiers
+starting with a period (".").  Consider the following example:
+
+    (let ((.foo 42)) `,.foo)
+
+In the past, this would have incorrectly evaluated to '(\,\. foo)',
+but will now instead evaluate to '42'.
 
 ---
 ** The REGEXP in 'magic-mode-alist' is now matched case-sensitively.
@@ -2120,6 +2276,14 @@ ending character were silently omitted.
 For example, '(rx (any "@z-a" (?9 . ?0)))' would match '@' only.
 Now, such 'rx' expressions generate an error.
 
+---
+** Internal 'rx' functions and variables have been removed,
+as a consequence of an improved implementation.  Packages using
+these should use the public 'rx' and 'rx-to-string' instead.
+'rx-constituents' is still available for compatibility, but the new
+extension mechanism is preferred: 'rx-define', 'rx-let' and
+'rx-let-eval'.
+
 +++
 ** 'text-mode' no longer sets the value of 'indent-line-function'.
 The global value of 'indent-line-function', which defaults to
@@ -2139,6 +2303,27 @@ valid event type.
 
 ---
 ** The obsolete package xesam.el (since Emacs 24) has been removed.
+
++++
+** The XBM image handler now accepts a ':stride' argument, which should
+be specified in image specs representing the entire bitmap as a single
+bool vector.
+
++++
+** 'regexp-quote' may return its argument string.
+If the argument needs no quoting, it can be returned instead of a copy.
+
++++
+** Mouse scroll up and down with control key modifier changes font size.
+Previously, the control key modifier was used to scroll up or down by
+an amount which was close to near a full screen.  This is now instead
+available by scrolling with the meta modifier key.
+
+To get the old behaviour back, customize the variable
+'mouse-wheel-scroll-amount', or add the following to your init file:
+
+(customize-set-variable 'mouse-wheel-scroll-amount
+                        '(5 ((shift) . 1) ((control) . nil)))
 
 
 * Lisp Changes in Emacs 27.1
@@ -2573,12 +2758,28 @@ directories if you ask it for a "file:///dir" URL.  Since this is a
 low-level library, such decisions (if they are to be made at all) are
 left to higher-level functions.
 
+---
+** The url-ns.el library is now marked obsolete.
+This library is used to open configuration files for the long defunct
+web browser Netscape, and is no longer relevant.
+
 ** Image mode
 
 *** New library Exif.
-An Exif library has been added that can parse JPEG files and
-output data about creation times and orientation and the like.
-'exif-parse' is the main interface function.
+An Exif library has been added that can parse JPEG files and output
+data about creation times and orientation and the like.
+'exif-parse-file' and 'exif-parse-buffer' are the main interface
+functions.
+
+*** New library image-converter.
+If you need to view exotic image formats for which Emacs doesn't have
+native support, customize the new variable 'convert-images-externally'
+to t.  If your system has GraphicsMagick, ImageMagick or 'ffmpeg'
+installed, they will then be used to convert images automatically
+before displaying them.
+
+*** 'image-mode' now uses this library to automatically rotate images
+according to the orientation in the Exif data, if any.
 
 *** 'imagemagick-types-inhibit' disables using ImageMagick by default.
 'image-mode' started using ImageMagick by default for all images
@@ -2591,6 +2792,12 @@ The image parameters 'image-transform-rotation',
 'image-transform-scale' and 'image-transform-resize' are now declared
 buffer-local, so each buffer could have its own values for these
 parameters.
+
++++
+*** Three new 'image-mode' commands have been added: 'm', which marks
+the file in the dired buffer(s) for the directory the file is in; 'u',
+which unmarks the file; and 'w', which pushes the current buffer's file
+name to the kill ring.
 
 +++
 *** The command 'image-rotate' now accepts a prefix argument.
