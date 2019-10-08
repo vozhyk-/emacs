@@ -15677,15 +15677,19 @@ redisplay_internal (void)
 		  STOP_POLLING;
 
 		  pending |= update_frame (f, false, false);
-#ifndef HAVE_PGTK
 		  /* On some platforms (at least MS-Windows), the
 		     scroll_run_hook called from scrolling_window
 		     called from update_frame could set the frame's
-		     garbaged flag, in which case we need to
-		     redisplay the frame.  */
+		     garbaged flag, in which case we need to redisplay
+		     the frame.  Don't do that on TTY frames, since we
+		     need to keep the garbaged flag in that case when
+		     the frame has been resized.  */
                   if (FRAME_GARBAGED_P (f))
-		    goto retry_frame;
-#endif
+		    {
+		      fset_redisplay (f);
+		      f->garbaged = false;
+		      goto retry_frame;
+		    }
 		  f->cursor_type_changed = false;
 		  f->updated_p = true;
 		  f->inhibit_clear_image_cache = false;
