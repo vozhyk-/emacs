@@ -5780,7 +5780,7 @@ button_event(GtkWidget *widget, GdkEvent *event, gpointer *user_data)
 
   if (f)
     {
-      if (!tool_bar_p)
+      if (!tab_bar_p && !tool_bar_p)
 	{
 	  if (ignore_next_mouse_click_timeout)
 	    {
