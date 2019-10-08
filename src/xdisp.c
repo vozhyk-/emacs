@@ -15677,6 +15677,7 @@ redisplay_internal (void)
 		  STOP_POLLING;
 
 		  pending |= update_frame (f, false, false);
+#ifndef HAVE_PGTK
 		  /* On some platforms (at least MS-Windows), the
 		     scroll_run_hook called from scrolling_window
 		     called from update_frame could set the frame's
@@ -15684,6 +15685,7 @@ redisplay_internal (void)
 		     redisplay the frame.  */
                   if (FRAME_GARBAGED_P (f))
 		    goto retry_frame;
+#endif
 		  f->cursor_type_changed = false;
 		  f->updated_p = true;
 		  f->inhibit_clear_image_cache = false;
