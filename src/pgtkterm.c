@@ -2239,9 +2239,9 @@ static void pgtk_draw_glyph_string(struct glyph_string *s)
   if (!s->for_overlaps)
     {
       /* Draw underline.  */
-      if (s->face->underline_p)
+      if (s->face->underline)
 	{
-	  if (s->face->underline_type == FACE_UNDER_WAVE)
+	  if (s->face->underline == FACE_UNDER_WAVE)
 	    {
 	      if (s->face->underline_defaulted_p)
 		x_draw_underwave (s, s->xgcv.foreground);
@@ -2250,13 +2250,13 @@ static void pgtk_draw_glyph_string(struct glyph_string *s)
 		  x_draw_underwave (s, s->face->underline_color);
 		}
 	    }
-	  else if (s->face->underline_type == FACE_UNDER_LINE)
+	  else if (s->face->underline == FACE_UNDER_LINE)
 	    {
 	      unsigned long thickness, position;
 	      int y;
 
-	      if (s->prev && s->prev->face->underline_p
-		  && s->prev->face->underline_type == FACE_UNDER_LINE)
+	      if (s->prev && s->prev->face->underline
+		  && s->prev->face->underline == FACE_UNDER_LINE)
 		{
 		  /* We use the same underline style as the previous one.  */
 		  thickness = s->prev->underline_thickness;
