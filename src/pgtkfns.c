@@ -1620,6 +1620,8 @@ Some window managers may refuse to restack windows.  */)
 }
 
 
+#ifdef HAVE_GSETTINGS
+
 #define RESOURCE_KEY_MAX_LEN 128
 #define SCHEMA_ID "org.gnu.emacs.defaults"
 #define PATH_FOR_CLASS_TYPE "/org/gnu/emacs/defaults-by-class/"
@@ -1787,6 +1789,22 @@ pgtk_set_defaults_value (const char *key, const char *value)
 #undef SCHEMA_ID
 #undef PATH_FOR_CLASS_TYPE
 #undef PATH_PREFIX_FOR_NAME_TYPE
+
+#else /* not HAVE_GSETTINGS */
+
+const char *
+pgtk_get_defaults_value (const char *key)
+{
+  return NULL;
+}
+
+static void
+pgtk_set_defaults_value (const char *key, const char *value)
+{
+  error ("gsettings not supported.");
+}
+
+#endif
 
 
 DEFUN ("pgtk-set-resource", Fpgtk_set_resource, Spgtk_set_resource, 2, 2, 0,
