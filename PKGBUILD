@@ -24,7 +24,7 @@
 # Take note that I don't expect you to track anything different to master
 # or emacs-26 for obvious reasons. (See below).
 #
-BRANCH=master
+BRANCH=pgtk
 
 #######################################################################
 # Assign "YES" to the variable you want enabled; empty or other value
