@@ -3867,7 +3867,7 @@ POSITION defaults to the value of `window-point' of WINDOW."
 	      (+ (nth 1 edges) (nth 1 pos-in-window)))))))
 
 (defun frame-root-window-p (window)
-  "Return non-nil if WINDOW is the root window of its frame."
+  "Return t if WINDOW is the root window of its frame."
   (eq window (frame-root-window window)))
 
 (defun window--subtree (window &optional next)
@@ -4732,13 +4732,16 @@ displayed there."
     ;; Handle case where `buffer-or-name' is nil and the current buffer
     ;; is shown in the selected window.
     (cond
-     ((or buffer-or-name (not (eq buffer (window-buffer)))))
+     ((or buffer-or-name
+          (not (eq buffer (window-buffer)))
+          ;; Don't try to delete the minibuffer window, undedicate it
+          ;; or switch to a previous buffer in it.
+          (window-minibuffer-p)))
      ((window--delete nil t))
      (t
       ;; Switch to another buffer in window.
       (set-window-dedicated-p nil nil)
       (switch-to-prev-buffer nil 'bury)))
-
     ;; Always return nil.
     nil))
 
