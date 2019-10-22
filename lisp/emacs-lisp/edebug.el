@@ -2845,6 +2845,7 @@ See `edebug-behavior-alist' for implementations.")
 	    (goto-char edebug-buffer-outside-point))
 	  ;; ... nothing more.
 	  )
+      (edebug--overlay-breakpoints-remove (point-min) (point-max))
       ;; Could be an option to keep eval display up.
       (if edebug-eval-buffer (kill-buffer edebug-eval-buffer))
       (with-timeout-unsuspend edebug-with-timeout-suspend)
@@ -2944,7 +2945,6 @@ See `edebug-behavior-alist' for implementations.")
 	    (setq signal-hook-function #'edebug-signal)
 	    (if edebug-backtrace-buffer
 		(kill-buffer edebug-backtrace-buffer))
-            (edebug--overlay-breakpoints-remove (point-min) (point-max))
 
 	    ;; Remember selected-window after recursive-edit.
 	    ;;      (setq edebug-inside-window (selected-window))
@@ -3232,6 +3232,9 @@ the breakpoint."
 	  (goto-char position)
           (edebug--overlay-breakpoints edebug-def-name)))))
 
+(define-fringe-bitmap 'edebug-breakpoint
+  "\x3c\x7e\xff\xff\xff\xff\x7e\x3c")
+
 (defun edebug--overlay-breakpoints (function)
   (let* ((data (get function 'edebug))
          (start (nth 0 data))
@@ -3245,12 +3248,22 @@ the breakpoint."
     (when edebug-active
       (dolist (breakpoint breakpoints)
         (let* ((pos (+ start (aref offsets (car breakpoint))))
-               (overlay (make-overlay pos (1+ pos))))
+               (overlay (make-overlay pos (1+ pos)))
+               (face (if (nth 4 breakpoint)
+                         (progn
+                           (overlay-put overlay
+                                        'help-echo "Disabled breakpoint")
+                           (overlay-put overlay
+                                        'face 'edebug-disabled-breakpoint))
+                       (overlay-put overlay 'help-echo "Breakpoint")
+                       (overlay-put overlay 'face 'edebug-enabled-breakpoint))))
           (overlay-put overlay 'edebug t)
-          (overlay-put overlay 'face
-                       (if (nth 4 breakpoint)
-                           'edebug-disabled-breakpoint
-                         'edebug-enabled-breakpoint)))))))
+          (let ((fringe (make-overlay pos pos)))
+            (overlay-put fringe 'edebug t)
+            (overlay-put fringe 'before-string
+                         (propertize
+                          "x" 'display
+                          `(left-fringe edebug-breakpoint ,face)))))))))
 
 (defun edebug--overlay-breakpoints-remove (start end)
   (dolist (overlay (overlays-in start end))
@@ -3736,26 +3749,45 @@ Print result in minibuffer."
     (concat (edebug-safe-prin1-to-string (car values))
             (eval-expression-print-format (car values))))))
 
-(defun edebug-eval-last-sexp ()
+(defun edebug-eval-last-sexp (&optional no-truncate)
   "Evaluate sexp before point in the outside environment.
-Print value in minibuffer."
-  (interactive)
-  (edebug-eval-expression (edebug-last-sexp)))
+Print value in minibuffer.
 
-(defun edebug-eval-print-last-sexp ()
+If NO-TRUNCATE is non-nil (or interactively with a prefix
+argument of zero), show the full length of the expression, not
+limited by `edebug-print-length' or `edebug-print-level'."
+  (interactive
+   (list (and current-prefix-arg
+              (zerop (prefix-numeric-value current-prefix-arg)))))
+  (if no-truncate
+      (let ((edebug-print-length nil)
+            (edebug-print-level nil))
+        (edebug-eval-expression (edebug-last-sexp)))
+    (edebug-eval-expression (edebug-last-sexp))))
+
+(defun edebug-eval-print-last-sexp (&optional no-truncate)
   "Evaluate sexp before point in outside environment; insert value.
-This prints the value into current buffer."
-  (interactive)
+This prints the value into current buffer.
+
+If NO-TRUNCATE is non-nil (or interactively with a prefix
+argument of zero), show the full length of the expression, not
+limited by `edebug-print-length' or `edebug-print-level'."
+  (interactive
+   (list (and current-prefix-arg
+              (zerop (prefix-numeric-value current-prefix-arg)))))
   (let* ((form (edebug-last-sexp))
 	 (result-string
 	  (edebug-outside-excursion
-	   (edebug-safe-prin1-to-string (edebug-safe-eval form))))
+	   (if no-truncate
+               (let ((edebug-print-length nil)
+                     (edebug-print-level nil))
+                 (edebug-safe-prin1-to-string (edebug-safe-eval form)))
+             (edebug-safe-prin1-to-string (edebug-safe-eval form)))))
 	 (standard-output (current-buffer)))
     (princ "\n")
     ;; princ the string to get rid of quotes.
     (princ result-string)
-    (princ "\n")
-    ))
+    (princ "\n")))
 
 ;;; Edebug Minor Mode
 
