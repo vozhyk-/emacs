@@ -7,11 +7,17 @@ inherit autotools elisp-common flag-o-matic multilib readme.gentoo-r1
 
 DESCRIPTION="The extensible, customizable, self-documenting real-time display editor"
 HOMEPAGE="https://www.gnu.org/software/emacs/"
-SRC_URI="mirror://gnu/emacs/${P}.tar.xz"
+
+if [[ ${PV} == *"9999" ]] ; then
+	inherit git-r3
+	EGIT_REPO_URI="https://github.com/masm11/emacs.git"
+else
+	SRC_URI="mirror://gnu/emacs/${P}.tar.xz"
+	KEYWORDS="~alpha ~amd64 ~arm ~arm64 ~hppa ~ia64 ~mips ~ppc ~ppc64 ~riscv ~sh ~sparc ~x86 ~amd64-fbsd ~x86-fbsd ~amd64-linux ~x86-linux ~ppc-macos ~x64-macos ~x86-macos"
+fi
 
 LICENSE="GPL-3+ FDL-1.3+ BSD HPND MIT W3C unicode PSF-2"
-SLOT="26"
-KEYWORDS="~alpha ~amd64 ~arm ~arm64 ~hppa ~ia64 ~mips ~ppc ~ppc64 ~riscv ~sh ~sparc ~x86 ~amd64-fbsd ~x86-fbsd ~amd64-linux ~x86-linux ~ppc-macos ~x64-macos ~x86-macos"
+SLOT="28"
 IUSE="acl alsa aqua athena cairo dbus dynamic-loading games gconf gfile gif gpm gsettings gtk gtk2 gzip-el imagemagick +inotify jpeg kerberos lcms libxml2 livecd m17n-lib mailutils motif png selinux sound source ssl svg systemd +threads tiff toolkit-scroll-bars wide-int X Xaw3d xft +xpm xwidgets zlib"
 REQUIRED_USE="?? ( aqua X )"
 
@@ -109,8 +115,12 @@ SITEFILE="20${PN}-${SLOT}-gentoo.el"
 # FULL_VERSION keeps the full version number, which is needed in
 # order to determine some path information correctly for copy/move
 # operations later on
-FULL_VERSION="${PV%%_*}"
-S="${WORKDIR}/emacs-${FULL_VERSION}"
+if [[ ${PV} == *"9999" ]]; then
+	FULL_VERSION="28.0.50"
+else
+	FULL_VERSION="${PV%%_*}"
+	S="${WORKDIR}/emacs-${FULL_VERSION}"
+fi
 
 src_prepare() {
 	#eapply ../patch
@@ -119,7 +129,9 @@ src_prepare() {
 	# Fix filename reference in redirected man page
 	sed -i -e "/^\\.so/s/etags/&-${EMACS_SUFFIX}/" doc/man/ctags.1 || die
 
-	#AT_M4DIR=m4 eautoreconf
+	if [[ ${PV} == *"9999" ]]; then
+		AT_M4DIR=m4 eautoreconf
+	fi
 }
 
 src_configure() {
