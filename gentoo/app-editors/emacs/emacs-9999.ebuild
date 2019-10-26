@@ -158,36 +158,44 @@ src_configure() {
 
 	if use X; then
 		myconf+=" --with-x --without-ns"
-		myconf+=" $(use_with gconf)"
-		myconf+=" $(use_with gsettings)"
-		myconf+=" $(use_with toolkit-scroll-bars)"
-		myconf+=" $(use_with gif)"
-		myconf+=" $(use_with jpeg)"
-		myconf+=" $(use_with png)"
-		myconf+=" $(use_with svg rsvg)"
-		myconf+=" $(use_with tiff)"
-		myconf+=" $(use_with xpm)"
-		myconf+=" $(use_with imagemagick)"
+	elif use aqua; then
+		einfo "Configuring to build with Nextstep (Cocoa) support"
+		myconf+=" --with-ns --disable-ns-self-contained"
+		myconf+=" --without-x"
+	else
+		myconf+=" --without-x --without-ns"
+	fi
 
-		if use xft; then
-			myconf+=" --with-xft"
-			myconf+=" $(use_with cairo)"
-			myconf+=" $(use_with m17n-lib libotf)"
-			myconf+=" $(use_with m17n-lib m17n-flt)"
-		else
-			myconf+=" --without-xft"
-			myconf+=" --without-cairo"
-			myconf+=" --without-libotf --without-m17n-flt"
-			use cairo && ewarn \
-				"USE flag \"cairo\" has no effect if \"xft\" is not set."
-			use m17n-lib && ewarn \
-				"USE flag \"m17n-lib\" has no effect if \"xft\" is not set."
-		fi
+	myconf+=" $(use_with gconf)"
+	myconf+=" $(use_with gsettings)"
+	myconf+=" $(use_with toolkit-scroll-bars)"
+	myconf+=" $(use_with gif)"
+	myconf+=" $(use_with jpeg)"
+	myconf+=" $(use_with png)"
+	myconf+=" $(use_with svg rsvg)"
+	myconf+=" $(use_with tiff)"
+	myconf+=" $(use_with xpm)"
+	myconf+=" $(use_with imagemagick)"
 
-		local f line
-		if use gtk; then
-			einfo "Configuring to build with GIMP Toolkit (GTK+)"
-			while read line; do ewarn "${line}"; done <<-EOF
+	if use xft; then
+		myconf+=" --with-xft"
+		myconf+=" $(use_with cairo)"
+		myconf+=" $(use_with m17n-lib libotf)"
+		myconf+=" $(use_with m17n-lib m17n-flt)"
+	else
+		myconf+=" --without-xft"
+		myconf+=" --without-cairo"
+		myconf+=" --without-libotf --without-m17n-flt"
+		use cairo && ewarn \
+				     "USE flag \"cairo\" has no effect if \"xft\" is not set."
+		use m17n-lib && ewarn \
+					"USE flag \"m17n-lib\" has no effect if \"xft\" is not set."
+	fi
+
+	local f line
+	if use gtk; then
+		einfo "Configuring to build with GIMP Toolkit (GTK+)"
+		while read line; do ewarn "${line}"; done <<-EOF
 				Your version of GTK+ will have problems with closing open
 				displays. This is no problem if you just use one display, but
 				if you use more than one and close one of them Emacs may crash.
@@ -196,43 +204,36 @@ src_configure() {
 				recommended that you compile Emacs with the Athena/Lucid or the
 				Motif toolkit instead.
 			EOF
-			if use gtk2; then
-				myconf+=" --with-x-toolkit=gtk2 --without-xwidgets"
-				use xwidgets && ewarn \
-					"USE flag \"xwidgets\" has no effect if \"gtk2\" is set."
-			else
-				myconf+=" --with-x-toolkit=gtk3 $(use_with xwidgets)"
-			fi
-			for f in motif Xaw3d athena; do
-				use ${f} && ewarn \
-					"USE flag \"${f}\" has no effect if \"gtk\" is set."
-			done
-		elif use motif; then
-			einfo "Configuring to build with Motif toolkit"
-			myconf+=" --with-x-toolkit=motif"
-			for f in Xaw3d athena; do
-				use ${f} && ewarn \
-					"USE flag \"${f}\" has no effect if \"motif\" is set."
-			done
-		elif use athena || use Xaw3d; then
-			einfo "Configuring to build with Athena/Lucid toolkit"
-			myconf+=" --with-x-toolkit=lucid $(use_with Xaw3d xaw3d)"
-		else
-			einfo "Configuring to build with no toolkit"
-			myconf+=" --with-x-toolkit=no"
-		fi
-		if ! use gtk; then
-			use gtk2 && ewarn \
-				"USE flag \"gtk2\" has no effect if \"gtk\" is not set."
+		if use gtk2; then
+			myconf+=" --with-x-toolkit=gtk2 --without-xwidgets"
 			use xwidgets && ewarn \
-				"USE flag \"xwidgets\" has no effect if \"gtk\" is not set."
+						"USE flag \"xwidgets\" has no effect if \"gtk2\" is set."
+		else
+			myconf+=" --with-x-toolkit=gtk3 $(use_with xwidgets)"
 		fi
-	elif use aqua; then
-		einfo "Configuring to build with Nextstep (Cocoa) support"
-		myconf+=" --with-ns --disable-ns-self-contained"
-		myconf+=" --without-x"
+		for f in motif Xaw3d athena; do
+			use ${f} && ewarn \
+					    "USE flag \"${f}\" has no effect if \"gtk\" is set."
+		done
+	elif use motif; then
+		einfo "Configuring to build with Motif toolkit"
+		myconf+=" --with-x-toolkit=motif"
+		for f in Xaw3d athena; do
+			use ${f} && ewarn \
+					    "USE flag \"${f}\" has no effect if \"motif\" is set."
+		done
+	elif use athena || use Xaw3d; then
+		einfo "Configuring to build with Athena/Lucid toolkit"
+		myconf+=" --with-x-toolkit=lucid $(use_with Xaw3d xaw3d)"
 	else
-		myconf+=" --without-x --without-ns"
+		einfo "Configuring to build with no toolkit"
+		myconf+=" --with-x-toolkit=no"
+	fi
+	if ! use gtk; then
+		use gtk2 && ewarn \
+				    "USE flag \"gtk2\" has no effect if \"gtk\" is not set."
+		use xwidgets && ewarn \
+					"USE flag \"xwidgets\" has no effect if \"gtk\" is not set."
 	fi
 
 	econf \
