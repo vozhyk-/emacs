@@ -702,7 +702,7 @@ at the end of the active minibuffer.
 *** New generic function 'map-insert'.
 
 +++
-** The 'type' arg can be a list '(hash-table :key1 VAL1 :key2 VAL2 ...)'
+*** The 'type' arg can be a list '(hash-table :key1 VAL1 :key2 VAL2 ...)'
 
 ** seq.el
 New convenience functions 'seq-first' and 'seq-rest' give easy access
@@ -810,6 +810,15 @@ command itself, not how many files are marked in total.
 *** A new face, 'dired-special', is used to highlight sockets, named
 pipes, block devices and character devices.
 
++++
+*** The new user option 'dired-create-destination-dirs' controls whether
+'dired-do-copy' and 'dired-rename-file' should create non-existent
+directories in the destination.
+
++++
+*** The non-nil value of 'dired-dwim-target' uses one of the most recently
+visited windows with a Dired buffer instead of the next window.
+
 ** Find-Dired
 
 *** New user option 'find-dired-refine-function'.
@@ -822,6 +831,12 @@ The default value is 'find-dired-sort-by-filename'.
 'dired-do-compress-to'.
 
 ** Change Logs and VC
+
+---
+*** New user option 'vc-tor'.
+When non-nil, this option causes the VC commands to communicate with
+the repository via Tor's proxy, using the 'torsocks' wrapper script.
+The default is nil.
 
 +++
 *** New command 'log-edit-generate-changelog-from-diff', bound to 'C-c C-w'.
@@ -1360,13 +1375,6 @@ unescaping text.
 *** Python mode supports three different font lock decoration levels.
 The maximum level is used by default; customize
 'font-lock-maximum-decoration' to tone down the decoration.
-
-** Dired
-
-+++
-*** The new user option 'dired-create-destination-dirs' controls whether
-'dired-do-copy' and 'dired-rename-file' should create non-existent
-directories in the destination.
 
 ** Help
 
@@ -2724,6 +2732,8 @@ during last redisplay.  'window-old-pixel-width' (renamed from
 (renamed from 'window-pixel-height-before-size-change'),
 'window-old-body-pixel-width' and 'window-old-body-pixel-height'
 return the total and body sizes of any window during last redisplay.
+
+Also 'run-window-configuration-change-hook' is declared obsolete.
 
 See the section "(elisp) Window Hooks" in the Elisp manual for a
 detailed explanation of the new behavior.

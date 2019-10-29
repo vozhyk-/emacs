@@ -2128,7 +2128,9 @@ the end of the list of defaults just after the default value."
 
 (defun goto-history-element (nabs)
   "Puts element of the minibuffer history in the minibuffer.
-The argument NABS specifies the absolute history position."
+The argument NABS specifies the absolute history position in
+descending order, where 0 means the current element and a
+positive number N means the Nth previous element."
   (interactive "p")
   (when (and (not minibuffer-default-add-done)
 	     (functionp minibuffer-default-add-function)
@@ -3336,7 +3338,7 @@ to `shell-command-history'."
         (shell-completion-vars)
 	(set (make-local-variable 'minibuffer-default-add-function)
 	     'minibuffer-default-add-shell-commands))
-    (apply 'read-from-minibuffer prompt initial-contents
+    (apply #'read-from-minibuffer prompt initial-contents
 	   minibuffer-local-shell-command-map
 	   nil
 	   (or hist 'shell-command-history)
@@ -5197,10 +5199,10 @@ a character from history."
      (t
       (error "Invalid history: %s" history)))
     (while (not result)
-      (setq result (read-char prompt inherit-input-method seconds))
+      (setq result (read-event prompt inherit-input-method seconds))
       ;; Go back in history.
       (cond
-       ((eq result ?\M-p)
+       ((memq result '(?\M-p up))
         (if (>= index (length (symbol-value histvar)))
             (progn
               (message "Beginning of history; no preceding item")
@@ -5211,7 +5213,7 @@ a character from history."
                                 (elt (symbol-value histvar) (1- index)))))
         (setq result nil))
        ;; Go forward in history.
-       ((eq result ?\M-n)
+       ((memq result '(?\M-n down))
         (if (zerop index)
             (progn
               (message "End of history; no next item")
@@ -5225,9 +5227,13 @@ a character from history."
         (setq result nil))
        ;; The user hits RET to either select a history item or to
        ;; return RET.
-       ((eq result ?\r)
-        (unless (zerop index)
-          (setq result (elt (symbol-value histvar) (1- index)))))))
+       ((eq result 'return)
+        (if (zerop index)
+            (setq result ?\r)
+          (setq result (elt (symbol-value histvar) (1- index)))))
+       ;; The user has entered some non-character event.
+       ((not (characterp result))
+        (user-error "Non-character input event"))))
     ;; Record the chosen key.
     (set histvar (cons result (symbol-value histvar)))
     result))
@@ -8494,10 +8500,7 @@ Called from `temp-buffer-show-hook'."
 		 "In this buffer, type \\[choose-completion] to \
 select the completion near point.\n\n"))))))
 
-(add-hook 'completion-setup-hook 'completion-setup-function)
-
-(define-key minibuffer-local-completion-map [prior] 'switch-to-completions)
-(define-key minibuffer-local-completion-map "\M-v"  'switch-to-completions)
+(add-hook 'completion-setup-hook #'completion-setup-function)
 
 (defun switch-to-completions ()
   "Select the completion list window."
