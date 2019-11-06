@@ -23,7 +23,7 @@ This repository contains PKGBUILD, so you can do to install:
 ```
 mkdir /tmp/emacs
 cd /tmp/emacs
-wget https://raw.githubusercontent.com/masm11/emacs/master/PKGBUILD
+wget https://raw.githubusercontent.com/masm11/emacs/pgtk/PKGBUILD
 makepkg -s
 sudo pacman -U emacs-pgtk*.tar.xz
 ```
