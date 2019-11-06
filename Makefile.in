@@ -303,7 +303,7 @@ LN_S_FILEONLY = @LN_S_FILEONLY@
 # We use gzip to compress installed .el and some .txt files.
 GZIP_PROG = @GZIP_PROG@
 
-GLIB_COMPILE_SCHEMAS = /usr/bin/glib-compile-schemas
+GLIB_COMPILE_SCHEMAS = glib-compile-schemas
 
 # ============================= Targets ==============================
 
