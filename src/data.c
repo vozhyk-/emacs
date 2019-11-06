@@ -2944,7 +2944,7 @@ arith_driver (enum arithop code, ptrdiff_t nargs, Lisp_Object *args,
 	/* Set ACCUM to the next operation's result if it fits,
 	   else exit the loop.  */
 	bool overflow = false;
-	intmax_t a UNINIT;
+	intmax_t a;
 	switch (code)
 	  {
 	  case Aadd : overflow = INT_ADD_WRAPV (accum, next, &a); break;
@@ -2953,9 +2953,8 @@ arith_driver (enum arithop code, ptrdiff_t nargs, Lisp_Object *args,
 	  case Adiv:
 	    if (next == 0)
 	      xsignal0 (Qarith_error);
-	    overflow = INT_DIVIDE_OVERFLOW (accum, next);
-	    if (!overflow)
-	      a = accum / next;
+	    eassert (! INT_DIVIDE_OVERFLOW (accum, next));
+	    a = accum / next;
 	    break;
 	  case Alogand: accum &= next; continue;
 	  case Alogior: accum |= next; continue;
@@ -3290,14 +3289,29 @@ In this case, the sign bit is duplicated.  */)
 Lisp_Object
 expt_integer (Lisp_Object x, Lisp_Object y)
 {
+  /* Special cases for -1 <= x <= 1, which never overflow.  */
+  if (EQ (x, make_fixnum (1)))
+    return x;
+  if (EQ (x, make_fixnum (0)))
+    return EQ (x, y) ? make_fixnum (1) : x;
+  if (EQ (x, make_fixnum (-1)))
+    return ((FIXNUMP (y) ? XFIXNUM (y) & 1 : mpz_odd_p (*xbignum_val (y)))
+	    ? x : make_fixnum (1));
+
   unsigned long exp;
-  if (TYPE_RANGED_FIXNUMP (unsigned long, y))
-    exp = XFIXNUM (y);
-  else if (MOST_POSITIVE_FIXNUM < ULONG_MAX && BIGNUMP (y)
-	   && mpz_fits_ulong_p (*xbignum_val (y)))
-    exp = mpz_get_ui (*xbignum_val (y));
+  if (FIXNUMP (y))
+    {
+      if (ULONG_MAX < XFIXNUM (y))
+	overflow_error ();
+      exp = XFIXNUM (y);
+    }
   else
-    overflow_error ();
+    {
+      if (ULONG_MAX <= MOST_POSITIVE_FIXNUM
+	  || !mpz_fits_ulong_p (*xbignum_val (y)))
+	overflow_error ();
+      exp = mpz_get_ui (*xbignum_val (y));
+    }
 
   emacs_mpz_pow_ui (mpz[0], *bignum_integer (&mpz[0], x), exp);
   return make_integer_mpz ();
@@ -3920,9 +3934,9 @@ syms_of_data (void)
   PUT_ERROR (Qsingularity_error, Fcons (Qdomain_error, arith_tail),
 	     "Arithmetic singularity error");
 
-  PUT_ERROR (Qoverflow_error, Fcons (Qdomain_error, arith_tail),
+  PUT_ERROR (Qoverflow_error, Fcons (Qrange_error, arith_tail),
 	     "Arithmetic overflow error");
-  PUT_ERROR (Qunderflow_error, Fcons (Qdomain_error, arith_tail),
+  PUT_ERROR (Qunderflow_error, Fcons (Qrange_error, arith_tail),
 	     "Arithmetic underflow error");
 
   /* Types that type-of returns.  */

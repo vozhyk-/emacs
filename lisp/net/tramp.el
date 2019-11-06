@@ -719,7 +719,7 @@ Used in user option `tramp-syntax'.  There are further variables
 to be set, depending on VALUE."
   ;; Check allowed values.
   (unless (memq value (tramp-syntax-values))
-    (tramp-user-error "Wrong `tramp-syntax' %s" value))
+    (tramp-user-error nil "Wrong `tramp-syntax' %s" value))
   ;; Cleanup existing buffers.
   (unless (eq (symbol-value symbol) value)
     (tramp-cleanup-all-buffers))
@@ -1651,7 +1651,8 @@ The outline level is equal to the verbosity of the Tramp message."
       ;; Furthermore, `outline-regexp' must have the correct value
       ;; already, because it is used by `font-lock-compile-keywords'.
       (let ((default-directory (tramp-compat-temporary-file-directory))
-	    (outline-regexp tramp-debug-outline-regexp))
+	    (outline-regexp tramp-debug-outline-regexp)
+	    signal-hook-function)
 	(outline-mode))
       (set (make-local-variable 'outline-regexp) tramp-debug-outline-regexp)
       (set (make-local-variable 'outline-level) 'tramp-debug-outline-level)
@@ -1888,8 +1889,13 @@ the resulting error message."
 ;; This function provides traces in case of errors not triggered by
 ;; Tramp functions.
 (defun tramp-signal-hook-function (error-symbol data)
-  "Funtion to be called via `signal-hook-function'."
-  (tramp-error (car tramp-current-connection) error-symbol "%s" data))
+  "Function to be called via `signal-hook-function'."
+  ;; `custom-initialize-*' functions provoke `void-variable' errors.
+  ;; We don't want to see them in the backtrace.
+  (unless (eq error-symbol 'void-variable)
+    (tramp-error
+     (car tramp-current-connection) error-symbol
+     "%s" (mapconcat (lambda (x) (format "%s" x)) data " "))))
 
 (defmacro with-parsed-tramp-file-name (filename var &rest body)
   "Parse a Tramp filename and make components available in the body.
@@ -3010,6 +3016,20 @@ User is always nil."
      filename newname 'ok-if-already-exists 'keep-time
      'preserve-uid-gid 'preserve-permissions)))
 
+(defun tramp-handle-copy-directory
+  (directory newname &optional keep-date parents copy-contents)
+  "Like `copy-directory' for Tramp files."
+  ;; `directory-files' creates `newname' before running this check.
+  ;; So we do it ourselves.
+  (unless (file-exists-p directory)
+    (tramp-error
+     (tramp-dissect-file-name directory) tramp-file-missing
+     "No such file or directory" directory))
+  ;; We must do it file-wise.
+  (tramp-run-real-handler
+   'copy-directory
+   (list directory newname keep-date parents copy-contents)))
+
 (defun tramp-handle-directory-file-name (directory)
   "Like `directory-file-name' for Tramp files."
   ;; If localname component of filename is "/", leave it unchanged.
@@ -3024,6 +3044,10 @@ User is always nil."
 
 (defun tramp-handle-directory-files (directory &optional full match nosort)
   "Like `directory-files' for Tramp files."
+  (unless (file-exists-p directory)
+    (tramp-error
+     (tramp-dissect-file-name directory) tramp-file-missing
+     "No such file or directory" directory))
   (when (file-directory-p directory)
     (setq directory (file-name-as-directory (expand-file-name directory)))
     (let ((temp (nreverse (file-name-all-completions "" directory)))

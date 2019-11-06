@@ -94,7 +94,7 @@ It is used for TCP/IP devices."
   '((access-file . tramp-handle-access-file)
     (add-name-to-file . tramp-handle-add-name-to-file)
     ;; `byte-compiler-base-file-name' performed by default handler.
-    ;; `copy-directory' performed by default handler.
+    (copy-directory . tramp-handle-copy-directory)
     (copy-file . tramp-adb-handle-copy-file)
     (delete-directory . tramp-adb-handle-delete-directory)
     (delete-file . tramp-adb-handle-delete-file)
@@ -383,6 +383,10 @@ ARGUMENTS to pass to the OPERATION."
 (defun tramp-adb-handle-directory-files-and-attributes
   (directory &optional full match nosort id-format)
   "Like `directory-files-and-attributes' for Tramp files."
+  (unless (file-exists-p directory)
+    (tramp-error
+     (tramp-dissect-file-name directory) tramp-file-missing
+     "No such file or directory" directory))
   (when (file-directory-p directory)
     (with-parsed-tramp-file-name (expand-file-name directory) nil
       (copy-tree
@@ -706,6 +710,10 @@ PRESERVE-UID-GID and PRESERVE-EXTENDED-ATTRIBUTES are completely ignored."
     (let ((t1 (tramp-tramp-file-p filename))
 	  (t2 (tramp-tramp-file-p newname)))
       (with-parsed-tramp-file-name (if t1 filename newname) nil
+	(unless (file-exists-p filename)
+	  (tramp-error
+	   v tramp-file-missing
+	   "Copying file" "No such file or directory" filename))
 	(when (and (not ok-if-already-exists) (file-exists-p newname))
 	  (tramp-error v 'file-already-exists newname))
 	(when (and (file-directory-p newname)
@@ -784,6 +792,10 @@ PRESERVE-UID-GID and PRESERVE-EXTENDED-ATTRIBUTES are completely ignored."
     (let ((t1 (tramp-tramp-file-p filename))
 	  (t2 (tramp-tramp-file-p newname)))
       (with-parsed-tramp-file-name (if t1 filename newname) nil
+	(unless (file-exists-p filename)
+	  (tramp-error
+	   v tramp-file-missing
+	   "Renaming file" "No such file or directory" filename))
 	(when (and (not ok-if-already-exists) (file-exists-p newname))
 	  (tramp-error v 'file-already-exists newname))
 	(when (and (file-directory-p newname)

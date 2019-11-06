@@ -1082,10 +1082,13 @@ boundaries."
   (let ((file-name (match-string-no-properties 1))
         (desc      (match-string-no-properties 2))
         (start     (line-beginning-position)))
-    ;; The terminating comment format could be extended to accept a
-    ;; generic string that is not in English.
+    ;; This warning was added in Emacs 27.1, and should be removed at
+    ;; the earliest in version 31.1.  The idea is to phase out the
+    ;; requirement for a "footer line" without unduly impacting users
+    ;; on earlier Emacs versions.  See Bug#26490 for more details.
     (unless (search-forward (concat ";;; " file-name ".el ends here"))
-      (error "Package lacks a terminating comment"))
+      (lwarn '(package package-format) :warning
+             "Package lacks a terminating comment"))
     ;; Try to include a trailing newline.
     (forward-line)
     (narrow-to-region start (point))
@@ -1540,20 +1543,24 @@ If successful, set or update `package-archive-contents'."
   (dolist (archive package-archives)
     (package-read-archive-contents (car archive))))
 
+
 ;;;; Package Initialize
 ;; A bit of a milestone.  This brings together some of the above
 ;; sections and populates all relevant lists of packages from contents
 ;; available on disk.
-(defvar package--initialized nil)
+
+(defvar package--initialized nil
+  "Non-nil if `package-initialize' has been run.")
+
+;;;###autoload
+(defvar package--activated nil
+  "Non-nil if `package-activate-all' has been run.")
 
 ;;;###autoload
 (defun package-initialize (&optional no-activate)
   "Load Emacs Lisp packages, and activate them.
 The variable `package-load-list' controls which packages to load.
 If optional arg NO-ACTIVATE is non-nil, don't activate packages.
-If called as part of loading `user-init-file', set
-`package-enable-at-startup' to nil, to prevent accidentally
-loading packages twice.
 
 It is not necessary to adjust `load-path' or `require' the
 individual packages after calling `package-initialize' -- this is
@@ -1570,7 +1577,6 @@ that code in the early init-file."
     (lwarn '(package reinitialization) :warning
            "Unnecessary call to `package-initialize' in init file"))
   (setq package-alist nil)
-  (setq package-enable-at-startup nil)
   (package-load-all-descriptors)
   (package-read-all-archive-contents)
   (setq package--initialized t)
@@ -1586,7 +1592,7 @@ that code in the early init-file."
 (defun package-activate-all ()
   "Activate all installed packages.
 The variable `package-load-list' controls which packages to load."
-  (setq package-enable-at-startup nil)
+  (setq package--activated t)
   (if (file-readable-p package-quickstart-file)
       ;; Skip load-source-file-function which would slow us down by a factor
       ;; 2 (this assumes we were careful to save this file so it doesn't need
@@ -2687,7 +2693,7 @@ either a full name or nil, and EMAIL is a valid email address."
     (define-key map "d" 'package-menu-mark-delete)
     (define-key map "i" 'package-menu-mark-install)
     (define-key map "U" 'package-menu-mark-upgrades)
-    (define-key map "r" 'package-menu-refresh)
+    (define-key map "r" 'revert-buffer)
     (define-key map (kbd "/ k") 'package-menu-filter-by-keyword)
     (define-key map (kbd "/ n") 'package-menu-filter-by-name)
     (define-key map (kbd "/ /") 'package-menu-clear-filter)
@@ -2706,7 +2712,7 @@ either a full name or nil, and EMAIL is a valid email address."
     ["Describe Package" package-menu-describe-package :help "Display information about this package"]
     ["Help" package-menu-quick-help :help "Show short key binding help for package-menu-mode"]
     "--"
-    ["Refresh Package List" package-menu-refresh
+    ["Refresh Package List" revert-buffer
      :help "Redownload the ELPA archive"
      :active (not package--downloads-in-progress)]
     ["Redisplay buffer" revert-buffer :help "Update the buffer with current list of packages"]
@@ -2761,6 +2767,7 @@ Letters do not insert themselves; instead, they are commands.
   (setq tabulated-list-sort-key (cons "Status" nil))
   (add-hook 'tabulated-list-revert-hook #'package-menu--refresh nil t)
   (tabulated-list-init-header)
+  (setq revert-buffer-function 'package-menu--refresh)
   (setf imenu-prev-index-position-function
         #'package--imenu-prev-index-position-function)
   (setf imenu-extract-index-name-function
@@ -2770,6 +2777,7 @@ Letters do not insert themselves; instead, they are commands.
   "Convenience macro for `package-menu--generate'.
 If the alist stored in the symbol LISTNAME lacks an entry for a
 package PKG-DESC, add one.  The alist is keyed with PKG-DESC."
+  (declare (obsolete nil "27.1"))
   `(unless (assoc ,pkg-desc ,listname)
      ;; FIXME: Should we move status into pkg-desc?
      (push (cons ,pkg-desc ,status) ,listname)))
@@ -3158,12 +3166,15 @@ Return (PKG-DESC [NAME VERSION STATUS DOC])."
 (defvar package-menu--old-archive-contents nil
   "`package-archive-contents' before the latest refresh.")
 
-(defun package-menu-refresh ()
+(defun package-menu--refresh (&optional _arg _noconfirm)
   "In Package Menu, download the Emacs Lisp package archive.
 Fetch the contents of each archive specified in
 `package-archives', and then refresh the package menu.  Signal a
-user-error if there is already a refresh running asynchronously."
-  (interactive)
+user-error if there is already a refresh running asynchronously.
+
+`package-menu-mode' sets `revert-buffer-function' to this
+function.  The args ARG and NOCONFIRM, passed from
+`revert-buffer', are ignored."
   (unless (derived-mode-p 'package-menu-mode)
     (user-error "The current buffer is not a Package Menu"))
   (when (and package-menu-async package--downloads-in-progress)
@@ -3171,6 +3182,7 @@ user-error if there is already a refresh running asynchronously."
   (setq package-menu--old-archive-contents package-archive-contents)
   (setq package-menu--new-package-list nil)
   (package-refresh-contents package-menu-async))
+(define-obsolete-function-alias 'package-menu-refresh 'revert-buffer "27.1")
 
 (defun package-menu-hide-package ()
   "Hide a package under point in Package Menu.
@@ -3634,7 +3646,7 @@ short description."
       (package-menu-mode)
 
       ;; Fetch the remote list of packages.
-      (unless no-fetch (package-menu-refresh))
+      (unless no-fetch (package-menu--refresh))
 
       ;; If we're not async, this would be redundant.
       (when package-menu-async

@@ -179,7 +179,7 @@ into the init file when Emacs was started.  This call can now safely
 be removed.  Alternatively, if you want to ensure that your init file
 is still compatible with earlier versions of Emacs, change it to:
 
-(when (version< emacs-version "27.1")
+(when (< emacs-major-version 27)
   (package-initialize))
 
 However, if your init file changes the values of 'package-load-list'
@@ -201,6 +201,16 @@ the new version of the file again.)
 
 
 * Changes in Emacs 27.1
+
++++
+** 'next/previous-multiframe-window' have been renamed.
+The new names are as follows:
+
+ 'next-multiframe-window'     -> 'next-window-any-frame'
+ 'previous-multiframe-window' -> 'previous-window-any-frame'
+
+The old function names are maintained as aliases for backward
+compatibility.
 
 ** emacsclient
 
@@ -320,6 +330,12 @@ Previously, this support was only available when using the external
 'gnutls-cli' command.  Call 'open-network-stream' with
 ':client-certificate t' to trigger looking up of per-server
 certificates via 'auth-source'.
+
++++
+** New user option 'network-stream-use-client-certificates'.
+When non-nil, 'open-network-stream' performs lookups of client
+certificates using 'auth-source' as if ':client-certificate t' were
+specified.  Defaults to t.
 
 +++
 ** New function 'fill-polish-nobreak-p', to be used in 'fill-nobreak-predicate'.
@@ -476,7 +492,7 @@ bind it.
 
 +++
 ** 'zap-to-char' now uses history of characters you used to zap to.
-'zap-to-char' uses the new 'read-char-with-history' function to allow
+'zap-to-char' uses the new 'read-char-from-minibuffer' function to allow
 navigating through the history of characters that have been input.
 This is mostly useful for characters that have complex input methods
 where inputting the character again may involve many keystrokes.
@@ -574,6 +590,17 @@ current and the previous or the next line, as before.
 
 
 * Changes in Specialized Modes and Packages in Emacs 27.1
+
+---
+** New HTML mode skeleton 'html-id-anchor'.
+This new command (which inserts an <a id="foo">_</a> skeleton) is
+bound to 'C-c C-c #'.
+
++++
+** New command 'font-lock-refontify'.
+This is an interactive convenience function to be used when developing
+font locking for a mode.  It recomputes the font locking data and then
+re-fontifies the buffer.
 
 ---
 ** The 'C' command in 'tar-mode' will now preserve the timestamp of
@@ -870,6 +897,13 @@ This new user option allows customizing the default arguments passed to
 When some files are marked, only those are stashed.
 When no files are marked, all modified files are stashed, as before.
 
+*** 'vc-git-stash' has now been bound to the 'C' keystroke in the
+stash headers.
+
+*** Some stash keybindings are now available in the stash button.
+'vc-git-stash' and 'vc-git-stash-snapshot' can now be run using 'C'
+and 'S' respectively, including when there are no stashes.
+
 *** The new hook 'vc-retrieve-tag-hook' runs after retrieving a tag.
 
 ---
@@ -1062,6 +1096,20 @@ it can't find the config file.
 
 ** Package
 
+*** Warn if "footer line" is missing, but still install package.
+package.el used to refuse to install a package without the so-called
+"footer line", which appears at the very end of the file:
+
+;;; FILENAME ends here
+
+package.el will now install packages without this line, but it will
+issue a warning.  To avoid this warning, packages should keep the
+"footer line".
+
+Note that versions of Emacs older than 27.1 will not only refuse to
+install packages without such a line -- they will be unable to parse
+package data.  It is therefore recommended to keep this line.
+
 *** Change of 'package-check-signature' for packages with multiple sigs
 In previous Emacsen, 't' checked that all signatures are valid.
 Now 't' only checks that at least one signature is valid and the new 'all'
@@ -1103,6 +1151,14 @@ the 'package-menu-clear-filter' function, bound to '/ /' by default.
 
 ---
 *** The package list can now be sorted by version or description.
+
++++
+*** In Package Menu, 'g' now updates package data from archives.
+Previously, 'g' invoked 'tabulated-list-revert' which did not update
+the cached archive data.  It is now bound to 'revert-buffer', which
+will now update the data.
+
+'package-menu-refresh' is an obsolete alias for 'revert-buffer'.
 
 ** Info
 
@@ -1153,6 +1209,15 @@ A new command 'xref-revert-buffer' is bound to 'g'.
 
 ---
 *** Imenu support has been added to 'xref--xref-buffer-mode'.
+
+** Icomplete
+
++++
+*** A new minor mode based on Icomplete, Fido mode, is made available.
+The point of this mode, named after "Fake Ido", is to recover much of
+the functionality that still separated the popular ido-mode from
+Icomplete, while still cooperating fully with all of Emacs's
+completion facilities.
 
 ** Ecomplete
 
@@ -1411,6 +1476,8 @@ commands repeat the search for the specified occurrence of the search string.
 A negative argument repeats the search in the opposite direction.
 This makes possible also to use a prefix argument for 'M-s .'
 ('isearch-forward-symbol-at-point') to find the next Nth symbol.
+Also a prefix argument is supported for 'isearch-yank-until-char',
+'isearch-yank-word-or-char', 'isearch-yank-symbol-or-char'.
 
 *** To go to the first/last occurrence of the current search string
 is possible now with new commands 'isearch-beginning-of-buffer' and
@@ -2480,9 +2547,10 @@ This macro works like 'progn', but messages how long it takes to
 evaluate the body forms.  The value of the last form is the return
 value.
 
-** New function 'read-char-with-history'.
-This function works like 'read-char', but maintains a history that can
-be navigated via the 'M-p'/'M-n' keystrokes.
+** New function 'read-char-from-minibuffer'.
+This function works like 'read-char', but uses 'read-from-minibuffer'
+to read a character, so it maintains a history that can be navigated
+via usual minibuffer keystrokes 'M-p'/'M-n'.
 
 ** 'setq-local' can now set an arbitrary number of variables, which
 makes the syntax more like 'setq'.
@@ -2583,6 +2651,11 @@ include functions like 'encode-char' that compute code-points, functions
 like 'file-attributes' that compute file sizes and other attributes,
 functions like 'process-id' that compute process IDs, and functions like
 'user-uid' and 'group-gid' that compute user and group IDs.
+
++++
+** overflow-error is now documented as a subcategory of range-error.
+Formerly it was undocumented, and was (incorrectly) a subcategory
+of domain-error.
 
 ** Time values
 
@@ -2933,6 +3006,9 @@ data about creation times and orientation and the like.
 'exif-parse-file' and 'exif-parse-buffer' are the main interface
 functions.
 
+*** 'image-mode' now uses this library to automatically rotate images
+according to the orientation in the Exif data, if any.
+
 *** New library image-converter.
 If you need to view exotic image formats for which Emacs doesn't have
 native support, customize the new user option
@@ -2940,8 +3016,9 @@ native support, customize the new user option
 GraphicsMagick, ImageMagick or 'ffmpeg' installed, they will then be
 used to convert images automatically before displaying them.
 
-*** 'image-mode' now uses this library to automatically rotate images
-according to the orientation in the Exif data, if any.
+*** 'auto-mode-alist' now includes many of the types typically
+supported by the external image converters, like WEPB, BMP and ICO.
+These now default to using 'image-mode'.
 
 *** 'imagemagick-types-inhibit' disables using ImageMagick by default.
 'image-mode' started using ImageMagick by default for all images
@@ -3083,6 +3160,12 @@ in other packages are now obsolete aliases of 'xor'.
 ** New text property 'help-echo-inhibit-substitution'.
 Setting this on the first character of a help string disables
 conversions via 'substitute-command-keys'.
+
++++
+** 'undo' can be made to ignore the active region for a command
+by setting 'undo-inhibit-region' symbol property of that command to
+non-nil.  This is used by 'mouse-drag-region' to make the effect
+easier to undo immediately afterwards.
 
 
 * Changes in Emacs 27.1 on Non-Free Operating Systems
