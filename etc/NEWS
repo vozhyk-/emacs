@@ -846,6 +846,9 @@ directories in the destination.
 *** The non-nil value of 'dired-dwim-target' uses one of the most recently
 visited windows with a Dired buffer instead of the next window.
 
+*** When the new user option 'dired-vc-rename-file' is non-nil,
+Dired performs file renaming using underlying version control system.
+
 ** Find-Dired
 
 *** New user option 'find-dired-refine-function'.
@@ -1213,10 +1216,11 @@ A new command 'xref-revert-buffer' is bound to 'g'.
 ** Icomplete
 
 +++
-*** A new minor mode based on Icomplete, Fido mode, is made available.
-The point of this mode, named after "Fake Ido", is to recover much of
-the functionality that still separated the popular ido-mode from
-Icomplete, while still cooperating fully with all of Emacs's
+*** New minor mode Fido mode.
+This mode is based on Icomplete, and its name stands for "Fake Ido".
+The point of this mode is to be an ido-mode workalike, but provide
+most of the functionality present in Icomplete that is not in
+ido-mode, while being much more compatible with all of Emacs's
 completion facilities.
 
 ** Ecomplete
@@ -1440,6 +1444,11 @@ unescaping text.
 *** Python mode supports three different font lock decoration levels.
 The maximum level is used by default; customize
 'font-lock-maximum-decoration' to tone down the decoration.
+
+---
+*** New user option 'python-pdbtrack-kill-buffers'.
+If non-nil, the default, buffers opened during pdbtracking session are
+killed when pdbtracking session is finished.
 
 ** Help
 
