@@ -710,6 +710,9 @@ list the contents of such directories when completing file names.
 
 ** Minibuffer
 
+*** Scrolling and recentering commands in the minibuffer are invoked
+on the original window (that was selected before activating the minibuffer).
+
 +++
 *** A new user option, 'minibuffer-beginning-of-buffer-movement', has
 been introduced to allow controlling how the 'M-<' command works in
@@ -719,6 +722,12 @@ the minibuffer.  If non-nil, point will move to the end of the prompt
 ---
 *** Minibuffer now uses 'minibuffer-message' to display error messages
 at the end of the active minibuffer.
+
++++
+*** 'y-or-n-p' now uses the minibuffer to read 'y' or 'n' answer.
+
+*** Some commands that previously used read-char-choice now read
+a character using the minibuffer by read-char-from-minibuffer.
 
 ** map.el
 *** Now also understands plists.
@@ -2264,6 +2273,14 @@ file-local variable, you may need to update the value.
 *** Declare 'define-overload' and 'define-child-mode' as obsolete
 *** Rename several internal functions to use a ''mode-local-' prefix
 
+** CC Mode
+
++++
+*** You can now flag "wrong style" comments with font-lock-warning-face.
+To do this, use c-toggle-comment-style, if needed, to set the desired
+default comment style (block or line); then set the option
+c-mark-wrong-style-of-comment to non-nil.
+
 
 * New Modes and Packages in Emacs 27.1
 
@@ -2556,6 +2573,7 @@ This macro works like 'progn', but messages how long it takes to
 evaluate the body forms.  The value of the last form is the return
 value.
 
++++
 ** New function 'read-char-from-minibuffer'.
 This function works like 'read-char', but uses 'read-from-minibuffer'
 to read a character, so it maintains a history that can be navigated

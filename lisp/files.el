@@ -2120,7 +2120,7 @@ think it does, because \"free\" is pretty hard to define in practice."
                                       ("Yes" . ?y)
                                       ("No" . ?n)
                                       ("Open literally" . ?l)))
-                (read-char-choice
+                (read-char-from-minibuffer
                  (concat prompt " (y)es or (n)o or (l)iterally ")
                  '(?y ?Y ?n ?N ?l ?L)))))
         (cond ((memq choice '(?y ?Y)) nil)
@@ -2819,6 +2819,7 @@ ARC\\|ZIP\\|LZH\\|LHA\\|ZOO\\|[JEW]AR\\|XPI\\|RAR\\|CBR\\|7Z\\)\\'" . archive-mo
      ("\\.properties\\(?:\\.[a-zA-Z0-9._-]+\\)?\\'" . conf-javaprop-mode)
      ("\\.toml\\'" . conf-toml-mode)
      ("\\.desktop\\'" . conf-desktop-mode)
+     ("/\\.redshift.conf\\'" . conf-windows-mode)
      ("\\`/etc/\\(?:DIR_COLORS\\|ethers\\|.?fstab\\|.*hosts\\|lesskey\\|login\\.?de\\(?:fs\\|vperm\\)\\|magic\\|mtab\\|pam\\.d/.*\\|permissions\\(?:\\.d/.+\\)?\\|protocols\\|rpc\\|services\\)\\'" . conf-space-mode)
      ("\\`/etc/\\(?:acpid?/.+\\|aliases\\(?:\\.d/.+\\)?\\|default/.+\\|group-?\\|hosts\\..+\\|inittab\\|ksysguarddrc\\|opera6rc\\|passwd-?\\|shadow-?\\|sysconfig/.+\\)\\'" . conf-mode)
      ;; ChangeLog.old etc.  Other change-log-mode entries are above;
@@ -2827,8 +2828,8 @@ ARC\\|ZIP\\|LZH\\|LHA\\|ZOO\\|[JEW]AR\\|XPI\\|RAR\\|CBR\\|7Z\\)\\'" . archive-mo
      ;; either user's dot-files or under /etc or some such
      ("/\\.?\\(?:gitconfig\\|gnokiirc\\|hgrc\\|kde.*rc\\|mime\\.types\\|wgetrc\\)\\'" . conf-mode)
      ;; alas not all ~/.*rc files are like this
-     ("/\\.\\(?:enigma\\|gltron\\|gtk\\|hxplayer\\|net\\|neverball\\|qt/.+\\|realplayer\\|scummvm\\|sversion\\|sylpheed/.+\\|xmp\\)rc\\'" . conf-mode)
-     ("/\\.\\(?:gdbtkinit\\|grip\\|orbital/.+txt\\|rhosts\\|tuxracer/options\\)\\'" . conf-mode)
+     ("/\\.\\(?:asound\\|enigma\\|fetchmail\\|gltron\\|gtk\\|hxplayer\\|mairix\\|mbsync\\|msmtp\\|net\\|neverball\\|nvidia-settings-\\|offlineimap\\|qt/.+\\|realplayer\\|reportbug\\|rtorrent\\.\\|screen\\|scummvm\\|sversion\\|sylpheed/.+\\|xmp\\)rc\\'" . conf-mode)
+     ("/\\.\\(?:gdbtkinit\\|grip\\|mpdconf\\|notmuch-config\\|orbital/.+txt\\|rhosts\\|tuxracer/options\\)\\'" . conf-mode)
      ("/\\.?X\\(?:default\\|resource\\|re\\)s\\>" . conf-xdefaults-mode)
      ("/X11.+app-defaults/\\|\\.ad\\'" . conf-xdefaults-mode)
      ("/X11.+locale/.+/Compose\\'" . conf-colon-mode)
@@ -3503,24 +3504,16 @@ n  -- to ignore the local variables list.")
       ;; Display the buffer and read a choice.
       (save-window-excursion
 	(pop-to-buffer buf '(display-buffer--maybe-at-bottom))
-	(let* ((exit-chars '(?y ?n ?\s ?\C-g ?\C-v))
+	(let* ((exit-chars '(?y ?n ?\s))
 	       (prompt (format "Please type %s%s: "
 			       (if offer-save "y, n, or !" "y or n")
 			       (if (< (line-number-at-pos (point-max))
 				      (window-body-height))
 				   ""
-				 (push ?\C-v exit-chars)
-				 ", or C-v to scroll")))
+				 ", or C-v/M-v to scroll")))
 	       char)
 	  (if offer-save (push ?! exit-chars))
-	  (while (null char)
-	    (setq char (read-char-choice prompt exit-chars t))
-	    (when (eq char ?\C-v)
-	      (condition-case nil
-		  (scroll-up)
-		(error (goto-char (point-min))
-		       (recenter 1)))
-	      (setq char nil)))
+	  (setq char (read-char-from-minibuffer prompt exit-chars))
 	  (when (and offer-save (= char ?!) unsafe-vars)
 	    (customize-push-and-save 'safe-local-variable-values unsafe-vars))
 	  (prog1 (memq char '(?! ?\s ?y))
