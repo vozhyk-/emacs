@@ -225,6 +225,8 @@ x_free_frame_resources (struct frame *f)
     FRAME_X_OUTPUT(f)->atimer_visible_bell = NULL;
   }
 
+  pgtk_im_finish(f);
+
   xfree (f->output_data.pgtk);
   f->output_data.pgtk = NULL;
 
@@ -2664,6 +2666,9 @@ pgtk_draw_window_cursor (struct window *w, struct glyph_row *glyph_row, int x,
 	if (FRAME_XIC (f) && (FRAME_XIC_STYLE (f) & XIMPreeditPosition))
 	  xic_set_preeditarea (w, x, y);
 #endif
+
+      if (w == XWINDOW (f->selected_window))
+	pgtk_im_set_preeditarea (w, x, y);
     }
 
   gtk_widget_queue_draw(FRAME_GTK_WIDGET(f));
@@ -4965,6 +4970,31 @@ pgtk_emacs_to_gtk_modifiers (struct pgtk_display_info *dpyinfo, int state)
 #define IsKeypadKey(keysym)       (0xff80 <= (keysym) && (keysym) < 0xffbe)
 #define IsFunctionKey(keysym)     (0xffbe <= (keysym) && (keysym) < 0xffe1)
 
+void
+pgtk_enqueue_string(struct frame *f, gchar *str)
+{
+  gunichar *ustr;
+
+  ustr = g_utf8_to_ucs4 (str, -1, NULL, NULL, NULL);
+  if (ustr == NULL)
+    return;
+  for ( ; *ustr != 0; ustr++) {
+    union buffered_input_event inev;
+    Lisp_Object c = make_fixnum (*ustr);
+    EVENT_INIT (inev.ie);
+    inev.ie.kind = (SINGLE_BYTE_CHAR_P (XFIXNAT (c))
+		    ? ASCII_KEYSTROKE_EVENT
+		    : MULTIBYTE_CHAR_KEYSTROKE_EVENT);
+    inev.ie.arg = Qnil;
+    inev.ie.code = XFIXNAT (c);
+    XSETFRAME (inev.ie.frame_or_window, f);
+    inev.ie.modifiers = 0;
+    inev.ie.timestamp = 0;
+    evq_enqueue (&inev);
+  }
+
+}
+
 static gboolean key_press_event(GtkWidget *widget, GdkEvent *event, gpointer *user_data)
 {
   struct coding_system coding;
@@ -4990,6 +5020,11 @@ static gboolean key_press_event(GtkWidget *widget, GdkEvent *event, gpointer *us
       clear_mouse_face (hlinfo);
       hlinfo->mouse_face_hidden = true;
     }
+
+  if (f != 0) {
+    if (pgtk_im_filter_keypress(f, event))
+      return TRUE;
+  }
 
   if (f != 0)
     {
@@ -5475,6 +5510,9 @@ focus_in_event(GtkWidget *widget, GdkEvent *event, gpointer *user_data)
 		   FRAME_DISPLAY_INFO(frame), frame, &inev);
   if (inev.ie.kind != NO_EVENT)
     evq_enqueue (&inev);
+
+  pgtk_im_focus_in (frame);
+
   return TRUE;
 }
 
@@ -5496,6 +5534,9 @@ focus_out_event(GtkWidget *widget, GdkEvent *event, gpointer *user_data)
 		   FRAME_DISPLAY_INFO(frame), frame, &inev);
   if (inev.ie.kind != NO_EVENT)
     evq_enqueue(&inev);
+
+  pgtk_im_focus_out (frame);
+
   return TRUE;
 }
 
