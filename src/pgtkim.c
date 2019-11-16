@@ -89,7 +89,7 @@ static void im_context_preedit_changed_cb(GtkIMContext *imc, gpointer user_data)
       }
     }
 
-    image_data = make_string(buf, dp - (unsigned char *) buf);
+    image_data = make_unibyte_string(buf, dp - (unsigned char *) buf);
 
     g_free(crbuf);
     g_free(buf);
@@ -97,6 +97,7 @@ static void im_context_preedit_changed_cb(GtkIMContext *imc, gpointer user_data)
     image_data = Qnil;
 
   call1(Qpgtk_refresh_preedit, image_data);
+  SET_FRAME_GARBAGED (f);
 
   if (FRAME_X_OUTPUT(f)->im.preedit_str != NULL)
     g_free(FRAME_X_OUTPUT(f)->im.preedit_str);
@@ -112,6 +113,7 @@ static void im_context_preedit_end_cb(GtkIMContext *imc, gpointer user_data)
   struct frame *f = user_data;
 
   call1(Qpgtk_refresh_preedit, Qnil);
+  SET_FRAME_GARBAGED (f);
 
   if (FRAME_X_OUTPUT(f)->im.preedit_str != NULL)
     g_free(FRAME_X_OUTPUT(f)->im.preedit_str);
