@@ -78,7 +78,7 @@ static void im_context_preedit_changed_cb(GtkIMContext *imc, gpointer user_data)
     cairo_surface_destroy(surface);
 
     unsigned char *sp = crbuf;
-    unsigned char *dp = buf + strlen(buf);
+    unsigned char *dp = (unsigned char *) buf + strlen(buf);
     for (int y = 0; y < height; y++) {
       for (int x = 0; x < width; x++) {
 	unsigned int rgb = *(unsigned int *) sp;
