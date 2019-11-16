@@ -394,9 +394,6 @@ struct pgtk_output
     GtkIMContext *context;
     char *preedit_str;
     PangoAttrList *preedit_attrs;
-    GtkWidget *drawing_area;
-    int preedit_x, preedit_y;
-    int preedit_min_x, preedit_max_x, preedit_min_y, preedit_max_y;
   } im;
 };
 
@@ -626,7 +623,5 @@ extern void pgtk_im_focus_in(struct frame *f);
 extern void pgtk_im_focus_out(struct frame *f);
 extern void pgtk_im_init(struct frame *f);
 extern void pgtk_im_finish(struct frame *f);
-extern void pgtk_im_set_preeditarea(struct window *w, int x, int y);
-extern gboolean pgtk_im_filter_keypress(struct frame *f, GdkEvent *ev);
 
 #endif	/* HAVE_PGTK */

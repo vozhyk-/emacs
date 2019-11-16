@@ -442,6 +442,17 @@ See the documentation of `create-fontset-from-fontset-spec' for the format.")
                                          &context (window-system pgtk))
   (pgtk-get-selection-internal selection-symbol target-type))
 
+(setq pgtk-preedit-overlay nil)
+(defun pgtk-refresh-preedit (image-data)
+  (when pgtk-preedit-overlay
+    (delete-overlay pgtk-preedit-overlay)
+    (setq pgtk-preedit-overlay nil))
+  (let (img)
+    (when image-data
+      (setq img (create-image image-data 'pbm t))
+      (setq pgtk-preedit-overlay (put-image img (point)))
+      )))
+
 (provide 'pgtk-win)
 (provide 'term/pgtk-win)
 

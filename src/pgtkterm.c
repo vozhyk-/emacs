@@ -2666,9 +2666,6 @@ pgtk_draw_window_cursor (struct window *w, struct glyph_row *glyph_row, int x,
 	if (FRAME_XIC (f) && (FRAME_XIC_STYLE (f) & XIMPreeditPosition))
 	  xic_set_preeditarea (w, x, y);
 #endif
-
-      if (w == XWINDOW (f->selected_window))
-	pgtk_im_set_preeditarea (w, x, y);
     }
 
   gtk_widget_queue_draw(FRAME_GTK_WIDGET(f));
@@ -5020,11 +5017,6 @@ static gboolean key_press_event(GtkWidget *widget, GdkEvent *event, gpointer *us
       clear_mouse_face (hlinfo);
       hlinfo->mouse_face_hidden = true;
     }
-
-  if (f != 0) {
-    if (pgtk_im_filter_keypress(f, event))
-      return TRUE;
-  }
 
   if (f != 0)
     {

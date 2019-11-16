@@ -24,8 +24,6 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 
 #include "pgtkterm.h"
 
-static void adjust_preeditarea(struct frame *f);
-
 static void im_context_commit_cb(GtkIMContext *imc, gchar *str, gpointer user_data)
 {
   struct frame *f = user_data;
@@ -43,30 +41,6 @@ static gboolean im_context_delete_surrounding_cb(GtkIMContext *imc, int offset, 
   return TRUE;
 }
 
-static gboolean preedit_window_draw_cb(GtkWidget *w, cairo_t *cr, gpointer user_data)
-{
-  struct frame *f = user_data;
-  PangoLayout *layout = gtk_widget_create_pango_layout(w, FRAME_X_OUTPUT(f)->im.preedit_str);
-  pango_layout_set_attributes(layout, FRAME_X_OUTPUT(f)->im.preedit_attrs);
-  int width, height;
-  pango_layout_get_pixel_size(layout, &width, &height);
-
-  cairo_save(cr);
-
-  cairo_set_source_rgb(cr, 0, 0, 0);
-  cairo_rectangle(cr, 0, 0, width, height);
-  cairo_fill(cr);
-  cairo_set_source_rgb(cr, 1, 1, 1);
-  pango_cairo_update_layout(cr, layout);
-  pango_cairo_show_layout(cr, layout);
-
-  cairo_restore(cr);
-
-  g_object_unref(layout);
-
-  return TRUE;
-}
-
 static void im_context_preedit_changed_cb(GtkIMContext *imc, gpointer user_data)
 {
   struct frame *f = user_data;
@@ -76,20 +50,53 @@ static void im_context_preedit_changed_cb(GtkIMContext *imc, gpointer user_data)
 
   gtk_im_context_get_preedit_string(imc, &str, &attrs, &pos);
 
-  if (strlen (str) == 0)
-    gtk_widget_hide(FRAME_X_OUTPUT(f)->im.drawing_area);
-  else
-    gtk_widget_show(FRAME_X_OUTPUT(f)->im.drawing_area);
-
   /* get size */
-  PangoLayout *layout = gtk_widget_create_pango_layout(FRAME_X_OUTPUT(f)->im.drawing_area, str);
+  PangoLayout *layout = gtk_widget_create_pango_layout(FRAME_GTK_WIDGET(f), str);
   pango_layout_set_attributes(layout, attrs);
   int width, height;
   pango_layout_get_pixel_size(layout, &width, &height);
-  gtk_widget_set_size_request(FRAME_X_OUTPUT(f)->im.drawing_area, width, height);
-  adjust_preeditarea(f);
-  gtk_widget_queue_draw(FRAME_X_OUTPUT(f)->im.drawing_area);
-  g_object_unref(layout);
+
+  Lisp_Object image_data;
+  if (width != 0 && height != 0) {
+    char *buf = g_new0(char, 5 + 20 + 20 + 10 + 3 * width * height);
+    sprintf(buf, "P6\n%d %d\n255\n", width, height);
+
+    int stride = cairo_format_stride_for_width(CAIRO_FORMAT_RGB24, width);
+    unsigned char *crbuf = g_new0(unsigned char, stride * height);
+    cairo_surface_t *surface = cairo_image_surface_create_for_data(crbuf, CAIRO_FORMAT_RGB24, width, height, stride);
+
+    cairo_t *cr = cairo_create(surface);
+    cairo_set_source_rgb(cr, 0, 0, 0);
+    cairo_rectangle(cr, 0, 0, width, height);
+    cairo_fill(cr);
+    cairo_set_source_rgb(cr, 1, 1, 1);
+    pango_cairo_update_layout(cr, layout);
+    pango_cairo_show_layout(cr, layout);
+    cairo_destroy(cr);
+
+    cairo_surface_flush(surface);
+    cairo_surface_destroy(surface);
+
+    unsigned char *sp = crbuf;
+    unsigned char *dp = buf + strlen(buf);
+    for (int y = 0; y < height; y++) {
+      for (int x = 0; x < width; x++) {
+	unsigned int rgb = *(unsigned int *) sp;
+	*dp++ = (rgb >> 16) & 0xff;
+	*dp++ = (rgb >>  8) & 0xff;
+	*dp++ = (rgb >>  0) & 0xff;
+	sp += 4;
+      }
+    }
+
+    image_data = make_string(buf, dp - (unsigned char *) buf);
+
+    g_free(crbuf);
+    g_free(buf);
+  } else
+    image_data = Qnil;
+
+  call1(Qpgtk_refresh_preedit, image_data);
 
   if (FRAME_X_OUTPUT(f)->im.preedit_str != NULL)
     g_free(FRAME_X_OUTPUT(f)->im.preedit_str);
@@ -103,25 +110,20 @@ static void im_context_preedit_changed_cb(GtkIMContext *imc, gpointer user_data)
 static void im_context_preedit_end_cb(GtkIMContext *imc, gpointer user_data)
 {
   struct frame *f = user_data;
-  gtk_widget_hide(FRAME_X_OUTPUT(f)->im.drawing_area);
+
+  call1(Qpgtk_refresh_preedit, Qnil);
+
+  if (FRAME_X_OUTPUT(f)->im.preedit_str != NULL)
+    g_free(FRAME_X_OUTPUT(f)->im.preedit_str);
+  FRAME_X_OUTPUT(f)->im.preedit_str = NULL;
+
+  if (FRAME_X_OUTPUT(f)->im.preedit_attrs != NULL)
+    pango_attr_list_unref(FRAME_X_OUTPUT(f)->im.preedit_attrs);
+  FRAME_X_OUTPUT(f)->im.preedit_attrs = NULL;
 }
 
 static void im_context_preedit_start_cb(GtkIMContext *imc, gpointer user_data)
 {
-}
-
-static void adjust_preeditarea(struct frame *f)
-{
-  int pex = FRAME_X_OUTPUT(f)->im.preedit_x;
-  int pey = FRAME_X_OUTPUT(f)->im.preedit_y;
-  int pew, peh;
-  gtk_widget_get_size_request(FRAME_X_OUTPUT(f)->im.drawing_area, &pew, &peh);
-  pex = min(pex, FRAME_X_OUTPUT(f)->im.preedit_max_x - pew);
-  pey = min(pey, FRAME_X_OUTPUT(f)->im.preedit_max_y - peh);
-  pex = max(pex, FRAME_X_OUTPUT(f)->im.preedit_min_x);
-  pey = max(pey, FRAME_X_OUTPUT(f)->im.preedit_min_y);
-  gtk_fixed_move(GTK_FIXED(FRAME_GTK_WIDGET(f)), FRAME_X_OUTPUT(f)->im.drawing_area, pex, pey);
-  gdk_window_raise(gtk_widget_get_window(FRAME_GTK_WIDGET(f)));
 }
 
 void pgtk_im_focus_in(struct frame *f)
@@ -134,40 +136,10 @@ void pgtk_im_focus_out(struct frame *f)
   gtk_im_context_focus_out (FRAME_X_OUTPUT (f)->im.context);
 }
 
-void pgtk_im_set_preeditarea(struct window *w, int x, int y)
-{
-  struct frame *f = XFRAME (w->frame);
-
-  FRAME_X_OUTPUT(f)->im.preedit_x = WINDOW_TO_FRAME_PIXEL_X (w, x) + WINDOW_LEFT_FRINGE_WIDTH (w);
-  FRAME_X_OUTPUT(f)->im.preedit_y = WINDOW_TO_FRAME_PIXEL_Y (w, y) + FONT_BASE (FRAME_FONT (f));
-
-  FRAME_X_OUTPUT(f)->im.preedit_min_x = WINDOW_BOX_LEFT_EDGE_X(w) + WINDOW_LEFT_FRINGE_WIDTH(w);
-  FRAME_X_OUTPUT(f)->im.preedit_max_x = WINDOW_BOX_RIGHT_PIXEL_EDGE(w) - WINDOW_RIGHT_FRINGE_WIDTH(w);
-
-  FRAME_X_OUTPUT(f)->im.preedit_min_y = WINDOW_TOP_PIXEL_EDGE(w);
-  FRAME_X_OUTPUT(f)->im.preedit_max_y = WINDOW_BOTTOM_PIXEL_EDGE(w);
-
-  adjust_preeditarea(f);
-}
-
-gboolean pgtk_im_filter_keypress(struct frame *f, GdkEvent *ev)
-{
-  if (FRAME_DISPLAY_INFO (f)->use_im_context) {
-    if (gtk_im_context_filter_keypress (FRAME_X_OUTPUT (f)->im.context, ev))
-      return TRUE;
-  }
-  return FALSE;
-}
-
 void pgtk_im_init(struct frame *f)
 {
   FRAME_X_OUTPUT(f)->im.preedit_str = NULL;
   FRAME_X_OUTPUT(f)->im.preedit_attrs = NULL;
-
-  FRAME_X_OUTPUT(f)->im.drawing_area = gtk_drawing_area_new();
-  g_signal_connect(FRAME_X_OUTPUT(f)->im.drawing_area, "draw", G_CALLBACK(preedit_window_draw_cb), f);
-  gtk_widget_set_size_request(FRAME_X_OUTPUT(f)->im.drawing_area, 1, 1);
-  gtk_fixed_put(GTK_FIXED(FRAME_GTK_WIDGET(f)), FRAME_X_OUTPUT(f)->im.drawing_area, 0, 0);
 
   FRAME_X_OUTPUT(f)->im.context = gtk_im_multicontext_new();
   g_signal_connect(FRAME_X_OUTPUT (f)->im.context, "commit", G_CALLBACK(im_context_commit_cb), f);
@@ -192,9 +164,6 @@ void pgtk_im_finish(struct frame *f)
   if (FRAME_X_OUTPUT(f)->im.preedit_attrs != NULL)
     pango_attr_list_unref(FRAME_X_OUTPUT(f)->im.preedit_attrs);
   FRAME_X_OUTPUT(f)->im.preedit_attrs = NULL;
-
-  gtk_widget_destroy(FRAME_X_OUTPUT(f)->im.drawing_area);
-  FRAME_X_OUTPUT(f)->im.drawing_area = NULL;
 }
 
 DEFUN ("pgtk-use-im-context", Fpgtk_use_im_context, Spgtk_use_im_context,
@@ -215,4 +184,6 @@ void
 syms_of_pgtkim (void)
 {
   defsubr (&Spgtk_use_im_context);
+
+  DEFSYM (Qpgtk_refresh_preedit, "pgtk-refresh-preedit");
 }
