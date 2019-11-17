@@ -4993,6 +4993,20 @@ pgtk_enqueue_string(struct frame *f, gchar *str)
 
 }
 
+void
+pgtk_enqueue_preedit(struct frame *f, Lisp_Object image_data)
+{
+  union buffered_input_event inev;
+  EVENT_INIT (inev.ie);
+  inev.ie.kind = PGTK_PREEDIT_TEXT_EVENT;
+  inev.ie.arg = image_data;
+  inev.ie.code = 0;
+  XSETFRAME (inev.ie.frame_or_window, f);
+  inev.ie.modifiers = 0;
+  inev.ie.timestamp = 0;
+  evq_enqueue (&inev);
+}
+
 static gboolean key_press_event(GtkWidget *widget, GdkEvent *event, gpointer *user_data)
 {
   struct coding_system coding;

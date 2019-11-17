@@ -109,8 +109,7 @@ static void im_context_preedit_changed_cb(GtkIMContext *imc, gpointer user_data)
   } else
     image_data = Qnil;
 
-  call1(Qpgtk_refresh_preedit, image_data);
-  SET_FRAME_GARBAGED (f);
+  pgtk_enqueue_preedit(f, image_data);
 
   if (dpyinfo->im.preedit_str != NULL)
     g_free(dpyinfo->im.preedit_str);
@@ -131,8 +130,7 @@ static void im_context_preedit_end_cb(GtkIMContext *imc, gpointer user_data)
   if (f == NULL)
     return;
 
-  call1(Qpgtk_refresh_preedit, Qnil);
-  SET_FRAME_GARBAGED (f);
+  pgtk_enqueue_preedit(f, Qnil);
 
   if (dpyinfo->im.preedit_str != NULL)
     g_free(dpyinfo->im.preedit_str);
