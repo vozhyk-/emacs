@@ -1553,8 +1553,6 @@ This function is an internal primitive--use `make-frame' instead.  */)
   FRAME_X_OUTPUT(f)->cr_surface_visible_bell = NULL;
   FRAME_X_OUTPUT(f)->atimer_visible_bell = NULL;
 
-  pgtk_im_init(f);
-
   /* Make sure windows on this frame appear in calls to next-window
      and similar functions.  */
   Vwindow_list = Qnil;

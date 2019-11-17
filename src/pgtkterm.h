@@ -231,7 +231,14 @@ struct pgtk_display_info
   int meta_mod_mask, alt_mod_mask;
 
   /* whether to use Gtk's IM context. */
-  bool use_im_context;
+
+  /* input method */
+  struct {
+    GtkIMContext *context;
+    char *preedit_str;
+    PangoAttrList *preedit_attrs;
+    struct frame *focused_frame;
+  } im;
 };
 
 /* This is a chain of structures for all the PGTK displays currently in use.  */
@@ -388,13 +395,6 @@ struct pgtk_output
      frame, or IMPLICIT if we received an EnterNotify.
      FocusOut and LeaveNotify clears EXPLICIT/IMPLICIT. */
   int focus_state;
-
-  /* input method */
-  struct {
-    GtkIMContext *context;
-    char *preedit_str;
-    PangoAttrList *preedit_attrs;
-  } im;
 };
 
 /* this dummy decl needed to support TTYs */
@@ -621,7 +621,7 @@ extern struct pgtk_display_info *check_pgtk_display_info (Lisp_Object object);
 extern void pgtk_enqueue_string(struct frame *f, gchar *str);
 extern void pgtk_im_focus_in(struct frame *f);
 extern void pgtk_im_focus_out(struct frame *f);
-extern void pgtk_im_init(struct frame *f);
-extern void pgtk_im_finish(struct frame *f);
+extern void pgtk_im_init(struct pgtk_display_info *dpyinfo);
+extern void pgtk_im_finish(struct pgtk_display_info *dpyinfo);
 
 #endif	/* HAVE_PGTK */

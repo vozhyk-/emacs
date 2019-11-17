@@ -188,6 +188,7 @@ x_free_frame_resources (struct frame *f)
   CLEAR_IF_EQ(last_mouse_frame);
   CLEAR_IF_EQ(last_mouse_motion_frame);
   CLEAR_IF_EQ(last_mouse_glyph_frame);
+  CLEAR_IF_EQ(im.focused_frame);
 
 #undef CLEAR_IF_EQ
 
@@ -224,8 +225,6 @@ x_free_frame_resources (struct frame *f)
     cancel_atimer(FRAME_X_OUTPUT(f)->atimer_visible_bell);
     FRAME_X_OUTPUT(f)->atimer_visible_bell = NULL;
   }
-
-  pgtk_im_finish(f);
 
   xfree (f->output_data.pgtk);
   f->output_data.pgtk = NULL;
@@ -4285,6 +4284,8 @@ pgtk_delete_terminal (struct terminal *terminal)
 
   block_input ();
 
+  pgtk_im_finish (dpyinfo);
+
   /* Normally, the display is available...  */
   if (dpyinfo->gdpy)
     {
@@ -6281,6 +6282,8 @@ pgtk_term_init (Lisp_Object display_name, char *resource_name)
     init_sigio (dpyinfo->connection);
 
   pgtk_selection_init();
+
+  pgtk_im_init (dpyinfo);
 
   unblock_input ();
 

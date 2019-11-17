@@ -26,7 +26,14 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 
 static void im_context_commit_cb(GtkIMContext *imc, gchar *str, gpointer user_data)
 {
-  struct frame *f = user_data;
+  struct pgtk_display_info *dpyinfo = user_data;
+  struct frame *f = dpyinfo->im.focused_frame;
+
+  if (dpyinfo->im.context == NULL)
+    return;
+  if (f == NULL)
+    return;
+
   pgtk_enqueue_string(f, str);
 }
 
@@ -43,10 +50,16 @@ static gboolean im_context_delete_surrounding_cb(GtkIMContext *imc, int offset, 
 
 static void im_context_preedit_changed_cb(GtkIMContext *imc, gpointer user_data)
 {
-  struct frame *f = user_data;
+  struct pgtk_display_info *dpyinfo = user_data;
+  struct frame *f = dpyinfo->im.focused_frame;
   char *str;
   PangoAttrList *attrs;
   int pos;
+
+  if (dpyinfo->im.context == NULL)
+    return;
+  if (f == NULL)
+    return;
 
   gtk_im_context_get_preedit_string(imc, &str, &attrs, &pos);
 
@@ -99,29 +112,35 @@ static void im_context_preedit_changed_cb(GtkIMContext *imc, gpointer user_data)
   call1(Qpgtk_refresh_preedit, image_data);
   SET_FRAME_GARBAGED (f);
 
-  if (FRAME_X_OUTPUT(f)->im.preedit_str != NULL)
-    g_free(FRAME_X_OUTPUT(f)->im.preedit_str);
-  FRAME_X_OUTPUT(f)->im.preedit_str = str;
+  if (dpyinfo->im.preedit_str != NULL)
+    g_free(dpyinfo->im.preedit_str);
+  dpyinfo->im.preedit_str = str;
 
-  if (FRAME_X_OUTPUT(f)->im.preedit_attrs != NULL)
-    pango_attr_list_unref(FRAME_X_OUTPUT(f)->im.preedit_attrs);
-  FRAME_X_OUTPUT(f)->im.preedit_attrs = attrs;
+  if (dpyinfo->im.preedit_attrs != NULL)
+    pango_attr_list_unref(dpyinfo->im.preedit_attrs);
+  dpyinfo->im.preedit_attrs = attrs;
 }
 
 static void im_context_preedit_end_cb(GtkIMContext *imc, gpointer user_data)
 {
-  struct frame *f = user_data;
+  struct pgtk_display_info *dpyinfo = user_data;
+  struct frame *f = dpyinfo->im.focused_frame;
+
+  if (dpyinfo->im.context == NULL)
+    return;
+  if (f == NULL)
+    return;
 
   call1(Qpgtk_refresh_preedit, Qnil);
   SET_FRAME_GARBAGED (f);
 
-  if (FRAME_X_OUTPUT(f)->im.preedit_str != NULL)
-    g_free(FRAME_X_OUTPUT(f)->im.preedit_str);
-  FRAME_X_OUTPUT(f)->im.preedit_str = NULL;
+  if (dpyinfo->im.preedit_str != NULL)
+    g_free(dpyinfo->im.preedit_str);
+  dpyinfo->im.preedit_str = NULL;
 
-  if (FRAME_X_OUTPUT(f)->im.preedit_attrs != NULL)
-    pango_attr_list_unref(FRAME_X_OUTPUT(f)->im.preedit_attrs);
-  FRAME_X_OUTPUT(f)->im.preedit_attrs = NULL;
+  if (dpyinfo->im.preedit_attrs != NULL)
+    pango_attr_list_unref(dpyinfo->im.preedit_attrs);
+  dpyinfo->im.preedit_attrs = NULL;
 }
 
 static void im_context_preedit_start_cb(GtkIMContext *imc, gpointer user_data)
@@ -130,42 +149,48 @@ static void im_context_preedit_start_cb(GtkIMContext *imc, gpointer user_data)
 
 void pgtk_im_focus_in(struct frame *f)
 {
-  gtk_im_context_focus_in (FRAME_X_OUTPUT (f)->im.context);
+  struct pgtk_display_info *dpyinfo = FRAME_DISPLAY_INFO (f);
+  if (dpyinfo->im.context != NULL) {
+    gtk_im_context_reset (dpyinfo->im.context);
+    gtk_im_context_set_client_window (dpyinfo->im.context, gtk_widget_get_window (FRAME_GTK_WIDGET (f)));
+    gtk_im_context_focus_in (dpyinfo->im.context);
+  }
+  dpyinfo->im.focused_frame = f;
 }
 
 void pgtk_im_focus_out(struct frame *f)
 {
-  gtk_im_context_focus_out (FRAME_X_OUTPUT (f)->im.context);
+  struct pgtk_display_info *dpyinfo = FRAME_DISPLAY_INFO (f);
+  if (dpyinfo->im.focused_frame == f) {
+    if (dpyinfo->im.context != NULL) {
+      gtk_im_context_reset (dpyinfo->im.context);
+      gtk_im_context_focus_out (dpyinfo->im.context);
+      gtk_im_context_set_client_window (dpyinfo->im.context, NULL);
+    }
+    dpyinfo->im.focused_frame = NULL;
+  }
 }
 
-void pgtk_im_init(struct frame *f)
+void pgtk_im_init(struct pgtk_display_info *dpyinfo)
 {
-  FRAME_X_OUTPUT(f)->im.preedit_str = NULL;
-  FRAME_X_OUTPUT(f)->im.preedit_attrs = NULL;
-
-  FRAME_X_OUTPUT(f)->im.context = gtk_im_multicontext_new();
-  g_signal_connect(FRAME_X_OUTPUT (f)->im.context, "commit", G_CALLBACK(im_context_commit_cb), f);
-  g_signal_connect(FRAME_X_OUTPUT (f)->im.context, "retrieve-surrounding", G_CALLBACK(im_context_retrieve_surrounding_cb), f);
-  g_signal_connect(FRAME_X_OUTPUT (f)->im.context, "delete-surrounding", G_CALLBACK(im_context_delete_surrounding_cb), f);
-  g_signal_connect(FRAME_X_OUTPUT (f)->im.context, "preedit-changed", G_CALLBACK(im_context_preedit_changed_cb), f);
-  g_signal_connect(FRAME_X_OUTPUT (f)->im.context, "preedit-end", G_CALLBACK(im_context_preedit_end_cb), f);
-  g_signal_connect(FRAME_X_OUTPUT (f)->im.context, "preedit-start", G_CALLBACK(im_context_preedit_start_cb), f);
-  gtk_im_context_set_use_preedit (FRAME_X_OUTPUT (f)->im.context, TRUE);
-  gtk_im_context_set_client_window (FRAME_X_OUTPUT (f)->im.context, gtk_widget_get_window(FRAME_GTK_WIDGET (f)));
+  dpyinfo->im.preedit_str = NULL;
+  dpyinfo->im.preedit_attrs = NULL;
+  dpyinfo->im.context = NULL;
 }
 
-void pgtk_im_finish(struct frame *f)
+void pgtk_im_finish(struct pgtk_display_info *dpyinfo)
 {
-  g_object_unref(FRAME_X_OUTPUT(f)->im.context);
-  FRAME_X_OUTPUT(f)->im.context = NULL;
+  if (dpyinfo->im.context != NULL)
+    g_object_unref(dpyinfo->im.context);
+  dpyinfo->im.context = NULL;
 
-  if (FRAME_X_OUTPUT(f)->im.preedit_str != NULL)
-    g_free(FRAME_X_OUTPUT(f)->im.preedit_str);
-  FRAME_X_OUTPUT(f)->im.preedit_str = NULL;
+  if (dpyinfo->im.preedit_str != NULL)
+    g_free(dpyinfo->im.preedit_str);
+  dpyinfo->im.preedit_str = NULL;
 
-  if (FRAME_X_OUTPUT(f)->im.preedit_attrs != NULL)
-    pango_attr_list_unref(FRAME_X_OUTPUT(f)->im.preedit_attrs);
-  FRAME_X_OUTPUT(f)->im.preedit_attrs = NULL;
+  if (dpyinfo->im.preedit_attrs != NULL)
+    pango_attr_list_unref(dpyinfo->im.preedit_attrs);
+  dpyinfo->im.preedit_attrs = NULL;
 }
 
 DEFUN ("pgtk-use-im-context", Fpgtk_use_im_context, Spgtk_use_im_context,
@@ -175,12 +200,44 @@ DEFUN ("pgtk-use-im-context", Fpgtk_use_im_context, Spgtk_use_im_context,
 {
   struct pgtk_display_info *dpyinfo = check_pgtk_display_info (terminal);
 
-  dpyinfo->use_im_context = !NILP(use_p);
+  if (NILP(use_p)) {
+    if (dpyinfo->im.context != NULL) {
+      gtk_im_context_reset (dpyinfo->im.context);
+      gtk_im_context_focus_out (dpyinfo->im.context);
+      gtk_im_context_set_client_window (dpyinfo->im.context, NULL);
+
+      g_object_unref(dpyinfo->im.context);
+      dpyinfo->im.context = NULL;
+
+      if (dpyinfo->im.preedit_str != NULL)
+	g_free(dpyinfo->im.preedit_str);
+      dpyinfo->im.preedit_str = NULL;
+
+      if (dpyinfo->im.preedit_attrs != NULL)
+	pango_attr_list_unref(dpyinfo->im.preedit_attrs);
+      dpyinfo->im.preedit_attrs = NULL;
+    }
+  } else {
+    if (dpyinfo->im.context == NULL) {
+      dpyinfo->im.preedit_str = NULL;
+      dpyinfo->im.preedit_attrs = NULL;
+
+      dpyinfo->im.context = gtk_im_multicontext_new();
+      g_signal_connect(dpyinfo->im.context, "commit", G_CALLBACK(im_context_commit_cb), dpyinfo);
+      g_signal_connect(dpyinfo->im.context, "retrieve-surrounding", G_CALLBACK(im_context_retrieve_surrounding_cb), dpyinfo);
+      g_signal_connect(dpyinfo->im.context, "delete-surrounding", G_CALLBACK(im_context_delete_surrounding_cb), dpyinfo);
+      g_signal_connect(dpyinfo->im.context, "preedit-changed", G_CALLBACK(im_context_preedit_changed_cb), dpyinfo);
+      g_signal_connect(dpyinfo->im.context, "preedit-end", G_CALLBACK(im_context_preedit_end_cb), dpyinfo);
+      g_signal_connect(dpyinfo->im.context, "preedit-start", G_CALLBACK(im_context_preedit_start_cb), dpyinfo);
+      gtk_im_context_set_use_preedit (dpyinfo->im.context, TRUE);
+
+      if (dpyinfo->im.focused_frame)
+	pgtk_im_focus_in(dpyinfo->im.focused_frame);
+    }
+  }
 
   return Qnil;
 }
-
-
 
 void
 syms_of_pgtkim (void)
