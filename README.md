@@ -18,7 +18,7 @@ Ignore warnings.
 
 #### For archlinux users
 
-This repository contains PKGBUILD, so you can do to install:
+This repository contains PKGBUILD, so you can install by:
 
 ```
 mkdir /tmp/emacs
@@ -113,14 +113,12 @@ On gdb, you may want to do:
 (gdb) handle SIGPIPE nostop noprint
 ```
 
-## Supporting Color Emoji Fonts
+## Color Emoji Fonts
 
-By default, color fonts are ignored.
-
-To use them, you can write this code in `~/.emacs`:
+To use color emoji fonts, you can write this code in `~/.emacs`:
 
 ```elisp
-(when (featurep 'pgtk)
+(when (eq window-system 'pgtk)
   (setq xft-ignore-color-fonts nil))
 ```
 
