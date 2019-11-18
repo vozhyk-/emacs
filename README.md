@@ -126,20 +126,37 @@ To use them, you can write this code in `~/.emacs`:
 
 Changing this variable on the fly may not work.
 
-You need cairo 1.16.0.
+You need cairo 1.16.0, or greater.
+
+## Input Methods
+
+```elisp
+(when (eq window-system 'pgtk)
+  (pgtk-use-im-context t))
+```
+
+This enables Gtk's `GtkIMContext`.
+
+However, when you type e.g. `C-x o`,
+`C-x` goes through input methods and is handled by Emacs,
+and `o` is handled by input methods, so `お` appears as a preedit text.
+I have no idea. You can turn off input method before typing that.
+I do, so no problem.
 
 ## My Environment
 
 - archlinux
-- gtk+ 3.24.8
-- glib2 2.60.4
-- gnome-shell 3.32.2
-- gcc 8.3.0
+- gtk+ 3.24.12
+- glib2 2.62.2
+- gcc 9.2.0
 - wayland 1.17.0
-- wayland-protocols 1.17
-- cairo 1.16.0
-- freetype2 2.10.0
-- imagemagick 7.0.8.49
+- wayland-protocols 1.18
+- cairo 1.17.2
+- freetype2 2.10.1
+- imagemagick 7.0.9.2
+- ibus 1.5.21
+- mozc 2.23.2815.102
+- wayfire 0.3
 
 ## Notice
 
