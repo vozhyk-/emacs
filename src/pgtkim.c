@@ -63,6 +63,53 @@ static void im_context_preedit_changed_cb(GtkIMContext *imc, gpointer user_data)
 
   gtk_im_context_get_preedit_string(imc, &str, &attrs, &pos);
 
+  PangoAttrIterator* iter;
+  iter = pango_attr_list_get_iterator(attrs);
+  do {
+    int st, ed;
+    pango_attr_iterator_range(iter, &st, &ed);
+    printf("pango: %d..%d\n", st, ed);
+    PangoAttrInt *ul = pango_attr_iterator_get(iter, PANGO_ATTR_UNDERLINE);
+    if (ul != NULL) {
+      printf("pango: has underline ");
+      switch (ul->value) {
+      case PANGO_UNDERLINE_NONE:
+	printf("none\n");
+        break;
+      case PANGO_UNDERLINE_DOUBLE:
+	printf("double\n");
+        break;
+      case PANGO_UNDERLINE_ERROR:
+	printf("error\n");
+        break;
+      case PANGO_UNDERLINE_SINGLE:
+	printf("single\n");
+	break;
+      case PANGO_UNDERLINE_LOW:
+	printf("low\n");
+        break;
+      default:
+        break;
+      }
+    }
+    PangoAttrColor *ulc = pango_attr_iterator_get(iter, PANGO_ATTR_UNDERLINE_COLOR);
+    if (ulc != NULL) {
+      printf("pango: has underline color %02x%02x%02x\n",
+	     ulc->color.red >> 8, ulc->color.green >> 8, ulc->color.blue >> 8);
+    }
+    PangoAttrColor *fore = pango_attr_iterator_get(iter, PANGO_ATTR_FOREGROUND);
+    if (fore != NULL) {
+      printf("pango: has foreground %02x%02x%02x\n",
+	     fore->color.red >> 8, fore->color.green >> 8, fore->color.blue >> 8);
+    }
+    PangoAttrColor *back = pango_attr_iterator_get(iter, PANGO_ATTR_BACKGROUND);
+    if (back != NULL) {
+      printf("pango: has background %02x%02x%02x\n",
+	     back->color.red >> 8, back->color.green >> 8, back->color.blue >> 8);
+    }
+  } while (pango_attr_iterator_next(iter));
+
+
   /* get size */
   PangoLayout *layout = gtk_widget_create_pango_layout(FRAME_GTK_WIDGET(f), str);
   pango_layout_set_attributes(layout, attrs);
@@ -110,6 +157,9 @@ static void im_context_preedit_changed_cb(GtkIMContext *imc, gpointer user_data)
     image_data = Qnil;
 
   pgtk_enqueue_preedit(f, image_data);
+
+  g_object_unref(layout);
+  pango_font_description_free(font_desc);
 
   if (dpyinfo->im.preedit_str != NULL)
     g_free(dpyinfo->im.preedit_str);
