@@ -113,19 +113,6 @@ On gdb, you may want to do:
 (gdb) handle SIGPIPE nostop noprint
 ```
 
-## Color Emoji Fonts
-
-To use color emoji fonts, you can write this code in `~/.emacs`:
-
-```elisp
-(when (eq window-system 'pgtk)
-  (setq xft-ignore-color-fonts nil))
-```
-
-Changing this variable on the fly may not work.
-
-You need cairo 1.16.0, or greater.
-
 ## Input Methods
 
 ```elisp
