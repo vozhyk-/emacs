@@ -138,7 +138,7 @@ This enables Gtk's `GtkIMContext`.
 However, when you type e.g. `C-x o`,
 `C-x` goes through input methods and is handled by Emacs,
 and `o` is handled by input methods, so `お` appears as a preedit text.
-I have no idea. You can turn off input method before typing that.
+I have no idea. You can turn off input method before typing `C-x o`.
 I do, so no problem.
 
 ## My Environment
