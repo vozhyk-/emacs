@@ -958,7 +958,7 @@ one or more of those symbols."
       ;; M-x load-library RET t/x.e TAB finds some files.  Also remove elements
       ;; from `names' that matched `string' only when they still had
       ;; their suffix.
-      (setq names (all-completions string names))
+      (setq names (all-completions string-file names))
       ;; Remove duplicates of the first element, so that we can easily check
       ;; if `names' really contains only a single element.
       (when (cdr names) (setcdr names (delete (car names) (cdr names))))
@@ -2798,7 +2798,7 @@ ARC\\|ZIP\\|LZH\\|LHA\\|ZOO\\|[JEW]AR\\|XPI\\|RAR\\|CBR\\|7Z\\)\\'" . archive-mo
      ("\\.\\(diffs?\\|patch\\|rej\\)\\'" . diff-mode)
      ("\\.\\(dif\\|pat\\)\\'" . diff-mode) ; for MS-DOS
      ("\\.[eE]?[pP][sS]\\'" . ps-mode)
-     ("\\.\\(?:PDF\\|DVI\\|OD[FGPST]\\|DOCX?\\|XLSX?\\|PPTX?\\|pdf\\|djvu\\|dvi\\|od[fgpst]\\|docx?\\|xlsx?\\|pptx?\\)\\'" . doc-view-mode-maybe)
+     ("\\.\\(?:PDF\\|DVI\\|OD[FGPST]\\|DOCX\\|XLSX?\\|PPTX?\\|pdf\\|djvu\\|dvi\\|od[fgpst]\\|docx\\|xlsx?\\|pptx?\\)\\'" . doc-view-mode-maybe)
      ("configure\\.\\(ac\\|in\\)\\'" . autoconf-mode)
      ("\\.s\\(v\\|iv\\|ieve\\)\\'" . sieve-mode)
      ("BROWSE\\'" . ebrowse-tree-mode)
@@ -3062,6 +3062,7 @@ If FUNCTION is nil, then it is not called.  (That is a way of saying
 	     (comment-re (concat "\\(?:!--" incomment-re "*-->[ \t\r\n]*<\\)")))
 	(concat "[ \t\r\n]*<" comment-re "*!DOCTYPE "))
      . sgml-mode)
+    ("\320\317\021\340\241\261\032\341" . doc-view-mode-maybe) ; Word documents 1997-2004
     ("%!PS" . ps-mode)
     ("# xmcd " . conf-unix-mode)))
   "Like `magic-mode-alist' but has lower priority than `auto-mode-alist'.
@@ -7710,7 +7711,8 @@ Otherwise, trash FILENAME using the freedesktop.org conventions,
 		    (setq info-fn (make-temp-file
 				   (expand-file-name files-base trash-info-dir)
 				   nil ".trashinfo"))
-		    (setq files-base (file-name-nondirectory info-fn))
+		    (setq files-base (substring (file-name-nondirectory info-fn)
+                                                0 (- (length ".trashinfo"))))
 		    (write-region nil nil info-fn nil 'quiet info-fn)))
 		 ;; Finally, try to move the file to the trashcan.
 		 (let ((delete-by-moving-to-trash nil)

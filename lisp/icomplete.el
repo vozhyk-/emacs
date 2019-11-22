@@ -69,7 +69,7 @@ When nil, show candidates in full."
   :version "24.4")
 
 (defvar icomplete-tidy-shadowed-file-names nil
-  "If non-nil, delete superflous parts of input file names.
+  "If non-nil, automatically delete superflous parts of file names.
 For example, if the user types ~/ after a long path name,
 everything preceding the ~/ is discarded so the interactive
 selection process starts again from the user's $HOME.")
@@ -253,7 +253,11 @@ require user confirmation."
                           (path (expand-file-name thing dir)))
                      (when (yes-or-no-p (concat "Delete file " path "? "))
                        (delete-file path) t)))))))
-        (when (funcall action)
+        (when (let (;; Allow `yes-or-no-p' to work and don't let it
+                    ;; `icomplete-exhibit' anything.
+                    (enable-recursive-minibuffers t)
+                    (icomplete-mode nil))
+                (funcall action))
           (completion--cache-all-sorted-completions
            (icomplete--field-beg)
            (icomplete--field-end)
@@ -319,13 +323,14 @@ require user confirmation."
 
 (defun icomplete--fido-mode-setup ()
   "Setup `fido-mode''s minibuffer."
-  (use-local-map (make-composed-keymap icomplete-fido-mode-map
-                                       (current-local-map)))
-  (setq-local icomplete-tidy-shadowed-file-names t
-              icomplete-show-matches-on-no-input t
-              icomplete-hide-common-prefix nil
-              completion-styles '(flex)
-              completion-category-defaults nil))
+  (when (and icomplete-mode (icomplete-simple-completing-p))
+    (use-local-map (make-composed-keymap icomplete-fido-mode-map
+                                         (current-local-map)))
+    (setq-local icomplete-tidy-shadowed-file-names t
+                icomplete-show-matches-on-no-input t
+                icomplete-hide-common-prefix nil
+                completion-styles '(flex)
+                completion-category-defaults nil)))
 
 ;;;###autoload
 (define-minor-mode fido-mode
@@ -462,58 +467,61 @@ Should be run via minibuffer `post-command-hook'.
 See `icomplete-mode' and `minibuffer-setup-hook'."
   (when (and icomplete-mode
              (icomplete-simple-completing-p)) ;Shouldn't be necessary.
-    (save-excursion
-      (goto-char (point-max))
+    (let ((saved-point (point)))
+      (save-excursion
+        (goto-char (point-max))
                                         ; Insert the match-status information:
-      (when (and (or icomplete-show-matches-on-no-input
-                     (> (icomplete--field-end) (icomplete--field-beg)))
-                 (or
-                  ;; Don't bother with delay after certain number of chars:
-                  (> (- (point) (icomplete--field-beg))
-                     icomplete-max-delay-chars)
-                  ;; Don't delay if the completions are known.
-                  completion-all-sorted-completions
-                  ;; Don't delay if alternatives number is small enough:
-                  (and (sequencep (icomplete--completion-table))
-                       (< (length (icomplete--completion-table))
-                          icomplete-delay-completions-threshold))
-                  ;; Delay - give some grace time for next keystroke, before
-		  ;; embarking on computing completions:
-		  (sit-for icomplete-compute-delay)))
-        (when (and
-               icomplete-tidy-shadowed-file-names
-               (eq (alist-get 'category
-                              (cdr (completion--field-metadata
-                                    (icomplete--field-beg))))
-                   'file)
-               rfn-eshadow-overlay (overlay-buffer rfn-eshadow-overlay)
-               (or (>= (- (point) (overlay-end rfn-eshadow-overlay)) 2)
-                   (eq ?/ (char-before (- (point) 2)))))
-          (delete-region (overlay-start rfn-eshadow-overlay)
-                         (overlay-end rfn-eshadow-overlay)) )
-	(let* ((field-string (icomplete--field-string))
-               ;; Not sure why, but such requests seem to come
-               ;; every once in a while.  It's not fully
-               ;; deterministic but `C-x C-f M-DEL M-DEL ...'
-               ;; seems to trigger it fairly often!
-               (while-no-input-ignore-events '(selection-request))
-               (text (while-no-input
-                       (icomplete-completions
-                        field-string
-                        (icomplete--completion-table)
-                        (icomplete--completion-predicate)
-                        (if (window-minibuffer-p)
-                            (not minibuffer-completion-confirm)))))
-               (buffer-undo-list t)
-               deactivate-mark)
-	  ;; Do nothing if while-no-input was aborted.
-          (when (stringp text)
-            (move-overlay icomplete-overlay (point) (point) (current-buffer))
-            ;; The current C cursor code doesn't know to use the overlay's
-            ;; marker's stickiness to figure out whether to place the cursor
-            ;; before or after the string, so let's spoon-feed it the pos.
-            (put-text-property 0 1 'cursor t text)
-            (overlay-put icomplete-overlay 'after-string text)))))))
+        (when (and (or icomplete-show-matches-on-no-input
+                       (> (icomplete--field-end) (icomplete--field-beg)))
+                   (or
+                    ;; Don't bother with delay after certain number of chars:
+                    (> (- (point) (icomplete--field-beg))
+                       icomplete-max-delay-chars)
+                    ;; Don't delay if the completions are known.
+                    completion-all-sorted-completions
+                    ;; Don't delay if alternatives number is small enough:
+                    (and (sequencep (icomplete--completion-table))
+                         (< (length (icomplete--completion-table))
+                            icomplete-delay-completions-threshold))
+                    ;; Delay - give some grace time for next keystroke, before
+                    ;; embarking on computing completions:
+                    (sit-for icomplete-compute-delay)))
+          (when (and
+                 icomplete-tidy-shadowed-file-names
+                 (eq (alist-get 'category
+                                (cdr (completion--field-metadata
+                                      (icomplete--field-beg))))
+                     'file)
+                 rfn-eshadow-overlay (overlay-buffer rfn-eshadow-overlay)
+                 (eq this-command 'self-insert-command)
+                 (= saved-point (icomplete--field-end))
+                 (or (>= (- (point) (overlay-end rfn-eshadow-overlay)) 2)
+                     (eq ?/ (char-before (- (point) 2)))))
+            (delete-region (overlay-start rfn-eshadow-overlay)
+                           (overlay-end rfn-eshadow-overlay)) )
+          (let* ((field-string (icomplete--field-string))
+                 ;; Not sure why, but such requests seem to come
+                 ;; every once in a while.  It's not fully
+                 ;; deterministic but `C-x C-f M-DEL M-DEL ...'
+                 ;; seems to trigger it fairly often!
+                 (while-no-input-ignore-events '(selection-request))
+                 (text (while-no-input
+                         (icomplete-completions
+                          field-string
+                          (icomplete--completion-table)
+                          (icomplete--completion-predicate)
+                          (if (window-minibuffer-p)
+                              (not minibuffer-completion-confirm)))))
+                 (buffer-undo-list t)
+                 deactivate-mark)
+            ;; Do nothing if while-no-input was aborted.
+            (when (stringp text)
+              (move-overlay icomplete-overlay (point) (point) (current-buffer))
+              ;; The current C cursor code doesn't know to use the overlay's
+              ;; marker's stickiness to figure out whether to place the cursor
+              ;; before or after the string, so let's spoon-feed it the pos.
+              (put-text-property 0 1 'cursor t text)
+              (overlay-put icomplete-overlay 'after-string text))))))))
 
 ;;;_ > icomplete-completions (name candidates predicate require-match)
 (defun icomplete-completions (name candidates predicate require-match)
