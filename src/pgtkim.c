@@ -63,103 +63,78 @@ static void im_context_preedit_changed_cb(GtkIMContext *imc, gpointer user_data)
 
   gtk_im_context_get_preedit_string(imc, &str, &attrs, &pos);
 
+
+  /*
+   * (
+   *   (TEXT (ul . COLOR) (bg . COLOR) (fg . COLOR))
+   *   ...
+   * )
+   */
+  Lisp_Object list = Qnil;
+
   PangoAttrIterator* iter;
   iter = pango_attr_list_get_iterator(attrs);
   do {
     int st, ed;
+    int has_underline = 0;
+    Lisp_Object part = Qnil;
+
     pango_attr_iterator_range(iter, &st, &ed);
-    printf("pango: %d..%d\n", st, ed);
-    PangoAttrInt *ul = pango_attr_iterator_get(iter, PANGO_ATTR_UNDERLINE);
+
+    if (ed > strlen(str))
+      ed = strlen(str);
+    if (st >= ed)
+      continue;
+
+    Lisp_Object text = make_string(str + st, ed - st);
+    part = Fcons(text, part);
+
+    PangoAttrInt *ul = (PangoAttrInt *) pango_attr_iterator_get(iter, PANGO_ATTR_UNDERLINE);
     if (ul != NULL) {
-      printf("pango: has underline ");
-      switch (ul->value) {
-      case PANGO_UNDERLINE_NONE:
-	printf("none\n");
-        break;
-      case PANGO_UNDERLINE_DOUBLE:
-	printf("double\n");
-        break;
-      case PANGO_UNDERLINE_ERROR:
-	printf("error\n");
-        break;
-      case PANGO_UNDERLINE_SINGLE:
-	printf("single\n");
-	break;
-      case PANGO_UNDERLINE_LOW:
-	printf("low\n");
-        break;
-      default:
-        break;
+      if (ul->value != PANGO_UNDERLINE_NONE)
+	has_underline = 1;
+    }
+
+    if (has_underline) {
+      PangoAttrColor *ulc = (PangoAttrColor *) pango_attr_iterator_get(iter, PANGO_ATTR_UNDERLINE_COLOR);
+      if (ulc != NULL) {
+	char *str = g_strdup_printf("#%02x%02x%02x",
+				    ulc->color.red >> 8,
+				    ulc->color.green >> 8,
+				    ulc->color.blue >> 8);
+	part = Fcons(Fcons(intern("ul"), make_string(str, strlen(str))), part);
+	g_free(str);
+      } else {
+	part = Fcons(Fcons(intern("ul"), Qt), part);
       }
     }
-    PangoAttrColor *ulc = pango_attr_iterator_get(iter, PANGO_ATTR_UNDERLINE_COLOR);
-    if (ulc != NULL) {
-      printf("pango: has underline color %02x%02x%02x\n",
-	     ulc->color.red >> 8, ulc->color.green >> 8, ulc->color.blue >> 8);
-    }
-    PangoAttrColor *fore = pango_attr_iterator_get(iter, PANGO_ATTR_FOREGROUND);
+
+    PangoAttrColor *fore = (PangoAttrColor *) pango_attr_iterator_get(iter, PANGO_ATTR_FOREGROUND);
     if (fore != NULL) {
-      printf("pango: has foreground %02x%02x%02x\n",
-	     fore->color.red >> 8, fore->color.green >> 8, fore->color.blue >> 8);
+      char *str = g_strdup_printf("#%02x%02x%02x",
+				  fore->color.red >> 8,
+				  fore->color.green >> 8,
+				  fore->color.blue >> 8);
+      part = Fcons(Fcons(intern("fg"), make_string(str, strlen(str))), part);
+      g_free(str);
     }
-    PangoAttrColor *back = pango_attr_iterator_get(iter, PANGO_ATTR_BACKGROUND);
+
+    PangoAttrColor *back = (PangoAttrColor *) pango_attr_iterator_get(iter, PANGO_ATTR_BACKGROUND);
     if (back != NULL) {
-      printf("pango: has background %02x%02x%02x\n",
-	     back->color.red >> 8, back->color.green >> 8, back->color.blue >> 8);
+      char *str = g_strdup_printf("#%02x%02x%02x",
+				  back->color.red >> 8,
+				  back->color.green >> 8,
+				  back->color.blue >> 8);
+      part = Fcons(Fcons(intern("bg"), make_string(str, strlen(str))), part);
+      g_free(str);
     }
+
+    part = Freverse(part);
+    list = Fcons(part, list);
   } while (pango_attr_iterator_next(iter));
 
-
-  /* get size */
-  PangoLayout *layout = gtk_widget_create_pango_layout(FRAME_GTK_WIDGET(f), str);
-  pango_layout_set_attributes(layout, attrs);
-  int width, height;
-  pango_layout_get_pixel_size(layout, &width, &height);
-
-  Lisp_Object image_data;
-  if (width != 0 && height != 0) {
-    char *buf = g_new0(char, 5 + 20 + 20 + 10 + 3 * width * height);
-    sprintf(buf, "P6\n%d %d\n255\n", width, height);
-
-    int stride = cairo_format_stride_for_width(CAIRO_FORMAT_RGB24, width);
-    unsigned char *crbuf = g_new0(unsigned char, stride * height);
-    cairo_surface_t *surface = cairo_image_surface_create_for_data(crbuf, CAIRO_FORMAT_RGB24, width, height, stride);
-
-    cairo_t *cr = cairo_create(surface);
-    cairo_set_source_rgb(cr, 0, 0, 0);
-    cairo_rectangle(cr, 0, 0, width, height);
-    cairo_fill(cr);
-    cairo_set_source_rgb(cr, 1, 1, 1);
-    pango_cairo_update_layout(cr, layout);
-    pango_cairo_show_layout(cr, layout);
-    cairo_destroy(cr);
-
-    cairo_surface_flush(surface);
-    cairo_surface_destroy(surface);
-
-    unsigned char *sp = crbuf;
-    unsigned char *dp = (unsigned char *) buf + strlen(buf);
-    for (int y = 0; y < height; y++) {
-      for (int x = 0; x < width; x++) {
-	unsigned int rgb = *(unsigned int *) sp;
-	*dp++ = (rgb >> 16) & 0xff;
-	*dp++ = (rgb >>  8) & 0xff;
-	*dp++ = (rgb >>  0) & 0xff;
-	sp += 4;
-      }
-    }
-
-    image_data = make_unibyte_string(buf, dp - (unsigned char *) buf);
-
-    g_free(crbuf);
-    g_free(buf);
-  } else
-    image_data = Qnil;
-
-  pgtk_enqueue_preedit(f, image_data);
-
-  g_object_unref(layout);
-  pango_font_description_free(font_desc);
+  list = Freverse(list);
+  pgtk_enqueue_preedit(f, list);
 
   if (dpyinfo->im.preedit_str != NULL)
     g_free(dpyinfo->im.preedit_str);

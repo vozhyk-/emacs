@@ -4994,12 +4994,12 @@ pgtk_enqueue_string(struct frame *f, gchar *str)
 }
 
 void
-pgtk_enqueue_preedit(struct frame *f, Lisp_Object image_data)
+pgtk_enqueue_preedit(struct frame *f, Lisp_Object preedit)
 {
   union buffered_input_event inev;
   EVENT_INIT (inev.ie);
   inev.ie.kind = PGTK_PREEDIT_TEXT_EVENT;
-  inev.ie.arg = image_data;
+  inev.ie.arg = preedit;
   inev.ie.code = 0;
   XSETFRAME (inev.ie.frame_or_window, f);
   inev.ie.modifiers = 0;
