@@ -768,7 +768,7 @@ ftfont_spec_pattern (Lisp_Object spec, char *otlayout, struct OpenTypeSpec **ots
   if (scalable >= 0
       && ! FcPatternAddBool (pattern, FC_SCALABLE, scalable ? FcTrue : FcFalse))
     goto err;
-#if (defined HAVE_XFT || defined USE_CAIRO) && defined FC_COLOR
+#if defined HAVE_XFT && defined FC_COLOR
   /* We really don't like color fonts, they cause Xft crashes.  See
      Bug#30874.  */
   if (Vxft_ignore_color_fonts
@@ -1266,19 +1266,6 @@ ftfont_entity_pattern (Lisp_Object entity, int pixel_size)
 
 #ifndef USE_CAIRO
 
-static bool
-is_color_font (FT_Face face)
-{
-  static unsigned int tag = FT_MAKE_TAG('C', 'B', 'D', 'T');
-  unsigned long length = 0;
-  FT_Load_Sfnt_Table(face, tag, 0, NULL, &length);
-  if (length)
-    {
-      return true;
-    }
-  return false;
-}
-
 Lisp_Object
 ftfont_open (struct frame *f, Lisp_Object entity, int pixel_size)
 {
@@ -1293,8 +1280,6 @@ ftfont_open (struct frame *f, Lisp_Object entity, int pixel_size)
   int spacing;
   int i;
   double upEM;
-  bool color;
-  double scale = 1.0;
 
   val = assq_no_quit (QCfont_entity, AREF (entity, FONT_EXTRA_INDEX));
   if (! CONSP (val))
@@ -1321,33 +1306,15 @@ ftfont_open (struct frame *f, Lisp_Object entity, int pixel_size)
   size = XFIXNUM (AREF (entity, FONT_SIZE_INDEX));
   if (size == 0)
     size = pixel_size;
-
-  color = is_color_font(ft_face);
-  if (!color)
+  if (FT_Set_Pixel_Sizes (ft_face, size, size) != 0)
     {
-      if (FT_Set_Pixel_Sizes (ft_face, size, size) != 0)
+      if (cache_data->face_refcount == 0)
 	{
-	  if (cache_data->face_refcount == 0)
-	    {
-	      FT_Done_Face (ft_face);
-	      cache_data->ft_face = NULL;
-	    }
-	  return Qnil;
+	  FT_Done_Face (ft_face);
+	  cache_data->ft_face = NULL;
 	}
+      return Qnil;
     }
-  else
-    {
-      if (ft_face->num_fixed_sizes == 0 || FT_Select_Size(ft_face, 0) != 0)
-	{
-	  if (cache_data->face_refcount == 0)
-	    {
-	      FT_Done_Face (ft_face);
-	      cache_data->ft_face = NULL;
-	    }
-	  return Qnil;
-       }
-    }
-
   cache_data->face_refcount++;
 
   font_object = font_build_object (VECSIZE (struct font_info),
@@ -1366,7 +1333,6 @@ ftfont_open (struct frame *f, Lisp_Object entity, int pixel_size)
 #endif	/* HAVE_HARFBUZZ */
   /* This means that there's no need of transformation.  */
   ftfont_info->matrix.xx = 0;
-  ftfont_info->is_color_font = color;
   font->pixel_size = size;
 #ifdef HAVE_HARFBUZZ
   if (EQ (AREF (font_object, FONT_TYPE_INDEX), Qfreetypehb))
@@ -1418,22 +1384,12 @@ ftfont_open (struct frame *f, Lisp_Object entity, int pixel_size)
       && spacing != FC_DUAL
 #endif	/* FC_DUAL */
       )
-    {
-      int adv = 0;
-      if (scalable && upEM != 0)
-	adv = ft_face->max_advance_width * size / upEM + 0.5;
-      if (adv == 0)
-	adv = ft_face->size->metrics.max_advance >> 6;
-      adv *= scale;
-      font->min_width = font->average_width = font->space_width = adv;
-    }
+    font->min_width = font->average_width = font->space_width
+      = (scalable ? ft_face->max_advance_width * size / upEM + 0.5
+	 : ft_face->size->metrics.max_advance >> 6);
   else
     {
       int n;
-      int load_flag = FT_LOAD_DEFAULT;
-
-      if (color)
-	load_flag |= FT_LOAD_COLOR;
 
       font->min_width = font->average_width = font->space_width = 0;
       for (i = 32, n = 0; i < 127; i++)
@@ -1457,7 +1413,7 @@ ftfont_open (struct frame *f, Lisp_Object entity, int pixel_size)
   font->relative_compose = 0;
   font->default_ascent = 0;
   font->vertical_centering = 0;
-  if (scalable && upEM != 0)
+  if (scalable)
     {
       font->underline_position = (-ft_face->underline_position * size / upEM
 				  + 0.5);
@@ -1469,8 +1425,6 @@ ftfont_open (struct frame *f, Lisp_Object entity, int pixel_size)
       font->underline_position = -1;
       font->underline_thickness = 0;
     }
-
-  ftfont_info->scale = scale;
 
   return font_object;
 }
@@ -1578,14 +1532,9 @@ ftfont_text_extents (struct font *font, const unsigned int *code,
   FT_Face ft_face = ftfont_info->ft_size->face;
   int i, width = 0;
   bool first;
-  int load_flag;
 
   if (ftfont_info->ft_size != ft_face->size)
     FT_Activate_Size (ftfont_info->ft_size);
-
-  load_flag = FT_LOAD_DEFAULT;
-  if (ftfont_info->is_color_font)
-    load_flag |= FT_LOAD_COLOR;
 
   for (i = 0, first = 1; i < nglyphs; i++)
     {
@@ -1615,10 +1564,6 @@ ftfont_text_extents (struct font *font, const unsigned int *code,
 	width += font->space_width;
     }
   metrics->width = width;
-
-  metrics->width *= ftfont_info->scale;
-  metrics->lbearing *= ftfont_info->scale;
-  metrics->rbearing *= ftfont_info->scale;
 }
 
 #endif /* !USE_CAIRO */
@@ -1672,15 +1617,10 @@ ftfont_anchor_point (struct font *font, unsigned int code, int idx,
 {
   struct font_info *ftfont_info = (struct font_info *) font;
   FT_Face ft_face = ftfont_info->ft_size->face;
-  int load_flag;
-
-  load_flag = FT_LOAD_DEFAULT;
-  if (ftfont_info->is_color_font)
-    load_flag |= FT_LOAD_COLOR;
 
   if (ftfont_info->ft_size != ft_face->size)
     FT_Activate_Size (ftfont_info->ft_size);
-  if (FT_Load_Glyph (ft_face, code, load_flag) != 0)
+  if (FT_Load_Glyph (ft_face, code, FT_LOAD_DEFAULT) != 0)
     return -1;
   if (ft_face->glyph->format != FT_GLYPH_FORMAT_OUTLINE)
     return -1;

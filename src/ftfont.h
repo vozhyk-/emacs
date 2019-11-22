@@ -62,8 +62,6 @@ struct font_info
 #ifdef HAVE_HARFBUZZ
   hb_font_t *hb_font;
 #endif  /* HAVE_HARFBUZZ */
-  bool is_color_font;
-  double scale;
 
 #ifdef USE_CAIRO
   cairo_scaled_font_t *cr_scaled_font;
