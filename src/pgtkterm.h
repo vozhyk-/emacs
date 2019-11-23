@@ -235,8 +235,6 @@ struct pgtk_display_info
   /* input method */
   struct {
     GtkIMContext *context;
-    char *preedit_str;
-    PangoAttrList *preedit_attrs;
     struct frame *focused_frame;
   } im;
 };

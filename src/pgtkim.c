@@ -48,6 +48,16 @@ static gboolean im_context_delete_surrounding_cb(GtkIMContext *imc, int offset, 
   return TRUE;
 }
 
+static Lisp_Object make_color_string(PangoAttrColor *pac)
+{
+  char buf[256];
+  sprintf(buf, "#%02x%02x%02x",
+	  pac->color.red >> 8,
+	  pac->color.green >> 8,
+	  pac->color.blue >> 8);
+  return build_string(buf);
+}
+
 static void im_context_preedit_changed_cb(GtkIMContext *imc, gpointer user_data)
 {
   struct pgtk_display_info *dpyinfo = user_data;
@@ -95,54 +105,32 @@ static void im_context_preedit_changed_cb(GtkIMContext *imc, gpointer user_data)
 	has_underline = 1;
     }
 
+    PangoAttrColor *pac;
     if (has_underline) {
-      PangoAttrColor *ulc = (PangoAttrColor *) pango_attr_iterator_get(iter, PANGO_ATTR_UNDERLINE_COLOR);
-      if (ulc != NULL) {
-	char *str = g_strdup_printf("#%02x%02x%02x",
-				    ulc->color.red >> 8,
-				    ulc->color.green >> 8,
-				    ulc->color.blue >> 8);
-	part = Fcons(Fcons(intern("ul"), make_string(str, strlen(str))), part);
-	g_free(str);
-      } else {
-	part = Fcons(Fcons(intern("ul"), Qt), part);
-      }
+      pac = (PangoAttrColor *) pango_attr_iterator_get(iter, PANGO_ATTR_UNDERLINE_COLOR);
+      if (pac != NULL)
+	part = Fcons(Fcons(Qul, make_color_string(pac)), part);
+      else
+	part = Fcons(Fcons(Qul, Qt), part);
     }
 
-    PangoAttrColor *fore = (PangoAttrColor *) pango_attr_iterator_get(iter, PANGO_ATTR_FOREGROUND);
-    if (fore != NULL) {
-      char *str = g_strdup_printf("#%02x%02x%02x",
-				  fore->color.red >> 8,
-				  fore->color.green >> 8,
-				  fore->color.blue >> 8);
-      part = Fcons(Fcons(intern("fg"), make_string(str, strlen(str))), part);
-      g_free(str);
-    }
+    pac = (PangoAttrColor *) pango_attr_iterator_get(iter, PANGO_ATTR_FOREGROUND);
+    if (pac != NULL)
+      part = Fcons(Fcons(Qfg, make_color_string(pac)), part);
 
-    PangoAttrColor *back = (PangoAttrColor *) pango_attr_iterator_get(iter, PANGO_ATTR_BACKGROUND);
-    if (back != NULL) {
-      char *str = g_strdup_printf("#%02x%02x%02x",
-				  back->color.red >> 8,
-				  back->color.green >> 8,
-				  back->color.blue >> 8);
-      part = Fcons(Fcons(intern("bg"), make_string(str, strlen(str))), part);
-      g_free(str);
-    }
+    pac = (PangoAttrColor *) pango_attr_iterator_get(iter, PANGO_ATTR_BACKGROUND);
+    if (pac != NULL)
+      part = Fcons(Fcons(Qbg, make_color_string(pac)), part);
 
-    part = Freverse(part);
+    part = Fnreverse(part);
     list = Fcons(part, list);
   } while (pango_attr_iterator_next(iter));
 
-  list = Freverse(list);
+  list = Fnreverse(list);
   pgtk_enqueue_preedit(f, list);
 
-  if (dpyinfo->im.preedit_str != NULL)
-    g_free(dpyinfo->im.preedit_str);
-  dpyinfo->im.preedit_str = str;
-
-  if (dpyinfo->im.preedit_attrs != NULL)
-    pango_attr_list_unref(dpyinfo->im.preedit_attrs);
-  dpyinfo->im.preedit_attrs = attrs;
+  g_free(str);
+  pango_attr_list_unref(attrs);
 }
 
 static void im_context_preedit_end_cb(GtkIMContext *imc, gpointer user_data)
@@ -156,14 +144,6 @@ static void im_context_preedit_end_cb(GtkIMContext *imc, gpointer user_data)
     return;
 
   pgtk_enqueue_preedit(f, Qnil);
-
-  if (dpyinfo->im.preedit_str != NULL)
-    g_free(dpyinfo->im.preedit_str);
-  dpyinfo->im.preedit_str = NULL;
-
-  if (dpyinfo->im.preedit_attrs != NULL)
-    pango_attr_list_unref(dpyinfo->im.preedit_attrs);
-  dpyinfo->im.preedit_attrs = NULL;
 }
 
 static void im_context_preedit_start_cb(GtkIMContext *imc, gpointer user_data)
@@ -196,8 +176,6 @@ void pgtk_im_focus_out(struct frame *f)
 
 void pgtk_im_init(struct pgtk_display_info *dpyinfo)
 {
-  dpyinfo->im.preedit_str = NULL;
-  dpyinfo->im.preedit_attrs = NULL;
   dpyinfo->im.context = NULL;
 }
 
@@ -206,14 +184,6 @@ void pgtk_im_finish(struct pgtk_display_info *dpyinfo)
   if (dpyinfo->im.context != NULL)
     g_object_unref(dpyinfo->im.context);
   dpyinfo->im.context = NULL;
-
-  if (dpyinfo->im.preedit_str != NULL)
-    g_free(dpyinfo->im.preedit_str);
-  dpyinfo->im.preedit_str = NULL;
-
-  if (dpyinfo->im.preedit_attrs != NULL)
-    pango_attr_list_unref(dpyinfo->im.preedit_attrs);
-  dpyinfo->im.preedit_attrs = NULL;
 }
 
 DEFUN ("pgtk-use-im-context", Fpgtk_use_im_context, Spgtk_use_im_context,
@@ -231,20 +201,9 @@ DEFUN ("pgtk-use-im-context", Fpgtk_use_im_context, Spgtk_use_im_context,
 
       g_object_unref(dpyinfo->im.context);
       dpyinfo->im.context = NULL;
-
-      if (dpyinfo->im.preedit_str != NULL)
-	g_free(dpyinfo->im.preedit_str);
-      dpyinfo->im.preedit_str = NULL;
-
-      if (dpyinfo->im.preedit_attrs != NULL)
-	pango_attr_list_unref(dpyinfo->im.preedit_attrs);
-      dpyinfo->im.preedit_attrs = NULL;
     }
   } else {
     if (dpyinfo->im.context == NULL) {
-      dpyinfo->im.preedit_str = NULL;
-      dpyinfo->im.preedit_attrs = NULL;
-
       dpyinfo->im.context = gtk_im_multicontext_new();
       g_signal_connect(dpyinfo->im.context, "commit", G_CALLBACK(im_context_commit_cb), dpyinfo);
       g_signal_connect(dpyinfo->im.context, "retrieve-surrounding", G_CALLBACK(im_context_retrieve_surrounding_cb), dpyinfo);
@@ -268,4 +227,7 @@ syms_of_pgtkim (void)
   defsubr (&Spgtk_use_im_context);
 
   DEFSYM (Qpgtk_refresh_preedit, "pgtk-refresh-preedit");
+  DEFSYM (Qul, "ul");
+  DEFSYM (Qfg, "fg");
+  DEFSYM (Qbg, "bg");
 }
