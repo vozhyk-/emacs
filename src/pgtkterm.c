@@ -5033,6 +5033,11 @@ static gboolean key_press_event(GtkWidget *widget, GdkEvent *event, gpointer *us
       hlinfo->mouse_face_hidden = true;
     }
 
+  if (f != 0) {
+    if (pgtk_im_filter_keypress (f, &event->key))
+      return TRUE;
+  }
+
   if (f != 0)
     {
       guint keysym, orig_keysym;

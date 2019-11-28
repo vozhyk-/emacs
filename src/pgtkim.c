@@ -174,6 +174,16 @@ void pgtk_im_focus_out(struct frame *f)
   }
 }
 
+bool pgtk_im_filter_keypress(struct frame *f, GdkEventKey *ev)
+{
+  struct pgtk_display_info *dpyinfo = FRAME_DISPLAY_INFO (f);
+  if (dpyinfo->im.context != NULL) {
+    if (gtk_im_context_filter_keypress (dpyinfo->im.context, ev))
+      return true;
+  }
+  return false;
+}
+
 void pgtk_im_init(struct pgtk_display_info *dpyinfo)
 {
   dpyinfo->im.context = NULL;
