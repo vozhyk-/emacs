@@ -3668,6 +3668,7 @@ menubar_map_cb (GtkWidget *w, gpointer user_data)
   GtkRequisition req;
   struct frame *f = user_data;
   gtk_widget_get_preferred_size (w, NULL, &req);
+  req.height *= xg_get_scale (f);
   if (FRAME_MENUBAR_HEIGHT (f) != req.height)
     {
       FRAME_MENUBAR_HEIGHT (f) = req.height;
@@ -3699,7 +3700,7 @@ xg_update_frame_menubar (struct frame *f)
   g_signal_connect (x->menubar_widget, "map", G_CALLBACK (menubar_map_cb), f);
   gtk_widget_show_all (x->menubar_widget);
   gtk_widget_get_preferred_size (x->menubar_widget, NULL, &req);
-
+  req.height *= xg_get_scale (f);
   if (FRAME_MENUBAR_HEIGHT (f) != req.height)
     {
       FRAME_MENUBAR_HEIGHT (f) = req.height;
@@ -3766,8 +3767,9 @@ xg_event_is_for_menubar (struct frame *f, const EVENT *event)
 
   list = gtk_container_get_children (GTK_CONTAINER (x->menubar_widget));
   if (! list) return 0;
-  rec.x = event->xbutton.x;
-  rec.y = event->xbutton.y;
+  int scale = xg_get_scale (f);
+  rec.x = event->xbutton.x / scale;
+  rec.y = event->xbutton.y / scale;
   rec.width = 1;
   rec.height = 1;
 
