@@ -2099,7 +2099,6 @@ x_frame_of_widget (Widget widget)
     {
       f = XFRAME (frame);
       if (FRAME_X_P (f)
-	  && f->output_data.nothing != 1
 	  && FRAME_DISPLAY_INFO (f) == dpyinfo
 	  && f->output_data.x->widget == widget)
 	return f;
@@ -10098,8 +10097,6 @@ For details, see etc/PROBLEMS.\n",
   error ("%s", error_msg);
 }
 
-/* We specifically use it before defining it, so that gcc doesn't inline it,
-   otherwise gdb doesn't know how to properly put a breakpoint on it.  */
 static void x_error_quitter (Display *, XErrorEvent *);
 
 /* This is the first-level handler for X protocol errors.
@@ -10128,9 +10125,6 @@ x_error_handler (Display *display, XErrorEvent *event)
    If that was the only one, it prints an error message and kills Emacs.  */
 
 /* .gdbinit puts a breakpoint here, so make sure it is not inlined.  */
-
-/* On older GCC versions, just putting x_error_quitter
-   after x_error_handler prevents inlining into the former.  */
 
 static void NO_INLINE
 x_error_quitter (Display *display, XErrorEvent *event)

@@ -1117,7 +1117,6 @@ make_initial_frame (void)
   f->output_method = terminal->type;
   f->terminal = terminal;
   f->terminal->reference_count++;
-  f->output_data.nothing = 0;
 
   FRAME_FOREGROUND_PIXEL (f) = FACE_TTY_DEFAULT_FG_COLOR;
   FRAME_BACKGROUND_PIXEL (f) = FACE_TTY_DEFAULT_BG_COLOR;
@@ -2138,7 +2137,6 @@ delete_frame (Lisp_Object frame, Lisp_Object force)
     if (FRAME_TERMINAL (f)->delete_frame_hook)
       (*FRAME_TERMINAL (f)->delete_frame_hook) (f);
     terminal = FRAME_TERMINAL (f);
-    f->output_data.nothing = 0;
     f->terminal = 0;             /* Now the frame is dead.  */
     unblock_input ();
 
@@ -3563,7 +3561,7 @@ window managers may refuse to honor a HEIGHT that is not an integer
 multiple of the default frame font height.
 
 When called interactively, HEIGHT is the numeric prefix and the
-currenly selected frame will be set to this height.  */)
+currently selected frame will be set to this height.  */)
   (Lisp_Object frame, Lisp_Object height, Lisp_Object pretend, Lisp_Object pixelwise)
 {
   struct frame *f = decode_live_frame (frame);
@@ -3592,7 +3590,7 @@ window managers may refuse to honor a WIDTH that is not an integer
 multiple of the default frame font width.
 
 When called interactively, WIDTH is the numeric prefix and the
-currenly selected frame will be set to this width.    */)
+currently selected frame will be set to this width.    */)
   (Lisp_Object frame, Lisp_Object width, Lisp_Object pretend, Lisp_Object pixelwise)
 {
   struct frame *f = decode_live_frame (frame);
