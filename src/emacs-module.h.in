@@ -50,7 +50,7 @@ extern "C" {
 #endif
 
 /* Current environment.  */
-typedef struct emacs_env_27 emacs_env;
+typedef struct emacs_env_@emacs_major_version@ emacs_env;
 
 /* Opaque pointer representing an Emacs Lisp value.
    BEWARE: Do not assume NULL is a valid value!  */
@@ -68,7 +68,7 @@ struct emacs_runtime
   struct emacs_runtime_private *private_members;
 
   /* Return an environment pointer.  */
-  emacs_env *(*get_environment) (struct emacs_runtime *ert)
+  emacs_env *(*get_environment) (struct emacs_runtime *runtime)
     EMACS_ATTRIBUTE_NONNULL(1);
 };
 
@@ -125,8 +125,19 @@ struct emacs_env_27
 @module_env_snippet_27@
 };
 
+struct emacs_env_28
+{
+@module_env_snippet_25@
+
+@module_env_snippet_26@
+
+@module_env_snippet_27@
+
+@module_env_snippet_28@
+};
+
 /* Every module should define a function as follows.  */
-extern int emacs_module_init (struct emacs_runtime *ert)
+extern int emacs_module_init (struct emacs_runtime *runtime)
   EMACS_NOEXCEPT
   EMACS_ATTRIBUTE_NONNULL(1);
 
