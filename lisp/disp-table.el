@@ -1,6 +1,6 @@
 ;;; disp-table.el --- functions for dealing with char tables
 
-;; Copyright (C) 1987, 1994-1995, 1999, 2001-2019 Free Software
+;; Copyright (C) 1987, 1994-1995, 1999, 2001-2020 Free Software
 ;; Foundation, Inc.
 
 ;; Author: Erik Naggum <erik@naggum.no>
@@ -221,7 +221,7 @@ for a graphical frame."
 (defun make-glyph-code (char &optional face)
   "Return a glyph code representing char CHAR with face FACE."
   ;; Due to limitations on Emacs integer values, faces with
-  ;; face id greater that 512 are silently ignored.
+  ;; face id greater than 512 are silently ignored.
   (if (not face)
       char
     (let ((fid (face-id face)))

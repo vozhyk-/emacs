@@ -1,6 +1,6 @@
 ;;; nnheader.el --- header access macros for Gnus and its backends
 
-;; Copyright (C) 1987-1990, 1993-1998, 2000-2019 Free Software
+;; Copyright (C) 1987-1990, 1993-1998, 2000-2020 Free Software
 ;; Foundation, Inc.
 
 ;; Author: Masanobu UMEDA <umerin@flab.flab.fujitsu.junet>
@@ -487,8 +487,8 @@ the line could be found."
 		      (< num article)))
 	(forward-line 1)
 	(setq found (point))
-	(or (eobp)
-	    (= (setq num (read cur)) article)))
+	(unless (eobp)
+	  (setq num (read cur))))
       (unless (eq num article)
 	(goto-char found)))
     (beginning-of-line)

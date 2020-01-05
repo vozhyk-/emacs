@@ -1,6 +1,6 @@
 ;;; hideif.el --- hides selected code within ifdef  -*- lexical-binding:t -*-
 
-;; Copyright (C) 1988, 1994, 2001-2019 Free Software Foundation, Inc.
+;; Copyright (C) 1988, 1994, 2001-2020 Free Software Foundation, Inc.
 
 ;; Author: Brian Marick
 ;;	Daniel LaLiberte <liberte@holonexus.org>
@@ -162,7 +162,7 @@ This behavior is generally undesirable.  If this option is non-nil, the outermos
   "\\.h\\(h\\|xx\\|pp\\|\\+\\+\\)?\\'"
   "C/C++ header file name patterns to determine if current buffer is a header.
 Effective only if `hide-ifdef-expand-reinclusion-protection' is t."
-  :type 'string
+  :type 'regexp
   :version "25.1")
 
 (defvar hide-ifdef-mode-submap

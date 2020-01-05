@@ -1,6 +1,6 @@
 @c -*-texinfo-*-
 @c This is part of the GNU Emacs Lisp Reference Manual.
-@c Copyright (C) 1990-1993, 1998-1999, 2001-2019 Free Software
+@c Copyright (C) 1990--1993, 1998--1999, 2001--2020 Free Software
 @c Foundation, Inc.
 @c See the file elisp.texi for copying conditions.
 @node GNU Emacs Internals
@@ -972,7 +972,7 @@ The name of the variable to be used by Lisp programs.
 The name of the variable in the C sources.
 @item doc
 The documentation for the variable, as a C
-comment.  @xref{Documentation Basics} for more details.
+comment.  @xref{Documentation Basics}, for more details.
 @end table
 
   By convention, when defining variables of a ``native'' type
@@ -1314,7 +1314,8 @@ subsection describes how to write such @dfn{module functions}.
 
 A module function has the following general form and signature:
 
-@deftypefn Function emacs_value module_func (emacs_env *@var{env}, ptrdiff_t @var{nargs}, emacs_value *@var{args}, void *@var{data})
+@deftypefn Function emacs_value emacs_function (emacs_env *@var{env}, ptrdiff_t @var{nargs}, emacs_value *@var{args}, void *@var{data})
+@tindex emacs_function
 The @var{env} argument provides a pointer to the @acronym{API}
 environment, needed to access Emacs objects and functions.  The
 @var{nargs} argument is the required number of arguments, which can be
@@ -1323,7 +1324,7 @@ of the argument number), and @var{args} is a pointer to the array of
 the function arguments.  The argument @var{data} points to additional
 data required by the function, which was arranged when
 @code{make_function} (see below) was called to create an Emacs
-function from @code{module_func}.
+function from @code{emacs_function}.
 
 Module functions use the type @code{emacs_value} to communicate Lisp
 objects between Emacs and the module (@pxref{Module Values}).  The
@@ -1338,6 +1339,10 @@ However, if the user typed @kbd{C-g}, or if the module function or its
 callees signaled an error or exited nonlocally (@pxref{Module
 Nonlocal}), Emacs will ignore the returned value and quit or throw as
 it does when Lisp code encounters the same situations.
+
+The header @file{emacs-module.h} provides the type
+@code{emacs_function} as an alias type for a function pointer to a
+module function.
 @end deftypefn
 
 After writing your C code for a module function, you should make a
@@ -1348,11 +1353,11 @@ normally done in the module initialization function (@pxref{module
 initialization function}), after verifying the @acronym{API}
 compatibility.
 
-@deftypefn Function emacs_value make_function (emacs_env *@var{env}, ptrdiff_t @var{min_arity}, ptrdiff_t @var{max_arity}, subr @var{func}, const char *@var{docstring}, void *@var{data})
+@deftypefn Function emacs_value make_function (emacs_env *@var{env}, ptrdiff_t @var{min_arity}, ptrdiff_t @var{max_arity}, emacs_function @var{func}, const char *@var{docstring}, void *@var{data})
 @vindex emacs_variadic_function
 This returns an Emacs function created from the C function @var{func},
-whose signature is as described for @code{module_func} above (assumed
-here to be @code{typedef}'ed as @code{subr}).  The arguments
+whose signature is as described for @code{emacs_function} above.
+The arguments
 @var{min_arity} and @var{max_arity} specify the minimum and maximum
 number of arguments that @var{func} can accept.  The @var{max_arity}
 argument can have the special value @code{emacs_variadic_function},
@@ -1403,6 +1408,22 @@ the function to that symbol.  Note that it is possible to use
 @code{fset} instead of @code{defalias}; the differences are described
 in @ref{Defining Functions, defalias}.
 
+Module functions including the @code{emacs_module_init} function
+(@pxref{module initialization function}) may only interact with Emacs
+by calling environment functions from some live @code{emacs_env}
+pointer while being called directly or indirectly from Emacs.  In
+other words, if a module function wants to call Lisp functions or
+Emacs primitives, convert @code{emacs_value} objects to and from C
+datatypes (@pxref{Module Values}), or interact with Emacs in any other
+way, some call from Emacs to @code{emacs_module_init} or to a module
+function must be in the callstack.  Module function may not interact
+with Emacs while garbage collection is running; @pxref{Garbage
+Collection}.  They may only interact with Emacs from Lisp interpreter
+threads (including the main thread) created by Emacs; @pxref{Threads}.
+The @kbd{--module-assertions} command-line option can detect some
+violations of the above requirements.  @xref{Initial Options,,,emacs,
+The GNU Emacs Manual}.
+
 Using the module @acronym{API}, it is possible to define more complex
 function and data types: interactive functions, inline functions,
 macros, etc.  However, the resulting C code will be cumbersome and
@@ -1423,8 +1444,56 @@ following simple Lisp wrapper:
 @end lisp
 
 The Lisp package which goes with your module could then load the
-module using the @code{module-load} primitive (@pxref{Dynamic
-Modules}) when the package is loaded into Emacs.
+module using the @code{load} primitive (@pxref{Dynamic Modules}) when
+the package is loaded into Emacs.
+
+@anchor{Module Function Finalizers}
+If you want to run some code when a module function object (i.e., an
+object returned by @code{make_function}) is garbage-collected, you can
+install a @dfn{function finalizer}.  Function finalizers are available
+since Emacs 28.  For example, if you have passed some heap-allocated
+structure to the @var{data} argument of @code{make_function}, you can
+use the finalizer to deallocate the structure.  @xref{Basic
+Allocation,,,libc}, and @pxref{Freeing after Malloc,,,libc}.  The
+finalizer function has the following signature:
+
+@example
+void finalizer (void *@var{data})
+@end example
+
+Here, @var{data} receives the value passed to @var{data} when calling
+@code{make_function}.  Note that the finalizer can't interact with
+Emacs in any way.
+
+Directly after calling @code{make_function}, the newly-created
+function doesn't have a finalizer.  Use @code{set_function_finalizer}
+to add one, if desired.
+
+@deftypefun void emacs_finalizer (void *@var{ptr})
+The header @file{emacs-module.h} provides the type
+@code{emacs_finalizer} as a type alias for an Emacs finalizer
+function.
+@end deftypefun
+
+@deftypefun emacs_finalizer get_function_finalizer (emacs_env *@var{env}, emacs_value @var{arg})
+This function, which is available since Emacs 28, returns the function
+finalizer associated with the module function represented by
+@var{arg}.  @var{arg} must refer to a module function, that is, an
+object returned by @code{make_function}.  If no finalizer is
+associated with the function, @code{NULL} is returned.
+@end deftypefun
+
+@deftypefun void set_function_finalizer (emacs_env *@var{env}, emacs_value @var{arg}, emacs_finalizer @var{fin})
+This function, which is available since Emacs 28, sets the function
+finalizer associated with the module function represented by @var{arg}
+to @var{fin}.  @var{arg} must refer to a module function, that is, an
+object returned by @code{make_function}.  @var{fin} can either be
+@code{NULL} to clear @var{arg}'s function finalizer, or a pointer to a
+function to be called when the object represented by @var{arg} is
+garbage-collected.  At most one function finalizer can be set per
+function; if @var{arg} already has a finalizer, it is replaced by
+@var{fin}.
+@end deftypefun
 
 @node Module Values
 @subsection Conversion Between Lisp and Module Values
@@ -1630,7 +1699,7 @@ little-endian magnitude of the return value.
 
 The following example uses the GNU Multiprecision Library (GMP) to
 calculate the next probable prime after a given integer.
-@xref{Top,,,gmp} for a general overview of GMP, and @pxref{Integer
+@xref{Top,,,gmp}, for a general overview of GMP, and @pxref{Integer
 Import and Export,,,gmp} for how to convert the @code{magnitude} array
 to and from GMP @code{mpz_t} values.
 
@@ -1844,6 +1913,9 @@ represented by @var{arg} to be @var{fin}.  If @var{fin} is a
 finalizer.
 @end deftypefn
 
+Note that the @code{emacs_finalizer} type works for both user pointer
+an module function finalizers.  @xref{Module Function Finalizers}.
+
 @node Module Misc
 @subsection Miscellaneous Convenience Functions for Modules
 
@@ -1901,8 +1973,7 @@ calling the more powerful Emacs @code{intern} function
 emacs_value fintern = env->intern (env, "intern");
 emacs_value sym_name =
   env->make_string (env, name_str, strlen (name_str));
-emacs_value intern_args[] = @{ sym_name, env->intern (env, "nil") @};
-emacs_value symbol = env->funcall (env, fintern, 2, intern_args);
+emacs_value symbol = env->funcall (env, fintern, 1, &sym_name);
 @end example
 
 @end deftypefn

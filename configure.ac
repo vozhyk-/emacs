@@ -4,7 +4,7 @@ dnl	autoconf
 dnl in the directory containing this script.
 dnl If you changed any AC_DEFINES, also run autoheader.
 dnl
-dnl Copyright (C) 1994-1996, 1999-2019 Free Software Foundation, Inc.
+dnl Copyright (C) 1994-1996, 1999-2020 Free Software Foundation, Inc.
 dnl
 dnl  This file is part of GNU Emacs.
 dnl
@@ -3744,7 +3744,12 @@ HAVE_MODULES=no
 MODULES_OBJ=
 case $opsys in
   cygwin|mingw32) MODULES_SUFFIX=".dll" ;;
+  darwin) MODULES_SUFFIX=".dylib" ;;
   *) MODULES_SUFFIX=".so" ;;
+esac
+case "${opsys}" in
+  darwin) MODULES_SECONDARY_SUFFIX='.so' ;;
+  *) MODULES_SECONDARY_SUFFIX='' ;;
 esac
 if test "${with_modules}" != "no"; then
   case $opsys in
@@ -3776,11 +3781,16 @@ if test "${HAVE_MODULES}" = yes; then
    AC_DEFINE(HAVE_MODULES, 1, [Define to 1 if dynamic modules are enabled])
    AC_DEFINE_UNQUOTED(MODULES_SUFFIX, "$MODULES_SUFFIX",
      [System extension for dynamic libraries])
+   if test -n "${MODULES_SECONDARY_SUFFIX}"; then
+     AC_DEFINE_UNQUOTED(MODULES_SECONDARY_SUFFIX, "$MODULES_SECONDARY_SUFFIX",
+       [Alternative system extension for dynamic libraries.])
+   fi
 fi
 AC_SUBST(MODULES_OBJ)
 AC_SUBST(LIBMODULES)
 AC_SUBST(HAVE_MODULES)
 AC_SUBST(MODULES_SUFFIX)
+AC_SUBST(MODULES_SECONDARY_SUFFIX)
 
 AC_CONFIG_FILES([src/emacs-module.h])
 AC_SUBST_FILE([module_env_snippet_25])
@@ -5255,7 +5265,7 @@ fi
 
 version=$PACKAGE_VERSION
 
-copyright="Copyright (C) 2019 Free Software Foundation, Inc."
+copyright="Copyright (C) 2020 Free Software Foundation, Inc."
 AC_DEFINE_UNQUOTED(COPYRIGHT, ["$copyright"],
   [Short copyright string for this version of Emacs.])
 AC_SUBST(copyright)
@@ -5633,7 +5643,7 @@ AC_SUBST(WINDOW_SYSTEM_OBJ)
 
 AH_TOP([/* GNU Emacs site configuration template file.
 
-Copyright (C) 1988, 1993-1994, 1999-2002, 2004-2019
+Copyright (C) 1988, 1993-1994, 1999-2002, 2004-2020
   Free Software Foundation, Inc.
 
 This file is part of GNU Emacs.

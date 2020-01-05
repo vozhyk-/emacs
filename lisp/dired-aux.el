@@ -1,6 +1,6 @@
 ;;; dired-aux.el --- less commonly used parts of dired -*- lexical-binding: t -*-
 
-;; Copyright (C) 1985-1986, 1992, 1994, 1998, 2000-2019 Free Software
+;; Copyright (C) 1985-1986, 1992, 1994, 1998, 2000-2020 Free Software
 ;; Foundation, Inc.
 
 ;; Author: Sebastian Kremer <sk@thp.uni-koeln.de>.
@@ -2957,6 +2957,7 @@ with the command \\[tags-loop-continue]."
 
 (declare-function xref--show-xrefs "xref")
 (declare-function xref-query-replace-in-results "xref")
+(declare-function project--files-in-directory "project")
 
 ;;;###autoload
 (defun dired-do-find-regexp (regexp)
@@ -2975,19 +2976,24 @@ REGEXP should use constructs supported by your local `grep' command."
   (require 'xref)
   (defvar grep-find-ignored-files)
   (declare-function rgrep-find-ignored-directories "grep" (dir))
-  (let* ((files (dired-get-marked-files nil nil nil nil t))
+  (let* ((marks (dired-get-marked-files nil nil nil nil t))
          (ignores (nconc (mapcar
                           #'file-name-as-directory
                           (rgrep-find-ignored-directories default-directory))
                          grep-find-ignored-files))
          (fetcher
           (lambda ()
-            (let ((xrefs (mapcan
-                          (lambda (file)
-                            (xref-collect-matches regexp "*" file
-                                                  (and (file-directory-p file)
-                                                       ignores)))
-                          files)))
+            (let (files xrefs)
+              (mapc
+               (lambda (mark)
+                 (if (file-directory-p mark)
+                     (setq files (nconc
+                                  (project--files-in-directory mark ignores "*")
+                                  files))
+                   (push mark files)))
+               (nreverse marks))
+              (setq xrefs
+                    (xref-matches-in-files regexp files))
               (unless xrefs
                 (user-error "No matches for: %s" regexp))
               xrefs))))

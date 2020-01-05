@@ -1,6 +1,6 @@
 ;;; ediff-init.el --- Macros, variables, and defsubsts used by Ediff  -*- lexical-binding:t -*-
 
-;; Copyright (C) 1994-2019 Free Software Foundation, Inc.
+;; Copyright (C) 1994-2020 Free Software Foundation, Inc.
 
 ;; Author: Michael Kifer <kifer@cs.stonybrook.edu>
 ;; Package: ediff
@@ -1282,7 +1282,7 @@ Do not start with `~/' or `~USERNAME/'."
 (defcustom ediff-metachars "[ \t\n!\"#$&'()*;<=>?[\\^`{|~]"
   "Regexp that matches characters that must be quoted with `\\' in shell command line.
 This default should work without changes."
-  :type 'string
+  :type 'regexp
   :group 'ediff)
 
 ;; needed to simulate frame-char-width in XEmacs.

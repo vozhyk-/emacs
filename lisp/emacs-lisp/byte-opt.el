@@ -1,6 +1,6 @@
 ;;; byte-opt.el --- the optimization passes of the emacs-lisp byte compiler -*- lexical-binding: t -*-
 
-;; Copyright (C) 1991, 1994, 2000-2019 Free Software Foundation, Inc.
+;; Copyright (C) 1991, 1994, 2000-2020 Free Software Foundation, Inc.
 
 ;; Author: Jamie Zawinski <jwz@lucid.com>
 ;;	Hallvard Furuseth <hbf@ulrik.uio.no>
@@ -480,6 +480,13 @@
                                                  backwards)))))
 	     (cons fn (mapcar 'byte-optimize-form (cdr form)))))
 
+	  ((eq fn 'while)
+           (unless (consp (cdr form))
+	     (byte-compile-warn "too few arguments for `while'"))
+           (cons fn
+                 (cons (byte-optimize-form (cadr form) nil)
+                       (byte-optimize-body (cddr form) t))))
+
 	  ((eq fn 'interactive)
 	   (byte-compile-warn "misplaced interactive spec: `%s'"
 			      (prin1-to-string form))
@@ -491,15 +498,12 @@
 	   form)
 
 	  ((eq fn 'condition-case)
-           (if byte-compile--use-old-handlers
-               ;; Will be optimized later.
-               form
-             `(condition-case ,(nth 1 form) ;Not evaluated.
-                  ,(byte-optimize-form (nth 2 form) for-effect)
-                ,@(mapcar (lambda (clause)
-                            `(,(car clause)
-                              ,@(byte-optimize-body (cdr clause) for-effect)))
-                          (nthcdr 3 form)))))
+           `(condition-case ,(nth 1 form) ;Not evaluated.
+                ,(byte-optimize-form (nth 2 form) for-effect)
+              ,@(mapcar (lambda (clause)
+                          `(,(car clause)
+                            ,@(byte-optimize-body (cdr clause) for-effect)))
+                        (nthcdr 3 form))))
 
 	  ((eq fn 'unwind-protect)
 	   ;; the "protected" part of an unwind-protect is compiled (and thus
@@ -514,12 +518,7 @@
 	  ((eq fn 'catch)
 	   (cons fn
 		 (cons (byte-optimize-form (nth 1 form) nil)
-                       (if byte-compile--use-old-handlers
-                           ;; The body of a catch is compiled (and thus
-                           ;; optimized) as a top-level form, so don't do it
-                           ;; here.
-                           (cdr (cdr form))
-                         (byte-optimize-body (cdr form) for-effect)))))
+                       (byte-optimize-body (cdr form) for-effect))))
 
 	  ((eq fn 'ignore)
 	   ;; Don't treat the args to `ignore' as being

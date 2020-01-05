@@ -1,6 +1,6 @@
 ;;; paragraphs.el --- paragraph and sentence parsing  -*- lexical-binding: t -*-
 
-;; Copyright (C) 1985-1987, 1991, 1994-1997, 1999-2019 Free Software
+;; Copyright (C) 1985-1987, 1991, 1994-1997, 1999-2020 Free Software
 ;; Foundation, Inc.
 
 ;; Maintainer: emacs-devel@gnu.org
@@ -168,7 +168,7 @@ to obtain the value of this variable."
 (defcustom sentence-end-base "[.?!…‽][]\"'”’)}»›]*"
   "Regexp matching the basic end of a sentence, not including following space."
   :group 'paragraphs
-  :type 'string
+  :type 'regexp
   :version "25.1")
 (put 'sentence-end-base 'safe-local-variable 'stringp)
 

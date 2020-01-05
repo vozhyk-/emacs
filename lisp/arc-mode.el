@@ -1,6 +1,6 @@
 ;;; arc-mode.el --- simple editing of archives
 
-;; Copyright (C) 1995, 1997-1998, 2001-2019 Free Software Foundation,
+;; Copyright (C) 1995, 1997-1998, 2001-2020 Free Software Foundation,
 ;; Inc.
 
 ;; Author: Morten Welinder <terra@gnu.org>
@@ -1797,8 +1797,7 @@ This doesn't recover lost files, it just undoes changes in the buffer itself."
         (maxlen 8)
 	(totalsize 0)
         files
-	visual
-        emacs-int-has-32bits)
+	visual)
     (when (= p -1)
       ;; If the offset of end-of-central-directory is -1, this is a
       ;; Zip64 extended ZIP file format, and we need to glean the info

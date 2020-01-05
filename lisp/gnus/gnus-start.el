@@ -1,6 +1,6 @@
 ;;; gnus-start.el --- startup functions for Gnus -*- lexical-binding:t -*-
 
-;; Copyright (C) 1996-2019 Free Software Foundation, Inc.
+;; Copyright (C) 1996-2020 Free Software Foundation, Inc.
 
 ;; Author: Lars Magne Ingebrigtsen <larsi@gnus.org>
 ;; Keywords: news
@@ -1256,19 +1256,19 @@ INFO-LIST), otherwise it's a list in the format of the
 `gnus-newsrc-hashtb' entries.  LEVEL is the new level of the
 group, OLDLEVEL is the old level and PREVIOUS is the group (a
 string name) to insert this group before."
-  (let (group info active num)
-    ;; Glean what info we can from the arguments.
-    (if (consp entry)
-	(setq group (if fromkilled (nth 1 entry) (car (nth 1 entry))))
-      (setq group entry))
+  ;; Glean what info we can from the arguments.
+  (let ((group (if (consp entry)
+	           (if fromkilled (nth 1 entry) (car (nth 1 entry)))
+	         entry))
+	info active num)
     (when (and (stringp entry)
 	       oldlevel
 	       (< oldlevel gnus-level-zombie))
       (setq entry (gnus-group-entry entry)))
-    (if (and (not oldlevel)
-	     (consp entry))
-	(setq oldlevel (gnus-info-level (nth 1 entry)))
-      (setq oldlevel (or oldlevel gnus-level-killed)))
+    (setq oldlevel (if (and (not oldlevel)
+	                    (consp entry))
+	               (gnus-info-level (nth 1 entry))
+	             (or oldlevel gnus-level-killed)))
 
     ;; This table is used for completion, so put a dummy entry there.
     (unless (gethash group gnus-active-hashtb)
@@ -1333,7 +1333,7 @@ string name) to insert this group before."
 	    (let ((method (gnus-method-simplify
 			   (or gnus-override-subscribe-method
 			       (gnus-group-method group)))))
-	      (gnus-info-make group level nil nil method)))
+	      (setq info (gnus-info-make group level nil nil method))))
 	  ;; Add group.  The exact ordering only matters for
 	  ;; `gnus-group-list', though we need to keep the dummy group
 	  ;; at the head of `gnus-newsrc-alist'.
@@ -2871,7 +2871,6 @@ SPECIFIC-VARIABLES, or those in `gnus-variable-list'."
 		    (nth 1 (gethash g gnus-newsrc-hashtb)))
 		  (delete "dummy.group" gnus-group-list)))
     (let* ((print-quoted t)
-           (print-readably t)
            (print-escape-multibyte nil)
            (print-escape-nonascii t)
            (print-length nil)

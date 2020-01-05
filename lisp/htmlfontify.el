@@ -1,6 +1,6 @@
 ;;; htmlfontify.el --- htmlize a buffer/source tree with optional hyperlinks -*- lexical-binding: t -*-
 
-;; Copyright (C) 2002-2003, 2009-2019 Free Software Foundation, Inc.
+;; Copyright (C) 2002-2003, 2009-2020 Free Software Foundation, Inc.
 
 ;; Emacs Lisp Archive Entry
 ;; Package: htmlfontify
@@ -197,7 +197,7 @@ It takes only one argument, the filename."
   "Regex to remove from the `<style> a' variant of an htmlfontify CSS class."
   :group 'htmlfontify
   :tag   "src-doc-link-unstyle"
-  :type  '(string))
+  :type  '(regexp))
 
 (defcustom hfy-link-extn nil
   "File extension used for href links.

@@ -1,6 +1,6 @@
 ;;; man.el --- browse UNIX manual pages -*- lexical-binding: t -*-
 
-;; Copyright (C) 1993-1994, 1996-1997, 2001-2019 Free Software
+;; Copyright (C) 1993-1994, 1996-1997, 2001-2020 Free Software
 ;; Foundation, Inc.
 
 ;; Author: Barry A. Warsaw <bwarsaw@cen.com>
@@ -253,7 +253,7 @@ the associated section number."
   "Regexp that matches the text that precedes the command's name.
 Used in `bookmark-set' to get the default bookmark name."
   :version "24.1"
-  :type 'string :group 'bookmark)
+  :type 'regexp :group 'bookmark)
 
 (defcustom manual-program "man"
   "Program used by `man' to produce man pages."

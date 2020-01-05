@@ -1,6 +1,6 @@
 /* Minibuffer input and completion.
 
-Copyright (C) 1985-1986, 1993-2019 Free Software Foundation, Inc.
+Copyright (C) 1985-1986, 1993-2020 Free Software Foundation, Inc.
 
 This file is part of GNU Emacs.
 
@@ -414,8 +414,8 @@ read_minibuf (Lisp_Object map, Lisp_Object initial, Lisp_Object prompt,
   if (!enable_recursive_minibuffers
       && minibuf_level > 0)
     {
-      Lisp_Object str = build_string ("Command attempted to use minibuffer"
-                                      "while in minibuffer");
+      Lisp_Object str
+	= build_string ("Command attempted to use minibuffer while in minibuffer");
       if (EQ (selected_window, minibuf_window))
 	Fsignal (Quser_error, (list1 (str)));
       else

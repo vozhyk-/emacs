@@ -1,6 +1,6 @@
 ;;; bindat.el --- binary data structure packing and unpacking.
 
-;; Copyright (C) 2002-2019 Free Software Foundation, Inc.
+;; Copyright (C) 2002-2020 Free Software Foundation, Inc.
 
 ;; Author: Kim F. Storm <storm@cua.dk>
 ;; Assignment name: struct.el
@@ -148,9 +148,6 @@
 ;;          |  vec LEN [TYPE]           -- vector of LEN items of TYPE (default: u8)
 ;;          |  ip                       -- 4 byte vector
 ;;          |  bits LEN                 -- List with bits set in LEN bytes.
-;;
-;;          -- Note: 32 bit values may be limited by emacs' INTEGER
-;;             implementation limits.
 ;;
 ;;          -- Example: `bits 2' will unpack 0x28 0x1c to (2 3 4 11 13)
 ;;                                       and 0x1c 0x28 to (3 5 10 11 12).

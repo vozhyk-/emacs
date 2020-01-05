@@ -1,6 +1,6 @@
 ;;; erc-backend.el --- Backend network communication for ERC  -*- lexical-binding:t -*-
 
-;; Copyright (C) 2004-2019 Free Software Foundation, Inc.
+;; Copyright (C) 2004-2020 Free Software Foundation, Inc.
 
 ;; Filename: erc-backend.el
 ;; Author: Lawrence Mitchell <wence@gmx.li>
@@ -375,7 +375,7 @@ Example: If you know that the channel #linux-ru uses the coding-system
 `cyrillic-koi8', then add (\"#linux-ru\" . cyrillic-koi8) to the
 alist."
   :group 'erc-server
-  :type '(repeat (cons (string :tag "Target")
+  :type '(repeat (cons (regexp :tag "Target")
                        coding-system)))
 
 (defcustom erc-server-connect-function #'erc-open-network-stream

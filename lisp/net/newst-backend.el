@@ -1,6 +1,6 @@
 ;;; newst-backend.el --- Retrieval backend for newsticker  -*- lexical-binding:t -*-
 
-;; Copyright (C) 2003-2019 Free Software Foundation, Inc.
+;; Copyright (C) 2003-2020 Free Software Foundation, Inc.
 
 ;; Author:      Ulf Jasper <ulf.jasper@web.de>
 ;; Filename:    newst-backend.el
@@ -363,7 +363,7 @@ description are marked as immortal."
                                (const :tag "Title" title)
                                (const :tag "Description" description)
                                (const :tag "All" all))
-                              (string :tag "Regexp")))))
+                              (regexp :tag "Regexp")))))
   :group 'newsticker-headline-processing)
 
 ;; ======================================================================

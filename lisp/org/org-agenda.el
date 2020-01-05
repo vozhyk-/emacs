@@ -1,6 +1,6 @@
 ;;; org-agenda.el --- Dynamic task and appointment lists for Org
 
-;; Copyright (C) 2004-2019 Free Software Foundation, Inc.
+;; Copyright (C) 2004-2020 Free Software Foundation, Inc.
 
 ;; Author: Carsten Dominik <carsten at orgmode dot org>
 ;; Keywords: outlines, hypermedia, calendar, wp
@@ -1883,7 +1883,7 @@ Nil means don't hide any tags."
   :group 'org-agenda-line-format
   :type '(choice
 	  (const  :tag "Hide none" nil)
-	  (string :tag "Regexp   ")))
+	  (regexp :tag "Regexp   ")))
 
 (defvaralias 'org-agenda-remove-tags-when-in-prefix
   'org-agenda-remove-tags)
@@ -1980,7 +1980,7 @@ category, you can use:
   (\"Emacs\" \\='(space . (:width (16))))"
   :group 'org-agenda-line-format
   :version "24.1"
-  :type '(alist :key-type (string :tag "Regexp matching category")
+  :type '(alist :key-type (regexp :tag "Regexp matching category")
 		:value-type (choice (list :tag "Icon"
 					  (string :tag "File or data")
 					  (symbol :tag "Type")

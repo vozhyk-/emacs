@@ -1,6 +1,6 @@
 ;;; speedbar --- quick access to files and tags in a frame
 
-;; Copyright (C) 1996-2019 Free Software Foundation, Inc.
+;; Copyright (C) 1996-2020 Free Software Foundation, Inc.
 
 ;; Author: Eric M. Ludlam <zappo@gnu.org>
 ;; Keywords: file, tags, tools
@@ -641,7 +641,7 @@ They should include commonly existing directories which are not
 useful.  It is no longer necessary to include version-control
 directories here; see `vc-directory-exclusion-list'."
   :group 'speedbar
-  :type 'string)
+  :type 'regexp)
 
 (defcustom speedbar-file-unshown-regexp
   (let ((nstr "") (noext completion-ignored-extensions))
@@ -654,7 +654,7 @@ directories here; see `vc-directory-exclusion-list'."
   "Regexp matching files we don't want displayed in a speedbar buffer.
 It is generated from the variable `completion-ignored-extensions'."
   :group 'speedbar
-  :type 'string)
+  :type 'regexp)
 
 (defvar speedbar-file-regexp nil
   "Regular expression matching files we know how to expand.
@@ -1703,7 +1703,7 @@ argument."
       (put-text-property start end 'help-echo #'dframe-help-echo))
   (if function (put-text-property start end 'speedbar-function function))
   (if token (put-text-property start end 'speedbar-token token))
-  ;; So far the only text we have is less that 3 chars.
+  ;; So far the only text we have is less than 3 chars.
   (if (<= (- end start) 3)
       (speedbar-insert-image-button-maybe start (- end start)))
   )

@@ -1,6 +1,6 @@
 ;;; emacs-module-tests --- Test GNU Emacs modules.  -*- lexical-binding: t; -*-
 
-;; Copyright 2015-2019 Free Software Foundation, Inc.
+;; Copyright 2015-2020 Free Software Foundation, Inc.
 
 ;; This file is part of GNU Emacs.
 
@@ -383,5 +383,43 @@ Interactively, you can try hitting \\[keyboard-quit] to quit."
                        most-negative-fixnum (1- most-negative-fixnum)))
     (ert-info ((format "input: %d" input))
       (should (= (mod-test-double input) (* 2 input))))))
+
+(ert-deftest module-darwin-secondary-suffix ()
+  "Check that on Darwin, both .so and .dylib suffixes work.
+See Bug#36226."
+  (skip-unless (eq system-type 'darwin))
+  (should (member ".dylib" load-suffixes))
+  (should (member ".so" load-suffixes))
+  ;; Preserve the old `load-history'.  This is needed for some of the
+  ;; other unit tests that indirectly rely on `load-history'.
+  (let ((load-history load-history)
+        (dylib (concat mod-test-file ".dylib"))
+        (so (concat mod-test-file ".so")))
+    (should (file-regular-p dylib))
+    (should-not (file-exists-p so))
+    (add-name-to-file dylib so)
+    (unwind-protect
+        (load so nil nil :nosuffix :must-suffix)
+      (delete-file so))))
+
+(ert-deftest module/function-finalizer ()
+  "Test that module function finalizers are properly called."
+  ;; We create and leak a couple of module functions with attached
+  ;; finalizer.  Creating only one function risks spilling it to the
+  ;; stack, where it wouldn't be garbage-collected.  However, with one
+  ;; hundred functions, there should be at least one that's
+  ;; unreachable.
+  (dotimes (_ 100)
+    (mod-test-make-function-with-finalizer))
+  (cl-destructuring-bind (valid-before invalid-before)
+      (mod-test-function-finalizer-calls)
+    (should (zerop invalid-before))
+    (garbage-collect)
+    (cl-destructuring-bind (valid-after invalid-after)
+        (mod-test-function-finalizer-calls)
+      (should (zerop invalid-after))
+      ;; We don't require exactly 100 invocations of the finalizer,
+      ;; but at least one.
+      (should (> valid-after valid-before)))))
 
 ;;; emacs-module-tests.el ends here

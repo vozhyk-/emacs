@@ -1,6 +1,6 @@
 ;;; spam.el --- Identifying spam
 
-;; Copyright (C) 2002-2019 Free Software Foundation, Inc.
+;; Copyright (C) 2002-2020 Free Software Foundation, Inc.
 
 ;; Author: Lars Magne Ingebrigtsen <larsi@gnus.org>
 ;; Maintainer: Ted Zlatanov <tzz@lifelogs.com>
@@ -579,7 +579,7 @@ This must be a list.  For example, `(\"-C\" \"configfile\")'."
 (defcustom spam-spamassassin-positive-spam-flag-header "YES"
   "The regex on `spam-spamassassin-spam-flag-header' for positive spam
 identification."
-  :type 'string
+  :type 'regexp
   :group 'spam-spamassassin)
 
 (defcustom spam-spamassassin-spam-status-header "X-Spam-Status"

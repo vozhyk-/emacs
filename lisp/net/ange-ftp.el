@@ -1,6 +1,6 @@
 ;;; ange-ftp.el --- transparent FTP support for GNU Emacs  -*- lexical-binding:t -*-
 
-;; Copyright (C) 1989-1996, 1998, 2000-2019 Free Software Foundation,
+;; Copyright (C) 1989-1996, 1998, 2000-2020 Free Software Foundation,
 ;; Inc.
 
 ;; Author: Andy Norman (ange@hplb.hpl.hp.com)
@@ -838,7 +838,7 @@ If nil, prompt the user for a password."
   "If non-nil, regexp matching hosts on which `dir' command lists directory."
   :group 'ange-ftp
   :type '(choice (const :tag "Default" nil)
-		 string))
+		 regexp))
 
 (defcustom ange-ftp-binary-file-name-regexp ""
   "If a file matches this regexp then it is transferred in binary mode."

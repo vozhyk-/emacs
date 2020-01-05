@@ -1,6 +1,6 @@
 /* emacs-module.c - Module loading and runtime implementation
 
-Copyright (C) 2015-2019 Free Software Foundation, Inc.
+Copyright (C) 2015-2020 Free Software Foundation, Inc.
 
 This file is part of GNU Emacs.
 
@@ -121,12 +121,6 @@ To add a new module function, proceed as follows:
 
 /* Function prototype for the module init function.  */
 typedef int (*emacs_init_function) (struct emacs_runtime *);
-
-/* Function prototype for module user-pointer finalizers.  These
-   should not throw C++ exceptions, so emacs-module.h declares the
-   corresponding interfaces with EMACS_NOEXCEPT.  There is only C code
-   in this module, though, so this constraint is not enforced here.  */
-typedef void (*emacs_finalizer) (void *);
 
 
 /* Memory management.  */
@@ -333,6 +327,12 @@ static bool module_assertions = false;
   MODULE_HANDLE_NONLOCAL_EXIT (error_retval)
 
 static void
+CHECK_MODULE_FUNCTION (Lisp_Object obj)
+{
+  CHECK_TYPE (MODULE_FUNCTIONP (obj), Qmodule_function_p, obj);
+}
+
+static void
 CHECK_USER_PTR (Lisp_Object obj)
 {
   CHECK_TYPE (USER_PTRP (obj), Quser_ptrp, obj);
@@ -466,10 +466,6 @@ module_non_local_exit_throw (emacs_env *env, emacs_value tag, emacs_value value)
 				   value_to_lisp (value));
 }
 
-/* Function prototype for the module Lisp functions.  */
-typedef emacs_value (*emacs_subr) (emacs_env *, ptrdiff_t,
-				   emacs_value *, void *);
-
 /* Module function.  */
 
 /* A function environment is an auxiliary structure returned by
@@ -486,8 +482,9 @@ struct Lisp_Module_Function
 
   /* Fields ignored by GC.  */
   ptrdiff_t min_arity, max_arity;
-  emacs_subr subr;
+  emacs_function subr;
   void *data;
+  emacs_finalizer finalizer;
 } GCALIGNED_STRUCT;
 
 static struct Lisp_Module_Function *
@@ -505,7 +502,7 @@ allocate_module_function (void)
 
 static emacs_value
 module_make_function (emacs_env *env, ptrdiff_t min_arity, ptrdiff_t max_arity,
-		      emacs_subr func, const char *docstring, void *data)
+		      emacs_function func, const char *docstring, void *data)
 {
   MODULE_FUNCTION_BEGIN (NULL);
 
@@ -521,6 +518,7 @@ module_make_function (emacs_env *env, ptrdiff_t min_arity, ptrdiff_t max_arity,
   function->max_arity = max_arity;
   function->subr = func;
   function->data = data;
+  function->finalizer = NULL;
 
   if (docstring)
     function->documentation = build_string_from_utf8 (docstring);
@@ -530,6 +528,32 @@ module_make_function (emacs_env *env, ptrdiff_t min_arity, ptrdiff_t max_arity,
   eassert (MODULE_FUNCTIONP (result));
 
   return lisp_to_value (env, result);
+}
+
+static emacs_finalizer
+module_get_function_finalizer (emacs_env *env, emacs_value arg)
+{
+  MODULE_FUNCTION_BEGIN (NULL);
+  Lisp_Object lisp = value_to_lisp (arg);
+  CHECK_MODULE_FUNCTION (lisp);
+  return XMODULE_FUNCTION (lisp)->finalizer;
+}
+
+static void
+module_set_function_finalizer (emacs_env *env, emacs_value arg,
+                               emacs_finalizer fin)
+{
+  MODULE_FUNCTION_BEGIN ();
+  Lisp_Object lisp = value_to_lisp (arg);
+  CHECK_MODULE_FUNCTION (lisp);
+  XMODULE_FUNCTION (lisp)->finalizer = fin;
+}
+
+void
+module_finalize_function (const struct Lisp_Module_Function *func)
+{
+  if (func->finalizer != NULL)
+    func->finalizer (func->data);
 }
 
 static emacs_value
@@ -1339,6 +1363,8 @@ initialize_environment (emacs_env *env, struct emacs_env_private *priv)
   env->make_time = module_make_time;
   env->extract_big_integer = module_extract_big_integer;
   env->make_big_integer = module_make_big_integer;
+  env->get_function_finalizer = module_get_function_finalizer;
+  env->set_function_finalizer = module_set_function_finalizer;
   Vmodule_environments = Fcons (make_mint_ptr (env), Vmodule_environments);
   return env;
 }

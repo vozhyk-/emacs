@@ -1,6 +1,6 @@
 ;;; erc-ezbounce.el ---  Handle EZBounce bouncer commands
 
-;; Copyright (C) 2002, 2004, 2006-2019 Free Software Foundation, Inc.
+;; Copyright (C) 2002, 2004, 2006-2020 Free Software Foundation, Inc.
 
 ;; Author: Andreas Fuchs <asf@void.at>
 ;; Maintainer: emacs-devel@gnu.org
@@ -34,7 +34,7 @@
 (defcustom erc-ezb-regexp "^ezbounce!srv$"
   "Regexp used by the EZBouncer to identify itself to the user."
   :group 'erc-ezbounce
-  :type 'string)
+  :type 'regexp)
 
 (defcustom erc-ezb-login-alist '()
   "Alist of logins suitable for the server we're connecting to.

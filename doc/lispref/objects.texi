@@ -1,6 +1,6 @@
 @c -*- mode: texinfo; coding: utf-8 -*-
 @c This is part of the GNU Emacs Lisp Reference Manual.
-@c Copyright (C) 1990-1995, 1998-1999, 2001-2019 Free Software
+@c Copyright (C) 1990--1995, 1998--1999, 2001--2020 Free Software
 @c Foundation, Inc.
 @c See the file elisp.texi for copying conditions.
 @node Lisp Data Types
@@ -160,7 +160,7 @@ Skip the next @samp{N} characters (@pxref{Comments}).
 @samp{N} represented as a binary number (@samp{#b101010}).
 
 @item #(@dots{})
-A string text properties (@pxref{Text Props and Strings}).
+String text properties (@pxref{Text Props and Strings}).
 
 @item #^
 A char table (@pxref{Char-Table Type}).
