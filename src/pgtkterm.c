@@ -357,13 +357,13 @@ x_set_offset (struct frame *f, int xoff, int yoff, int change_gravity)
 {
   /* not working on wayland. */
 
-  PGTK_TRACE("x_set_offset: %d,%d,%d.", xoff, yoff, change_gravity);
+  APGTK_TRACE("x_set_offset: %d,%d,%d.", xoff, yoff, change_gravity);
 
   if (change_gravity > 0)
     {
-      PGTK_TRACE("x_set_offset: change_gravity > 0");
-      f->top_pos = yoff;
-      f->left_pos = xoff;
+      APGTK_TRACE("x_set_offset: change_gravity > 0");
+      f->top_pos = yoff+60;
+      f->left_pos = xoff + 25;
       f->size_hint_flags &= ~ (XNegative | YNegative);
       if (xoff < 0)
 	f->size_hint_flags |= XNegative;
@@ -381,7 +381,7 @@ x_set_offset (struct frame *f, int xoff, int yoff, int change_gravity)
      has been realized already, leave it to gtk_window_move to DTRT
      and return.  Used for Bug#25851 and Bug#25943.  */
   if (change_gravity != 0 && FRAME_GTK_OUTER_WIDGET (f)) {
-    PGTK_TRACE("x_set_offset: move to %d,%d.", f->left_pos, f->top_pos);
+    APGTK_TRACE("x_set_offset: move to %d,%d.", f->left_pos, f->top_pos);
     gtk_window_move (GTK_WINDOW (FRAME_GTK_OUTER_WIDGET (f)),
 		     f->left_pos, f->top_pos);
   }
