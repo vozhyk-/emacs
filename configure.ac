@@ -3498,6 +3498,7 @@ fi   # "${HAVE_X11}" != "yes"
 
 HAVE_HARFBUZZ=no
 if test "${HAVE_X11}" = "yes" && test "${HAVE_FREETYPE}" = "yes" \
+        || test "$window_system" = "pgtk" \
         || test "${HAVE_W32}" = "yes"; then
   if test "${with_harfbuzz}" != "no"; then
     ### On MS-Windows we use hb_font_get_nominal_glyph, which appeared
