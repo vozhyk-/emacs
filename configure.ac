@@ -3660,7 +3660,7 @@ HAVE_JPEG=no
 LIBJPEG=
 if test "${NS_IMPL_COCOA}" = yes; then
   : # Cocoa provides its own jpeg support, so do nothing.
-elif test "${HAVE_X11}" = "yes" || test "${HAVE_W32}" = "yes"; then
+elif test "${HAVE_X11}" = "yes" || test "${HAVE_W32}" = "yes" || test "$window_system" = "pgtk"; then
   if test "${with_jpeg}" != "no"; then
     AC_CACHE_CHECK([for jpeglib 6b or later],
       [emacs_cv_jpeglib],
