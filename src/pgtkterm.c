@@ -2955,13 +2955,6 @@ pgtk_update_end (struct frame *f)
 {
   /* Mouse highlight may be displayed again.  */
   MOUSE_HL_INFO (f)->mouse_face_defer = false;
-
-  if (FRAME_CR_SURFACE (f))
-    {
-      block_input();
-      gtk_widget_queue_draw(FRAME_GTK_WIDGET(f));
-      unblock_input ();
-    }
 }
 
 /* Return the current position of the mouse.
