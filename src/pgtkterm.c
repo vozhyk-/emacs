@@ -98,7 +98,7 @@ pgtk_any_window_to_frame (GdkWindow *window);
 
 static void flip_cr_context(struct frame *f)
 {
-  APGTK_TRACE("flip_cr_context");
+  PGTK_TRACE("flip_cr_context");
   cairo_t * cr = FRAME_CR_ACTIVE_CONTEXT(f);
 
   block_input();
@@ -407,7 +407,6 @@ pgtk_set_window_size (struct frame *f,
   block_input ();
 
   gtk_widget_get_size_request(FRAME_GTK_WIDGET(f), &pixelwidth, &pixelheight);
-  PGTK_TRACE("old: %dx%d", pixelwidth, pixelheight);
 
   if (pixelwise)
     {
@@ -428,18 +427,13 @@ pgtk_set_window_size (struct frame *f,
 	    make_fixnum (FRAME_PGTK_TITLEBAR_HEIGHT (f)),
 	    make_fixnum (FRAME_TOOLBAR_HEIGHT (f))));
 
-  PGTK_TRACE("new: %dx%d", pixelwidth, pixelheight);
   for (GtkWidget *w = FRAME_GTK_WIDGET(f); w != NULL; w = gtk_widget_get_parent(w)) {
-    PGTK_TRACE("%p %s %d %d", w, G_OBJECT_TYPE_NAME(w), gtk_widget_get_mapped(w), gtk_widget_get_visible(w));
     gint wd, hi;
     gtk_widget_get_size_request(w, &wd, &hi);
-    PGTK_TRACE(" %dx%d", wd, hi);
     GtkAllocation alloc;
     gtk_widget_get_allocation(w, &alloc);
-    PGTK_TRACE(" %dx%d+%d+%d", alloc.width, alloc.height, alloc.x, alloc.y);
   }
 
-  PGTK_TRACE("pgtk_set_window_size: %p: %dx%d.", f, width, height);
   f->output_data.pgtk->preferred_width = pixelwidth;
   f->output_data.pgtk->preferred_height = pixelheight;
   x_wm_set_size_hint(f, 0, 0);
@@ -677,6 +671,63 @@ x_display_pixel_width (struct pgtk_display_info *dpyinfo)
   PGTK_TRACE(" = %d", gdk_screen_get_width(gscr));
   return gdk_screen_get_width(gscr);
 }
+
+void
+x_set_parent_frame (struct frame *f, Lisp_Object new_value, Lisp_Object old_value)
+/* --------------------------------------------------------------------------
+     Set frame F's `parent-frame' parameter.  If non-nil, make F a child
+     frame of the frame specified by that parameter.  Technically, this
+     makes F's window-system window a child window of the parent frame's
+     window-system window.  If nil, make F's window-system window a
+     top-level window--a child of its display's root window.
+
+     A child frame's `left' and `top' parameters specify positions
+     relative to the top-left corner of its parent frame's native
+     rectangle.  On macOS moving a parent frame moves all its child
+     frames too, keeping their position relative to the parent
+     unaltered.  When a parent frame is iconified or made invisible, its
+     child frames are made invisible.  When a parent frame is deleted,
+     its child frames are deleted too.
+
+     Whether a child frame has a tool bar may be window-system or window
+     manager dependent.  It's advisable to disable it via the frame
+     parameter settings.
+
+     Some window managers may not honor this parameter.
+   -------------------------------------------------------------------------- */
+{
+  struct frame *p = NULL;
+  int width = 0, height = 0;
+
+  PGTK_TRACE ("x_set_parent_frame x: %d, y: %d, size: %d x %d", f->left_pos, f->top_pos, width, height );
+  gtk_window_get_size(FRAME_X_WINDOW(f), &width, &height);
+
+
+  PGTK_TRACE ("x_set_parent_frame x: %d, y: %d, size: %d x %d", f->left_pos, f->top_pos, width, height );
+
+  if (!NILP (new_value)
+      && (!FRAMEP (new_value)
+	  || !FRAME_LIVE_P (p = XFRAME (new_value))
+	  || !FRAME_PGTK_P (p)))
+    {
+      store_frame_param (f, Qparent_frame, old_value);
+      error ("Invalid specification of `parent-frame'");
+    }
+
+  if (p != FRAME_PARENT_FRAME (f))
+    {
+      block_input ();
+      gtk_window_set_transient_for(FRAME_X_WINDOW(f), FRAME_X_WINDOW(p));
+      gtk_window_set_attached_to(FRAME_X_WINDOW(f), FRAME_X_WINDOW(p));
+      gtk_window_move(FRAME_X_WINDOW(f), f->left_pos, f->top_pos);
+      gtk_window_set_keep_above(FRAME_X_WINDOW(f), true);
+      //fill this in
+      unblock_input ();
+
+      fset_parent_frame (f, new_value);
+    }
+}
+
 
 void
 x_set_no_focus_on_map (struct frame *f, Lisp_Object new_value, Lisp_Object old_value)
@@ -4807,9 +4858,9 @@ pgtk_handle_draw(GtkWidget *widget, cairo_t *cr, gpointer *data)
       if (src == NULL && FRAME_CR_ACTIVE_CONTEXT(f) != NULL)
 	src = cairo_get_target(FRAME_CR_ACTIVE_CONTEXT(f));
     }
-    APGTK_TRACE("  surface=%p", src);
+    PGTK_TRACE("  surface=%p", src);
     if (src != NULL) {
-      APGTK_TRACE("  resized_p=%d", f->resized_p);
+      PGTK_TRACE("  resized_p=%d", f->resized_p);
       PGTK_TRACE("  garbaged=%d", f->garbaged);
       PGTK_TRACE("  scroll_bar_width=%f", (double) PGTK_SCROLL_BAR_WIDTH(f));
       // PGTK_TRACE("  scroll_bar_adjust=%d", PGTK_SCROLL_BAR_ADJUST(f));
@@ -6600,7 +6651,7 @@ pgtk_end_cr_clip (struct frame *f)
 void
 pgtk_set_cr_source_with_gc_foreground (struct frame *f, Emacs_GC *gc)
 {
-  PGTK_TRACE("pgtk_set_cr_source_with_gc_foreground: %08lx", gc->foreground);
+  PGTK_TRACE ("pgtk_set_cr_source_with_gc_foreground: %08lx", gc->foreground);
   pgtk_set_cr_source_with_color(f, gc->foreground);
 }
 
