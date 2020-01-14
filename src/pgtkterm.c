@@ -486,7 +486,6 @@ pgtk_iconify_frame (struct frame *f)
   SET_FRAME_ICONIFIED (f, true);
   SET_FRAME_VISIBLE (f, 0);
 
-  gdk_flush();
   unblock_input ();
 }
 
@@ -521,8 +520,6 @@ pgtk_make_frame_visible (struct frame *f)
       gtk_widget_show(win);
       gtk_window_deiconify(GTK_WINDOW(win));
 
-      gdk_flush();
-
       if (FLOATP (Vpgtk_wait_for_event_timeout)) {
 	guint msec = (guint) (XFLOAT_DATA (Vpgtk_wait_for_event_timeout) * 1000);
 	int found = 0;
@@ -550,7 +547,6 @@ pgtk_make_frame_invisible (struct frame *f)
   GtkWidget *win = FRAME_OUTPUT_DATA(f)->widget;
 
   gtk_widget_hide(win);
-  gdk_flush();
 
   SET_FRAME_VISIBLE (f, 0);
   SET_FRAME_ICONIFIED (f, false);
@@ -3284,9 +3280,6 @@ pgtk_hide_hourglass(struct frame *f)
 static void
 pgtk_flush_display (struct frame *f)
 {
-  block_input ();
-  gdk_flush();
-  unblock_input ();
 }
 
 extern frame_parm_handler pgtk_frame_parm_handlers[];
