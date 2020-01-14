@@ -34,10 +34,6 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include <c-ctype.h>
 #include <flexmember.h>
 
-#ifdef HAVE_PGTK
-#include <cairo.h>
-#endif
-
 #include "lisp.h"
 #include "frame.h"
 #include "process.h"
@@ -406,7 +402,8 @@ static cairo_pattern_t *
 image_create_pattern_from_pixbuf (struct frame *f, GdkPixbuf *pixbuf)
 {
   GdkPixbuf *pb = gdk_pixbuf_add_alpha (pixbuf, TRUE, 255, 255, 255);
-  cairo_surface_t *surface = cairo_surface_create_similar_image (f->output_data.pgtk->cr_surface,
+  cairo_surface_t *surface = cairo_surface_create_similar_image (cairo_get_target(
+								   f->output_data.pgtk->cr_context),
 								 CAIRO_FORMAT_A1,
 								 gdk_pixbuf_get_width (pb),
 								 gdk_pixbuf_get_height (pb));
