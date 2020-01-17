@@ -4302,6 +4302,8 @@ pgtk_delete_terminal (struct terminal *terminal)
       dpyinfo->gdpy = NULL;
     }
 
+  delete_keyboard_wait_descriptor(0);
+
   pgtk_delete_display (dpyinfo);
   unblock_input ();
 }
@@ -6268,6 +6270,11 @@ pgtk_term_init (Lisp_Object display_name, char *resource_name)
   x_setup_pointer_blanking (dpyinfo);
 
   xsettings_initialize (dpyinfo);
+
+  /* According to w32term.c this will stop the emacs console handling
+     code from handling keyboard input when we want gtk to do that for
+     us */
+  add_keyboard_wait_descriptor (0);
 
   pgtk_selection_init();
 
