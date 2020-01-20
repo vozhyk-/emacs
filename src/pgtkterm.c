@@ -58,7 +58,6 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include "font.h"
 #include "xsettings.h"
 #include "pgtkselect.h"
-#include "pgtkconn.h"
 
 #define STORE_KEYSYM_FOR_DEBUG(keysym) ((void)0)
 
@@ -95,7 +94,6 @@ static void pgtk_clip_to_row (struct window *w, struct glyph_row *row,
 				enum glyph_row_area area, cairo_t *cr);
 static struct frame *
 pgtk_any_window_to_frame (GdkWindow *window);
-
 
 static void evq_enqueue(union buffered_input_event *ev)
 {
@@ -4304,17 +4302,7 @@ pgtk_delete_terminal (struct terminal *terminal)
       dpyinfo->gdpy = NULL;
     }
 
-  /* ...but if called from x_connection_closed, the display may already
-     be closed and dpyinfo->display was set to 0 to indicate that.  Since
-     X server is most likely gone, explicit close is the only reliable
-     way to continue and avoid Bug#19147.  */
-  else if (dpyinfo->connection >= 0)
-    emacs_close (dpyinfo->connection);
-
-  /* No more input on this descriptor.  */
-  delete_keyboard_wait_descriptor (dpyinfo->connection);
-  /* Mark as dead. */
-  dpyinfo->connection = -1;
+  delete_keyboard_wait_descriptor(0);
 
   pgtk_delete_display (dpyinfo);
   unblock_input ();
@@ -6124,7 +6112,6 @@ pgtk_term_init (Lisp_Object display_name, char *resource_name)
   static char *initial_display = NULL;
   char *dpy_name;
   Lisp_Object lisp_dpy_name = Qnil;
-  int conn_fd;
 
   block_input ();
 
@@ -6139,11 +6126,6 @@ pgtk_term_init (Lisp_Object display_name, char *resource_name)
 
       ++x_initialized;
     }
-
-#if 0
-  if (! x_display_ok (SSDATA (display_name)))
-    error ("Display %s can't be opened", SSDATA (display_name));
-#endif
 
   dpy_name = SSDATA (display_name);
   if (strlen(dpy_name) == 0 && initial_display != NULL)
@@ -6212,14 +6194,7 @@ pgtk_term_init (Lisp_Object display_name, char *resource_name)
       return 0;
     }
 
-  conn_fd = pgtk_detect_connection(dpy);
-  if (conn_fd < 0) {
-    unblock_input();
-    return 0;
-  }
-
   /* We have definitely succeeded.  Record the new connection.  */
-
   dpyinfo = xzalloc (sizeof *dpyinfo);
   pgtk_initialize_display_info (dpyinfo);
   terminal = pgtk_create_terminal (dpyinfo);
@@ -6251,7 +6226,6 @@ pgtk_term_init (Lisp_Object display_name, char *resource_name)
 
   dpyinfo->name_list_element = Fcons (lisp_dpy_name, Qnil);
   dpyinfo->gdpy = dpy;
-  dpyinfo->connection = conn_fd;
 
   /* https://lists.gnu.org/r/emacs-devel/2015-11/msg00194.html  */
   dpyinfo->smallest_font_height = 1;
@@ -6297,16 +6271,10 @@ pgtk_term_init (Lisp_Object display_name, char *resource_name)
 
   xsettings_initialize (dpyinfo);
 
-  /* This is only needed for distinguishing keyboard and process input.  */
-  if (dpyinfo->connection != 0)
-    add_keyboard_wait_descriptor (dpyinfo->connection);
-
-#ifdef F_SETOWN
-  fcntl (dpyinfo->connection, F_SETOWN, getpid ());
-#endif /* ! defined (F_SETOWN) */
-
-  if (interrupt_input)
-    init_sigio (dpyinfo->connection);
+  /* According to w32term.c this will stop the emacs console handling
+     code from handling keyboard input when we want gtk to do that for
+     us */
+  add_keyboard_wait_descriptor (0);
 
   pgtk_selection_init();
 
