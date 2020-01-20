@@ -1350,7 +1350,7 @@ xg_create_frame_widgets (struct frame *f)
   wtop = gtk_window_new (type);
 #ifdef HAVE_PGTK
 	gtk_widget_add_events(wtop, GDK_ALL_EVENTS_MASK);
-	gtk_window_set_hide_titlebar_when_maximized(wtop, TRUE);
+	gtk_window_set_hide_titlebar_when_maximized(GTK_WINDOW(wtop), TRUE);
 #endif
 
   /* gtk_window_set_has_resize_grip is a Gtk+ 3.0 function but Ubuntu
@@ -1693,10 +1693,8 @@ x_wm_set_size_hint (struct frame *f, long int flags, bool user_position)
 		 sizeof (size_hints)) != 0)
     {
       block_input ();
-#ifndef HAVE_PGTK
       gtk_window_set_geometry_hints (GTK_WINDOW (FRAME_GTK_OUTER_WIDGET (f)),
 				     NULL, &size_hints, hint_flags);
-#endif
       f->output_data.xp->size_hints = size_hints;
       f->output_data.xp->hint_flags = hint_flags;
       unblock_input ();

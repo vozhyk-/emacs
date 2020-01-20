@@ -38,6 +38,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 
 #include "lisp.h"
 #include "blockinput.h"
+#include "frame.h"
 #include "sysselect.h"
 #include "gtkutil.h"
 #include "systime.h"
@@ -357,13 +358,24 @@ x_set_offset (struct frame *f, int xoff, int yoff, int change_gravity)
 {
   /* not working on wayland. */
 
-  APGTK_TRACE("x_set_offset: %d,%d,%d.", xoff, yoff, change_gravity);
+  PGTK_TRACE("x_set_offset: %d,%d,%d.", xoff, yoff, change_gravity);
+
+  struct frame *parent = FRAME_PARENT_FRAME(f);
+  GtkAllocation a = {0};
+
+  if (parent)
+    {
+      GtkWidget *w = FRAME_GTK_WIDGET(parent);
+      gtk_widget_get_allocation(w, &a);
+    }
+
 
   if (change_gravity > 0)
     {
-      APGTK_TRACE("x_set_offset: change_gravity > 0");
-      f->top_pos = yoff+60;
-      f->left_pos = xoff + 25;
+      PGTK_TRACE("x_set_offset: change_gravity %d > 0, %d %d", change_gravity, a.x , a.y);
+      f->top_pos = yoff + a.y; //~60
+      f->left_pos = xoff + a.x; //~25
+
       f->size_hint_flags &= ~ (XNegative | YNegative);
       if (xoff < 0)
 	f->size_hint_flags |= XNegative;
@@ -381,7 +393,7 @@ x_set_offset (struct frame *f, int xoff, int yoff, int change_gravity)
      has been realized already, leave it to gtk_window_move to DTRT
      and return.  Used for Bug#25851 and Bug#25943.  */
   if (change_gravity != 0 && FRAME_GTK_OUTER_WIDGET (f)) {
-    APGTK_TRACE("x_set_offset: move to %d,%d.", f->left_pos, f->top_pos);
+    PGTK_TRACE("x_set_offset: move to %d,%d.", f->left_pos, f->top_pos);
     gtk_window_move (GTK_WINDOW (FRAME_GTK_OUTER_WIDGET (f)),
 		     f->left_pos, f->top_pos);
   }
@@ -430,8 +442,6 @@ pgtk_set_window_size (struct frame *f,
   for (GtkWidget *w = FRAME_GTK_WIDGET(f); w != NULL; w = gtk_widget_get_parent(w)) {
     gint wd, hi;
     gtk_widget_get_size_request(w, &wd, &hi);
-    GtkAllocation alloc;
-    gtk_widget_get_allocation(w, &alloc);
   }
 
   f->output_data.pgtk->preferred_width = pixelwidth;
@@ -697,13 +707,7 @@ x_set_parent_frame (struct frame *f, Lisp_Object new_value, Lisp_Object old_valu
    -------------------------------------------------------------------------- */
 {
   struct frame *p = NULL;
-  int width = 0, height = 0;
-
-  PGTK_TRACE ("x_set_parent_frame x: %d, y: %d, size: %d x %d", f->left_pos, f->top_pos, width, height );
-  gtk_window_get_size(FRAME_NATIVE_WINDOW(f), &width, &height);
-
-
-  PGTK_TRACE ("x_set_parent_frame x: %d, y: %d, size: %d x %d", f->left_pos, f->top_pos, width, height );
+  PGTK_TRACE ("x_set_parent_frame x: %d, y: %d", f->left_pos, f->top_pos);
 
   if (!NILP (new_value)
       && (!FRAMEP (new_value)
@@ -722,7 +726,6 @@ x_set_parent_frame (struct frame *f, Lisp_Object new_value, Lisp_Object old_valu
       gtk_window_set_attached_to(FRAME_NATIVE_WINDOW(f), FRAME_GTK_WIDGET(p));
       gtk_window_move(FRAME_NATIVE_WINDOW(f), f->left_pos, f->top_pos);
       gtk_window_set_keep_above(FRAME_NATIVE_WINDOW(f), true);
-      //fill this in
       unblock_input ();
 
       fset_parent_frame (f, new_value);
@@ -2683,7 +2686,6 @@ pgtk_draw_window_cursor (struct window *w, struct glyph_row *glyph_row, int x,
 {
   PGTK_TRACE("draw_window_cursor: %d, %d, %d, %d, %d, %d.",
 	       x, y, cursor_type, cursor_width, on_p, active_p);
-
   if (on_p)
     {
       w->phys_cursor_type = cursor_type;
@@ -2732,6 +2734,7 @@ pgtk_draw_window_cursor (struct window *w, struct glyph_row *glyph_row, int x,
 	  xic_set_preeditarea (w, x, y);
 #endif
     }
+
 }
 
 static void

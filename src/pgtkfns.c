@@ -1459,12 +1459,14 @@ This function is an internal primitive--use `make-frame' instead.  */)
       struct frame *p = XFRAME (parent_frame);
 
       block_input ();
-      APGTK_TRACE ("x_set_parent_frame x: %d, y: %d, size: %d x %d", f->left_pos, f->top_pos, -1,-1);
-      gtk_window_set_transient_for(FRAME_GTK_OUTER_WIDGET(f), FRAME_GTK_OUTER_WIDGET(p));
-      gtk_window_set_attached_to(FRAME_GTK_OUTER_WIDGET(f), FRAME_GTK_OUTER_WIDGET(p));
-
+      PGTK_TRACE ("x_set_parent_frame x: %d, y: %d", f->left_pos, f->top_pos);
+      gtk_window_set_transient_for(GTK_WINDOW(FRAME_GTK_OUTER_WIDGET(f)),
+				   GTK_WINDOW(FRAME_GTK_OUTER_WIDGET(p)));
+      gtk_window_set_attached_to(GTK_WINDOW(FRAME_GTK_OUTER_WIDGET(f)),
+				 FRAME_GTK_WIDGET(p));
+      gtk_window_set_destroy_with_parent(GTK_WINDOW(FRAME_GTK_OUTER_WIDGET(f)),
+					 TRUE);
       gtk_widget_show_all(FRAME_GTK_OUTER_WIDGET(f));
-      APGTK_TRACE ("FINISH: x_set_parent_frame x: %d, y: %d, size: %d x %d", f->left_pos, f->top_pos, -1,-1);
       unblock_input ();
     }
 
@@ -3184,7 +3186,7 @@ void pgtk_log(const char *file, int lineno, const char *fmt, ...)
   va_end(ap);
   fputc('\n', stderr);
 }
-
+#ifdef PGTK_DEBUG
 void pgtk_backtrace(const char *file, int lineno)
 {
   Lisp_Object bt = make_uninit_vector(10);
@@ -3214,7 +3216,7 @@ void pgtk_backtrace(const char *file, int lineno)
 
   fprintf(stderr, "%s %.10s:%04d ********\n", timestr, file, lineno);
 }
-#ifdef PGTK_DEBUG
+
 #endif
 
 #endif
