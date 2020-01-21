@@ -3604,6 +3604,17 @@ pgtk_select (int fds_lim, fd_set *rfds, fd_set *wfds, fd_set *efds,
 	tmop = &tmo;
     }
 
+  /* Before sleep, dispatch draw events. */
+  if (context_acquired)
+    {
+      int pselect_errno = errno;
+      block_input ();
+      while (g_main_context_pending (context))
+	g_main_context_dispatch (context);
+      unblock_input ();
+      errno = pselect_errno;
+    }
+
   fds_lim = max_fds + 1;
   nfds = thread_select (pselect, fds_lim,
 			&all_rfds, have_wfds ? &all_wfds : NULL, efds,
@@ -6270,11 +6281,6 @@ pgtk_term_init (Lisp_Object display_name, char *resource_name)
   x_setup_pointer_blanking (dpyinfo);
 
   xsettings_initialize (dpyinfo);
-
-  /* According to w32term.c this will stop the emacs console handling
-     code from handling keyboard input when we want gtk to do that for
-     us */
-  add_keyboard_wait_descriptor (0);
 
   pgtk_selection_init();
 
