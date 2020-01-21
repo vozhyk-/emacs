@@ -131,17 +131,17 @@ I do, so no problem.
 ## My Environment
 
 - archlinux
-- gtk+ 3.24.12
-- glib2 2.62.2
+- gtk+ 3.24.13
+- glib2 2.62.4
 - gcc 9.2.0
 - wayland 1.17.0
 - wayland-protocols 1.18
 - cairo 1.17.2
 - freetype2 2.10.1
-- imagemagick 7.0.9.2
+- imagemagick 7.0.9.16
 - ibus 1.5.21
 - mozc 2.23.2815.102
-- wayfire 0.3
+- wayfire 57a585d
 
 ## Notice
 
