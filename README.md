@@ -145,11 +145,6 @@ I do, so no problem.
 
 ## Notice
 
-- This code is NOT completely pure.
-
-  It uses backend-specific functions to obtain the socket file
-  descriptor to the display server. It supports X11 and Wayland.
-
 - Commit messages are in Japanese.
 
 ## About me
