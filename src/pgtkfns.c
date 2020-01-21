@@ -3176,7 +3176,7 @@ void pgtk_log(const char *file, int lineno, const char *fmt, ...)
   localtime_r(&ts.tv_sec, &tm);
   strftime(timestr, sizeof timestr, "%H:%M:%S", &tm);
 
-  fprintf(stderr, "%s %.10s:%04d ", timestr, file, lineno);
+  fprintf(stderr, "%s.%06ld %.10s:%04d ", timestr, ts.tv_nsec / 1000, file, lineno);
   va_start(ap, fmt);
   vfprintf(stderr, fmt, ap);
   va_end(ap);
@@ -3198,7 +3198,7 @@ void pgtk_backtrace(const char *file, int lineno)
   localtime_r(&ts.tv_sec, &tm);
   strftime(timestr, sizeof timestr, "%H:%M:%S", &tm);
 
-  fprintf(stderr, "%s %.10s:%04d ********\n", timestr, file, lineno);
+  fprintf(stderr, "%s.%06ld %.10s:%04d ********\n", timestr, ts.tv_nsec / 1000, file, lineno);
 
   get_backtrace(bt);
   for (int i = 0; i < 10; i++) {
