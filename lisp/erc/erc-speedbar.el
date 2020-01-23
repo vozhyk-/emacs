@@ -4,7 +4,7 @@
 
 ;; Author: Mario Lang <mlang@delysid.org>
 ;; Contributor: Eric M. Ludlam <zappo@gnu.org>
-;; Maintainer: emacs-devel@gnu.org
+;; Maintainer: Amin Bandali <mab@gnu.org>
 
 ;; This file is part of GNU Emacs.
 
@@ -89,9 +89,8 @@ nil            - Do not sort users"
   "Additional menu-items to add to speedbar frame.")
 
 ;; Make sure our special speedbar major mode is loaded
-(if (featurep 'speedbar)
-    (erc-install-speedbar-variables)
-  (add-hook 'speedbar-load-hook 'erc-install-speedbar-variables))
+(with-eval-after-load 'speedbar
+  (erc-install-speedbar-variables))
 
 ;;; ERC hierarchy display method
 ;;;###autoload
