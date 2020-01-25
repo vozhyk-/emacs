@@ -2915,15 +2915,15 @@ visible.  */)
   return Qnil;
 }
 
-DEFUN ("pgtk-read-file-name", Fpgtk_read_file_name, Spgtk_read_file_name, 2, 5, 0,
+DEFUN ("x-file-dialog", Fx_file_dialog, Sx_file_dialog, 2, 5, 0,
        doc: /* Read file name, prompting with PROMPT in directory DIR.
 Use a file selection dialog.  Select DEFAULT-FILENAME in the dialog's file
 selection box, if specified.  If MUSTMATCH is non-nil, the returned file
 or directory must exist.
 
-This function is only defined on NS, MS Windows, and X Windows with the
+This function is defined only on PGTK, NS, MS Windows, and X Windows with the
 Motif or Gtk toolkits.  With the Motif toolkit, ONLY-DIR-P is ignored.
-Otherwise, if ONLY-DIR-P is non-nil, the user can only select directories.
+Otherwise, if ONLY-DIR-P is non-nil, the user can select only directories.
 On MS Windows 7 and later, the file selection dialog "remembers" the last
 directory where the user selected a file, and will open that directory
 instead of DIR on subsequent invocations of this function with the same
@@ -3107,7 +3107,7 @@ be used as the image of the icon representing the frame.  */);
   defsubr (&Spgtk_print_frames_dialog);
   defsubr (&Spgtk_backend_display_class);
 
-  defsubr (&Spgtk_read_file_name);
+  defsubr (&Sx_file_dialog);
 
   as_status = 0;
   as_script = Qnil;
