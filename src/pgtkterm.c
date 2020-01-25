@@ -570,7 +570,6 @@ pgtk_new_font (struct frame *f, Lisp_Object font_object, int fontset)
 {
   PGTK_TRACE("pgtk_new_font");
   struct font *font = XFONT_OBJECT (font_object);
-  // EmacsView *view = FRAME_NS_VIEW (f);
   int font_ascent, font_descent;
 
   if (fontset < 0)
@@ -4567,7 +4566,7 @@ x_new_focus_frame (struct pgtk_display_info *dpyinfo, struct frame *frame)
 static struct terminal *
 pgtk_create_terminal (struct pgtk_display_info *dpyinfo)
 /* --------------------------------------------------------------------------
-      Set up use of NS before we make the first connection.
+      Set up use of Gtk before we make the first connection.
    -------------------------------------------------------------------------- */
 {
   struct terminal *terminal;
@@ -6325,7 +6324,7 @@ pgtk_delete_display (struct pgtk_display_info *dpyinfo)
 char *
 pgtk_xlfd_to_fontname (const char *xlfd)
 /* --------------------------------------------------------------------------
-    Convert an X font name (XLFD) to an NS font name.
+    Convert an X font name (XLFD) to an Gtk font name.
     Only family is used.
     The string returned is temporarily allocated.
    -------------------------------------------------------------------------- */
@@ -6402,7 +6401,7 @@ int pgtk_parse_color (const char *color_name, Emacs_Color *color)
 int
 pgtk_lisp_to_color (Lisp_Object color, Emacs_Color *col)
 /* --------------------------------------------------------------------------
-     Convert a Lisp string object to a NS color
+     Convert a Lisp string object to a color
    -------------------------------------------------------------------------- */
 {
   PGTK_TRACE("pgtk_lisp_to_color");

@@ -175,8 +175,7 @@ x_set_background_color (struct frame *f, Lisp_Object arg, Lisp_Object oldval)
       error ("Unknown color");
     }
 
-  /* clear the frame; in some instances the NS-internal GC appears not to
-     update, or it does update and cannot clear old text properly */
+  /* clear the frame */
   if (FRAME_VISIBLE_P (f))
     pgtk_clear_frame (f);
 
@@ -370,7 +369,6 @@ pgtk_implicitly_set_name (struct frame *f, Lisp_Object arg, Lisp_Object oldval)
   Lisp_Object icon_title = buffer_local_value
     (Qicon_title_format, XWINDOW (f->selected_window)->contents);
 
-  /* Deal with NS specific format t.  */
   if (FRAME_PGTK_P (f) && ((FRAME_ICONIFIED_P (f) && EQ (icon_title, Qt))
                          || EQ (frame_title, Qt)))
     pgtk_set_name_as_filename (f);
