@@ -194,7 +194,6 @@ locallisppath='${datadir}/emacs/${version}/site-lisp:'\
 lisppath='${locallisppath}:${standardlisppath}'
 etcdir='${datadir}/emacs/${version}/etc'
 archlibdir='${libexecdir}/emacs/${version}/${configuration}'
-emacs_srcdir='${datadir}/emacs/${version}'
 etcdocdir='${datadir}/emacs/${version}/etc'
 gamedir='${localstatedir}/games/emacs'
 
@@ -462,7 +461,7 @@ OPTION_DEFAULT_ON([gsettings],[don't compile with GSettings support])
 OPTION_DEFAULT_ON([selinux],[don't compile with SELinux support])
 OPTION_DEFAULT_ON([gnutls],[don't use -lgnutls for SSL/TLS support])
 OPTION_DEFAULT_ON([zlib],[don't compile with zlib decompression support])
-OPTION_DEFAULT_ON([modules],[compile with dynamic modules support])
+OPTION_DEFAULT_ON([modules],[don't compile with dynamic modules support])
 OPTION_DEFAULT_ON([threads],[don't compile with elisp threading support])
 
 AC_ARG_WITH([file-notification],[AS_HELP_STRING([--with-file-notification=LIB],
@@ -540,15 +539,6 @@ if test "${enableval}" = "no"; then
 elif test "${enableval}" != "yes"; then
   locallisppath=${enableval} locallisppathset=yes
 fi)
-
-AC_ARG_ENABLE([install-srcdir],
-  [AS_HELP_STRING([--disable-install-srcdir],
-     [do not install low-level Emacs source code useful for debugging.])],
-  [case $enableval in
-     yes) ;;
-     no) emacs_srcdir=;;
-     *) AC_MSG_ERROR([invalid install-srcdir]);;
-   esac])
 
 AC_ARG_ENABLE(checking,
 [AS_HELP_STRING([--enable-checking@<:@=LIST@:>@],
@@ -2060,9 +2050,6 @@ if test "${HAVE_NS}" = yes; then
      dnl This one isn't really used, only archlibdir is.
      libexecdir="\${ns_appbindir}/libexec"
      archlibdir="\${ns_appbindir}/libexec"
-     case $emacs_srcdir in
-       ?*) emacs_srcdir="\${ns_appresdir}";;
-     esac
      etcdocdir="\${ns_appresdir}/etc"
      etcdir="\${ns_appresdir}/etc"
      dnl FIXME maybe set datarootdir instead.
@@ -5313,7 +5300,6 @@ AC_SUBST(lisppath)
 AC_SUBST(x_default_search_path)
 AC_SUBST(etcdir)
 AC_SUBST(archlibdir)
-AC_SUBST([emacs_srcdir])
 AC_SUBST(etcdocdir)
 AC_SUBST(bitmapdir)
 AC_SUBST(gamedir)
@@ -5839,9 +5825,9 @@ case $opsys,$emacs_uname_r in
     AC_MSG_WARN([[building Emacs on Cygwin 1.5 is not supported.]])
            echo
 	   ;;
-  cygwin,3.0.[[0-7]]'('*)
+  cygwin,3.0.[[0-7]]'('* | cygwin,3.1.[[0-2]]'('*)
     AC_DEFINE([HAVE_CYGWIN_O_PATH_BUG], 1,
-      [Define to 1 if opening a FIFO with O_PATH causes a hang.]);;
+      [Define to 1 if opening a FIFO, socket, or symlink with O_PATH is buggy.]);;
 esac
 
 # Remove any trailing slashes in these variables.

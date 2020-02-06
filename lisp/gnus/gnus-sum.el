@@ -12310,7 +12310,7 @@ no matter what the properties `:decode' and `:headers' are."
 					  (buffer-string))))))
       (put 'gnus-summary-save-in-pipe :headers headers))
     (unless (zerop (length result))
-      (if (with-current-buffer (get-buffer-create result-buffer)
+      (if (with-current-buffer (gnus-get-buffer-create result-buffer)
 	    (erase-buffer)
 	    (insert result)
 	    (prog1
@@ -12498,7 +12498,7 @@ save those articles instead."
 		       (gnus-activate-group to-newsgroup nil nil to-method)
 		       (gnus-subscribe-group to-newsgroup))
 		  (error "Couldn't create group %s" to-newsgroup)))
-	  (error "No such group: %s" to-newsgroup))
+	  (user-error "No such group: %s" to-newsgroup))
       to-newsgroup)))
 
 (defvar gnus-summary-save-parts-counter)
