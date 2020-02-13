@@ -3721,9 +3721,9 @@ support symbolic links."
 	    (if (process-live-p p)
 	      ;; Display output.
 	      (with-current-buffer output-buffer
-		(display-buffer output-buffer '(nil (allow-no-window . t)))
 		(setq mode-line-process '(":%s"))
-		(shell-mode)
+		(unless (eq major-mode 'shell-mode)
+		  (shell-mode))
 		(set-process-filter p #'comint-output-filter)
 		(set-process-sentinel p #'shell-command-sentinel)
 		(when error-file
@@ -3733,7 +3733,8 @@ support symbolic links."
 		     (with-current-buffer error-buffer
 		       (insert-file-contents-literally
 			error-file nil nil nil 'replace))
-		     (delete-file error-file)))))
+		     (delete-file error-file))))
+		(display-buffer output-buffer '(nil (allow-no-window . t))))
 
 	      (when error-file
 		(delete-file error-file)))))
@@ -4848,7 +4849,12 @@ verbosity of 6."
   "Read a password from user (compat function).
 Consults the auth-source package.
 Invokes `password-read' if available, `read-passwd' else."
-  (let* ((case-fold-search t)
+  (let* (;; If `auth-sources' contains "~/.authinfo.gpg", and
+	 ;; `exec-path' contains a relative file name like ".", it
+	 ;; could happen that the "gpg" command is not found.  So we
+	 ;; adapt `default-directory'.  (Bug#39389, Bug#39489)
+	 (default-directory (tramp-compat-temporary-file-directory))
+	 (case-fold-search t)
 	 (key (tramp-make-tramp-file-name
 	       ;; In tramp-sh.el, we must use "password-vector" due to
 	       ;; multi-hop.
