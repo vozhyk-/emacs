@@ -1562,12 +1562,12 @@ If FILE-SYSTEM is non-nil, return file system attributes."
     (tramp-run-real-handler
      #'rename-file (list filename newname ok-if-already-exists))))
 
-(defun tramp-gvfs-handle-set-file-modes (filename mode)
+(defun tramp-gvfs-handle-set-file-modes (filename mode &optional flag)
   "Like `set-file-modes' for Tramp files."
   (with-parsed-tramp-file-name filename nil
     (tramp-flush-file-properties v localname)
     (tramp-gvfs-send-command
-     v "gvfs-set-attribute" "-t" "uint32"
+     v "gvfs-set-attribute" (if (eq flag 'nofollow) "-nt" "-t") "uint32"
      (tramp-gvfs-url-file-name (tramp-make-tramp-file-name v))
      "unix::mode" (number-to-string mode))))
 
@@ -2345,16 +2345,13 @@ It checks for registered GNOME Online Accounts."
   ;; SERVICE might be encoded as a DNS-SD service.
   (and (string-match tramp-dns-sd-service-regexp service)
        (setq service (match-string 1 service)))
-  (let (result)
-    (maphash
-     (lambda (key _value)
-       (if (and (tramp-goa-account-p key)
-		(string-equal service (tramp-goa-account-method key)))
-	   (push (list (tramp-goa-account-user key)
-		       (tramp-goa-account-host key))
-		 result)))
-     tramp-cache-data)
-    result))
+  (mapcar
+   (lambda (key)
+     (and (tramp-goa-account-p key)
+	  (string-equal service (tramp-goa-account-method key))
+	  (list (tramp-goa-account-user key)
+		(tramp-goa-account-host key))))
+   (hash-table-keys tramp-cache-data)))
 
 
 ;; Media devices functions.
@@ -2407,18 +2404,14 @@ It checks for mounted media devices."
   ;; SERVICE might be encoded as a DNS-SD service.
   (and (string-match tramp-dns-sd-service-regexp service)
        (setq service (match-string 1 service)))
-  (let (result)
-    (maphash
-     (lambda (key _value)
-       (if (and (tramp-media-device-p key)
-		(string-equal service (tramp-media-device-method key))
-		(tramp-get-connection-property key "vector" nil))
-	   (push
-	    (list nil (tramp-file-name-host
-		       (tramp-get-connection-property key "vector" nil)))
-	    result)))
-     tramp-cache-data)
-    result))
+  (mapcar
+   (lambda (key)
+     (and (tramp-media-device-p key)
+	  (string-equal service (tramp-media-device-method key))
+	  (tramp-get-connection-property key "vector" nil)
+	  (list nil (tramp-file-name-host
+		     (tramp-get-connection-property key "vector" nil)))))
+   (hash-table-keys tramp-cache-data)))
 
 
 ;; D-Bus zeroconf functions.

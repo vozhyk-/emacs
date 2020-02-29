@@ -86,7 +86,7 @@
 ;; compiled runtime constants ready for use by (the byte compiled) CC
 ;; Mode, and the source definitions in this file don't have to be
 ;; loaded then.  However, if a byte compiled package is loaded that
-;; has been compiled with a different version of CC Mode than the one
+;; has been compiled with a different version of CC Mode from the one
 ;; currently loaded, then the compiled-in values will be discarded and
 ;; new ones will be built when the mode is initialized.  That will
 ;; automatically trig a load of the file(s) containing the source
@@ -1706,15 +1706,16 @@ ender."
 (c-lang-defvar c-last-c-comment-end-on-line-re
 	       (c-lang-const c-last-c-comment-end-on-line-re))
 
-(c-lang-defconst c-last-open-c-comment-start-on-line-re
-  "Regexp which matches the last block comment start on the
-current ine, if any, or nil in those languages without block
-comments.  When a match is found, submatch 1 contains the comment
-starter."
-  t "\\(/\\*\\)\\([^*]\\|\\*+\\([^*/]\\|$\\)\\)*$"
-  awk nil)
-(c-lang-defvar c-last-open-c-comment-start-on-line-re
-	       (c-lang-const c-last-open-c-comment-start-on-line-re))
+;; The following is no longer used (2020-02-16).
+;; (c-lang-defconst c-last-open-c-comment-start-on-line-re
+;;   "Regexp which matches the last block comment start on the
+;; current ine, if any, or nil in those languages without block
+;; comments.  When a match is found, submatch 1 contains the comment
+;; starter."
+;;   t "\\(/\\*\\)\\([^*]\\|\\*+\\([^*/]\\|$\\)\\)*$"
+;;   awk nil)
+;; (c-lang-defvar c-last-open-c-comment-start-on-line-re
+;;   (c-lang-const c-last-open-c-comment-start-on-line-re))
 
 (c-lang-defconst c-literal-start-regexp
   ;; Regexp to match the start of comments and string literals.

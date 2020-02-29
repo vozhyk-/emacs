@@ -1004,14 +1004,14 @@ The value of this variable is used when Font Lock mode is turned on."
 ;; font-lock.el uses its own function for buffer fontification.  This function
 ;; makes fontification be on a message-by-message basis and so visiting an
 ;; RMAIL file is much faster.  A clever implementation of the function might
-;; fontify the headers differently than the message body.  (It should, and
+;; fontify the headers differently from the message body.  (It should, and
 ;; correspondingly for Mail mode, but I can't be bothered to do the work.  Can
 ;; you?)  This hints at a more interesting use...
 ;;
 ;; Languages that contain text normally contained in different major modes
 ;; could define their own fontification functions that treat text differently
 ;; depending on its context.  For example, Perl mode could arrange that here
-;; docs are fontified differently than Perl code.  Or Yacc mode could fontify
+;; docs are fontified differently from Perl code.  Or Yacc mode could fontify
 ;; rules one way and C code another.  Neat!
 ;;
 ;; A further reason to use the fontification indirection feature is when the
@@ -1120,9 +1120,10 @@ locking for a mode, and is not meant to be called from lisp functions."
   "Make sure the region BEG...END has been fontified.
 If the region is not specified, it defaults to the entire accessible
 portion of the buffer."
-  (font-lock-set-defaults)
-  (funcall font-lock-ensure-function
-           (or beg (point-min)) (or end (point-max))))
+  (when (font-lock-specified-p t)
+    (font-lock-set-defaults)
+    (funcall font-lock-ensure-function
+             (or beg (point-min)) (or end (point-max)))))
 
 (defun font-lock-default-fontify-buffer ()
   "Fontify the whole buffer using `font-lock-fontify-region-function'."

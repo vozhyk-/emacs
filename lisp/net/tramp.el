@@ -2135,11 +2135,13 @@ For definition of that list see `tramp-set-completion-function'."
 (defvar tramp-devices 0
   "Keeps virtual device numbers.")
 
-(defun tramp-default-file-modes (filename)
+(defun tramp-default-file-modes (filename &optional flag)
   "Return file modes of FILENAME as integer.
-If the file modes of FILENAME cannot be determined, return the
-value of `default-file-modes', without execute permissions."
-  (or (file-modes filename)
+If optional FLAG is ‘nofollow’, do not follow FILENAME if it is a
+symbolic link.  If the file modes of FILENAME cannot be
+determined, return the value of `default-file-modes', without
+execute permissions."
+  (or (tramp-compat-file-modes filename flag)
       (logand (default-file-modes) #o0666)))
 
 (defun tramp-replace-environment-variables (filename)
@@ -3179,10 +3181,13 @@ User is always nil."
       (copy-file filename tmpfile 'ok-if-already-exists 'keep-time)
       tmpfile)))
 
-(defun tramp-handle-file-modes (filename)
+(defun tramp-handle-file-modes (filename &optional flag)
   "Like `file-modes' for Tramp files."
-  (when-let ((attrs (file-attributes (or (file-truename filename) filename))))
-    (tramp-mode-string-to-int (tramp-compat-file-attribute-modes attrs))))
+  (when-let ((attrs (file-attributes filename))
+	     (mode-string (tramp-compat-file-attribute-modes attrs)))
+    (if (and (not (eq flag 'nofollow)) (eq ?l (aref mode-string 0)))
+	(file-modes (file-truename filename))
+      (tramp-mode-string-to-int mode-string))))
 
 ;; Localname manipulation functions that grok Tramp localnames...
 (defun tramp-handle-file-name-as-directory (file)
@@ -3876,7 +3881,8 @@ of."
       (tramp-error v 'file-already-exists filename))
 
     (let ((tmpfile (tramp-compat-make-temp-file filename))
-	  (modes (save-excursion (tramp-default-file-modes filename))))
+	  (modes (tramp-default-file-modes
+		  filename (and (eq mustbenew 'excl) 'nofollow))))
       (when (and append (file-exists-p filename))
 	(copy-file filename tmpfile 'ok))
       ;; The permissions of the temporary file should be set.  If
@@ -5006,10 +5012,12 @@ name of a process or buffer, or nil to default to the current buffer."
 	  (tramp-error proc 'error "Process %s is not active" proc)
 	(tramp-message proc 5 "Interrupt process %s with pid %s" proc pid)
 	;; This is for tramp-sh.el.  Other backends do not support this (yet).
+	;; Not all "kill" implementations support process groups by
+	;; negative pid, so we try both variants.
 	(tramp-compat-funcall
 	 'tramp-send-command
 	 (process-get proc 'vector)
-	 (format "kill -2 -%d" pid))
+	 (format "(\\kill -2 -%d || \\kill -2 %d) 2>/dev/null" pid pid))
 	;; Wait, until the process has disappeared.  If it doesn't,
 	;; fall back to the default implementation.
         (while (tramp-accept-process-output proc 0))
@@ -5064,10 +5072,5 @@ name of a process or buffer, or nil to default to the current buffer."
 ;;   and friends, for most of the handlers this is the major
 ;;   difference between the different backends.  Other handlers but
 ;;   *-process-file would profit from this as well.
-;;
-;; * Get rid of `shell-command'.  In its primary implementation, it
-;;   uses `process-file-shell-command' and
-;;   `start-file-process-shell-command', which is sufficient due to
-;;   connection-local `shell-file-name'.
 
 ;;; tramp.el ends here

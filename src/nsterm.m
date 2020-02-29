@@ -1141,7 +1141,6 @@ ns_update_end (struct frame *f)
 
 #ifdef NS_IMPL_COCOA
   [NSGraphicsContext setCurrentContext:nil];
-  [view display];
 #else
   block_input ();
 
@@ -2853,7 +2852,9 @@ ns_clear_frame (struct frame *f)
   ns_unfocus (f);
 
   /* as of 2006/11 or so this is now needed */
-  ns_redraw_scroll_bars (f);
+  /* FIXME: I don't see any reason for this and removing it makes no
+     difference here.  Do we need it for GNUstep?  */
+  //ns_redraw_scroll_bars (f);
   unblock_input ();
 }
 
@@ -3168,18 +3169,6 @@ ns_draw_fringe_bitmap (struct window *w, struct glyph_row *row,
       NSRect fromRect = NSMakeRect(0, 0, p->wd, p->h);
 
       NSTRACE_RECT ("fromRect", fromRect);
-
-      /* Because we're drawing into an offscreen buffer which isn't
-         flipped, the images come out upside down.  To work around it
-         we need to do some fancy transforms.  */
-      {
-        NSAffineTransform *transform = [NSAffineTransform transform];
-        [transform translateXBy:0 yBy:NSMaxY(imageRect)];
-        [transform scaleXBy:1 yBy:-1];
-        [transform concat];
-
-        imageRect.origin.y = 0;
-      }
 
       [img drawInRect: imageRect
              fromRect: fromRect
@@ -3937,11 +3926,6 @@ ns_dumpglyphs_image (struct glyph_string *s, NSRect r)
       [setOrigin concat];
 
       NSAffineTransform *doTransform = [NSAffineTransform transform];
-
-      /* We have to flip the image around the X axis as the offscreen
-         bitmap we're drawing to is flipped.  */
-      [doTransform scaleXBy:1 yBy:-1];
-      [doTransform translateXBy:0 yBy:-[img size].height];
 
       /* ImageMagick images don't have transforms.  */
       if (img->transform)
@@ -6473,6 +6457,10 @@ not_in_argv (NSString *arg)
   if (!emacs_event)
     return;
 
+  /* First, clear any working text.  */
+  if (workingText != nil)
+    [self deleteWorkingText];
+
   /* It might be preferable to use getCharacters:range: below,
      cf. https://developer.apple.com/library/content/documentation/Cocoa/Conceptual/CocoaPerformance/Articles/StringDrawing.html#//apple_ref/doc/uid/TP40001445-112378.
      However, we probably can't use SAFE_NALLOCA here because it might
@@ -6501,10 +6489,6 @@ not_in_argv (NSString *arg)
       emacs_event->code = code;
       EV_TRAILER ((id)nil);
     }
-
-  /* Last, clear any working text.  */
-  if (workingText != nil)
-    [self deleteWorkingText];
 }
 
 
@@ -6600,12 +6584,17 @@ not_in_argv (NSString *arg)
 {
   NSRect rect;
   NSPoint pt;
-  struct window *win = XWINDOW (FRAME_SELECTED_WINDOW (emacsframe));
+  struct window *win;
 
   NSTRACE ("[EmacsView firstRectForCharacterRange:]");
 
   if (NS_KEYLOG)
     NSLog (@"firstRectForCharRange request");
+
+  if (WINDOWP (echo_area_window) && ! NILP (call0 (intern ("ns-in-echo-area"))))
+    win = XWINDOW (echo_area_window);
+  else
+    win = XWINDOW (FRAME_SELECTED_WINDOW (emacsframe));
 
   rect.size.width = theRange.length * FRAME_COLUMN_WIDTH (emacsframe);
   rect.size.height = FRAME_LINE_HEIGHT (emacsframe);
@@ -6712,8 +6701,6 @@ not_in_argv (NSString *arg)
   NSPoint p = [self convertPoint: [theEvent locationInWindow] fromView: nil];
 
   NSTRACE ("[EmacsView mouseDown:]");
-
-  [self deleteWorkingText];
 
   if (!emacs_event)
     return;
@@ -7104,7 +7091,7 @@ not_in_argv (NSString *arg)
          from non-native fullscreen, in other circumstances it appears
          to be a noop.  (bug#28872) */
       wr = NSMakeRect (0, 0, neww, newh);
-      [self createDrawingBufferWithRect:wr];
+      [self createDrawingBuffer];
       [view setFrame: wr];
 
       // To do: consider using [NSNotificationCenter postNotificationName:].
@@ -7341,7 +7328,6 @@ not_in_argv (NSString *arg)
 
   if (emacs_event && is_focus_frame)
     {
-      [self deleteWorkingText];
       emacs_event->kind = FOCUS_OUT_EVENT;
       EV_TRAILER ((id)nil);
     }
@@ -7444,7 +7430,7 @@ not_in_argv (NSString *arg)
   maximizing_resize = NO;
 #endif
 
-  [self createDrawingBufferWithRect:r];
+  [self createDrawingBuffer];
 
   win = [[EmacsWindow alloc]
             initWithContentRect: r
@@ -8199,12 +8185,7 @@ not_in_argv (NSString *arg)
   if (!emacs_event)
     return self;
 
-  /* Send first event (for some reason two needed).  */
   theEvent = [[self window] currentEvent];
-  emacs_event->kind = TOOL_BAR_EVENT;
-  XSETFRAME (emacs_event->arg, emacsframe);
-  EV_TRAILER (theEvent);
-
   emacs_event->kind = TOOL_BAR_EVENT;
   /* XSETINT (emacs_event->code, 0); */
   emacs_event->arg = AREF (emacsframe->tool_bar_items,
@@ -8229,52 +8210,65 @@ not_in_argv (NSString *arg)
 }
 
 
-- (void)createDrawingBufferWithRect:(NSRect)rect
-  /* Create and store a new NSBitmapImageRep for Emacs to draw
-     into.
-
-     Drawing to an offscreen bitmap doesn't work in GNUstep as there's
-     a bug in graphicsContextWithBitmapImageRep
-     (https://savannah.gnu.org/bugs/?38405).  So under GNUstep we
-     retain the old method of drawing direct to the EmacsView.  */
-{
 #ifdef NS_IMPL_COCOA
-  if (drawingBuffer != nil)
-    [drawingBuffer release];
+- (void)createDrawingBuffer
+  /* Create and store a new CGGraphicsContext for Emacs to draw into.
 
-  drawingBuffer = [[self bitmapImageRepForCachingDisplayInRect:rect] retain];
-#endif
+     We can't do this in GNUstep as there's no equivalent, so under
+     GNUstep we retain the old method of drawing direct to the
+     EmacsView.  */
+{
+  NSTRACE ("EmacsView createDrawingBuffer]");
+
+  NSGraphicsContext *screen;
+  CGColorSpaceRef colorSpace = [[[self window] colorSpace] CGColorSpace];
+  CGFloat scale = [[self window] backingScaleFactor];
+  NSRect frame = [self frame];
+
+  if (drawingBuffer != nil)
+    CGContextRelease (drawingBuffer);
+
+  drawingBuffer = CGBitmapContextCreate (nil, NSWidth (frame) * scale, NSHeight (frame) * scale,
+                                         8, 0, colorSpace,
+                                         kCGImageAlphaPremultipliedFirst | kCGBitmapByteOrder32Host);
+
+  /* This fixes the scale to match the backing scale factor, and flips the image.  */
+  CGContextTranslateCTM(drawingBuffer, 0, NSHeight (frame) * scale);
+  CGContextScaleCTM(drawingBuffer, scale, -scale);
 }
 
 
-#ifdef NS_IMPL_COCOA
 - (void)focusOnDrawingBuffer
 {
-  /* Creating the graphics context each time is very slow, but it
-     doesn't seem possible to cache and reuse it.  */
-  [NSGraphicsContext
-    setCurrentContext:
-      [NSGraphicsContext graphicsContextWithBitmapImageRep:drawingBuffer]];
+  NSTRACE ("EmacsView focusOnDrawingBuffer]");
+
+  NSGraphicsContext *buf =
+    [NSGraphicsContext
+        graphicsContextWithCGContext:drawingBuffer flipped:YES];
+
+  [NSGraphicsContext setCurrentContext:buf];
 }
 
 
 - (void)windowDidChangeBackingProperties:(NSNotification *)notification
   /* Update the drawing buffer when the backing scale factor changes.  */
 {
-   CGFloat old = [[[notification userInfo]
-                    objectForKey:@"NSBackingPropertyOldScaleFactorKey"]
-                   doubleValue];
-   CGFloat new = [[self window] backingScaleFactor];
+  NSTRACE ("EmacsView windowDidChangeBackingProperties:]");
 
-   if (old != new)
-     {
-       NSRect frame = [self frame];
-       [self createDrawingBufferWithRect:frame];
-       ns_clear_frame (emacsframe);
-       expose_frame (emacsframe, 0, 0, NSWidth (frame), NSHeight (frame));
-     }
+  CGFloat old = [[[notification userInfo]
+                    objectForKey:@"NSBackingPropertyOldScaleFactorKey"]
+                  doubleValue];
+  CGFloat new = [[self window] backingScaleFactor];
+
+  if (old != new)
+    {
+      NSRect frame = [self frame];
+      [self createDrawingBuffer];
+      ns_clear_frame (emacsframe);
+      expose_frame (emacsframe, 0, 0, NSWidth (frame), NSHeight (frame));
+    }
 }
-#endif
+#endif /* NS_IMPL_COCOA */
 
 
 - (void)copyRect:(NSRect)srcRect to:(NSRect)dstRect
@@ -8284,13 +8278,32 @@ not_in_argv (NSString *arg)
   NSTRACE_RECT ("Destination", dstRect);
 
 #ifdef NS_IMPL_COCOA
-  [drawingBuffer drawInRect:dstRect
-                   fromRect:srcRect
-                  operation:NSCompositingOperationCopy
-                   fraction:1.0
-             respectFlipped:NO
-                      hints:nil];
+  CGImageRef copy;
+  NSRect frame = [self frame];
+  NSAffineTransform *setOrigin = [NSAffineTransform transform];
 
+  [[NSGraphicsContext currentContext] saveGraphicsState];
+
+  /* Set the clipping before messing with the buffer's
+     orientation.  */
+  NSRectClip (dstRect);
+
+  /* Unflip the buffer as the copied image will be unflipped, and
+     offset the top left so when we draw back into the buffer the
+     correct part of the image is drawn.  */
+  CGContextScaleCTM(drawingBuffer, 1, -1);
+  CGContextTranslateCTM(drawingBuffer,
+                        NSMinX (dstRect) - NSMinX (srcRect),
+                        -NSHeight (frame) - (NSMinY (dstRect) - NSMinY (srcRect)));
+
+  /* Take a copy of the buffer and then draw it back to the buffer,
+     limited by the clipping rectangle.  */
+  copy = CGBitmapContextCreateImage (drawingBuffer);
+  CGContextDrawImage (drawingBuffer, frame, copy);
+
+  CGImageRelease (copy);
+
+  [[NSGraphicsContext currentContext] restoreGraphicsState];
   [self setNeedsDisplayInRect:dstRect];
 #else
   hide_bell();              // Ensure the bell image isn't scrolled.
@@ -8304,6 +8317,24 @@ not_in_argv (NSString *arg)
 }
 
 
+#ifdef NS_IMPL_COCOA
+- (BOOL)wantsUpdateLayer
+{
+    return YES;
+}
+
+
+- (void)updateLayer
+{
+  NSTRACE ("[EmacsView updateLayer]");
+
+  CGImageRef contentsImage = CGBitmapContextCreateImage(drawingBuffer);
+  [[self layer] setContents:(id)contentsImage];
+  CGImageRelease(contentsImage);
+}
+#endif
+
+
 - (void)drawRect: (NSRect)rect
 {
   NSTRACE ("[EmacsView drawRect:" NSTRACE_FMT_RECT "]",
@@ -8312,14 +8343,6 @@ not_in_argv (NSString *arg)
   if (!emacsframe || !emacsframe->output_data.ns)
     return;
 
-#ifdef NS_IMPL_COCOA
-  [drawingBuffer drawInRect:rect
-                   fromRect:rect
-                  operation:NSCompositingOperationSourceOver
-                   fraction:1
-             respectFlipped:NO
-                      hints:nil];
-#else
   int x = NSMinX (rect), y = NSMinY (rect);
   int width = NSWidth (rect), height = NSHeight (rect);
 
@@ -8327,7 +8350,6 @@ not_in_argv (NSString *arg)
   block_input ();
   expose_frame (emacsframe, x, y, width, height);
   unblock_input ();
-#endif
 }
 
 

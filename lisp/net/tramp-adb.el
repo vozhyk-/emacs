@@ -665,11 +665,14 @@ But handle the case, if the \"test\" command is not available."
 	(tramp-message v 0 "Wrote %s" filename))
       (run-hooks 'tramp-handle-write-region-hook))))
 
-(defun tramp-adb-handle-set-file-modes (filename mode)
+(defun tramp-adb-handle-set-file-modes (filename mode &optional flag)
   "Like `set-file-modes' for Tramp files."
   (with-parsed-tramp-file-name filename nil
-    (tramp-flush-file-properties v localname)
-    (tramp-adb-send-command-and-check v (format "chmod %o %s" mode localname))))
+    ;; ADB shell does not support "chmod -h".
+    (unless (and (eq flag 'nofollow) (file-symlink-p filename))
+      (tramp-flush-file-properties v localname)
+      (tramp-adb-send-command-and-check
+       v (format "chmod %o %s" mode localname)))))
 
 (defun tramp-adb-handle-set-file-times (filename &optional time)
   "Like `set-file-times' for Tramp files."

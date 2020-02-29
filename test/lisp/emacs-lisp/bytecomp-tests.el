@@ -347,7 +347,12 @@
                                 ((eq x 't) 99)
                                 (t 999))))
             '((a c) (b c) (7 c) (-3 c) (nil nil) (t c) (q c) (r c) (s c)
-              (t c) (x "a") (x "c") (x c) (x d) (x e))))
+              (t c) (x "a") (x "c") (x c) (x d) (x e)))
+
+    ;; `substring' bytecode generation (bug#39709).
+    (substring "abcdef")
+    (substring "abcdef" 2)
+    (substring "abcdef" 3 2))
   "List of expression for test.
 Each element will be executed by interpreter and with
 bytecompiled code, and their results compared.")
@@ -614,17 +619,6 @@ literals (Bug#20852)."
       (bytecomp-tests--with-temp-file destination
         (let ((byte-compile-dest-file-function (lambda (_) destination)))
           (should (byte-compile-file source)))))))
-
-(ert-deftest bytecomp-tests--old-style-backquotes ()
-  "Check that byte compiling warns about old-style backquotes."
-  (bytecomp-tests--with-temp-file source
-    (write-region "(` (a b))" nil source)
-    (bytecomp-tests--with-temp-file destination
-      (let* ((byte-compile-dest-file-function (lambda (_) destination))
-             (byte-compile-debug t)
-             (err (should-error (byte-compile-file source))))
-        (should (equal (cdr err) '("Old-style backquotes detected!")))))))
-
 
 (ert-deftest bytecomp-tests-function-put ()
   "Check `function-put' operates during compilation."

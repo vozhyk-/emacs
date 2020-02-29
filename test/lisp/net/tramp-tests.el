@@ -50,6 +50,7 @@
 (require 'vc-hg)
 
 (declare-function tramp-find-executable "tramp-sh")
+(declare-function tramp-get-remote-chmod-h "tramp-sh")
 (declare-function tramp-get-remote-gid "tramp-sh")
 (declare-function tramp-get-remote-path "tramp-sh")
 (declare-function tramp-get-remote-perl "tramp-sh")
@@ -2217,11 +2218,10 @@ This checks also `file-name-as-directory', `file-name-directory',
 
   ;; Bug#10085.
   (when (tramp--test-enabled) ;; Packages like tramp-gvfs.el might be disabled.
-    (dolist (n-e '(nil t))
+    (dolist (non-essential '(nil t))
       ;; We must clear `tramp-default-method'.  On hydra, it is "ftp",
       ;; which ruins the tests.
-      (let ((non-essential n-e)
-	    (tramp-default-method
+      (let ((tramp-default-method
 	     (file-remote-p tramp-test-temporary-file-directory 'method))
 	    (host (file-remote-p tramp-test-temporary-file-directory 'host)))
 	(dolist
@@ -3365,25 +3365,80 @@ This tests also `file-executable-p', `file-writable-p' and `set-file-modes'."
 	 "ftp" (file-remote-p tramp-test-temporary-file-directory 'method)))))
 
   (dolist (quoted (if (tramp--test-expensive-test) '(nil t) '(nil)))
-    (let ((tmp-name (tramp--test-make-temp-name nil quoted)))
+    (let ((tmp-name1 (tramp--test-make-temp-name nil quoted))
+	  (tmp-name2 (tramp--test-make-temp-name nil quoted)))
+
       (unwind-protect
 	  (progn
-	    (write-region "foo" nil tmp-name)
-	    (should (file-exists-p tmp-name))
-	    (set-file-modes tmp-name #o777)
-	    (should (= (file-modes tmp-name) #o777))
-	    (should (file-executable-p tmp-name))
-	    (should (file-writable-p tmp-name))
-	    (set-file-modes tmp-name #o444)
-	    (should (= (file-modes tmp-name) #o444))
-	    (should-not (file-executable-p tmp-name))
+	    (write-region "foo" nil tmp-name1)
+	    (should (file-exists-p tmp-name1))
+	    (set-file-modes tmp-name1 #o777)
+	    (should (= (file-modes tmp-name1) #o777))
+	    (should (file-executable-p tmp-name1))
+	    (should (file-writable-p tmp-name1))
+	    (set-file-modes tmp-name1 #o444)
+	    (should (= (file-modes tmp-name1) #o444))
+	    (should-not (file-executable-p tmp-name1))
 	    ;; A file is always writable for user "root".
 	    (unless (zerop (tramp-compat-file-attribute-user-id
-			    (file-attributes tmp-name)))
-	      (should-not (file-writable-p tmp-name))))
+			    (file-attributes tmp-name1)))
+	      (should-not (file-writable-p tmp-name1)))
+	    ;; Check the NOFOLLOW arg.  It exists since Emacs 28.  For
+	    ;; regular files, there shouldn't be a difference.
+	    (when (tramp--test-emacs28-p)
+	      (with-no-warnings
+		(set-file-modes tmp-name1 #o222 'nofollow)
+		(should (= (file-modes tmp-name1 'nofollow) #o222)))))
 
 	;; Cleanup.
-	(ignore-errors (delete-file tmp-name))))))
+	(ignore-errors (delete-file tmp-name1)))
+
+      ;; Check the NOFOLLOW arg.  It exists since Emacs 28.  It is
+      ;; implemented for tramp-gvfs.el and tramp-sh.el.  However,
+      ;; tramp-gvfs,el does not support creating symbolic links.  And
+      ;; in tramp-sh.el, we must ensure that the remote chmod command
+      ;; supports the "-h" argument.
+      (when (and (tramp--test-emacs28-p) (tramp--test-sh-p)
+		 (tramp-get-remote-chmod-h (tramp-dissect-file-name tmp-name1)))
+	(unwind-protect
+	    (with-no-warnings
+	      (write-region "foo" nil tmp-name1)
+	      (should (file-exists-p tmp-name1))
+	      (make-symbolic-link tmp-name1 tmp-name2)
+	      (should
+	       (string-equal
+		(funcall
+		 (if quoted #'tramp-compat-file-name-unquote #'identity)
+		 (file-remote-p tmp-name1 'localname))
+		(file-symlink-p tmp-name2)))
+	      ;; Both report the modes of `tmp-name1'.
+	      (should
+	       (= (file-modes tmp-name1) (file-modes tmp-name2)))
+	      ;; `tmp-name1' is a regular file.  NOFOLLOW doesn't matter.
+	      (should
+	       (= (file-modes tmp-name1) (file-modes tmp-name1 'nofollow)))
+	      ;; `tmp-name2' is a symbolic link.  It has different permissions.
+	      (should-not
+	       (= (file-modes tmp-name2) (file-modes tmp-name2 'nofollow)))
+	      (should-not
+	       (= (file-modes tmp-name1 'nofollow)
+		  (file-modes tmp-name2 'nofollow)))
+	      ;; Change permissions.
+	      (set-file-modes tmp-name1 #o200)
+	      (set-file-modes tmp-name2 #o200)
+	      (should
+	       (= (file-modes tmp-name1) (file-modes tmp-name2) #o200))
+	      ;; Change permissions with NOFOLLOW.
+	      (set-file-modes tmp-name1 #o300 'nofollow)
+	      (set-file-modes tmp-name2 #o300 'nofollow)
+	      (should
+	       (= (file-modes tmp-name1 'nofollow)
+		  (file-modes tmp-name2 'nofollow)))
+	      (should-not (= (file-modes tmp-name1) (file-modes tmp-name2))))
+
+	  ;; Cleanup.
+	  (ignore-errors (delete-file tmp-name1))
+	  (ignore-errors (delete-file tmp-name2)))))))
 
 ;; Method "smb" could run into "NT_STATUS_REVISION_MISMATCH" error.
 (defmacro tramp--test-ignore-add-name-to-file-error (&rest body)
@@ -4035,10 +4090,9 @@ This tests also `make-symbolic-link', `file-truename' and `add-name-to-file'."
 	;; Cleanup.
         (tramp-change-syntax orig-syntax))))
 
-  (dolist (n-e '(nil t))
+  (dolist (non-essential '(nil t))
     (dolist (quoted (if (tramp--test-expensive-test) '(nil t) '(nil)))
-      (let ((non-essential n-e)
-	    (tmp-name (tramp--test-make-temp-name nil quoted)))
+      (let ((tmp-name (tramp--test-make-temp-name nil quoted)))
 
 	(unwind-protect
 	    (progn
@@ -4196,7 +4250,7 @@ This tests also `make-symbolic-link', `file-truename' and `add-name-to-file'."
 	    (setq proc (start-file-process "test1" (current-buffer) "cat"))
 	    (should (processp proc))
 	    (should (equal (process-status proc) 'run))
-	    (process-send-string proc "foo")
+	    (process-send-string proc "foo\n")
 	    (process-send-eof proc)
 	    ;; Read output.
 	    (with-timeout (10 (tramp--test-timeout-handler))
@@ -4239,7 +4293,7 @@ This tests also `make-symbolic-link', `file-truename' and `add-name-to-file'."
 	    (set-process-filter
 	     proc
 	     (lambda (p s) (with-current-buffer (process-buffer p) (insert s))))
-	    (process-send-string proc "foo")
+	    (process-send-string proc "foo\n")
 	    (process-send-eof proc)
 	    ;; Read output.
 	    (with-timeout (10 (tramp--test-timeout-handler))
@@ -4277,7 +4331,7 @@ This tests also `make-symbolic-link', `file-truename' and `add-name-to-file'."
 		     :file-handler t)))
 	    (should (processp proc))
 	    (should (equal (process-status proc) 'run))
-	    (process-send-string proc "foo")
+	    (process-send-string proc "foo\n")
 	    (process-send-eof proc)
 	    ;; Read output.
 	    (with-timeout (10 (tramp--test-timeout-handler))
@@ -4326,7 +4380,7 @@ This tests also `make-symbolic-link', `file-truename' and `add-name-to-file'."
 		     :file-handler t)))
 	    (should (processp proc))
 	    (should (equal (process-status proc) 'run))
-	    (process-send-string proc "foo")
+	    (process-send-string proc "foo\n")
 	    (process-send-eof proc)
 	    ;; Read output.
 	    (with-timeout (10 (tramp--test-timeout-handler))
@@ -4352,7 +4406,7 @@ This tests also `make-symbolic-link', `file-truename' and `add-name-to-file'."
 		     :file-handler t)))
 	    (should (processp proc))
 	    (should (equal (process-status proc) 'run))
-	    (process-send-string proc "foo")
+	    (process-send-string proc "foo\n")
 	    (process-send-eof proc)
 	    (delete-process proc)
 	    ;; Read output.
@@ -4360,8 +4414,13 @@ This tests also `make-symbolic-link', `file-truename' and `add-name-to-file'."
 	      (while (accept-process-output proc 0 nil t)))
 	    ;; We cannot use `string-equal', because tramp-adb.el
 	    ;; echoes also the sent string.  And a remote macOS sends
-	    ;; a slightly modified string.
-	    (should (string-match "killed.*\n\\'" (buffer-string))))
+	    ;; a slightly modified string.  On MS Windows,
+	    ;; `delete-process' sends an unknown signal.
+	    (should
+	     (string-match
+	      (if (eq system-type 'windows-nt)
+		  "unknown signal\n\\'" "killed.*\n\\'")
+	      (buffer-string))))
 
 	;; Cleanup.
 	(ignore-errors (delete-process proc)))
@@ -4419,9 +4478,7 @@ This tests also `make-symbolic-link', `file-truename' and `add-name-to-file'."
 
 (ert-deftest tramp-test31-interrupt-process ()
   "Check `interrupt-process'."
-  ;; The test fails from time to time, w/o a reproducible pattern.  So
-  ;; we mark it as unstable.
-  :tags '(:expensive-test :unstable)
+  :tags '(:expensive-test)
   (skip-unless (tramp--test-enabled))
   (skip-unless (tramp--test-sh-p))
   ;; Since Emacs 26.1.
@@ -4435,7 +4492,9 @@ This tests also `make-symbolic-link', `file-truename' and `add-name-to-file'."
 	kill-buffer-query-functions proc)
     (unwind-protect
 	(with-temp-buffer
-	  (setq proc (start-file-process "test" (current-buffer) "sleep" "10"))
+	  (setq proc (start-file-process-shell-command
+		      "test" (current-buffer)
+		      "trap 'echo boom; exit 1' 2; sleep 100"))
 	  (should (processp proc))
 	  (should (process-live-p proc))
 	  (should (equal (process-status proc) 'run))
@@ -5340,6 +5399,12 @@ variables, so we check the Emacs version directly."
 Some semantics has been changed for there, w/o new functions or
 variables, so we check the Emacs version directly."
   (>= emacs-major-version 27))
+
+(defun tramp--test-emacs28-p ()
+  "Check for Emacs version >= 28.1.
+Some semantics has been changed for there, w/o new functions or
+variables, so we check the Emacs version directly."
+  (>= emacs-major-version 28))
 
 (defun tramp--test-adb-p ()
   "Check, whether the remote host runs Android.
@@ -6304,9 +6369,7 @@ If INTERACTIVE is non-nil, the tests are run interactively."
 ;; * Fix `tramp-test06-directory-file-name' for `ftp'.
 ;; * Investigate, why `tramp-test11-copy-file' and `tramp-test12-rename-file'
 ;;   do not work properly for `nextcloud'.
-;; * Fix `tramp-test29-start-file-process' and
-;;   `tramp-test30-make-process' on MS Windows (`process-send-eof'?).
-;; * Implement `tramp-test31-interrupt-process' for `adb'.  Fix `:unstable'.
+;; * Implement `tramp-test31-interrupt-process' for `adb'.
 ;; * Fix Bug#16928 in `tramp-test43-asynchronous-requests'.  A remote
 ;;   file name operation cannot run in the timer.  Remove `:unstable' tag?
 

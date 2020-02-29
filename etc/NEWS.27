@@ -3352,6 +3352,14 @@ backslash, although there is no harm in doing so to make the code
 easier to edit with an older Emacs version.
 
 ---
+** New symbolic accessor functions for a parse state list.
+The new accessor functions 'ppss-depth', 'ppss-list-start',
+'ppss-last-sexp-start', 'ppss-string-terminator', 'comment-depth',
+'quoted-p', 'comment-style', 'comment-or-string-start', 'open-parens',
+and 'two-character-syntax' can be used on the list value returned by
+'parse-partial-sexp' and 'syntax-ppss'.
+
+---
 ** The 'server-name' and 'server-socket-dir' variables are set when a
 socket has been passed to Emacs.
 
@@ -3527,13 +3535,6 @@ This is currently supported on GNUish hosts and on modern versions of
 MS-Windows.
 
 +++
-** The function 'regexp-opt' accepts an additional optional argument.
-By default, the regexp returned by 'regexp-opt' may match the strings
-in any order.  If the new third argument is non-nil, the match is
-guaranteed to be performed in the order given, as if the strings were
-made into a regexp by joining them with '\|'.
-
-+++
 ** The function 'regexp-opt', when given an empty list of strings, now
 returns a regexp that never matches anything, which is an identity for
 this operation.  Previously, the empty string was returned in this
@@ -3589,6 +3590,12 @@ in other packages are now obsolete aliases of 'xor'.
 ** New text property 'help-echo-inhibit-substitution'.
 Setting this on the first character of a help string disables
 conversions via 'substitute-command-keys'.
+
++++
+** New text property 'minibuffer-message'.
+Setting this on a character of the minibuffer text will display the
+temporary echo messages before that character, when messages need to
+be displayed while minibuffer is active.
 
 +++
 ** 'undo' can be made to ignore the active region for a command
