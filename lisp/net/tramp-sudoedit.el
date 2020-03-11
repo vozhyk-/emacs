@@ -281,7 +281,8 @@ absolute file names."
 	;; Set the time and mode. Mask possible errors.
 	(when keep-date
 	  (ignore-errors
-	    (set-file-times newname file-times)
+	    (tramp-compat-set-file-times
+	     newname file-times (unless ok-if-already-exists 'nofollow))
 	    (set-file-modes newname file-modes)))
 
 	;; Handle `preserve-extended-attributes'.  We ignore possible
@@ -523,7 +524,7 @@ the result will be a local, non-Tramp, file name."
 		     (string-to-number (match-string 2)))
 		  (string-to-number (match-string 3)))))))))
 
-(defun tramp-sudoedit-handle-set-file-times (filename &optional time)
+(defun tramp-sudoedit-handle-set-file-times (filename &optional time flag)
   "Like `set-file-times' for Tramp files."
   (with-parsed-tramp-file-name filename nil
     (tramp-flush-file-properties v localname)
@@ -536,6 +537,7 @@ the result will be a local, non-Tramp, file name."
       (tramp-sudoedit-send-command
        v "env" "TZ=UTC" "touch" "-t"
        (format-time-string "%Y%m%d%H%M.%S" time t)
+       (if (eq flag 'nofollow) "-h" "")
        (tramp-compat-file-name-unquote localname)))))
 
 (defun tramp-sudoedit-handle-file-truename (filename)

@@ -1427,14 +1427,7 @@ When called interactively, prompt for a FILE to ignore, unless a
 prefix argument is given, in which case prompt for a file FILE to
 remove from the list of ignored files."
   (interactive
-   (let* ((backend (vc-responsible-backend default-directory))
-          (rel-dir
-           (condition-case nil
-               (file-name-directory
-                (vc-call-backend backend 'find-ignore-file
-                                 default-directory))
-             (vc-not-supported
-              default-directory)))
+   (let* ((rel-dir (vc--ignore-base-dir))
           (file (read-file-name "File to ignore: ")))
      (when (and (file-name-absolute-p file)
                 (file-in-directory-p file rel-dir))
@@ -1446,6 +1439,15 @@ remove from the list of ignored files."
 	 (backend (or (vc-responsible-backend default-directory)
                       (error "Unknown backend"))))
     (vc-call-backend backend 'ignore file directory remove)))
+
+(defun vc--ignore-base-dir ()
+  (let ((backend (vc-responsible-backend default-directory)))
+    (condition-case nil
+        (file-name-directory
+         (vc-call-backend backend 'find-ignore-file
+                          default-directory))
+      (vc-not-supported
+       default-directory))))
 
 (defun vc-default-ignore (backend file &optional directory remove)
   "Ignore FILE under DIRECTORY (default is `default-directory').
@@ -2556,15 +2558,17 @@ with its diffs (if the underlying VCS supports that)."
 
 ;;;###autoload
 (defun vc-print-branch-log (branch)
-  "Show the change log for BRANCH in a window."
+  "Show the change log for BRANCH root in a window."
   (interactive
    (list
     (vc-read-revision "Branch to log: ")))
   (when (equal branch "")
     (error "No branch specified"))
-  (vc-print-log-internal (vc-responsible-backend default-directory)
-                         (list default-directory) branch t
-                         (when (> vc-log-show-limit 0) vc-log-show-limit)))
+  (let* ((backend (vc-responsible-backend default-directory))
+         (rootdir (vc-call-backend backend 'root default-directory)))
+    (vc-print-log-internal backend
+                           (list rootdir) branch t
+                           (when (> vc-log-show-limit 0) vc-log-show-limit))))
 
 ;;;###autoload
 (defun vc-log-incoming (&optional remote-location)

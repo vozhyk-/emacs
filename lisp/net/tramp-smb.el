@@ -538,10 +538,11 @@ pass to the OPERATION."
 
 	    ;; Handle KEEP-DATE argument.
 	    (when keep-date
-	      (set-file-times
+	      (tramp-compat-set-file-times
 	       newname
 	       (tramp-compat-file-attribute-modification-time
-		(file-attributes dirname))))
+		(file-attributes dirname))
+	       (unless ok-if-already-exists 'nofollow)))
 
 	    ;; Set the mode.
 	    (unless keep-date
@@ -616,10 +617,11 @@ PRESERVE-UID-GID and PRESERVE-EXTENDED-ATTRIBUTES are completely ignored."
 
     ;; KEEP-DATE handling.
     (when keep-date
-      (set-file-times
+      (tramp-compat-set-file-times
        newname
        (tramp-compat-file-attribute-modification-time
-	(file-attributes filename))))))
+	(file-attributes filename))
+       (unless ok-if-already-exists 'nofollow)))))
 
 (defun tramp-smb-handle-delete-directory (directory &optional recursive _trash)
   "Like `delete-directory' for Tramp files."
