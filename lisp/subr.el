@@ -2988,13 +2988,17 @@ This finishes the change group by reverting all of its changes."
 	(widen)
 	(let ((old-car (car-safe elt))
 	      (old-cdr (cdr-safe elt))
-	      (start-pul pending-undo-list))
+	      ;; Use `pending-undo-list' temporarily since `undo-more' needs
+	      ;; it, but restore it afterwards so as not to mess with an
+	      ;; ongoing sequence of `undo's.
+	      (pending-undo-list
+	       ;; Use `buffer-undo-list' unconditionally (bug#39680).
+	       buffer-undo-list))
           (unwind-protect
               (progn
                 ;; Temporarily truncate the undo log at ELT.
                 (when (consp elt)
                   (setcar elt nil) (setcdr elt nil))
-                (setq pending-undo-list buffer-undo-list)
                 ;; Make sure there's no confusion.
                 (when (and (consp elt) (not (eq elt (last pending-undo-list))))
                   (error "Undoing to some unrelated state"))
@@ -3007,13 +3011,7 @@ This finishes the change group by reverting all of its changes."
             ;; Reset the modified cons cell ELT to its original content.
             (when (consp elt)
               (setcar elt old-car)
-              (setcdr elt old-cdr)))
-          ;; Let's not break a sequence of undos just because we
-          ;; tried to make a change and then undid it: preserve
-          ;; the original `pending-undo-list' if it's still valid.
-          (if (eq (undo--last-change-was-undo-p buffer-undo-list)
-                  start-pul)
-              (setq pending-undo-list start-pul)))))))
+              (setcdr elt old-cdr))))))))
 
 ;;;; Display-related functions.
 
