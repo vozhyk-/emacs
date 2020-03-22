@@ -611,7 +611,9 @@ decode_options (int argc, char **argv)
       alt_display = "w32";
 #endif
 
-      display = egetenv ("DISPLAY");
+      display = egetenv ("WAYLAND_DISPLAY");
+      if (!display)
+	display = egetenv ("DISPLAY");
     }
 
   if (!display)
