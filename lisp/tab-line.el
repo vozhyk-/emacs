@@ -142,11 +142,19 @@
 (defcustom tab-line-new-tab-choice t
   "Defines what to show in a new tab.
 If t, display a selection menu with all available buffers.
-If the value is a function, call it with no arguments.
-If nil, don't show the new tab button."
+If the value is a function, call it with no arguments."
   :type '(choice (const     :tag "Buffer menu" t)
-                 (function  :tag "Function")
-                 (const     :tag "No button" nil))
+                 (function  :tag "Function"))
+  :group 'tab-line
+  :version "27.1")
+
+(defcustom tab-line-new-button-show t
+  "If non-nil, show the \"New tab\" button in the tab line."
+  :type 'boolean
+  :initialize 'custom-initialize-default
+  :set (lambda (sym val)
+         (set-default sym val)
+         (force-mode-line-update))
   :group 'tab-line
   :version "27.1")
 
@@ -211,7 +219,8 @@ If nil, don't show it at all."
               'help-echo "Click to scroll right")
   "Button for scrolling horizontally to the right.")
 
-(defvar tab-line-separator nil)
+(defvar tab-line-separator nil
+  "String that delimits tabs.")
 
 
 (defcustom tab-line-tab-name-function #'tab-line-tab-name-buffer
@@ -453,9 +462,11 @@ variable `tab-line-tabs-function'."
                      (> (length strings) 1))
                tab-line-right-button)))
      (if hscroll (nthcdr (truncate hscroll) strings) strings)
-     (when (eq tab-line-tabs-function #'tab-line-tabs-window-buffers)
-       (list (concat separator (when tab-line-new-tab-choice
-                                 tab-line-new-button)))))))
+     (list separator)
+     (when (and (eq tab-line-tabs-function #'tab-line-tabs-window-buffers)
+                tab-line-new-button-show
+                tab-line-new-button)
+       (list tab-line-new-button)))))
 
 (defvar tab-line-auto-hscroll)
 
@@ -463,7 +474,7 @@ variable `tab-line-tabs-function'."
   "Template for displaying tab line for selected window."
   (let* ((tabs (funcall tab-line-tabs-function))
          (cache-key (list tabs
-                          (window-buffer)
+                          (buffer-name (window-buffer))
                           (window-parameter nil 'tab-line-hscroll)))
          (cache (window-parameter nil 'tab-line-cache)))
     ;; Enable auto-hscroll again after it was disabled on manual scrolling.
