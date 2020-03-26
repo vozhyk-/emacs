@@ -700,7 +700,7 @@ x_set_parent_frame (struct frame *f, Lisp_Object new_value, Lisp_Object old_valu
   int width = 0, height = 0;
 
   PGTK_TRACE ("x_set_parent_frame x: %d, y: %d, size: %d x %d", f->left_pos, f->top_pos, width, height );
-  gtk_window_get_size(FRAME_X_WINDOW(f), &width, &height);
+  gtk_window_get_size(FRAME_NATIVE_WINDOW(f), &width, &height);
 
 
   PGTK_TRACE ("x_set_parent_frame x: %d, y: %d, size: %d x %d", f->left_pos, f->top_pos, width, height );
@@ -714,13 +714,14 @@ x_set_parent_frame (struct frame *f, Lisp_Object new_value, Lisp_Object old_valu
       error ("Invalid specification of `parent-frame'");
     }
 
-  if (p != FRAME_PARENT_FRAME (f))
+  if (p != FRAME_PARENT_FRAME (f)
+      && (p != NULL))
     {
       block_input ();
-      gtk_window_set_transient_for(FRAME_X_WINDOW(f), FRAME_X_WINDOW(p));
-      gtk_window_set_attached_to(FRAME_X_WINDOW(f), FRAME_X_WINDOW(p));
-      gtk_window_move(FRAME_X_WINDOW(f), f->left_pos, f->top_pos);
-      gtk_window_set_keep_above(FRAME_X_WINDOW(f), true);
+      gtk_window_set_transient_for(FRAME_NATIVE_WINDOW(f), FRAME_NATIVE_WINDOW(p));
+      gtk_window_set_attached_to(FRAME_NATIVE_WINDOW(f), FRAME_GTK_WIDGET(p));
+      gtk_window_move(FRAME_NATIVE_WINDOW(f), f->left_pos, f->top_pos);
+      gtk_window_set_keep_above(FRAME_NATIVE_WINDOW(f), true);
       //fill this in
       unblock_input ();
 
@@ -2682,8 +2683,6 @@ pgtk_draw_window_cursor (struct window *w, struct glyph_row *glyph_row, int x,
 {
   PGTK_TRACE("draw_window_cursor: %d, %d, %d, %d, %d, %d.",
 	       x, y, cursor_type, cursor_width, on_p, active_p);
-  struct frame *f = XFRAME (WINDOW_FRAME (w));
-  PGTK_TRACE("%p\n", f->output_data.pgtk);
 
   if (on_p)
     {
