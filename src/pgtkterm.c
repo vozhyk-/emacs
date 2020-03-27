@@ -61,8 +61,9 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 
 #define STORE_KEYSYM_FOR_DEBUG(keysym) ((void)0)
 
-#define FRAME_CR_CONTEXT(f)	((f)->output_data.pgtk->cr_context)
-#define FRAME_CR_SURFACE(f)	((f)->output_data.pgtk->cr_surface)
+#define FRAME_CR_CONTEXT(f) ((f)->output_data.pgtk->cr_context)
+#define FRAME_CR_ACTIVE_CONTEXT(f)	((f)->output_data.pgtk->cr_active)
+#define FRAME_CR_SURFACE(f) (cairo_get_target(FRAME_CR_CONTEXT(f)))
 #define FRAME_CR_SURFACE_DESIRED_WIDTH(f)		\
   ((f)->output_data.pgtk->cr_surface_desired_width)
 #define FRAME_CR_SURFACE_DESIRED_HEIGHT(f) \
@@ -94,6 +95,22 @@ static void pgtk_clip_to_row (struct window *w, struct glyph_row *row,
 				enum glyph_row_area area, cairo_t *cr);
 static struct frame *
 pgtk_any_window_to_frame (GdkWindow *window);
+
+static void flip_cr_context(struct frame *f)
+{
+  PGTK_TRACE("flip_cr_context");
+  cairo_t * cr = FRAME_CR_ACTIVE_CONTEXT(f);
+
+  block_input();
+  if ( cr != FRAME_CR_CONTEXT(f))
+    {
+      cairo_destroy(cr);
+      FRAME_CR_ACTIVE_CONTEXT(f) = cairo_reference(FRAME_CR_CONTEXT(f));
+
+    }
+  unblock_input();
+}
+
 
 static void evq_enqueue(union buffered_input_event *ev)
 {
@@ -390,7 +407,6 @@ pgtk_set_window_size (struct frame *f,
   block_input ();
 
   gtk_widget_get_size_request(FRAME_GTK_WIDGET(f), &pixelwidth, &pixelheight);
-  PGTK_TRACE("old: %dx%d", pixelwidth, pixelheight);
 
   if (pixelwise)
     {
@@ -411,18 +427,13 @@ pgtk_set_window_size (struct frame *f,
 	    make_fixnum (FRAME_PGTK_TITLEBAR_HEIGHT (f)),
 	    make_fixnum (FRAME_TOOLBAR_HEIGHT (f))));
 
-  PGTK_TRACE("new: %dx%d", pixelwidth, pixelheight);
   for (GtkWidget *w = FRAME_GTK_WIDGET(f); w != NULL; w = gtk_widget_get_parent(w)) {
-    PGTK_TRACE("%p %s %d %d", w, G_OBJECT_TYPE_NAME(w), gtk_widget_get_mapped(w), gtk_widget_get_visible(w));
     gint wd, hi;
     gtk_widget_get_size_request(w, &wd, &hi);
-    PGTK_TRACE(" %dx%d", wd, hi);
     GtkAllocation alloc;
     gtk_widget_get_allocation(w, &alloc);
-    PGTK_TRACE(" %dx%d+%d+%d", alloc.width, alloc.height, alloc.x, alloc.y);
   }
 
-  PGTK_TRACE("pgtk_set_window_size: %p: %dx%d.", f, width, height);
   f->output_data.pgtk->preferred_width = pixelwidth;
   f->output_data.pgtk->preferred_height = pixelheight;
   x_wm_set_size_hint(f, 0, 0);
@@ -486,7 +497,6 @@ pgtk_iconify_frame (struct frame *f)
   SET_FRAME_ICONIFIED (f, true);
   SET_FRAME_VISIBLE (f, 0);
 
-  gdk_flush();
   unblock_input ();
 }
 
@@ -521,8 +531,6 @@ pgtk_make_frame_visible (struct frame *f)
       gtk_widget_show(win);
       gtk_window_deiconify(GTK_WINDOW(win));
 
-      gdk_flush();
-
       if (FLOATP (Vpgtk_wait_for_event_timeout)) {
 	guint msec = (guint) (XFLOAT_DATA (Vpgtk_wait_for_event_timeout) * 1000);
 	int found = 0;
@@ -550,7 +558,6 @@ pgtk_make_frame_invisible (struct frame *f)
   GtkWidget *win = FRAME_OUTPUT_DATA(f)->widget;
 
   gtk_widget_hide(win);
-  gdk_flush();
 
   SET_FRAME_VISIBLE (f, 0);
   SET_FRAME_ICONIFIED (f, false);
@@ -664,6 +671,64 @@ x_display_pixel_width (struct pgtk_display_info *dpyinfo)
   PGTK_TRACE(" = %d", gdk_screen_get_width(gscr));
   return gdk_screen_get_width(gscr);
 }
+
+void
+x_set_parent_frame (struct frame *f, Lisp_Object new_value, Lisp_Object old_value)
+/* --------------------------------------------------------------------------
+     Set frame F's `parent-frame' parameter.  If non-nil, make F a child
+     frame of the frame specified by that parameter.  Technically, this
+     makes F's window-system window a child window of the parent frame's
+     window-system window.  If nil, make F's window-system window a
+     top-level window--a child of its display's root window.
+
+     A child frame's `left' and `top' parameters specify positions
+     relative to the top-left corner of its parent frame's native
+     rectangle.  On macOS moving a parent frame moves all its child
+     frames too, keeping their position relative to the parent
+     unaltered.  When a parent frame is iconified or made invisible, its
+     child frames are made invisible.  When a parent frame is deleted,
+     its child frames are deleted too.
+
+     Whether a child frame has a tool bar may be window-system or window
+     manager dependent.  It's advisable to disable it via the frame
+     parameter settings.
+
+     Some window managers may not honor this parameter.
+   -------------------------------------------------------------------------- */
+{
+  struct frame *p = NULL;
+  int width = 0, height = 0;
+
+  PGTK_TRACE ("x_set_parent_frame x: %d, y: %d, size: %d x %d", f->left_pos, f->top_pos, width, height );
+  gtk_window_get_size(FRAME_NATIVE_WINDOW(f), &width, &height);
+
+
+  PGTK_TRACE ("x_set_parent_frame x: %d, y: %d, size: %d x %d", f->left_pos, f->top_pos, width, height );
+
+  if (!NILP (new_value)
+      && (!FRAMEP (new_value)
+	  || !FRAME_LIVE_P (p = XFRAME (new_value))
+	  || !FRAME_PGTK_P (p)))
+    {
+      store_frame_param (f, Qparent_frame, old_value);
+      error ("Invalid specification of `parent-frame'");
+    }
+
+  if (p != FRAME_PARENT_FRAME (f)
+      && (p != NULL))
+    {
+      block_input ();
+      gtk_window_set_transient_for(FRAME_NATIVE_WINDOW(f), FRAME_NATIVE_WINDOW(p));
+      gtk_window_set_attached_to(FRAME_NATIVE_WINDOW(f), FRAME_GTK_WIDGET(p));
+      gtk_window_move(FRAME_NATIVE_WINDOW(f), f->left_pos, f->top_pos);
+      gtk_window_set_keep_above(FRAME_NATIVE_WINDOW(f), true);
+      //fill this in
+      unblock_input ();
+
+      fset_parent_frame (f, new_value);
+    }
+}
+
 
 void
 x_set_no_focus_on_map (struct frame *f, Lisp_Object new_value, Lisp_Object old_value)
@@ -2618,8 +2683,6 @@ pgtk_draw_window_cursor (struct window *w, struct glyph_row *glyph_row, int x,
 {
   PGTK_TRACE("draw_window_cursor: %d, %d, %d, %d, %d, %d.",
 	       x, y, cursor_type, cursor_width, on_p, active_p);
-  struct frame *f = XFRAME (WINDOW_FRAME (w));
-  PGTK_TRACE("%p\n", f->output_data.pgtk);
 
   if (on_p)
     {
@@ -2669,8 +2732,6 @@ pgtk_draw_window_cursor (struct window *w, struct glyph_row *glyph_row, int x,
 	  xic_set_preeditarea (w, x, y);
 #endif
     }
-
-  gtk_widget_queue_draw(FRAME_GTK_WIDGET(f));
 }
 
 static void
@@ -2773,24 +2834,6 @@ pgtk_scroll_run (struct window *w, struct run *run)
 static void
 pgtk_update_begin (struct frame *f)
 {
-  if (! NILP (tip_frame) && XFRAME (tip_frame) == f
-      && ! FRAME_VISIBLE_P (f))
-    return;
-
-  if (! FRAME_CR_SURFACE (f))
-    {
-      int width = FRAME_PIXEL_WIDTH (f);
-      int height = FRAME_PIXEL_HEIGHT (f);
-
-      if (width > 0 && height > 0)
-	{
-	  block_input();
-	  FRAME_CR_SURFACE (f) = cairo_image_surface_create
-	    (CAIRO_FORMAT_ARGB32, width, height);
-	  unblock_input();
-	}
-    }
-
   pgtk_clear_under_internal_border (f);
 }
 
@@ -2953,15 +2996,12 @@ pgtk_update_window_end (struct window *w, bool cursor_on_p,
 static void
 pgtk_update_end (struct frame *f)
 {
+  GtkWidget *widget = FRAME_GTK_WIDGET(f);
   /* Mouse highlight may be displayed again.  */
   MOUSE_HL_INFO (f)->mouse_face_defer = false;
 
-  if (FRAME_CR_SURFACE (f))
-    {
-      block_input();
-      gtk_widget_queue_draw(FRAME_GTK_WIDGET(f));
-      unblock_input ();
-    }
+  gtk_widget_queue_draw (widget);
+  flip_cr_context(f);
 }
 
 /* Return the current position of the mouse.
@@ -3134,13 +3174,10 @@ pgtk_cr_draw_image (struct frame *f, Emacs_GC *gc, cairo_pattern_t *image,
 		 int src_x, int src_y, int width, int height,
 		 int dest_x, int dest_y, bool overlay_p)
 {
-  cairo_t *cr;
-  cairo_matrix_t matrix;
-  cairo_surface_t *surface;
-  cairo_format_t format;
+  cairo_t *cr = pgtk_begin_cr_clip (f);
 
   PGTK_TRACE("pgtk_cr_draw_image: 0: %d,%d,%d,%d,%d,%d,%d.", src_x, src_y, width, height, dest_x, dest_y, overlay_p);
-  cr = pgtk_begin_cr_clip (f);
+
   if (overlay_p)
     cairo_rectangle (cr, dest_x, dest_y, width, height);
   else
@@ -3149,42 +3186,24 @@ pgtk_cr_draw_image (struct frame *f, Emacs_GC *gc, cairo_pattern_t *image,
       cairo_rectangle (cr, dest_x, dest_y, width, height);
       cairo_fill_preserve (cr);
     }
-  cairo_clip (cr);
-  cairo_matrix_init_translate (&matrix, src_x - dest_x, src_y - dest_y);
-  cairo_pattern_set_matrix (image, &matrix);
+  cairo_translate (cr, dest_x - src_x, dest_y - src_y);
+
+  cairo_surface_t *surface;
   cairo_pattern_get_surface (image, &surface);
-  format = cairo_image_surface_get_format (surface);
+  cairo_format_t format = cairo_image_surface_get_format (surface);
   if (format != CAIRO_FORMAT_A8 && format != CAIRO_FORMAT_A1)
     {
-      PGTK_TRACE("other format.");
       cairo_set_source (cr, image);
       cairo_fill (cr);
     }
   else
     {
-      if (format == CAIRO_FORMAT_A8)
-	PGTK_TRACE("format A8.");
-      else if (format == CAIRO_FORMAT_A1)
-	PGTK_TRACE("format A1.");
-      else
-	PGTK_TRACE("format ??.");
       pgtk_set_cr_source_with_gc_foreground (f, gc);
-      cairo_rectangle_list_t *rects = cairo_copy_clip_rectangle_list(cr);
-      PGTK_TRACE("rects:");
-      PGTK_TRACE(" status: %u", rects->status);
-      PGTK_TRACE(" rectangles:");
-      for (int i = 0; i < rects->num_rectangles; i++) {
-	PGTK_TRACE("  %fx%f+%f+%f",
-		rects->rectangles[i].width,
-		rects->rectangles[i].height,
-		rects->rectangles[i].x,
-		rects->rectangles[i].y);
-      }
-      cairo_rectangle_list_destroy(rects);
+      cairo_clip (cr);
       cairo_mask (cr, image);
     }
+
   pgtk_end_cr_clip (f);
-  PGTK_TRACE("pgtk_cr_draw_image: 9.");
 }
 
 static void
@@ -3291,9 +3310,6 @@ pgtk_hide_hourglass(struct frame *f)
 static void
 pgtk_flush_display (struct frame *f)
 {
-  block_input ();
-  gdk_flush();
-  unblock_input ();
 }
 
 extern frame_parm_handler pgtk_frame_parm_handlers[];
@@ -3373,8 +3389,6 @@ recover_from_visible_bell(struct atimer *timer)
 
   if (FRAME_X_OUTPUT(f)->atimer_visible_bell != NULL)
     FRAME_X_OUTPUT(f)->atimer_visible_bell = NULL;
-
-  gtk_widget_queue_draw(FRAME_GTK_WIDGET(f));
 }
 
 static void
@@ -3434,8 +3448,6 @@ pgtk_flash (struct frame *f)
 			width, height - 2 * FRAME_INTERNAL_BORDER_WIDTH (f));
 
       FRAME_X_OUTPUT(f)->cr_surface_visible_bell = surface;
-      gtk_widget_queue_draw(FRAME_GTK_WIDGET(f));
-
       {
 	struct timespec delay = make_timespec (0, 50 * 1000 * 1000);
 	if (FRAME_X_OUTPUT(f)->atimer_visible_bell != NULL) {
@@ -4843,8 +4855,8 @@ pgtk_handle_draw(GtkWidget *widget, cairo_t *cr, gpointer *data)
     PGTK_TRACE("  f=%p", f);
     if (f != NULL) {
       src = FRAME_X_OUTPUT(f)->cr_surface_visible_bell;
-      if (src == NULL)
-	src = FRAME_CR_SURFACE(f);
+      if (src == NULL && FRAME_CR_ACTIVE_CONTEXT(f) != NULL)
+	src = cairo_get_target(FRAME_CR_ACTIVE_CONTEXT(f));
     }
     PGTK_TRACE("  surface=%p", src);
     if (src != NULL) {
@@ -6595,27 +6607,10 @@ pgtk_cr_update_surface_desired_size (struct frame *f, int width, int height)
   if (FRAME_CR_SURFACE_DESIRED_WIDTH (f) != width
       || FRAME_CR_SURFACE_DESIRED_HEIGHT (f) != height)
     {
-      cairo_surface_t *old_surface = FRAME_CR_SURFACE(f);
-      cairo_t *cr = NULL;
-      cairo_t *old_cr = FRAME_CR_CONTEXT(f);
-      FRAME_CR_SURFACE(f) = gdk_window_create_similar_surface(gtk_widget_get_window(FRAME_GTK_WIDGET(f)),
-							      CAIRO_CONTENT_COLOR_ALPHA,
-							      width,
-							      height);
-
-      if (old_surface){
-	cr = cairo_create(FRAME_CR_SURFACE(f));
-	cairo_set_source_surface (cr, old_surface, 0, 0);
-
-	cairo_paint(cr);
-	FRAME_CR_CONTEXT (f) = cr;
-
-        cairo_destroy(old_cr);
-	cairo_surface_destroy (old_surface);
-      }
-      gtk_widget_queue_draw(FRAME_GTK_WIDGET(f));
+      pgtk_cr_destroy_frame_context(f);
       FRAME_CR_SURFACE_DESIRED_WIDTH (f) = width;
       FRAME_CR_SURFACE_DESIRED_HEIGHT (f) = height;
+      SET_FRAME_GARBAGED(f);
     }
 }
 
@@ -6626,18 +6621,16 @@ pgtk_begin_cr_clip (struct frame *f)
   cairo_t *cr = FRAME_CR_CONTEXT (f);
 
   PGTK_TRACE("pgtk_begin_cr_clip");
-  if (! FRAME_CR_SURFACE (f))
-    {
-      FRAME_CR_SURFACE(f) = gdk_window_create_similar_surface(gtk_widget_get_window (FRAME_GTK_WIDGET (f)),
-							      CAIRO_CONTENT_COLOR_ALPHA,
-							      FRAME_PIXEL_WIDTH (f),
-							      FRAME_PIXEL_HEIGHT (f));
-    }
-
   if (!cr)
     {
-      cr = cairo_create (FRAME_CR_SURFACE (f));
-      FRAME_CR_CONTEXT (f) = cr;
+      cairo_surface_t *surface =
+	gdk_window_create_similar_surface(gtk_widget_get_window (FRAME_GTK_WIDGET (f)),
+					  CAIRO_CONTENT_COLOR_ALPHA,
+					  FRAME_CR_SURFACE_DESIRED_WIDTH (f),
+					  FRAME_CR_SURFACE_DESIRED_HEIGHT (f));
+
+      cr = FRAME_CR_CONTEXT (f) = cairo_create (surface);
+      cairo_surface_destroy (surface);
     }
 
   cairo_save (cr);
@@ -6650,15 +6643,12 @@ pgtk_end_cr_clip (struct frame *f)
 {
   PGTK_TRACE("pgtk_end_cr_clip");
   cairo_restore (FRAME_CR_CONTEXT (f));
-
-  GtkWidget *widget = FRAME_GTK_WIDGET(f);
-  gtk_widget_queue_draw(widget);
 }
 
 void
 pgtk_set_cr_source_with_gc_foreground (struct frame *f, Emacs_GC *gc)
 {
-  PGTK_TRACE("pgtk_set_cr_source_with_gc_foreground: %08lx", gc->foreground);
+  PGTK_TRACE ("pgtk_set_cr_source_with_gc_foreground: %08lx", gc->foreground);
   pgtk_set_cr_source_with_color(f, gc->foreground);
 }
 
@@ -6689,18 +6679,13 @@ pgtk_cr_draw_frame (cairo_t *cr, struct frame *f)
 }
 
 void
-pgtk_cr_destroy_surface(struct frame *f)
+pgtk_cr_destroy_frame_context(struct frame *f)
 {
-  PGTK_TRACE("pgtk_cr_destroy_surface");
+  PGTK_TRACE("pgtk_cr_destroy_frame_context");
   if (FRAME_CR_CONTEXT(f) != NULL) {
     cairo_destroy(FRAME_CR_CONTEXT(f));
     FRAME_CR_CONTEXT(f) = NULL;
   }
-  if (FRAME_CR_SURFACE(f) != NULL) {
-    cairo_surface_destroy(FRAME_CR_SURFACE(f));
-    FRAME_CR_SURFACE(f) = NULL;
-  }
-  SET_FRAME_GARBAGED (f);
 }
 
 void

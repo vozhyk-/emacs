@@ -364,11 +364,10 @@ struct pgtk_output
   int toolbar_left_width, toolbar_right_width;
 
 #ifdef USE_CAIRO
-  /* Cairo drawing context.  */
-  cairo_t *cr_context;
+  /* Cairo drawing contexts.  */
+  cairo_t *cr_context, *cr_active;
   int cr_surface_desired_width, cr_surface_desired_height;
   /* Cairo surface for double buffering */
-  cairo_surface_t *cr_surface;
   cairo_surface_t *cr_surface_visible_bell;
 #endif
   struct atimer *atimer_visible_bell;
@@ -426,8 +425,8 @@ enum
 
 /* aliases */
 #define FRAME_PGTK_VIEW(f)         FRAME_GTK_WIDGET(f)
-#define FRAME_X_WINDOW(f)          FRAME_GTK_WIDGET(f)
-#define FRAME_NATIVE_WINDOW(f)     FRAME_GTK_WIDGET(f)
+#define FRAME_X_WINDOW(f)          FRAME_GTK_OUTER_WIDGET(f)
+#define FRAME_NATIVE_WINDOW(f)     GTK_WINDOW(FRAME_X_WINDOW(f))
 
 #define FRAME_X_DISPLAY(f)        (FRAME_DISPLAY_INFO(f)->gdpy)
 
@@ -576,7 +575,7 @@ extern void pgtk_set_cr_source_with_gc_foreground (struct frame *f, Emacs_GC *gc
 extern void pgtk_set_cr_source_with_gc_background (struct frame *f, Emacs_GC *gc);
 extern void pgtk_set_cr_source_with_color (struct frame *f, unsigned long color);
 extern void pgtk_cr_draw_frame (cairo_t *cr, struct frame *f);
-extern void pgtk_cr_destroy_surface(struct frame *f);
+extern void pgtk_cr_destroy_frame_context(struct frame *f);
 
 /* Defined in pgtkmenu.c */
 extern Lisp_Object pgtk_popup_dialog (struct frame *f, Lisp_Object header, Lisp_Object contents);
