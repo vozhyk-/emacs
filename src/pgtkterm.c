@@ -38,6 +38,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 
 #include "lisp.h"
 #include "blockinput.h"
+#include "frame.h"
 #include "sysselect.h"
 #include "gtkutil.h"
 #include "systime.h"
@@ -355,22 +356,35 @@ x_set_offset (struct frame *f, int xoff, int yoff, int change_gravity)
      External: Position the window
    -------------------------------------------------------------------------- */
 {
-  /* not working on wayland. */
-
   PGTK_TRACE("x_set_offset: %d,%d,%d.", xoff, yoff, change_gravity);
 
-  if (change_gravity > 0)
-    {
-      PGTK_TRACE("x_set_offset: change_gravity > 0");
-      f->top_pos = yoff;
-      f->left_pos = xoff;
-      f->size_hint_flags &= ~ (XNegative | YNegative);
-      if (xoff < 0)
-	f->size_hint_flags |= XNegative;
-      if (yoff < 0)
-	f->size_hint_flags |= YNegative;
-      f->win_gravity = NorthWestGravity;
+  struct frame *parent = FRAME_PARENT_FRAME(f);
+  GtkAllocation a = {0};
+  if (change_gravity > 0) {
+    if (parent) {
+      /* determing the "height" of the titlebar, by finding the
+	 location of the "emacsfixed" widget on the surface/window */
+      GtkWidget *w = FRAME_GTK_WIDGET(parent);
+      gtk_widget_get_allocation(w, &a);
     }
+
+    f->size_hint_flags &= ~ (XNegative | YNegative);
+    /* if the value is negative, don't include the titlebar offset */
+    if (xoff < 0) {
+      f->size_hint_flags |= XNegative;
+      f->left_pos = xoff;
+    } else {
+      f->left_pos = xoff + a.x; //~25
+    }
+
+    if (yoff < 0){
+      f->size_hint_flags |= YNegative;
+      f->top_pos = yoff;
+      } else {
+      f->top_pos = yoff + a.y; //~60
+    }
+    f->win_gravity = NorthWestGravity;
+  }
 
   x_calc_absolute_position (f);
 
@@ -430,8 +444,6 @@ pgtk_set_window_size (struct frame *f,
   for (GtkWidget *w = FRAME_GTK_WIDGET(f); w != NULL; w = gtk_widget_get_parent(w)) {
     gint wd, hi;
     gtk_widget_get_size_request(w, &wd, &hi);
-    GtkAllocation alloc;
-    gtk_widget_get_allocation(w, &alloc);
   }
 
   f->output_data.pgtk->preferred_width = pixelwidth;
@@ -697,13 +709,7 @@ x_set_parent_frame (struct frame *f, Lisp_Object new_value, Lisp_Object old_valu
    -------------------------------------------------------------------------- */
 {
   struct frame *p = NULL;
-  int width = 0, height = 0;
-
-  PGTK_TRACE ("x_set_parent_frame x: %d, y: %d, size: %d x %d", f->left_pos, f->top_pos, width, height );
-  gtk_window_get_size(FRAME_NATIVE_WINDOW(f), &width, &height);
-
-
-  PGTK_TRACE ("x_set_parent_frame x: %d, y: %d, size: %d x %d", f->left_pos, f->top_pos, width, height );
+  PGTK_TRACE ("x_set_parent_frame x: %d, y: %d", f->left_pos, f->top_pos);
 
   if (!NILP (new_value)
       && (!FRAMEP (new_value)
@@ -722,7 +728,6 @@ x_set_parent_frame (struct frame *f, Lisp_Object new_value, Lisp_Object old_valu
       gtk_window_set_attached_to(FRAME_NATIVE_WINDOW(f), FRAME_GTK_WIDGET(p));
       gtk_window_move(FRAME_NATIVE_WINDOW(f), f->left_pos, f->top_pos);
       gtk_window_set_keep_above(FRAME_NATIVE_WINDOW(f), true);
-      //fill this in
       unblock_input ();
 
       fset_parent_frame (f, new_value);
@@ -815,8 +820,8 @@ pgtk_initialize_display_info (struct pgtk_display_info *dpyinfo)
       Initialize global info and storage for display.
    -------------------------------------------------------------------------- */
 {
-    dpyinfo->resx = 72.27; /* used 75.0, but this makes pt == pixel, expected */
-    dpyinfo->resy = 72.27;
+    dpyinfo->resx = 96;
+    dpyinfo->resy = 96;
     dpyinfo->color_p = 1;
     dpyinfo->n_planes = 32;
     dpyinfo->root_window = 42; /* a placeholder.. */
@@ -2683,7 +2688,6 @@ pgtk_draw_window_cursor (struct window *w, struct glyph_row *glyph_row, int x,
 {
   PGTK_TRACE("draw_window_cursor: %d, %d, %d, %d, %d, %d.",
 	       x, y, cursor_type, cursor_width, on_p, active_p);
-
   if (on_p)
     {
       w->phys_cursor_type = cursor_type;
@@ -2732,6 +2736,7 @@ pgtk_draw_window_cursor (struct window *w, struct glyph_row *glyph_row, int x,
 	  xic_set_preeditarea (w, x, y);
 #endif
     }
+
 }
 
 static void
@@ -5390,7 +5395,7 @@ static gboolean window_state_event(GtkWidget *widget, GdkEvent *event, gpointer 
 
   if (inev.ie.kind != NO_EVENT)
     evq_enqueue(&inev);
-  return TRUE;
+  return FALSE;
 }
 
 static gboolean delete_event(GtkWidget *widget, GdkEvent *event, gpointer *user_data)
@@ -6285,7 +6290,13 @@ pgtk_term_init (Lisp_Object display_name, char *resource_name)
 
   {
     GdkScreen *gscr = gdk_display_get_default_screen(dpyinfo->gdpy);
-    gdouble dpi = gdk_screen_get_resolution(gscr);
+
+    GSettings *set = g_settings_new("org.gnome.desktop.interface");
+    gdouble x = g_settings_get_double(set,"text-scaling-factor");
+    gdouble dpi = 0;
+
+    dpi =  96.0 * x;
+    gdk_screen_set_resolution(gscr, dpi);
     dpyinfo->resx = dpi;
     dpyinfo->resy = dpi;
   }
