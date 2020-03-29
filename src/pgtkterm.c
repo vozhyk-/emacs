@@ -97,6 +97,13 @@ static void pgtk_clip_to_row (struct window *w, struct glyph_row *row,
 static struct frame *
 pgtk_any_window_to_frame (GdkWindow *window);
 
+/*
+ * This is not a flip context in the same sense as gpu rendering
+ * scences, it only occurs when a new context was required due to a
+ * resize or other fundamental change.  This is called when that
+ * context's surface has completed drawing
+ */
+
 static void flip_cr_context(struct frame *f)
 {
   PGTK_TRACE("flip_cr_context");
@@ -6606,10 +6613,16 @@ If set to a non-float value, there will be no wait at all.  */);
 
   /* Tell Emacs about this window system.  */
   Fprovide (Qpgtk, Qnil);
-
 }
 
-
+/* Cairo does not allow resizing a surface/context after it is
+ * created, so we need to trash the old context, create a new context
+ * on the next cr_clip_begin with the new dimensions and request a
+ * re-draw.
+ *
+ * This Will leave the active context available to present on screen
+ * until a redrawn frame is completed.
+ */
 void
 pgtk_cr_update_surface_desired_size (struct frame *f, int width, int height)
 {
