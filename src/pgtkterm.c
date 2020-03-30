@@ -387,7 +387,7 @@ x_set_offset (struct frame *f, int xoff, int yoff, int change_gravity)
     if (yoff < 0){
       f->size_hint_flags |= YNegative;
       f->top_pos = yoff;
-      } else {
+    } else {
       f->top_pos = yoff + a.y; //~60
     }
     f->win_gravity = NorthWestGravity;
