@@ -1830,7 +1830,7 @@ xg_set_override_redirect (struct frame *f, Lisp_Object override_redirect)
    functions so GTK does not overwrite the icon.  */
 
 void
-xg_set_frame_icon (struct frame *f, Pixmap icon_pixmap, Pixmap icon_mask)
+xg_set_frame_icon (struct frame *f, Emacs_Pixmap icon_pixmap, Emacs_Pixmap icon_mask)
 {
   GdkPixbuf *gp = xg_get_pixbuf_from_pix_and_mask (f,
 						   icon_pixmap,
