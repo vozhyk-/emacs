@@ -296,7 +296,7 @@ new Dired buffers."
   :version "26.1"
   :group 'dired)
 
-(defcustom dired-mark-region 'exclusive
+(defcustom dired-mark-region 'file
   "Defines what commands that mark files do with the active region.
 
 When nil, marking commands don't operate on all files in the
@@ -306,7 +306,8 @@ When the value of this option is non-nil, then all Dired commands
 that mark or unmark files will operate on all files in the region
 if the region is active in Transient Mark mode.
 
-When `exclusive', don't mark the file if the end of the region is
+When `file', the region marking is based on the file name.
+This means don't mark the file if the end of the region is
 before the file name displayed on the Dired line, so the file name
 is visually outside the region.  This behavior is consistent with
 marking files without the region using the key `m' that advances
@@ -315,12 +316,13 @@ of keys used to mark files is the same as the number of keys
 used to select the region, e.g. `M-2 m' marks 2 files, and
 `C-SPC M-2 n m' marks 2 files, and `M-2 S-down m' marks 2 files.
 
-When `inclusive', include the file into marking if the end of the region
+When `line', the region marking is based on Dired lines,
+so include the file into marking if the end of the region
 is anywhere on its Dired line, except the beginning of the line."
   :type '(choice
           (const :tag "Don't mark files in active region" nil)
-          (const :tag "Exclude file name outside of region" exclusive)
-          (const :tag "Include the file at region end line" inclusive))
+          (const :tag "Exclude file name outside of region" file)
+          (const :tag "Include the file at region end line" line))
   :group 'dired
   :version "28.1")
 
@@ -646,16 +648,19 @@ of the region if `dired-mark-region' is non-nil.  Otherwise, operate
 on the whole buffer.
 
 Return value is the number of files marked, or nil if none were marked."
-  `(let ((inhibit-read-only t) count
-         (beg (if (and dired-mark-region (use-region-p))
+  `(let* ((inhibit-read-only t) count
+         (use-region-p (and dired-mark-region
+                            (region-active-p)
+                            (> (region-end) (region-beginning))))
+         (beg (if use-region-p
                   (save-excursion
                     (goto-char (region-beginning))
                     (line-beginning-position))
                 (point-min)))
-         (end (if (and dired-mark-region (use-region-p))
+         (end (if use-region-p
                   (save-excursion
                     (goto-char (region-end))
-                    (if (if (eq dired-mark-region 'inclusive)
+                    (if (if (eq dired-mark-region 'line)
                             (not (bolp))
                           (get-text-property (1- (point)) 'dired-filename))
                         (line-end-position)
@@ -673,7 +678,7 @@ Return value is the number of files marked, or nil if none were marked."
 		 (if (eq dired-del-marker dired-marker-char)
 		     " for deletion"
 		   "")
-                 (if (and dired-mark-region (use-region-p))
+                 (if use-region-p
                      " in region"
                    "")))
       (goto-char beg)
@@ -691,7 +696,7 @@ Return value is the number of files marked, or nil if none were marked."
                         (if (eq dired-marker-char ?\s) "un" "")
                         (if (eq dired-marker-char dired-del-marker)
                             "flagged" "marked")
-                        (if (and dired-mark-region (use-region-p))
+                        (if use-region-p
                             " in region"
                           ""))))
     (and (> count 0) count)))
@@ -1865,6 +1870,7 @@ Do so according to the former subdir alist OLD-SUBDIR-ALIST."
     (define-key map "\177" 'dired-unmark-backward)
     (define-key map [remap undo] 'dired-undo)
     (define-key map [remap advertised-undo] 'dired-undo)
+    (define-key map [remap vc-next-action] 'dired-vc-next-action)
     ;; thumbnail manipulation (image-dired)
     (define-key map "\C-td" 'image-dired-display-thumbs)
     (define-key map "\C-tt" 'image-dired-tag-files)
@@ -3515,26 +3521,27 @@ argument or confirmation)."
 	  ;; Mark *Marked Files* window as softly-dedicated, to prevent
 	  ;; other buffers e.g. *Completions* from reusing it (bug#17554).
 	  (display-buffer-mark-dedicated 'soft))
-      (with-displayed-buffer-window
+      (with-current-buffer-window
        buffer
-       (cons 'display-buffer-below-selected
-	     '((window-height . fit-window-to-buffer)
-	       (preserve-size . (nil . t))))
+       `(display-buffer-below-selected
+         (window-height . fit-window-to-buffer)
+         (preserve-size . (nil . t))
+         (body-function
+          . ,#'(lambda (_window)
+                 ;; Handle (t FILE) just like (FILE), here.  That value is
+                 ;; used (only in some cases), to mean just one file that was
+                 ;; marked, rather than the current line file.
+                 (dired-format-columns-of-files
+                  (if (eq (car files) t) (cdr files) files))
+                 (remove-text-properties (point-min) (point-max)
+                                         '(mouse-face nil help-echo nil))
+                 (setq tab-line-exclude nil))))
        #'(lambda (window _value)
 	   (with-selected-window window
 	     (unwind-protect
 		 (apply function args)
 	       (when (window-live-p window)
-		 (quit-restore-window window 'kill)))))
-       ;; Handle (t FILE) just like (FILE), here.  That value is
-       ;; used (only in some cases), to mean just one file that was
-       ;; marked, rather than the current line file.
-       (with-current-buffer buffer
-	 (dired-format-columns-of-files
-	  (if (eq (car files) t) (cdr files) files))
-	 (remove-text-properties (point-min) (point-max)
-				 '(mouse-face nil help-echo nil))
-	 (setq tab-line-exclude nil))))))
+		 (quit-restore-window window 'kill)))))))))
 
 (defun dired-format-columns-of-files (files)
   (let ((beg (point)))
@@ -3645,14 +3652,16 @@ this subdir."
   (interactive (list current-prefix-arg t))
   (cond
    ;; Mark files in the active region.
-   ((and dired-mark-region interactive (use-region-p))
+   ((and interactive dired-mark-region
+         (region-active-p)
+         (> (region-end) (region-beginning)))
     (save-excursion
       (let ((beg (region-beginning))
 	    (end (region-end)))
 	(dired-mark-files-in-region
 	 (progn (goto-char beg) (line-beginning-position))
 	 (progn (goto-char end)
-                (if (if (eq dired-mark-region 'inclusive)
+                (if (if (eq dired-mark-region 'line)
                         (not (bolp))
                       (get-text-property (1- (point)) 'dired-filename))
                     (line-end-position)

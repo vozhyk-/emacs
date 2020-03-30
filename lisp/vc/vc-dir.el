@@ -696,6 +696,17 @@ share the same state."
 		(vc-dir-mark-file crt)))
 	    (setq crt (ewoc-next vc-ewoc crt))))))))
 
+(defun vc-dir-mark-files (mark-files)
+  "Mark files specified by file names in the argument MARK-FILES.
+MARK-FILES should be a list of absolute filenames."
+  (ewoc-map
+   (lambda (filearg)
+     (when (member (expand-file-name (vc-dir-fileinfo->name filearg))
+                   mark-files)
+       (setf (vc-dir-fileinfo->marked filearg) t)
+       t))
+   vc-ewoc))
+
 (defun vc-dir-unmark-file ()
   ;; Unmark the current file and move to the next line.
   (let* ((crt (ewoc-locate vc-ewoc))
@@ -1193,7 +1204,8 @@ Throw an error if another update process is in progress."
                    (if remaining
                        (vc-dir-refresh-files
                         (mapcar 'vc-dir-fileinfo->name remaining))
-                     (setq mode-line-process nil))))))))))))
+                     (setq mode-line-process nil)
+                     (run-hooks 'vc-dir-refresh-hook))))))))))))
 
 (defun vc-dir-show-fileentry (file)
   "Insert an entry for a specific file into the current *VC-dir* listing.
@@ -1287,6 +1299,16 @@ state of item at point, if any."
     (list vc-dir-backend files only-files-list state model)))
 
 ;;;###autoload
+(defun vc-dir-root ()
+  "Run `vc-dir' in the repository root directory without prompt.
+If the default directory of the current buffer is
+not under version control, prompt for a directory."
+  (interactive)
+  (let ((root-dir (vc-root-dir)))
+    (if root-dir (vc-dir root-dir)
+      (call-interactively 'vc-dir))))
+
+;;;###autoload
 (defun vc-dir (dir &optional backend)
   "Show the VC status for \"interesting\" files in and below DIR.
 This allows you to mark files and perform VC operations on them.
@@ -1309,7 +1331,7 @@ These are the commands available for use in the file status buffer:
     ;; When you hit C-x v d in a visited VC file,
     ;; the *vc-dir* buffer visits the directory under its truename;
     ;; therefore it makes sense to always do that.
-    ;; Otherwise if you do C-x v d -> C-x C-f -> C-c v d
+    ;; Otherwise if you do C-x v d -> C-x C-f -> C-x v d
     ;; you may get a new *vc-dir* buffer, different from the original
     (file-truename (read-directory-name "VC status for directory: "
 					(vc-root-dir) nil t
