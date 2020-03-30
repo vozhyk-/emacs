@@ -1339,17 +1339,13 @@ xg_create_frame_widgets (struct frame *f)
       wtop = gtk_plug_new_for_display (gdpy, f->output_data.xp->parent_desc);
     }
   else
-#endif
-
-#ifdef HAVE_PGTK
-    if (!NILP(f->parent_frame)){
-      type = GTK_WINDOW_POPUP;
-    }
-#endif
-
+    wtop = gtk_window_new (type);
+#else
+  if (!NILP(f->parent_frame)){
+    type = GTK_WINDOW_POPUP;
+  }
   wtop = gtk_window_new (type);
-#ifdef HAVE_PGTK
-	gtk_widget_add_events(wtop, GDK_ALL_EVENTS_MASK);
+  gtk_widget_add_events(wtop, GDK_ALL_EVENTS_MASK);
 #endif
 
   /* gtk_window_set_has_resize_grip is a Gtk+ 3.0 function but Ubuntu
@@ -1834,7 +1830,7 @@ xg_set_override_redirect (struct frame *f, Lisp_Object override_redirect)
    functions so GTK does not overwrite the icon.  */
 
 void
-xg_set_frame_icon (struct frame *f, Pixmap icon_pixmap, Pixmap icon_mask)
+xg_set_frame_icon (struct frame *f, Emacs_Pixmap icon_pixmap, Emacs_Pixmap icon_mask)
 {
   GdkPixbuf *gp = xg_get_pixbuf_from_pix_and_mask (f,
 						   icon_pixmap,
