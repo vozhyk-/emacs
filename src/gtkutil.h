@@ -180,9 +180,11 @@ extern bool xg_check_special_colors (struct frame *f,
 				     const char *color_name,
 				     Emacs_Color *color);
 
+#ifndef HAVE_PGTK
 extern void xg_set_frame_icon (struct frame *f,
-                               Emacs_Pixmap icon_pixmap,
-                               Emacs_Pixmap icon_mask);
+                               Pixmap icon_pixmap,
+                               Pixmap icon_mask);
+#endif
 
 extern void xg_set_undecorated (struct frame *f, Lisp_Object undecorated);
 extern void xg_frame_restack (struct frame *f1, struct frame *f2, bool above);
