@@ -181,8 +181,8 @@ extern bool xg_check_special_colors (struct frame *f,
 				     Emacs_Color *color);
 
 extern void xg_set_frame_icon (struct frame *f,
-                               Emacs_Pixmap icon_pixmap,
-                               Emacs_Pixmap icon_mask);
+                               Pixmap icon_pixmap,
+                               Pixmap icon_mask);
 
 extern void xg_set_undecorated (struct frame *f, Lisp_Object undecorated);
 extern void xg_frame_restack (struct frame *f1, struct frame *f2, bool above);
