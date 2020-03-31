@@ -1468,7 +1468,9 @@ xg_create_frame_widgets (struct frame *f)
   gtk_widget_modify_style (wfixed, style);
 #else
   gtk_widget_set_can_focus (wfixed, TRUE);
-  gtk_widget_grab_focus(wfixed);			// Jeff added??
+#ifdef HAVE_PGTK
+  gtk_widget_grab_focus(wfixed);
+#endif
   gtk_window_set_resizable (GTK_WINDOW (wtop), TRUE);
 #endif
 
