@@ -5903,6 +5903,10 @@ button_event(GtkWidget *widget, GdkEvent *event, gpointer *user_data)
     {
       dpyinfo->grabbed |= (1 << event->button.button);
       dpyinfo->last_mouse_frame = f;
+
+      if (dpyinfo->last_click_event != NULL)
+	gdk_event_free(dpyinfo->last_click_event);
+      dpyinfo->last_click_event = gdk_event_copy(event);
     }
   else
     dpyinfo->grabbed &= ~(1 << event->button.button);
