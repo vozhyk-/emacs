@@ -82,7 +82,6 @@ Known problems:
 
 Not implemented:
 - GTK on wayland does not implement functions for these features:
-  - x_set_offset
   - x_set_no_focus_on_map
   - x_set_no_accept_focus
   - x_set_z_group
@@ -90,9 +89,7 @@ Not implemented:
 - GTK does not implement functions for these features:
   - vendor_specific_keysyms
 - Some other features. Keywords:
-  - popup_activated
   - gtk_plug (not exists on wayland)
-  - x_set_parent_frame
   - frame_x_embedded_p
 
 I may not develop them because I don't use them.
@@ -131,17 +128,17 @@ I do, so no problem.
 ## My Environment
 
 - archlinux
-- gtk+ 3.24.13
-- glib2 2.62.4
-- gcc 9.2.0
-- wayland 1.17.0
-- wayland-protocols 1.18
+- gtk+ 3.24.16
+- glib2 2.64.1
+- gcc 9.3.0
+- wayland 1.18.0
+- wayland-protocols 1.20
 - cairo 1.17.2
 - freetype2 2.10.1
-- imagemagick 7.0.9.16
-- ibus 1.5.21
+- imagemagick 7.0.10.3
+- ibus 1.5.22
 - mozc 2.23.2815.102
-- wayfire 57a585d
+- wayfire 0a0e980
 
 ## Notice
 
