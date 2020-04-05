@@ -532,15 +532,6 @@ initialize_frame_menubar (struct frame *f)
 /* The item selected in the popup menu.  */
 static Lisp_Object *volatile menu_item_selection;
 
-/* Used when position a popup menu.  See menu_position_func and
-   create_and_show_popup_menu below.  */
-struct next_popup_x_y
-{
-  struct frame *f;
-  int x;
-  int y;
-};
-
 static void
 popup_selection_callback (GtkWidget *widget, gpointer client_data)
 {
